@@ -154,7 +154,26 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
   const [yearComparison, setYearComparison] = useState<YearComparison | null>(null);
   const [historicalView, setHistoricalView] = useState<'personal' | 'company'>('personal');
 
+  // Rep selector state (admin/manager/sales_manager only)
+  const [selectedRepIds, setSelectedRepIds] = useState<string[]>([]);
+  const [salesRepsForSelector, setSalesRepsForSelector] = useState<Array<{ id: string; display_name: string; first_name: string }>>([]);
+  const [repComparisonData, setRepComparisonData] = useState<Array<{
+    repId: string;
+    name: string;
+    salesOrdersRevenue: number;
+    salesOrdersCount: number;
+    proposalsOut: number;
+    monthlyTarget: number;
+    targetProgress: number;
+    winRate: number;
+  }>>([]);
+  const [repComparisonLoading, setRepComparisonLoading] = useState(false);
+
   const isAdmin = profile?.role && ['admin', 'manager', 'sales_manager'].includes(profile.role);
+
+  // For single-rep view: the rep whose data the dashboard shows
+  const viewingRepId = selectedRepIds.length === 1 ? selectedRepIds[0] : null;
+  const isComparingMultiple = selectedRepIds.length >= 2;
 
   useEffect(() => {
     if (profile?.id && dateRange) {
@@ -182,7 +201,132 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         supabase.removeChannel(connectionsChannel);
       };
     }
-  }, [profile?.id, dateRange, historicalView]);
+  }, [profile?.id, dateRange, historicalView, viewingRepId]);
+
+  // Load available sales reps for the selector (admin/manager/sales_manager only)
+  useEffect(() => {
+    if (!profile?.organization_id || !isAdmin) return;
+    supabase
+      .from('profiles')
+      .select('id, full_name, first_name, last_name')
+      .eq('organization_id', profile.organization_id)
+      .in('role', ['sales', 'sales_manager', 'manager', 'admin', 'finance', 'service_manager'])
+      .order('first_name', { ascending: true })
+      .then(({ data }) => {
+        const reps = (data || []).map(p => ({
+          id: p.id,
+          display_name: p.first_name && p.last_name
+            ? `${p.first_name} ${p.last_name}`
+            : p.full_name || 'Unknown',
+          first_name: p.first_name || (p.full_name ? p.full_name.split(' ')[0] : 'Unknown'),
+        }));
+        setSalesRepsForSelector(reps);
+      });
+  }, [profile?.organization_id, isAdmin]);
+
+  // Load comparison data when 2+ reps are selected
+  useEffect(() => {
+    if (!isComparingMultiple || !profile?.organization_id) {
+      setRepComparisonData([]);
+      return;
+    }
+    loadRepComparisonData();
+  }, [selectedRepIds.join(','), dateRange]);
+
+  async function loadRepComparisonData() {
+    if (!profile?.organization_id || selectedRepIds.length < 2) return;
+    setRepComparisonLoading(true);
+    try {
+      const now = new Date();
+      const currentRange = dateRange || 'this_month';
+      let startDate: string;
+      let endDate: string = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+      switch (currentRange) {
+        case 'last_month':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+          endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+          break;
+        case 'this_quarter': {
+          const q = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear(), q * 3, 1).toISOString();
+          endDate = new Date(now.getFullYear(), (q + 1) * 3, 0, 23, 59, 59).toISOString();
+          break;
+        }
+        case 'this_year':
+          startDate = new Date(now.getFullYear(), 0, 1).toISOString();
+          endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59).toISOString();
+          break;
+        case 'all_time':
+          startDate = new Date('2020-01-01').toISOString();
+          endDate = new Date(now.getFullYear() + 1, 11, 31, 23, 59, 59).toISOString();
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      }
+
+      const results = await Promise.all(
+        selectedRepIds.map(async repId => {
+          const [soResult, proposalsResult, profileResult] = await Promise.all([
+            supabase
+              .from('sales_orders')
+              .select('id, contract_total, status')
+              .or(`sales_rep_id.eq.${repId},created_by.eq.${repId}`)
+              .gte('created_at', startDate)
+              .lte('created_at', endDate),
+            supabase
+              .from('proposals')
+              .select('id, status, total')
+              .eq('created_by', repId)
+              .in('status', ['approved', 'approved_pending_action', 'declined', 'cancelled', 'expired', 'sent', 'viewed']),
+            supabase
+              .from('profiles')
+              .select('monthly_sales_target, current_annual_quota')
+              .eq('id', repId)
+              .maybeSingle(),
+          ]);
+
+          const salesOrders = soResult.data || [];
+          const salesOrdersRevenue = salesOrders.reduce((s, so) => s + parseFloat(so.contract_total || '0'), 0);
+          const proposals = proposalsResult.data || [];
+          const proposalsOut = proposals.filter(p => ['sent', 'viewed'].includes(p.status)).length;
+          const approved = proposals.filter(p => ['approved', 'approved_pending_action'].includes(p.status)).length;
+          const declined = proposals.filter(p => ['declined', 'cancelled'].length > 0 && ['declined', 'cancelled'].includes(p.status)).length;
+          const closedUniverse = approved + declined + proposals.filter(p => p.status === 'expired').length;
+          const winRate = closedUniverse > 0 ? Math.round((approved / closedUniverse) * 100) : 0;
+          const annualQuota = parseFloat(profileResult.data?.current_annual_quota || '0');
+          const monthlyTarget = annualQuota > 0 ? annualQuota / 12 : parseFloat(profileResult.data?.monthly_sales_target || '0');
+          const targetProgress = monthlyTarget > 0 ? Math.round((salesOrdersRevenue / monthlyTarget) * 100) : 0;
+
+          const rep = salesRepsForSelector.find(r => r.id === repId);
+          return {
+            repId,
+            name: rep?.display_name || 'Unknown',
+            salesOrdersRevenue,
+            salesOrdersCount: salesOrders.length,
+            proposalsOut,
+            monthlyTarget,
+            targetProgress,
+            winRate,
+          };
+        })
+      );
+      setRepComparisonData(results);
+    } catch (err) {
+      console.error('Error loading rep comparison data:', err);
+    } finally {
+      setRepComparisonLoading(false);
+    }
+  }
+
+  function toggleRepSelection(repId: string) {
+    setSelectedRepIds(prev =>
+      prev.includes(repId) ? prev.filter(id => id !== repId) : [...prev, repId]
+    );
+  }
+
+  function clearRepSelection() {
+    setSelectedRepIds([]);
+  }
 
   async function handleDateRangeChange(newRange: string) {
     setDateRange(newRange);
@@ -196,6 +340,9 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
 
     try {
       setRefreshing(true);
+
+      // When a single rep is selected by admin, scope all queries to that rep
+      const targetId = viewingRepId || profile.id;
 
       // Get date range based on user preference
       const now = new Date();
@@ -239,7 +386,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       let closedLeadsQuery = supabase
         .from('leads')
         .select('estimated_value, status, created_at, updated_at')
-        .eq('assigned_to', profile.id)
+        .eq('assigned_to', targetId)
         .in('status', ['closed_won', 'closed_lost']);
 
       if (!isAllTime) {
@@ -251,7 +398,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       let proposalsQuery = supabase
         .from('proposals')
         .select('id, proposal_number, status, total, created_at, decline_reason, declined_by, declined_at, contact:contacts!proposals_contact_id_fkey(full_name, company_name)')
-        .eq('created_by', profile.id);
+        .eq('created_by', targetId);
 
       if (!isAllTime) {
         proposalsQuery = proposalsQuery
@@ -262,7 +409,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       let contactsQuery = supabase
         .from('contacts')
         .select('id', { count: 'exact', head: true })
-        .eq('created_by', profile.id);
+        .eq('created_by', targetId);
 
       if (!isAllTime) {
         contactsQuery = contactsQuery
@@ -273,7 +420,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       let connectionsQuery = supabase
         .from('connections')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', profile.id);
+        .eq('user_id', targetId);
 
       if (!isAllTime) {
         connectionsQuery = connectionsQuery
@@ -285,7 +432,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       let salesOrdersQuery = supabase
         .from('sales_orders')
         .select('id, status, contract_total, created_at')
-        .or(`sales_rep_id.eq.${profile.id},created_by.eq.${profile.id}`);
+        .or(`sales_rep_id.eq.${targetId},created_by.eq.${targetId}`);
 
       if (!isAllTime) {
         salesOrdersQuery = salesOrdersQuery
@@ -297,17 +444,18 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       const allTimeSalesOrdersQuery = supabase
         .from('sales_orders')
         .select('id', { count: 'exact', head: true })
-        .or(`sales_rep_id.eq.${profile.id},created_by.eq.${profile.id}`);
+        .or(`sales_rep_id.eq.${targetId},created_by.eq.${targetId}`);
 
       const allTimeProposalsQuery = supabase
         .from('proposals')
         .select('id', { count: 'exact', head: true })
-        .eq('created_by', profile.id)
+        .eq('created_by', targetId)
         .in('status', ['approved', 'approved_pending_action', 'completed']);
 
       // Build historical query in parallel with everything else
       const canViewCompanyHistoryEarly = ['admin', 'manager', 'sales_manager'].includes(profile.role || '');
-      const effectiveHistoricalViewEarly = canViewCompanyHistoryEarly ? historicalView : 'personal';
+      // When viewing a specific rep, always show personal history for that rep
+      const effectiveHistoricalViewEarly = (canViewCompanyHistoryEarly && !viewingRepId) ? historicalView : 'personal';
       let historicalQuery = supabase
         .from('yearly_sales_performance')
         .select('year, total_revenue')
@@ -315,7 +463,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       if (effectiveHistoricalViewEarly === 'company' && profile.organization_id) {
         historicalQuery = historicalQuery.eq('organization_id', profile.organization_id);
       } else {
-        historicalQuery = historicalQuery.eq('user_id', profile.id);
+        historicalQuery = historicalQuery.eq('user_id', targetId);
       }
 
       // Build imported historical query — fills years not yet in yearly_sales_performance
@@ -326,7 +474,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         .eq('source_type', 'historical_import')
         .order('stat_year', { ascending: true });
       if (effectiveHistoricalViewEarly === 'personal') {
-        importedHistoricalQuery = importedHistoricalQuery.eq('sales_rep_id', profile.id);
+        importedHistoricalQuery = importedHistoricalQuery.eq('sales_rep_id', targetId);
       }
 
       // Build sales_monthly_stats query matching the selected range (source of truth for booked revenue,
@@ -340,7 +488,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       let monthlyStatsQuery = supabase
         .from('sales_monthly_stats')
         .select('year, month, total_sales')
-        .eq('user_id', profile.id);
+        .eq('user_id', targetId);
       if (!isAllTime) {
         if (startYear === endYear) {
           monthlyStatsQuery = monthlyStatsQuery
@@ -379,7 +527,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         supabase
           .from('leads')
           .select('estimated_value, status, priority, company_name, contact_name, created_at, last_contact_date')
-          .eq('assigned_to', profile.id)
+          .eq('assigned_to', targetId)
           .in('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation']),
 
         // Deals closed (filtered by range or all time)
@@ -392,7 +540,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         supabase
           .from('proposals')
           .select('id, status, total')
-          .eq('created_by', profile.id)
+          .eq('created_by', targetId)
           .in('status', ['designing', 'ready_to_submit', 'sent', 'viewed']),
 
         // Contacts added (filtered by range or all time)
@@ -405,7 +553,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         supabase
           .from('connections')
           .select('id, connection_type, connection_date, notes, contact:contacts!proposals_contact_id_fkey(full_name, company_name)')
-          .eq('user_id', profile.id)
+          .eq('user_id', targetId)
           .order('connection_date', { ascending: false })
           .limit(10),
 
@@ -413,7 +561,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         supabase
           .from('leads')
           .select('id, company_name, contact_name, status, estimated_value, created_at, updated_at')
-          .or(`created_by.eq.${profile.id},assigned_to.eq.${profile.id}`)
+          .or(`created_by.eq.${targetId},assigned_to.eq.${targetId}`)
           .order('created_at', { ascending: false })
           .limit(10),
 
@@ -421,11 +569,11 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         supabase
           .from('proposals')
           .select('id, proposal_number, status, total, created_at, updated_at, contact:contacts!proposals_contact_id_fkey(full_name, company_name)')
-          .eq('created_by', profile.id)
+          .eq('created_by', targetId)
           .order('created_at', { ascending: false })
           .limit(10),
 
-        // Fishbowl count — scoped to this org
+        // Fishbowl count — scoped to this org (always org-wide)
         supabase
           .from('leads')
           .select('id', { count: 'exact', head: true })
@@ -441,11 +589,11 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
           .gt('points_earned', 0)
           .order('points_earned', { ascending: false }),
 
-        // Get fresh profile data to ensure we have the latest sales target
+        // Get fresh profile data (for the target rep's sales target)
         supabase
           .from('profiles')
           .select('monthly_sales_target, current_annual_quota')
-          .eq('id', profile.id)
+          .eq('id', targetId)
           .maybeSingle(),
 
         // Sales orders (filtered by range or all time)
@@ -862,14 +1010,36 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
   const daysRemaining = getDaysRemaining();
   const gapToGoal = Math.max(0, metrics.monthlyTarget - metrics.monthlyRevenue);
 
+  // Derive viewed rep name for header display
+  const viewingRepName = viewingRepId
+    ? salesRepsForSelector.find(r => r.id === viewingRepId)?.display_name || null
+    : null;
+
+  const CHIP_COLORS = [
+    '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+    '#06b6d4', '#ec4899', '#14b8a6', '#84cc16',
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header with Date Range and Refresh */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">My Sales Dashboard</h1>
-            <p className="text-gray-300">Your personal performance center</p>
+            <h1 className="text-2xl font-bold text-white mb-1">
+              {viewingRepName
+                ? `${viewingRepName}'s Dashboard`
+                : isComparingMultiple
+                ? 'Rep Comparison'
+                : 'My Sales Dashboard'}
+            </h1>
+            <p className="text-gray-300">
+              {viewingRepName
+                ? 'Viewing this rep\'s performance stats'
+                : isComparingMultiple
+                ? `Comparing ${selectedRepIds.length} reps side by side`
+                : 'Your personal performance center'}
+            </p>
           </div>
           <button
             onClick={loadDashboardData}
@@ -904,6 +1074,62 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
           ))}
         </div>
       </div>
+
+      {/* Rep Selector — visible to admin/manager/sales_manager only */}
+      {isAdmin && salesRepsForSelector.length > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 px-4 py-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium shrink-0">
+              <Users className="w-3.5 h-3.5" />
+              <span>View Rep:</span>
+            </div>
+            <button
+              onClick={clearRepSelection}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                selectedRepIds.length === 0
+                  ? 'bg-gray-600 border-gray-500 text-white'
+                  : 'bg-transparent border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300'
+              }`}
+            >
+              My Stats
+            </button>
+            {salesRepsForSelector.map((rep, i) => {
+              const color = CHIP_COLORS[i % CHIP_COLORS.length];
+              const selected = selectedRepIds.includes(rep.id);
+              return (
+                <button
+                  key={rep.id}
+                  onClick={() => toggleRepSelection(rep.id)}
+                  title={rep.display_name}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                    selected ? 'text-white' : 'bg-transparent text-gray-400 hover:text-gray-200'
+                  }`}
+                  style={
+                    selected
+                      ? { backgroundColor: color, borderColor: color }
+                      : { borderColor: color + '55' }
+                  }
+                >
+                  {rep.first_name}
+                </button>
+              );
+            })}
+            {selectedRepIds.length > 0 && (
+              <span className="ml-auto text-xs text-gray-500">
+                {selectedRepIds.length === 1
+                  ? `Viewing ${viewingRepName}`
+                  : `Comparing ${selectedRepIds.length} reps`}
+              </span>
+            )}
+          </div>
+          {isComparingMultiple && (
+            <p className="text-xs text-amber-400/80 mt-2 flex items-center gap-1">
+              <Award className="w-3 h-3" />
+              Comparison mode: hero card stats reflect the first selected rep. See the comparison grid below.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Weekly Check-In Banner */}
       <WeeklyCheckInBanner onNavigateToProposal={onProposalClick} />
@@ -999,6 +1225,78 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         )}
       </div>
 
+      {/* Multi-Rep Comparison Grid — shown when 2+ reps selected */}
+      {isComparingMultiple && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-blue-400" />
+            <h2 className="text-base font-bold text-white">Rep Comparison — {getDateRangeLabel()}</h2>
+            {repComparisonLoading && (
+              <div className="ml-auto">
+                <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+              </div>
+            )}
+          </div>
+          {repComparisonData.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {repComparisonData.map((rep, i) => {
+                const color = CHIP_COLORS[
+                  salesRepsForSelector.findIndex(r => r.id === rep.repId) % CHIP_COLORS.length
+                ] || CHIP_COLORS[i % CHIP_COLORS.length];
+                const progressClamped = Math.min(rep.targetProgress, 100);
+                return (
+                  <div
+                    key={rep.repId}
+                    className="bg-gray-900/60 rounded-lg border border-gray-700/60 p-4 flex flex-col gap-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                      <span className="font-semibold text-white text-sm truncate">{rep.name}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-xs text-gray-500 mb-0.5">Sales Orders</div>
+                        <div className="text-xl font-bold text-white tabular-nums">
+                          {formatCurrency(rep.salesOrdersRevenue)}
+                        </div>
+                        <div className="text-xs text-gray-400">{rep.salesOrdersCount} orders</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-0.5">Proposals Out</div>
+                        <div className="text-lg font-bold text-blue-400 tabular-nums">{rep.proposalsOut}</div>
+                      </div>
+                      {rep.monthlyTarget > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-xs text-gray-500">Target Progress</div>
+                            <div className="text-xs font-semibold" style={{ color }}>{rep.targetProgress}%</div>
+                          </div>
+                          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700"
+                              style={{ width: `${progressClamped}%`, backgroundColor: color }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">of {formatCurrency(rep.monthlyTarget)}</div>
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-xs text-gray-500 mb-0.5">Win Rate</div>
+                        <div className={`text-lg font-bold tabular-nums ${rep.winRate >= 50 ? 'text-green-400' : rep.winRate >= 25 ? 'text-yellow-400' : 'text-gray-300'}`}>
+                          {rep.winRate}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : !repComparisonLoading ? (
+            <div className="text-center py-8 text-gray-500 text-sm">No data for the selected period.</div>
+          ) : null}
+        </div>
+      )}
+
       {/* Key Performance Indicators */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white shadow-md">
@@ -1046,7 +1344,7 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
       <MonthlySalesStats />
 
       {/* Team Sales Comparison — visible to admin/manager/sales_manager/finance */}
-      <StaffSalesComparison />
+      <StaffSalesComparison filteredRepIds={selectedRepIds.length > 0 ? selectedRepIds : undefined} />
 
       {/* Proposals & Sales Orders Volume */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">

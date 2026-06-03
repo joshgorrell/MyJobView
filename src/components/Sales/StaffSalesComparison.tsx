@@ -197,7 +197,11 @@ function StatCard({
   );
 }
 
-export function StaffSalesComparison() {
+interface StaffSalesComparisonProps {
+  filteredRepIds?: string[];
+}
+
+export function StaffSalesComparison({ filteredRepIds }: StaffSalesComparisonProps) {
   const { profile } = useAuth();
   const [stats, setStats] = useState<StaffStat[]>([]);
   const [raw90Data, setRaw90Data] = useState<{ rep_id: string; created_at: string; amount: number }[]>([]);
@@ -296,6 +300,15 @@ export function StaffSalesComparison() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Sync external filteredRepIds into internal selection state
+  useEffect(() => {
+    if (filteredRepIds && filteredRepIds.length > 0) {
+      setSelectedStaffIds(new Set(filteredRepIds));
+    } else if (filteredRepIds && filteredRepIds.length === 0) {
+      setSelectedStaffIds(new Set());
+    }
+  }, [filteredRepIds?.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { chartData, staffIds, leaderboard, grandAvg, periodLabel, slots } = useMemo(() => {
     // ── 90-day mode: weekly buckets from raw sales_orders data ───────────────
