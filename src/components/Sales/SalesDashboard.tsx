@@ -1051,13 +1051,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     }
   }
 
-  function formatCurrency(value: number): string {
+  function formatCurrency(value: number | null | undefined): string {
+    const safe = (value == null || isNaN(value as number)) ? 0 : value;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(value);
+    }).format(safe);
   }
 
   function getActivityIcon(type: string, connectionType?: string) {
@@ -1225,13 +1226,16 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
   // Peak stats for the rep
   const repPeakStats = React.useMemo(() => {
     if (repAllMonthlyStats.length === 0) return null;
-    const best = repAllMonthlyStats.reduce((a, b) => a.total_sales > b.total_sales ? a : b);
+    const best = repAllMonthlyStats.reduce((a, b) => a.total_sales > b.total_sales ? a : b, repAllMonthlyStats[0]);
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
     // Best year
     const byYear = new Map<number, number>();
     repAllMonthlyStats.forEach(r => byYear.set(r.year, (byYear.get(r.year) || 0) + r.total_sales));
-    const [bestYear, bestYearTotal] = Array.from(byYear.entries()).reduce((a, b) => a[1] > b[1] ? a : b);
+    const yearEntries = Array.from(byYear.entries());
+    const [bestYear, bestYearTotal] = yearEntries.length > 0
+      ? yearEntries.reduce((a, b) => a[1] > b[1] ? a : b, yearEntries[0])
+      : [repAllMonthlyStats[0].year, 0] as [number, number];
 
     const careerAvg = repAllMonthlyStats.length > 0
       ? repAllMonthlyStats.reduce((s, r) => s + r.total_sales, 0) / repAllMonthlyStats.length
@@ -1482,7 +1486,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   {repQuota > 0 ? (
                     <>
                       <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
-                        {repPerfMetrics.quotaProgress}%
+                        {repPerfMetrics.quotaProgress ?? 0}%
                       </div>
                       <div className="w-full bg-gray-700 rounded-full h-2.5">
                         <div
@@ -1610,7 +1614,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 </div>
 
                 {/* Peak / career stats */}
-                {repPeakStats && (
+                {repPeakStats && repPerfMetrics && (
                   <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-4">
                     <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                       <Star className="w-4 h-4 text-yellow-400" />
