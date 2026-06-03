@@ -1,0 +1,1130 @@
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { ProposalApprovalModal } from './ProposalApprovalModal';
+import { ProposalQA } from '../Proposals/ProposalQA';
+
+interface ProposalRecording {
+  id: string;
+  title: string;
+  description: string | null;
+  recording_scope: 'full_proposal' | 'area';
+  room_id: string | null;
+  storage_path: string | null;
+  video_url: string | null;
+  duration_seconds: number | null;
+  sort_order: number;
+}
+
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return '';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRecording; signedUrl?: string; logoUrl?: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const videoSrc = recording.storage_path ? signedUrl : recording.video_url || undefined;
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (playing) {
+      videoRef.current.pause();
+      setPlaying(false);
+    } else {
+      videoRef.current.play();
+      setPlaying(true);
+    }
+  };
+
+  if (!videoSrc) return null;
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-blue-200 bg-gradient-to-br from-blue-950 to-gray-900 shadow-lg">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <Video className="w-3.5 h-3.5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white leading-tight">{recording.title}</p>
+            {recording.description && (
+              <p className="text-xs text-blue-300 mt-0.5 leading-tight">{recording.description}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {recording.duration_seconds != null && (
+            <span className="text-xs text-blue-300 font-mono">{formatDuration(recording.duration_seconds)}</span>
+          )}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition-colors"
+          >
+            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {expanded ? 'Collapse' : 'Play Video'}
+          </button>
+        </div>
+      </div>
+
+      {/* Video */}
+      {expanded && (
+        <div className="relative aspect-video bg-black">
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            controls
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            autoPlay
+            className="w-full h-full"
+          />
+          {logoUrl && (
+            <div className="absolute bottom-12 right-3 pointer-events-none z-10">
+              <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
+                <img
+                  src={logoUrl}
+                  alt="Company logo"
+                  className="h-7 w-auto max-w-[80px] object-contain opacity-85"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface Proposal {
+  id: string;
+  proposal_number: string;
+  title: string;
+  status: string;
+  total: number;
+  subtotal: number;
+  tax_amount: number;
+  deposit_amount_due: number;
+  deposit_percent: number;
+  created_at: string;
+  valid_until: string | null;
+  expires_at: string | null;
+  notes: string | null;
+  revision_notes: string | null;
+  renewal_count: number;
+  discount_amount: number;
+  project_management_amount: number;
+  current_portal_version?: number | null;
+}
+
+interface ProposalRoom {
+  id: string;
+  name: string;
+  sort_order: number;
+  description: string | null;
+  show_scope: boolean;
+}
+
+interface LineItem {
+  id: string;
+  room_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  labor_hours: number | null;
+  labor_rate: number | null;
+  labor_total: number | null;
+  is_hidden: boolean;
+  parent_item_id: string | null;
+  product_id: string | null;
+  products: { image_url: string | null } | null;
+}
+
+interface ReportTemplate {
+  show_quantity: boolean;
+  show_unit_price: boolean;
+  show_line_item_total: boolean;
+  show_manufacturer: boolean;
+  show_sku: boolean;
+  show_model_number: boolean;
+  show_labor_hours: boolean;
+  show_labor_rate: boolean;
+  show_labor_total: boolean;
+  show_area_descriptions: boolean;
+  show_area_subtotals: boolean;
+  show_tax_breakdown: boolean;
+  show_accepted_payment_methods: boolean;
+  show_payment_instructions: boolean;
+  show_product_images: boolean;
+}
+
+interface PortalProposalDetailProps {
+  proposalId: string;
+  onBack: () => void;
+  /** When true, skip activity tracking and status updates (internal preview use) */
+  previewMode?: boolean;
+  /** Override the template used for display (internal preview use) */
+  templateOverrideId?: string | null;
+}
+
+export function PortalProposalDetail({ proposalId, onBack, previewMode = false, templateOverrideId }: PortalProposalDetailProps) {
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [rooms, setRooms] = useState<ProposalRoom[]>([]);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [comment, setComment] = useState('');
+  const [declineReason, setDeclineReason] = useState('');
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showQA, setShowQA] = useState(false);
+  const [customerName, setCustomerName] = useState<string>('');
+  const [animate, setAnimate] = useState(false);
+  const [template, setTemplate] = useState<ReportTemplate | null>(null);
+  const [recordings, setRecordings] = useState<ProposalRecording[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadProposalDetails();
+    if (!previewMode) trackProposalView();
+    setTimeout(() => setAnimate(true), 100);
+  }, [proposalId]);
+
+  async function trackProposalDownload() {
+    if (previewMode) return;
+    try {
+      let clientInfo = {
+        ip: 'Unknown',
+        userAgent: navigator.userAgent,
+        deviceType: 'desktop',
+        browser: 'Unknown',
+        os: 'Unknown'
+      };
+      try {
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-client-ip`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          clientInfo = { ...clientInfo, ...data };
+        }
+      } catch {}
+      await supabase.from('proposal_activity').insert({
+        proposal_id: proposalId,
+        activity_type: 'downloaded',
+        user_agent: clientInfo.userAgent,
+        ip_address: clientInfo.ip,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          deviceType: clientInfo.deviceType,
+          browser: clientInfo.browser,
+          os: clientInfo.os
+        }
+      });
+    } catch {}
+  }
+
+  async function trackProposalView() {
+    try {
+      // Get client IP and device information from edge function
+      let clientInfo = {
+        ip: 'Unknown',
+        userAgent: navigator.userAgent,
+        deviceType: 'desktop',
+        browser: 'Unknown',
+        os: 'Unknown'
+      };
+
+      try {
+        const { data: { supabaseUrl } } = await supabase.auth.getSession();
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-client-ip`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          clientInfo = { ...clientInfo, ...data };
+        }
+      } catch (ipError) {
+        console.error('Failed to get IP information:', ipError);
+        // Continue with default values
+      }
+
+      // Insert activity record with IP and device information
+      await supabase.from('proposal_activity').insert({
+        proposal_id: proposalId,
+        activity_type: 'viewed',
+        user_agent: clientInfo.userAgent,
+        ip_address: clientInfo.ip,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          deviceType: clientInfo.deviceType,
+          browser: clientInfo.browser,
+          os: clientInfo.os
+        }
+      });
+
+      // Update proposal status from 'sent' to 'portal' (skip in preview mode)
+      if (!previewMode) {
+        await supabase
+          .from('proposals')
+          .update({ status: 'portal' })
+          .eq('id', proposalId)
+          .eq('status', 'sent');
+      }
+    } catch (error) {
+      console.error('Error tracking view:', error);
+    }
+  }
+
+  async function loadProposalDetails() {
+    try {
+      const [proposalRes, roomsRes, itemsRes] = await Promise.all([
+        supabase
+          .from('proposals')
+          .select(`
+            *,
+            contacts:contacts!proposals_contact_id_fkey(full_name, contact_name, first_name, last_name)
+          `)
+          .eq('id', proposalId)
+          .maybeSingle(),
+        supabase
+          .from('proposal_rooms')
+          .select('*')
+          .eq('proposal_id', proposalId)
+          .order('sort_order'),
+        supabase
+          .from('proposal_line_items')
+          .select('*, products(image_url)')
+          .eq('proposal_id', proposalId)
+          .order('sort_order'),
+      ]);
+
+      if (proposalRes.error) throw proposalRes.error;
+      if (roomsRes.error) throw roomsRes.error;
+      if (itemsRes.error) throw itemsRes.error;
+
+      if (proposalRes.data) {
+        setProposal(proposalRes.data);
+        setRooms(roomsRes.data || []);
+        setLineItems(itemsRes.data || []);
+
+        // Fetch organization logo for video overlay
+        if (proposalRes.data.organization_id) {
+          supabase
+            .from('organizations')
+            .select('header_logo_url')
+            .eq('id', proposalRes.data.organization_id)
+            .maybeSingle()
+            .then(({ data: orgData }) => {
+              if (orgData?.header_logo_url) setOrgLogoUrl(orgData.header_logo_url);
+            });
+        }
+
+        // Load template settings — use override ID (from sales order) if provided, else fall back to proposal's own template
+        const effectiveTemplateId = templateOverrideId !== undefined ? templateOverrideId : proposalRes.data.report_template_id;
+        if (effectiveTemplateId) {
+          const { data: templateData, error: templateError } = await supabase
+            .from('proposal_report_templates')
+            .select('*')
+            .eq('id', effectiveTemplateId)
+            .maybeSingle();
+
+          if (!templateError && templateData) {
+            setTemplate(templateData);
+          } else {
+            console.log('No template found, using default display (show all)');
+            // Default to showing everything
+            setTemplate({
+              show_quantity: true,
+              show_unit_price: true,
+              show_line_item_total: true,
+              show_manufacturer: true,
+              show_sku: true,
+              show_model_number: true,
+              show_labor_hours: true,
+              show_labor_rate: true,
+              show_labor_total: true,
+              show_area_descriptions: true,
+              show_area_subtotals: true,
+              show_tax_breakdown: true,
+              show_accepted_payment_methods: true,
+              show_payment_instructions: true,
+              show_product_images: true,
+            });
+          }
+        } else {
+          // No template assigned, show everything
+          setTemplate({
+            show_quantity: true,
+            show_unit_price: true,
+            show_line_item_total: true,
+            show_manufacturer: true,
+            show_sku: true,
+            show_model_number: true,
+            show_labor_hours: true,
+            show_labor_rate: true,
+            show_labor_total: true,
+            show_area_descriptions: true,
+            show_area_subtotals: true,
+            show_tax_breakdown: true,
+            show_accepted_payment_methods: true,
+            show_payment_instructions: true,
+            show_product_images: true,
+          });
+        }
+
+        if (proposalRes.data.contacts) {
+          const name = proposalRes.data.contacts.full_name ||
+                       proposalRes.data.contacts.contact_name ||
+                       `${proposalRes.data.contacts.first_name || ''} ${proposalRes.data.contacts.last_name || ''}`.trim() ||
+                       'Customer';
+          setCustomerName(name);
+        }
+
+        // Load visible recordings
+        const { data: recordingsData } = await supabase
+          .from('proposal_recordings')
+          .select('id, title, description, recording_scope, room_id, storage_path, video_url, duration_seconds, sort_order')
+          .eq('proposal_id', proposalId)
+          .eq('is_portal_visible', true)
+          .order('recording_scope', { ascending: false })
+          .order('sort_order');
+
+        if (recordingsData && recordingsData.length > 0) {
+          setRecordings(recordingsData);
+          // Fetch signed URLs for stored videos
+          const storedPaths = recordingsData
+            .filter((r: ProposalRecording) => r.storage_path)
+            .map((r: ProposalRecording) => r.storage_path as string);
+          if (storedPaths.length > 0) {
+            const urls: Record<string, string> = {};
+            await Promise.all(
+              storedPaths.map(async (path: string) => {
+                const { data } = await supabase.storage
+                  .from('proposal-recordings')
+                  .createSignedUrl(path, 7200);
+                if (data?.signedUrl) urls[path] = data.signedUrl;
+              })
+            );
+            setSignedUrls(urls);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading proposal details:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleApprove() {
+    setShowApprovalModal(true);
+  }
+
+  function handleApprovalSuccess() {
+    setShowApprovalModal(false);
+    loadProposalDetails(); // Reload to show updated status
+  }
+
+  async function handleDecline() {
+    if (!proposal) return;
+    if (!declineReason) {
+      alert('Please select a reason for declining this proposal.');
+      return;
+    }
+    if (!confirm('Are you sure you want to decline this proposal?')) return;
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('proposals')
+        .update({
+          status: 'declined',
+          decline_reason: declineReason,
+          decline_notes: comment.trim() || null,
+          declined_at: new Date().toISOString(),
+          declined_by: 'customer',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', proposalId);
+
+      if (error) throw error;
+
+      // Log activity
+      await supabase.from('proposal_activity').insert({
+        proposal_id: proposalId,
+        activity_type: 'declined',
+        metadata: { reason: declineReason, notes: comment.trim() || null, by: 'customer' },
+      }).throwOnError().catch(() => {});
+
+      alert('Proposal declined. We will be in touch shortly.');
+      onBack();
+    } catch (error) {
+      console.error('Error declining proposal:', error);
+      alert('Failed to decline proposal. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading proposal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!proposal) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-gray-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Proposal Not Found</h2>
+          <p className="text-gray-500 mb-6">This proposal could not be loaded. It may have been removed or you may not have access.</p>
+          <button onClick={onBack} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+            Back to Proposals
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isProposalExpired = proposal.expires_at && new Date(proposal.expires_at) < new Date();
+
+  if (isProposalExpired) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
+        <header className="bg-white shadow-md border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center gap-4">
+              <button onClick={onBack} className="p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200">
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-10 object-contain" />
+            </div>
+          </div>
+        </header>
+        <div className="max-w-xl mx-auto px-4 py-20 text-center">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-10">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold mb-4">
+              <Clock className="w-3 h-3" />
+              Expired
+            </span>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">This Proposal Has Expired</h2>
+            <p className="text-gray-500 mb-2">
+              Proposal <span className="font-semibold text-gray-700">{proposal.proposal_number}</span> expired on{' '}
+              <span className="font-semibold text-gray-700">{new Date(proposal.expires_at!).toLocaleDateString()}</span>.
+            </p>
+            <p className="text-gray-500 mb-8 text-sm">
+              Pricing and availability may have changed. Please contact your sales representative to have this proposal reviewed and reactivated.
+            </p>
+            <button
+              onClick={onBack}
+              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-bold hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 hover:scale-105 shadow-md"
+            >
+              Back to Proposals
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const canTakeAction = proposal.status === 'sent' || proposal.status === 'viewed';
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
+      {/* Premium Header */}
+      <header className="bg-white shadow-md border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={onBack}
+                className="p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200 hover:scale-105"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <img
+                src="/el_logo_color_(2).png"
+                alt="Electronic Life"
+                className="h-10 object-contain"
+              />
+              <div>
+                <div className="flex items-center gap-3 mb-1 flex-wrap">
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                    {proposal.proposal_number}
+                  </h1>
+                  {proposal.renewal_count > 0 && (
+                    <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg">
+                      Rev. {proposal.renewal_count}
+                    </span>
+                  )}
+                  {(proposal.current_portal_version ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg border border-gray-200">
+                      <Layers className="w-3 h-3" />
+                      Version {proposal.current_portal_version}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 font-medium">{proposal.title}</p>
+              </div>
+            </div>
+            <button
+              onClick={trackProposalDownload}
+              className="flex items-center gap-2 px-5 py-2.5 text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-200 hover:scale-105 font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Download PDF
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Revision Notice */}
+            {proposal.revision_notes && proposal.renewal_count > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-xl p-6 shadow-md">
+                <div className="flex items-start gap-4">
+                  <div className="bg-blue-500/10 p-2.5 rounded-lg">
+                    <AlertCircle className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <h4 className="font-bold text-blue-900 text-lg">Updated Proposal</h4>
+                      <span className="px-3 py-1 bg-blue-200 text-blue-800 rounded-full font-bold text-xs">
+                        Revision #{proposal.renewal_count}
+                      </span>
+                    </div>
+                    <p className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed mb-3">
+                      {proposal.revision_notes}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-100 px-3 py-2 rounded-lg">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="font-medium">
+                        This proposal has been updated and you have a new 30-day review window
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Full Proposal Video Recordings */}
+            {recordings.filter(r => r.recording_scope === 'full_proposal').map(recording => (
+              <div key={recording.id} style={{ animation: animate ? 'slideInUp 0.4s ease-out both' : 'none' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Video className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-semibold text-gray-700">Proposal Walkthrough Video</span>
+                  <span className="text-xs text-gray-400">— recorded by your sales rep</span>
+                </div>
+                <VideoPlayer
+                  recording={recording}
+                  signedUrl={recording.storage_path ? signedUrls[recording.storage_path] : undefined}
+                  logoUrl={orgLogoUrl}
+                />
+              </div>
+            ))}
+
+            {/* Room Cards */}
+            {rooms.map((room, roomIndex) => {
+              const roomItems = lineItems.filter(item => item.room_id === room.id && !item.is_hidden);
+              const roomSubtotal = roomItems.reduce((sum, item) => sum + (item.line_total || 0), 0);
+              const showImages = template?.show_product_images !== false && roomItems.some(item => item.products?.image_url);
+
+              return (
+                <div
+                  key={room.id}
+                  className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                  style={{
+                    animation: animate ? `slideInUp 0.5s ease-out ${roomIndex * 0.1}s both` : 'none'
+                  }}
+                >
+                  {/* Room Header */}
+                  <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-500/20 p-2 rounded-lg">
+                        <Package className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">{room.name}</h3>
+                    </div>
+                  </div>
+
+                  {/* Per-area presentation video */}
+                  {(() => {
+                    const roomRecordings = recordings.filter(r => r.recording_scope === 'area' && r.room_id === room.id);
+                    if (roomRecordings.length === 0) return null;
+                    return (
+                      <div className="px-6 pt-4 space-y-2">
+                        {roomRecordings.map(recording => (
+                          <VideoPlayer
+                            key={recording.id}
+                            recording={recording}
+                            signedUrl={recording.storage_path ? signedUrls[recording.storage_path] : undefined}
+                            logoUrl={orgLogoUrl}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {room.description && room.show_scope && template?.show_area_descriptions && (
+                    <div className="px-6 pt-5 pb-3">
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <div className="flex items-start gap-2 mb-2">
+                          <FileText className="w-4 h-4 text-blue-600 mt-0.5" />
+                          <p className="text-sm font-bold text-blue-900">Scope of Work</p>
+                        </div>
+                        <p className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed ml-6">
+                          {room.description}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Items Table */}
+                  <div className="px-6 pb-6">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b-2 border-gray-200">
+                            {showImages && <th className="py-3 w-16"></th>}
+                            <th className="text-left py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Item</th>
+                            {template?.show_quantity && (
+                              <th className="text-center py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Qty</th>
+                            )}
+                            {template?.show_unit_price && (
+                              <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Price</th>
+                            )}
+                            {template?.show_line_item_total && (
+                              <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Total</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {roomItems.map((item) => (
+                            <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                              {showImages && (
+                                <td className="py-3 pr-3 w-16">
+                                  {item.products?.image_url ? (
+                                    <img
+                                      src={item.products.image_url}
+                                      alt={item.description}
+                                      className="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-sm"
+                                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-lg border border-gray-200 bg-gray-50" />
+                                  )}
+                                </td>
+                              )}
+                              <td className="py-4">
+                                <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                              </td>
+                              {template?.show_quantity && (
+                                <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
+                              )}
+                              {template?.show_unit_price && (
+                                <td className="text-right py-4 text-sm text-gray-700">
+                                  ${item.unit_price.toFixed(2)}
+                                </td>
+                              )}
+                              {template?.show_line_item_total && (
+                                <td className="text-right py-4 text-sm font-bold text-gray-900">
+                                  ${item.line_total.toFixed(2)}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                        {template?.show_area_subtotals && (
+                          <tfoot className="bg-gray-50">
+                            <tr>
+                              <td colSpan={
+                                (showImages ? 1 : 0) +
+                                1 +
+                                (template?.show_quantity ? 1 : 0) +
+                                (template?.show_unit_price ? 1 : 0) +
+                                (template?.show_line_item_total ? 1 : 0) - 1
+                              } className="pt-4 pb-4 pr-4 text-right font-bold text-gray-900 text-sm uppercase tracking-wide">
+                                Room Subtotal:
+                              </td>
+                              <td className="pt-4 pb-4 text-right font-bold text-blue-600 text-lg">
+                                ${roomSubtotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Unassigned Items (items without a room/area) */}
+            {(() => {
+              const unassignedItems = lineItems.filter(item => !item.room_id && !item.is_hidden);
+              if (unassignedItems.length === 0) return null;
+              const hasRooms = rooms.length > 0;
+              const unassignedSubtotal = unassignedItems.reduce((sum, item) => sum + (item.line_total || 0), 0);
+              const showImages = template?.show_product_images !== false && unassignedItems.some(item => item.products?.image_url);
+              return (
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                  {hasRooms && (
+                    <div className="bg-gradient-to-r from-amber-700 to-amber-800 px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-amber-500/20 p-2 rounded-lg">
+                          <Package className="w-5 h-5 text-amber-300" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white">Unassigned Items</h3>
+                      </div>
+                    </div>
+                  )}
+                  <div className="px-6 pb-6">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b-2 border-gray-200">
+                            {showImages && <th className="py-3 w-16"></th>}
+                            <th className="text-left py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Item</th>
+                            {template?.show_quantity && (
+                              <th className="text-center py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Qty</th>
+                            )}
+                            {template?.show_unit_price && (
+                              <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Price</th>
+                            )}
+                            {template?.show_line_item_total && (
+                              <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Total</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {unassignedItems.map((item) => (
+                            <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                              {showImages && (
+                                <td className="py-3 pr-3 w-16">
+                                  {item.products?.image_url ? (
+                                    <img
+                                      src={item.products.image_url}
+                                      alt={item.description}
+                                      className="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-sm"
+                                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-lg border border-gray-200 bg-gray-50" />
+                                  )}
+                                </td>
+                              )}
+                              <td className="py-4">
+                                <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                              </td>
+                              {template?.show_quantity && (
+                                <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
+                              )}
+                              {template?.show_unit_price && (
+                                <td className="text-right py-4 text-sm text-gray-700">
+                                  ${item.unit_price.toFixed(2)}
+                                </td>
+                              )}
+                              {template?.show_line_item_total && (
+                                <td className="text-right py-4 text-sm font-bold text-gray-900">
+                                  ${item.line_total.toFixed(2)}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                        {template?.show_area_subtotals && hasRooms && (
+                          <tfoot className="bg-gray-50">
+                            <tr>
+                              <td colSpan={
+                                (showImages ? 1 : 0) +
+                                1 +
+                                (template?.show_quantity ? 1 : 0) +
+                                (template?.show_unit_price ? 1 : 0) +
+                                (template?.show_line_item_total ? 1 : 0) - 1
+                              } className="pt-4 pb-4 pr-4 text-right font-bold text-gray-900 text-sm uppercase tracking-wide">
+                                Subtotal:
+                              </td>
+                              <td className="pt-4 pb-4 text-right font-bold text-blue-600 text-lg">
+                                ${unassignedSubtotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Additional Notes */}
+            {proposal.notes && (
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl p-6 shadow-md">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-500/10 p-2 rounded-lg">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-blue-900 mb-2">Additional Notes</h3>
+                    <p className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed">{proposal.notes}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Proposal Summary Card */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sticky top-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2.5 rounded-xl">
+                  <DollarSign className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Proposal Summary</h3>
+              </div>
+
+              {/* Total Amount */}
+              <div className="mb-6">
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-5 border border-blue-200">
+                  <div className="text-center">
+                    <div className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Total Investment</div>
+                    <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                      ${(proposal.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {proposal.valid_until && (
+                <div className="mb-6 flex items-center gap-2 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Valid until: {new Date(proposal.valid_until).toLocaleDateString()}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowQA(true)}
+                  className="w-full px-4 py-3.5 border-2 border-blue-500 text-blue-600 rounded-xl hover:bg-blue-50 flex items-center justify-center gap-2 font-bold transition-all duration-200 hover:scale-105"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  Ask Questions
+                </button>
+
+                {canTakeAction && (
+                  <>
+                    <button
+                      onClick={handleApprove}
+                      disabled={submitting}
+                      className="w-full px-4 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold transition-all duration-200 hover:scale-105 shadow-lg"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      Approve Proposal
+                    </button>
+
+                    <button
+                      onClick={() => setComment(comment ? '' : 'open')}
+                      className="w-full px-4 py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 font-bold transition-all duration-200"
+                    >
+                      <MessageSquare className="w-5 h-5" />
+                      Request Changes
+                    </button>
+
+                    <button
+                      onClick={() => setDeclineReason(declineReason ? '' : 'open')}
+                      className="w-full px-4 py-3.5 border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 flex items-center justify-center gap-2 font-medium transition-all duration-200"
+                    >
+                      <XCircle className="w-5 h-5" />
+                      Decline Proposal
+                    </button>
+                  </>
+                )}
+
+                {/* Status Badges */}
+                {proposal.status === 'approved' && (
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl flex items-start gap-3">
+                    <div className="bg-green-500/20 p-2 rounded-lg">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-green-900">Approved</p>
+                      <p className="text-xs text-green-700 mt-1">
+                        This proposal has been approved and a project has been created.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {proposal.status === 'declined' && (
+                  <div className="p-4 bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 rounded-xl flex items-start gap-3">
+                    <div className="bg-red-500/20 p-2 rounded-lg">
+                      <XCircle className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-red-900">Declined</p>
+                      <p className="text-xs text-red-700 mt-1">
+                        This proposal has been declined. We will be in touch shortly.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Request Changes / Comments Section */}
+            {comment && comment !== '' && (
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  Request Changes / Questions
+                </h3>
+                <textarea
+                  value={comment === 'open' ? '' : comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Please let us know what changes you'd like or any questions you have..."
+                  rows={4}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+                <button
+                  disabled={submitting || !comment.trim() || comment === 'open'}
+                  className="w-full mt-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 font-bold transition-all duration-200"
+                >
+                  Submit Feedback
+                </button>
+              </div>
+            )}
+
+            {/* Decline Section */}
+            {declineReason && (
+              <div className="bg-white rounded-2xl shadow-lg border-2 border-red-200 p-6">
+                <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
+                  <XCircle className="w-4 h-4" />
+                  Decline This Proposal
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Reason <span className="text-red-500">*</span></label>
+                  <select
+                    value={declineReason === 'open' ? '' : declineReason}
+                    onChange={(e) => setDeclineReason(e.target.value)}
+                    className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-400 focus:border-transparent text-sm"
+                  >
+                    <option value="">Select a reason...</option>
+                    <option value="price_too_high">Price is too high</option>
+                    <option value="went_with_competitor">Going with another company</option>
+                    <option value="project_cancelled">Project cancelled / no longer needed</option>
+                    <option value="timing">Not the right time</option>
+                    <option value="scope_change">Scope changed / not what I expected</option>
+                    <option value="changed_mind">I changed my mind</option>
+                    <option value="dont_want_rep">I do not want to work with this representative</option>
+                    <option value="dont_want_company">I do not want to work with this company</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Additional comments <span className="text-gray-400">(optional)</span></label>
+                  <textarea
+                    value={comment === 'open' ? '' : comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Any additional details..."
+                    rows={3}
+                    className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-400 focus:border-transparent text-sm resize-none"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setDeclineReason(''); setComment(''); }}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 font-medium text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDecline}
+                    disabled={submitting || !declineReason || declineReason === 'open'}
+                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50 font-bold text-sm transition-colors"
+                  >
+                    {submitting ? 'Submitting...' : 'Confirm Decline'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {proposal.deposit_amount_due > 0 && (
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-6 shadow-md">
+                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Deposit Required
+                </h3>
+                <p className="text-sm text-gray-700">
+                  A deposit of <span className="font-bold">${(proposal.deposit_amount_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> ({proposal.deposit_percent}%) is required upon approval.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Approval Modal */}
+      {showApprovalModal && proposal && (
+        <ProposalApprovalModal
+          proposalId={proposalId}
+          proposalNumber={proposal.proposal_number}
+          onClose={() => setShowApprovalModal(false)}
+          onSuccess={handleApprovalSuccess}
+        />
+      )}
+
+      {/* Q&A Chat */}
+      {showQA && (
+        <ProposalQA
+          proposalId={proposalId}
+          isPortal={true}
+          customerName={customerName}
+          onClose={() => setShowQA(false)}
+        />
+      )}
+
+      <style>{`
+        @keyframes slideInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}

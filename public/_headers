@@ -1,0 +1,15 @@
+# Cache static assets with fingerprints for 1 year
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Don't cache the service worker
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Don't cache the HTML
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Don't cache the manifest
+/manifest.json
+  Cache-Control: no-cache, no-store, must-revalidate

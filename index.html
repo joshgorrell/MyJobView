@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/MJV_icon.PNG" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563eb" />
+    <script>
+      // Dynamically add the correct manifest BEFORE browser fetches it
+      const isKiosk = window.location.pathname === '/kiosk';
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = isKiosk ? '/manifest-kiosk.json' : '/manifest.json';
+      manifestLink.id = 'app-manifest';
+      document.head.appendChild(manifestLink);
+
+      if (isKiosk) {
+        document.title = 'MJV Kiosk';
+      }
+    </script>
+    <title>MyJobView</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

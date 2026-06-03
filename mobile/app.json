@@ -1,0 +1,79 @@
+{
+  "expo": {
+    "name": "Field Ops Pro",
+    "slug": "field-ops-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fieldops.mobile",
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Field Ops Pro needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
+        "NSLocationWhenInUseUsageDescription": "Field Ops Pro needs your location while you're working to track your position and calculate travel time.",
+        "NSLocationAlwaysUsageDescription": "Field Ops Pro needs background location access to continuously track your position during work hours, even when the app is in the background.",
+        "NSCameraUsageDescription": "Field Ops Pro needs camera access to capture job site photos and completion documentation.",
+        "NSPhotoLibraryUsageDescription": "Field Ops Pro needs photo library access to save and retrieve job site photos.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.fieldops.mobile",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Field Ops Pro needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
+          "locationAlwaysPermission": "Field Ops Pro needs background location access to continuously track your position during work hours.",
+          "locationWhenInUsePermission": "Field Ops Pro needs your location while you're working to track your position.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Field Ops Pro needs camera access to capture job site photos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ]
+    ]
+  }
+}

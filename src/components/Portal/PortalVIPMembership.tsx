@@ -1,0 +1,1129 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { PaymentMethodForm, PaymentFormData } from './PaymentMethodForm';
+import { PaymentMethodManager } from './PaymentMethodManager';
+import { VIPMembershipFAQ } from './VIPMembershipFAQ';
+import { TrialStatusBanner } from './TrialStatusBanner';
+import {
+  Star,
+  Check,
+  Calendar,
+  DollarSign,
+  Shield,
+  X,
+  AlertCircle,
+  CreditCard,
+  ArrowLeft,
+  Package,
+  Clock,
+  Settings,
+  Building2,
+  Mail,
+  Sparkles,
+  TrendingUp
+} from 'lucide-react';
+
+interface VIPPlan {
+  id: string;
+  plan_name: string;
+  description: string | null;
+  billing_frequency: string;
+  amount: number;
+  is_active: boolean;
+  plan_type: string;
+}
+
+interface CurrentSubscription {
+  id: string;
+  status: string;
+  start_date: string;
+  next_billing_date: string;
+  trial_end_date: string | null;
+  trial_started_date: string | null;
+  plan: {
+    plan_name: string;
+    description: string | null;
+    amount: number;
+    billing_frequency: string;
+  };
+}
+
+interface PortalVIPMembershipProps {
+  contactId?: string;
+}
+
+export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembershipProps = {}) {
+  const [availablePlans, setAvailablePlans] = useState<VIPPlan[]>([]);
+  const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<VIPPlan | null>(null);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
+  const [contactInfo, setContactInfo] = useState<any>(null);
+  const [companyEmail, setCompanyEmail] = useState('info@example.com');
+  const [addressData, setAddressData] = useState({
+    street_address: '',
+    city: '',
+    state: '',
+    zip_code: '',
+  });
+
+  const getContactId = async () => {
+    if (propContactId) return propContactId;
+
+    const impersonatingContactId = localStorage.getItem('admin_impersonating_contact');
+    if (impersonatingContactId) return impersonatingContactId;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('contact_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    return profile?.contact_id || null;
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [propContactId]);
+
+  async function loadData() {
+    try {
+      const contactId = await getContactId();
+      if (!contactId) {
+        setLoading(false);
+        return;
+      }
+
+      // Load contact info including address
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id, full_name, email, phone, street_address, city, state, zip_code')
+        .eq('id', contactId)
+        .maybeSingle();
+
+      setContactInfo(contact);
+
+      // Pre-populate address if exists
+      if (contact) {
+        setAddressData({
+          street_address: contact.street_address || '',
+          city: contact.city || '',
+          state: contact.state || '',
+          zip_code: contact.zip_code || '',
+        });
+      }
+
+      // Load company settings for email
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('company_email')
+        .maybeSingle();
+
+      if (settings?.company_email) {
+        setCompanyEmail(settings.company_email);
+      }
+
+      // Load available VIP plans
+      const { data: plans, error: plansError } = await supabase
+        .from('recurring_plans')
+        .select('*')
+        .eq('is_active', true)
+        .eq('plan_type', 'vip')
+        .order('amount');
+
+      if (plansError) throw plansError;
+      setAvailablePlans(plans || []);
+
+      // Load current subscription (active or trial only - pending_payment doesn't grant access)
+      const { data: subscription, error: subError } = await supabase
+        .from('recurring_subscriptions')
+        .select(`
+          id,
+          status,
+          start_date,
+          next_billing_date,
+          trial_end_date,
+          trial_started_date,
+          plan:recurring_plans(
+            plan_name,
+            description,
+            amount,
+            billing_frequency
+          )
+        `)
+        .eq('contact_id', contactId)
+        .in('status', ['active', 'trial'])
+        .maybeSingle();
+
+      if (subError && subError.code !== 'PGRST116') throw subError;
+      setCurrentSubscription(subscription);
+
+    } catch (error) {
+      console.error('Error loading VIP membership data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleProceedToAddress() {
+    setShowPurchaseModal(false);
+
+    // Check if address is already complete
+    const hasCompleteAddress = addressData.street_address && addressData.city && addressData.state && addressData.zip_code;
+
+    if (hasCompleteAddress) {
+      // Skip address modal and go straight to payment
+      setShowPaymentModal(true);
+    } else {
+      // Show address collection modal
+      setShowAddressModal(true);
+    }
+  }
+
+  async function handleAddressSubmit() {
+    // Validate address
+    if (!addressData.street_address || !addressData.city || !addressData.state || !addressData.zip_code) {
+      alert('Please fill in all address fields');
+      return;
+    }
+
+    const contactId = await getContactId();
+    if (!contactId) {
+      alert('Contact information not found');
+      return;
+    }
+
+    try {
+      // Update contact with address
+      const { error } = await supabase
+        .from('contacts')
+        .update({
+          street_address: addressData.street_address,
+          city: addressData.city,
+          state: addressData.state,
+          zip_code: addressData.zip_code,
+        })
+        .eq('id', contactId);
+
+      if (error) throw error;
+
+      setShowAddressModal(false);
+      setShowPaymentModal(true);
+    } catch (error) {
+      console.error('Error saving address:', error);
+      alert('Failed to save address. Please try again.');
+    }
+  }
+
+  async function handlePayment(paymentData: PaymentFormData) {
+    if (!selectedPlan) return;
+
+    const contactId = await getContactId();
+    if (!contactId) {
+      throw new Error('Contact information not found');
+    }
+
+    try {
+      // In production, this would process payment through Stripe
+      // For now, we simulate successful payment and activate immediately
+
+      const startDate = new Date();
+      const nextBillingDate = new Date();
+
+      // Calculate next billing date based on frequency
+      switch (selectedPlan.billing_frequency) {
+        case 'monthly':
+          nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+          break;
+        case 'quarterly':
+          nextBillingDate.setMonth(nextBillingDate.getMonth() + 3);
+          break;
+        case 'yearly':
+          nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+          break;
+      }
+
+      // Calculate payment amounts
+      const amount = selectedPlan.amount;
+      const convenienceFee = paymentData.paymentType === 'card' ? amount * 0.03 : 0;
+      const totalAmount = amount + convenienceFee;
+
+      // In production, payment method and transaction details would be stored
+      // For now, we just activate the subscription
+
+      let subscription;
+
+      // Check if user is converting from trial
+      if (currentSubscription?.status === 'trial') {
+        // Update existing trial subscription to active
+        const { data: updatedSub, error: updateError } = await supabase
+          .from('recurring_subscriptions')
+          .update({
+            plan_id: selectedPlan.id,
+            status: 'active',
+            trial_end_date: null,
+            trial_started_date: null,
+            next_billing_date: nextBillingDate.toISOString().split('T')[0],
+            notes: `Converted from trial to paid subscription via customer portal. Amount: $${totalAmount} (${paymentData.paymentType})`
+          })
+          .eq('id', currentSubscription.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        subscription = updatedSub;
+      } else {
+        // Create new active subscription
+        const { data: newSub, error: subError } = await supabase
+          .from('recurring_subscriptions')
+          .insert({
+            contact_id: contactId,
+            plan_id: selectedPlan.id,
+            start_date: startDate.toISOString().split('T')[0],
+            next_billing_date: nextBillingDate.toISOString().split('T')[0],
+            status: 'active',
+            auto_invoice: true,
+            auto_send: false,
+            notes: `Self-service signup via customer portal. Amount: $${totalAmount} (${paymentData.paymentType})`
+          })
+          .select()
+          .single();
+
+        if (subError) throw subError;
+        subscription = newSub;
+      }
+
+      alert(
+        currentSubscription?.status === 'trial'
+          ? 'Payment successful! Your trial has been converted to a paid membership.'
+          : 'Payment successful! Your VIP membership is now active. Welcome to the VIP program!'
+      );
+      setShowPaymentModal(false);
+      setSelectedPlan(null);
+      loadData();
+    } catch (error: any) {
+      console.error('Error processing payment:', error);
+      throw new Error(error.message || 'Payment processing failed');
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!currentSubscription) return;
+
+    const contactId = await getContactId();
+    if (!contactId) return;
+
+    try {
+      const { error } = await supabase
+        .from('recurring_subscriptions')
+        .update({
+          status: 'cancelled',
+          notes: `Cancelled via customer portal on ${new Date().toISOString()}`
+        })
+        .eq('id', currentSubscription.id);
+
+      if (error) throw error;
+
+      alert('Your VIP membership has been cancelled. You will have access until your next billing date.');
+      setShowCancelModal(false);
+      loadData();
+    } catch (error) {
+      console.error('Error cancelling subscription:', error);
+      alert('Failed to cancel subscription. Please contact support.');
+    }
+  }
+
+  function getBillingFrequencyLabel(frequency: string) {
+    const labels: Record<string, string> = {
+      monthly: 'per month',
+      quarterly: 'per quarter',
+      yearly: 'per year',
+      weekly: 'per week',
+    };
+    return labels[frequency] || frequency;
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-400">Loading VIP membership options...</div>
+      </div>
+    );
+  }
+
+  const impersonatingName = localStorage.getItem('admin_impersonating_name');
+
+  return (
+    <div className="min-h-screen bg-gray-900">
+      {impersonatingName && (
+        <div className="bg-orange-600 text-white px-4 py-2 text-center text-sm font-medium">
+          Admin View: Previewing as {impersonatingName}
+        </div>
+      )}
+      <header className="bg-[#0f2347] sticky top-0 z-40 shadow-lg">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
+          <a
+            href="/portal"
+            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </a>
+          <img
+            src="/el_logo_color_(2).png"
+            alt="Electronic Life"
+            className="h-9 object-contain"
+          />
+          <div>
+            <h1 className="text-lg font-bold text-white leading-tight">VIP Membership</h1>
+            <p className="text-xs text-blue-200">Premium service & priority support</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <div className="bg-gradient-to-r from-yellow-900/20 to-amber-900/20 border border-yellow-700 rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <Star className="w-8 h-8 text-yellow-400" />
+          <div>
+            <h2 className="text-2xl font-bold text-white">VIP Membership</h2>
+            <p className="text-gray-300">Premium support and priority service</p>
+          </div>
+        </div>
+      </div>
+
+      {currentSubscription && (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-sm">
+          {/* Status Badge */}
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-green-400" />
+                Current Membership
+              </h3>
+              <p className="text-2xl font-bold text-white mb-2">
+                {currentSubscription.plan.plan_name}
+              </p>
+              {currentSubscription.plan.description && (
+                <p className="text-gray-300 mb-4">{currentSubscription.plan.description}</p>
+              )}
+            </div>
+            <div className={`${
+              currentSubscription.status === 'trial'
+                ? 'bg-blue-900/30 border-blue-700'
+                : 'bg-green-900/30 border-green-700'
+            } border px-3 py-1 rounded-full`}>
+              <span className={`${
+                currentSubscription.status === 'trial'
+                  ? 'text-blue-300'
+                  : 'text-green-300'
+              } text-sm font-medium`}>
+                {currentSubscription.status === 'trial' ? 'Free Trial' : 'Active'}
+              </span>
+            </div>
+          </div>
+
+          {/* Trial Warning Banner */}
+          {currentSubscription.status === 'trial' && currentSubscription.trial_end_date && (() => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const trialEnd = new Date(currentSubscription.trial_end_date);
+            trialEnd.setHours(0, 0, 0, 0);
+            const daysRemaining = Math.ceil((trialEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+            return (
+              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-yellow-200 mb-1">
+                      Free Trial - {daysRemaining} {daysRemaining === 1 ? 'Day' : 'Days'} Remaining
+                    </h4>
+                    <p className="text-yellow-300 text-sm mb-3">
+                      Your 90-day test and tune trial expires on {trialEnd.toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}. Subscribe now to keep your VIP benefits active.
+                    </p>
+                    <button
+                      onClick={() => {
+                        // Scroll to available plans
+                        const plansSection = document.querySelector('#available-plans');
+                        if (plansSection) {
+                          plansSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }}
+                      className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm flex items-center gap-2"
+                    >
+                      <Star className="w-4 h-4" />
+                      Subscribe to Keep Access
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {currentSubscription.status === 'trial' ? (
+              <>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <div className="text-sm text-gray-500 mb-1">Trial Started</div>
+                  <div className="text-xl font-bold text-white">
+                    {currentSubscription.trial_started_date
+                      ? new Date(currentSubscription.trial_started_date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                      : new Date(currentSubscription.start_date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                    }
+                  </div>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <div className="text-sm text-gray-500 mb-1">Trial Expires</div>
+                  <div className="text-xl font-bold text-white">
+                    {currentSubscription.trial_end_date
+                      ? new Date(currentSubscription.trial_end_date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                      : 'N/A'
+                    }
+                  </div>
+                </div>
+                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+                  <div className="text-sm text-blue-400 mb-1">Days Remaining</div>
+                  <div className="text-3xl font-bold text-blue-300">
+                    {currentSubscription.trial_end_date && (() => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const trialEnd = new Date(currentSubscription.trial_end_date);
+                      trialEnd.setHours(0, 0, 0, 0);
+                      return Math.ceil((trialEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    })()}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <div className="text-sm text-gray-500 mb-1">Monthly Cost</div>
+                  <div className="text-xl font-bold text-white">
+                    ${currentSubscription.plan.amount}
+                    <span className="text-sm text-gray-400 font-normal ml-1">
+                      /{getBillingFrequencyLabel(currentSubscription.plan.billing_frequency).replace('per ', '')}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <div className="text-sm text-gray-500 mb-1">Member Since</div>
+                  <div className="text-xl font-bold text-white">
+                    {new Date(currentSubscription.start_date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </div>
+                </div>
+                <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+                  <div className="text-sm text-green-400 mb-1">Renews On</div>
+                  <div className="text-xl font-bold text-green-300">
+                    {new Date(currentSubscription.next_billing_date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Benefits Section */}
+          <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 mb-4">
+            <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+              <Check className="w-5 h-5 text-blue-400" />
+              Your Benefits
+            </h4>
+            <ul className="space-y-2 text-gray-300">
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <span>Unlimited punchlist access</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <span>Priority scheduling for service requests</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <span>Regular maintenance visits</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <span>Exclusive member support</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            {currentSubscription.status !== 'trial' && (
+              <button
+                onClick={() => setShowPaymentSettings(true)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm flex items-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Payment Settings
+              </button>
+            )}
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+            >
+              {currentSubscription.status === 'trial' ? 'Cancel Trial' : 'Cancel Membership'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {((!currentSubscription || currentSubscription.status === 'trial') && availablePlans.length > 0) && (
+        <>
+          {currentSubscription?.status === 'trial' && currentSubscription.trial_end_date && (
+            <div className="mb-6">
+              <TrialStatusBanner
+                daysRemaining={(() => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const trialEnd = new Date(currentSubscription.trial_end_date);
+                  trialEnd.setHours(0, 0, 0, 0);
+                  return Math.ceil((trialEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                })()}
+                expirationDate={currentSubscription.trial_end_date}
+                subscriptionPlanName={null}
+                showDetails={true}
+                compact={false}
+              />
+            </div>
+          )}
+
+          {currentSubscription?.status === 'trial' && (
+            <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border-2 border-yellow-700 rounded-lg p-6 mb-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-yellow-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-6 h-6 text-yellow-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-white mb-2">What Happens After Your Trial?</h3>
+                  <div className="space-y-3 text-gray-300 text-sm mb-4">
+                    <p>
+                      Your <strong>90-Day Test & Tune trial</strong> will automatically end on{' '}
+                      {new Date(currentSubscription.trial_end_date!).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}. Here's what you need to know:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                        <span><strong>Punchlist access will end</strong> - You won't be able to create new service items</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                        <span><strong>Your data is saved</strong> - All your punchlist history remains accessible</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                        <span><strong>No automatic billing</strong> - We won't charge you unless you subscribe</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <TrendingUp className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <span><strong>Easy to continue</strong> - Subscribe anytime to restore full access</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-gray-300 text-sm">
+                    Ready to keep your VIP benefits? Choose a plan below to continue enjoying priority service,
+                    punchlist access, and regular maintenance after your trial ends.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div id="available-plans">
+            <h3 className="text-xl font-bold text-white mb-4">
+              {currentSubscription?.status === 'trial' ? 'Keep Your VIP Access' : 'Available Plans'}
+            </h3>
+            <p className="text-gray-300 mb-6">
+              {currentSubscription?.status === 'trial'
+                ? 'Choose a plan to continue enjoying uninterrupted VIP benefits after your trial expires.'
+                : 'Choose the VIP plan that best fits your needs. All plans include punchlist access, priority service, and regular maintenance.'
+              }
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {availablePlans.map((plan) => (
+              <div
+                key={plan.id}
+                className="bg-gray-800 border border-gray-700 rounded-lg p-6 hover:border-blue-500 hover:shadow-md transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <Package className="w-6 h-6 text-blue-400" />
+                  <h4 className="text-xl font-bold text-white">{plan.plan_name}</h4>
+                </div>
+
+                {plan.description && (
+                  <p className="text-gray-300 mb-4 min-h-[60px]">{plan.description}</p>
+                )}
+
+                <div className="mb-6">
+                  <div className="text-4xl font-bold text-white mb-2">
+                    ${plan.amount}
+                  </div>
+                  <div className="text-gray-400">
+                    {getBillingFrequencyLabel(plan.billing_frequency)}
+                  </div>
+                </div>
+
+                <ul className="space-y-3 mb-6">
+                  <li className="flex items-start gap-2 text-gray-300">
+                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Unlimited punchlist access</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-gray-300">
+                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Priority service scheduling</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-gray-300">
+                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Regular maintenance visits</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-gray-300">
+                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Dedicated support</span>
+                  </li>
+                </ul>
+
+                <button
+                  onClick={() => {
+                    setSelectedPlan(plan);
+                    setShowPurchaseModal(true);
+                  }}
+                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  {currentSubscription?.status === 'trial' ? 'Upgrade to Paid Plan' : 'Subscribe Now'}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Business VIP Inquiry Section */}
+          <div className="mt-8 bg-gradient-to-r from-blue-900/40 to-indigo-900/40 backdrop-blur-sm border border-blue-500/30 rounded-lg p-8">
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                  <Building2 className="w-8 h-8 text-blue-400" />
+                </div>
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  Business VIP Plans Available
+                </h3>
+                <p className="text-gray-300 mb-3">
+                  Need a VIP plan for your business? We offer customized service programs with multi-location support, dedicated account management, and flexible billing.
+                </p>
+                <p className="text-gray-400 text-sm">
+                  Contact us to discuss a tailored solution for your business needs.
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <a
+                  href={`mailto:${companyEmail}?subject=Business VIP Plan Inquiry&body=Hi,%0D%0A%0D%0AI'm interested in learning more about VIP membership options for my business.%0D%0A%0D%0ABusiness Name:%0D%0ANumber of Locations:%0D%0AContact Name:%0D%0APhone:%0D%0A%0D%0APlease contact me to discuss custom VIP solutions.`}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 whitespace-nowrap"
+                >
+                  <Mail className="w-5 h-5" />
+                  Contact About Business Plans
+                </a>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {!currentSubscription && availablePlans.length === 0 && (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+          <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">No VIP Plans Available</h3>
+          <p className="text-gray-400">
+            VIP membership plans are not currently available. Please contact us for more information.
+          </p>
+        </div>
+      )}
+
+      {/* FAQ Section */}
+      {availablePlans.length > 0 && (
+        <div className="mt-8">
+          <VIPMembershipFAQ />
+        </div>
+      )}
+
+      {/* Purchase Modal */}
+      {showPurchaseModal && selectedPlan && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">
+                {currentSubscription?.status === 'trial' ? 'Upgrade to Paid Membership' : 'Subscribe to VIP Plan'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowPurchaseModal(false);
+                  setSelectedPlan(null);
+                }}
+                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-4 mb-6">
+              <div className="text-lg font-bold text-white mb-2">{selectedPlan.plan_name}</div>
+              {selectedPlan.description && (
+                <p className="text-gray-300 text-sm mb-3">{selectedPlan.description}</p>
+              )}
+              <div className="text-3xl font-bold text-white">
+                ${selectedPlan.amount}
+                <span className="text-sm text-gray-400 font-normal ml-2">
+                  {getBillingFrequencyLabel(selectedPlan.billing_frequency)}
+                </span>
+              </div>
+            </div>
+
+            {contactInfo && (
+              <div className="mb-6">
+                <div className="text-sm font-medium text-gray-400 mb-2">Billing Contact</div>
+                <div className="bg-gray-900 rounded-lg p-3 text-sm">
+                  <div className="text-white font-medium">{contactInfo.full_name}</div>
+                  <div className="text-gray-400">{contactInfo.email}</div>
+                  {contactInfo.phone && <div className="text-gray-400">{contactInfo.phone}</div>}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-2">
+                <CreditCard className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-blue-200">
+                  <p className="font-medium mb-1">
+                    {currentSubscription?.status === 'trial'
+                      ? 'Convert Your Trial to Paid Membership'
+                      : 'Ready to Subscribe'
+                    }
+                  </p>
+                  <p>
+                    {currentSubscription?.status === 'trial'
+                      ? 'Your trial will be converted to a paid membership and you\'ll continue to enjoy all VIP benefits without interruption.'
+                      : 'Your VIP membership will activate immediately after payment is confirmed. All billing information and payment will be handled securely on the next screens.'
+                    }
+                  </p>
+                  {!currentSubscription && (
+                    <p className="mt-2 text-xs text-blue-300">
+                      Note: Free 90-day trials are only available through direct invitation from our company.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowPurchaseModal(false);
+                  setSelectedPlan(null);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProceedToAddress}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2"
+              >
+                <CreditCard className="w-4 h-4" />
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address Modal */}
+      {showAddressModal && selectedPlan && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-2xl w-full p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Service Address</h3>
+              <button
+                onClick={() => {
+                  setShowAddressModal(false);
+                  setSelectedPlan(null);
+                }}
+                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-gray-300 text-sm">
+                Please provide your service address for VIP membership activation.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="street_address" className="block text-sm font-medium text-gray-300 mb-2">
+                  Street Address *
+                </label>
+                <input
+                  id="street_address"
+                  type="text"
+                  value={addressData.street_address}
+                  onChange={(e) => setAddressData({ ...addressData, street_address: e.target.value })}
+                  required
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="123 Main St"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-2">
+                    City *
+                  </label>
+                  <input
+                    id="city"
+                    type="text"
+                    value={addressData.city}
+                    onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
+                    required
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="City"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="state" className="block text-sm font-medium text-gray-300 mb-2">
+                    State *
+                  </label>
+                  <input
+                    id="state"
+                    type="text"
+                    value={addressData.state}
+                    onChange={(e) => setAddressData({ ...addressData, state: e.target.value.toUpperCase() })}
+                    required
+                    maxLength={2}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="KS"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="zip_code" className="block text-sm font-medium text-gray-300 mb-2">
+                    ZIP Code *
+                  </label>
+                  <input
+                    id="zip_code"
+                    type="text"
+                    value={addressData.zip_code}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                      setAddressData({ ...addressData, zip_code: value });
+                    }}
+                    required
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="12345"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAddressModal(false);
+                  setShowPurchaseModal(true);
+                }}
+                className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleAddressSubmit}
+                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+              >
+                Continue to Payment
+                <ArrowLeft className="w-4 h-4 rotate-180" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedPlan && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-2xl w-full p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Complete Payment</h3>
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setSelectedPlan(null);
+                }}
+                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-4 mb-6">
+              <div className="text-lg font-bold text-white mb-1">{selectedPlan.plan_name}</div>
+              {selectedPlan.description && (
+                <p className="text-gray-300 text-sm mb-3">{selectedPlan.description}</p>
+              )}
+              <div className="text-2xl font-bold text-white">
+                ${selectedPlan.amount}
+                <span className="text-sm text-gray-400 font-normal ml-2">
+                  {getBillingFrequencyLabel(selectedPlan.billing_frequency)}
+                </span>
+              </div>
+            </div>
+
+            <PaymentMethodForm
+              amount={selectedPlan.amount}
+              onSubmit={handlePayment}
+              onCancel={() => {
+                setShowPaymentModal(false);
+                setShowAddressModal(true);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Payment Settings Modal */}
+      {showPaymentSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-2xl w-full p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Payment Settings</h3>
+              <button
+                onClick={() => setShowPaymentSettings(false)}
+                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <PaymentMethodManager
+              contactId={contactInfo?.id || ''}
+              onPaymentMethodAdded={() => {
+                loadData();
+              }}
+            />
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowPaymentSettings(false)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Modal */}
+      {showCancelModal && currentSubscription && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Cancel VIP Membership?</h3>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-300 mb-4">
+                Are you sure you want to cancel your VIP membership? You will lose access to:
+              </p>
+              <ul className="space-y-2 mb-4">
+                <li className="flex items-start gap-2 text-gray-300">
+                  <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                  <span>Punchlist portal access</span>
+                </li>
+                <li className="flex items-start gap-2 text-gray-300">
+                  <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                  <span>Priority service scheduling</span>
+                </li>
+                <li className="flex items-start gap-2 text-gray-300">
+                  <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                  <span>Regular maintenance visits</span>
+                </li>
+              </ul>
+              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <Clock className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-yellow-200">
+                    You will have access until your next billing date on{' '}
+                    {new Date(currentSubscription.next_billing_date).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+              >
+                Keep Membership
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
+                Cancel Membership
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </main>
+    </div>
+  );
+}
