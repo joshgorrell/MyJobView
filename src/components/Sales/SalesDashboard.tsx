@@ -1129,30 +1129,13 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading your dashboard...</div>
-      </div>
-    );
-  }
-
-  const daysRemaining = getDaysRemaining();
-  const gapToGoal = Math.max(0, metrics.monthlyTarget - metrics.monthlyRevenue);
-
-  // Derive viewed rep name for header display
-  const viewingRepName = viewingRepId
-    ? salesRepsForSelector.find(r => r.id === viewingRepId)?.display_name || null
-    : null;
-
   // ─── Rep Performance derived values ─────────────────────────────────────────
-  // Computed from repAllMonthlyStats so they are always correct regardless of
-  // which date-range button is currently selected.
+  // These useMemo hooks MUST be above any conditional return to satisfy the Rules of Hooks.
   const repPerfMetrics = React.useMemo(() => {
     if (!viewingRepId || repAllMonthlyStats.length === 0) return null;
     const now = new Date();
     const curYear = now.getFullYear();
-    const curMonth = now.getMonth() + 1; // 1-based
+    const curMonth = now.getMonth() + 1;
     const prevYear = curYear - 1;
 
     const sum = (rows: typeof repAllMonthlyStats) =>
@@ -1188,7 +1171,6 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
     const quotaProgress = repQuota > 0 ? Math.round((ytdTotal / repQuota) * 100) : null;
 
-    // Rolling trends (vs prior equivalent window)
     const rolling = (months: number) => {
       const rows: typeof repAllMonthlyStats = [];
       for (let i = 0; i < months; i++) {
@@ -1223,13 +1205,11 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     };
   }, [viewingRepId, repAllMonthlyStats, repQuota]);
 
-  // Peak stats for the rep
   const repPeakStats = React.useMemo(() => {
     if (repAllMonthlyStats.length === 0) return null;
     const best = repAllMonthlyStats.reduce((a, b) => a.total_sales > b.total_sales ? a : b, repAllMonthlyStats[0]);
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-    // Best year
     const byYear = new Map<number, number>();
     repAllMonthlyStats.forEach(r => byYear.set(r.year, (byYear.get(r.year) || 0) + r.total_sales));
     const yearEntries = Array.from(byYear.entries());
@@ -1249,7 +1229,6 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     };
   }, [repAllMonthlyStats]);
 
-  // Year-by-year breakdown for the rep trend section
   const repYearCards = React.useMemo(() => {
     const byYear = new Map<number, number>();
     repAllMonthlyStats.forEach(r => byYear.set(r.year, (byYear.get(r.year) || 0) + r.total_sales));
@@ -1262,7 +1241,6 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     });
   }, [repAllMonthlyStats]);
 
-  // Last-24-months bar data for the trend chart
   const repBarData = React.useMemo(() => {
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const now = new Date();
@@ -1289,6 +1267,21 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#06b6d4', '#ec4899', '#14b8a6', '#84cc16',
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-400">Loading your dashboard...</div>
+      </div>
+    );
+  }
+
+  const daysRemaining = getDaysRemaining();
+  const gapToGoal = Math.max(0, metrics.monthlyTarget - metrics.monthlyRevenue);
+
+  const viewingRepName = viewingRepId
+    ? salesRepsForSelector.find(r => r.id === viewingRepId)?.display_name || null
+    : null;
 
   return (
     <div className="space-y-6">
@@ -1405,7 +1398,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       <WeeklyCheckInBanner onNavigateToProposal={onProposalClick} />
 
       {/* Manager Team Compliance (admin/manager only) */}
-      {profile && ['admin', 'manager'].includes(profile.role) && (
+      {profile && ['admin', 'manager'].includes(profile?.role || '') && (
         <ManagerCheckInCompliance />
       )}
 
