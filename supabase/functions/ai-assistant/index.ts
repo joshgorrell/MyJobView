@@ -21,6 +21,22 @@ interface RequestBody {
     proposalTitle?: string;
     contactName?: string;
     contactId?: string;
+    salesRepContext?: {
+      repName: string;
+      thisMonthTotal: number;
+      ytdTotal: number;
+      prevYearFull: number;
+      ytdVsPriorPct: number | null;
+      ytdVsPriorDir: string;
+      rolling3Pct: number | null;
+      rolling3Dir: string;
+      rolling12Pct: number | null;
+      rolling12Dir: string;
+      careerAvg: number;
+      annualQuota: number;
+      quotaProgress: number | null;
+      allTimeTotal: number;
+    } | null;
   };
 }
 
@@ -240,7 +256,26 @@ Deno.serve(async (req: Request) => {
     if (context?.proposalTitle) contextDescription += `\n- Proposal title: ${context.proposalTitle}`;
     if (context?.contactName) contextDescription += `\n- Associated contact: ${context.contactName}`;
 
-    const systemPrompt = `You are an AI assistant embedded in MyJobView, a business management platform for security, AV, and smart home installation companies. Your job is to help users create and manage records quickly using natural language.${productCatalogSection}${contactsSection}${securityTemplatesSection}${monitoringServicesSection}
+    const src = context?.salesRepContext;
+    const currentYear = new Date().getFullYear();
+    const salesRepContextSection = src ? `\n\n═══════════════════════════════════════════════
+SALES REP CONTEXT (admin is currently viewing this rep)
+═══════════════════════════════════════════════
+Rep Name: ${src.repName}
+This Month Revenue: $${src.thisMonthTotal.toLocaleString()}
+${currentYear} YTD Revenue: $${src.ytdTotal.toLocaleString()}
+${currentYear - 1} Full Year Revenue: $${src.prevYearFull.toLocaleString()}
+YTD vs Prior Year Same Period: ${src.ytdVsPriorPct !== null ? src.ytdVsPriorPct + '%' : 'N/A'} (${src.ytdVsPriorDir})
+3-Month Rolling Trend: ${src.rolling3Pct !== null ? src.rolling3Pct + '%' : 'N/A'} vs prior 3 months (${src.rolling3Dir})
+12-Month Rolling Trend: ${src.rolling12Pct !== null ? src.rolling12Pct + '%' : 'N/A'} vs prior 12 months (${src.rolling12Dir})
+Career Monthly Average: $${src.careerAvg.toLocaleString()}
+Annual Quota: $${src.annualQuota > 0 ? src.annualQuota.toLocaleString() : 'not set'}
+Quota Progress (YTD): ${src.quotaProgress !== null ? src.quotaProgress + '%' : 'No quota set'}
+All-Time Total Revenue: $${src.allTimeTotal.toLocaleString()}
+
+Use this data to answer questions about this rep's performance, trends, and comparisons. "Up" means positive trend, "down" means negative. When answering, cite specific numbers from this context.` : '';
+
+    const systemPrompt = `You are an AI assistant embedded in MyJobView, a business management platform for security, AV, and smart home installation companies. Your job is to help users create and manage records quickly using natural language.${productCatalogSection}${contactsSection}${securityTemplatesSection}${monitoringServicesSection}${salesRepContextSection}
 
 CURRENT CONTEXT:${contextDescription || "\n- No specific record is currently open"}
 

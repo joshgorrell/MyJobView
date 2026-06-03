@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { TrendingUp, TrendingDown, DollarSign, Target, FileText, Users, Calendar, Clock, AlertCircle, Award, Phone, Mail, MapPin, CheckCircle, XCircle, Eye, Plus, ArrowRight, Sparkles, Activity, BarChart3, Flame, RefreshCw, MessageSquare, CreditCard as Edit, ShoppingCart, ClipboardList, Layers, Ban } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Target, FileText, Users, Calendar, Clock, AlertCircle, Award, Phone, Mail, MapPin, CheckCircle, XCircle, Eye, Plus, ArrowRight, Sparkles, Activity, BarChart3, Flame, RefreshCw, MessageSquare, CreditCard as Edit, ShoppingCart, ClipboardList, Layers, Ban, Zap, Star } from 'lucide-react';
 import { LeadDetail } from '../Leads/LeadDetail';
 import { WeeklyCheckInBanner } from './WeeklyCheckInBanner';
 import { ManagerCheckInCompliance } from './ManagerCheckInCompliance';
@@ -110,11 +110,29 @@ interface YearComparison {
   direction: 'up' | 'down' | 'neutral';
 }
 
-interface SalesDashboardProps {
-  onProposalClick?: (proposalId: string) => void;
+export interface SalesRepAIContext {
+  repName: string;
+  thisMonthTotal: number;
+  ytdTotal: number;
+  prevYearFull: number;
+  ytdVsPriorPct: number | null;
+  ytdVsPriorDir: 'up' | 'down' | 'flat';
+  rolling3Pct: number | null;
+  rolling3Dir: string;
+  rolling12Pct: number | null;
+  rolling12Dir: string;
+  careerAvg: number;
+  annualQuota: number;
+  quotaProgress: number | null;
+  allTimeTotal: number;
 }
 
-export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
+interface SalesDashboardProps {
+  onProposalClick?: (proposalId: string) => void;
+  onRepContextChange?: (ctx: SalesRepAIContext | null) => void;
+}
+
+export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDashboardProps) {
   const { profile } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     pipelineValue: 0,
@@ -168,6 +186,11 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
     winRate: number;
   }>>([]);
   const [repComparisonLoading, setRepComparisonLoading] = useState(false);
+
+  // All monthly stats rows for the viewed rep (used for the Rep Performance Card and Trend Section)
+  const [repAllMonthlyStats, setRepAllMonthlyStats] = useState<Array<{ year: number; month: number; total_sales: number }>>([]);
+  const [repQuota, setRepQuota] = useState<number>(0);
+  const [repMonthlyStatsLoading, setRepMonthlyStatsLoading] = useState(false);
 
   const isAdmin = profile?.role && ['admin', 'manager', 'sales_manager'].includes(profile.role);
 
@@ -232,6 +255,112 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
     }
     loadRepComparisonData();
   }, [selectedRepIds.join(','), dateRange]);
+
+  // Load all monthly stats + quota for a single viewed rep
+  useEffect(() => {
+    if (!viewingRepId) {
+      setRepAllMonthlyStats([]);
+      setRepQuota(0);
+      return;
+    }
+    async function loadRepMonthlyStats() {
+      setRepMonthlyStatsLoading(true);
+      try {
+        const [statsResult, profileResult] = await Promise.all([
+          supabase
+            .from('sales_monthly_stats')
+            .select('year, month, total_sales')
+            .eq('user_id', viewingRepId)
+            .order('year', { ascending: true })
+            .order('month', { ascending: true }),
+          supabase
+            .from('profiles')
+            .select('current_annual_quota, monthly_sales_target')
+            .eq('id', viewingRepId)
+            .maybeSingle(),
+        ]);
+        const rows = (statsResult.data || []).map(r => ({
+          year: r.year,
+          month: r.month,
+          total_sales: parseFloat(r.total_sales || '0'),
+        }));
+        setRepAllMonthlyStats(rows);
+        const quota = parseFloat(profileResult.data?.current_annual_quota || '0');
+        const legacy = parseFloat(profileResult.data?.monthly_sales_target || '0') * 12;
+        setRepQuota(quota > 0 ? quota : legacy);
+      } catch (err) {
+        console.error('Error loading rep monthly stats:', err);
+      } finally {
+        setRepMonthlyStatsLoading(false);
+      }
+    }
+    loadRepMonthlyStats();
+  }, [viewingRepId]);
+
+  // Notify parent of the viewed rep's AI context whenever it changes
+  useEffect(() => {
+    if (!onRepContextChange) return;
+    if (!viewingRepId || repAllMonthlyStats.length === 0) {
+      onRepContextChange(null);
+      return;
+    }
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1;
+    const prevYear = curYear - 1;
+    const sum = (rows: typeof repAllMonthlyStats) => rows.reduce((a, r) => a + r.total_sales, 0);
+
+    const thisMonthTotal = sum(repAllMonthlyStats.filter(r => r.year === curYear && r.month === curMonth));
+    const ytdTotal = sum(repAllMonthlyStats.filter(r => r.year === curYear && r.month <= curMonth));
+    const prevYearSamePeriod = sum(repAllMonthlyStats.filter(r => r.year === prevYear && r.month <= curMonth));
+    const prevYearFull = sum(repAllMonthlyStats.filter(r => r.year === prevYear));
+    const allTimeTotal = sum(repAllMonthlyStats);
+    const ytdVsPriorPct = prevYearSamePeriod > 0 ? Math.round(((ytdTotal - prevYearSamePeriod) / prevYearSamePeriod) * 100) : null;
+    const ytdVsPriorDir: 'up' | 'down' | 'flat' = ytdVsPriorPct === null ? 'flat' : ytdVsPriorPct > 0 ? 'up' : ytdVsPriorPct < 0 ? 'down' : 'flat';
+
+    const rollingCalc = (months: number) => {
+      const curRows: number[] = [];
+      const priorRows: number[] = [];
+      for (let i = 0; i < months; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const row = repAllMonthlyStats.find(r => r.year === d.getFullYear() && r.month === d.getMonth() + 1);
+        curRows.push(row?.total_sales || 0);
+      }
+      for (let i = months; i < months * 2; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const row = repAllMonthlyStats.find(r => r.year === d.getFullYear() && r.month === d.getMonth() + 1);
+        priorRows.push(row?.total_sales || 0);
+      }
+      const cur = curRows.reduce((a, b) => a + b, 0);
+      const prior = priorRows.reduce((a, b) => a + b, 0);
+      const pct = prior > 0 ? Math.round(((cur - prior) / prior) * 100) : null;
+      const dir = pct === null ? 'flat' : pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+      return { pct, dir };
+    };
+
+    const rolling3 = rollingCalc(3);
+    const rolling12 = rollingCalc(12);
+    const careerAvg = repAllMonthlyStats.length > 0 ? allTimeTotal / repAllMonthlyStats.length : 0;
+    const quotaProgress = repQuota > 0 ? Math.round((ytdTotal / repQuota) * 100) : null;
+    const repName = salesRepsForSelector.find(r => r.id === viewingRepId)?.display_name || 'Rep';
+
+    onRepContextChange({
+      repName,
+      thisMonthTotal,
+      ytdTotal,
+      prevYearFull,
+      ytdVsPriorPct,
+      ytdVsPriorDir,
+      rolling3Pct: rolling3.pct,
+      rolling3Dir: rolling3.dir,
+      rolling12Pct: rolling12.pct,
+      rolling12Dir: rolling12.dir,
+      careerAvg,
+      annualQuota: repQuota,
+      quotaProgress,
+      allTimeTotal,
+    });
+  }, [viewingRepId, repAllMonthlyStats, repQuota, salesRepsForSelector]);
 
   async function loadRepComparisonData() {
     if (!profile?.organization_id || selectedRepIds.length < 2) return;
@@ -1015,6 +1144,143 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
     ? salesRepsForSelector.find(r => r.id === viewingRepId)?.display_name || null
     : null;
 
+  // ─── Rep Performance derived values ─────────────────────────────────────────
+  // Computed from repAllMonthlyStats so they are always correct regardless of
+  // which date-range button is currently selected.
+  const repPerfMetrics = React.useMemo(() => {
+    if (!viewingRepId || repAllMonthlyStats.length === 0) return null;
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1; // 1-based
+    const prevYear = curYear - 1;
+
+    const sum = (rows: typeof repAllMonthlyStats) =>
+      rows.reduce((acc, r) => acc + r.total_sales, 0);
+
+    const thisMonthTotal = sum(
+      repAllMonthlyStats.filter(r => r.year === curYear && r.month === curMonth)
+    );
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthTotal = sum(
+      repAllMonthlyStats.filter(
+        r => r.year === lastMonthDate.getFullYear() && r.month === lastMonthDate.getMonth() + 1
+      )
+    );
+    const ytdTotal = sum(
+      repAllMonthlyStats.filter(r => r.year === curYear && r.month <= curMonth)
+    );
+    const prevYearSamePeriod = sum(
+      repAllMonthlyStats.filter(r => r.year === prevYear && r.month <= curMonth)
+    );
+    const prevYearFull = sum(repAllMonthlyStats.filter(r => r.year === prevYear));
+    const allTimeTotal = sum(repAllMonthlyStats);
+
+    const ytdVsPriorPct = prevYearSamePeriod > 0
+      ? Math.round(((ytdTotal - prevYearSamePeriod) / prevYearSamePeriod) * 100)
+      : null;
+    const ytdVsPriorDir: 'up' | 'down' | 'flat' =
+      ytdVsPriorPct === null ? 'flat' : ytdVsPriorPct > 0 ? 'up' : ytdVsPriorPct < 0 ? 'down' : 'flat';
+
+    const monthVsLastMonthPct = lastMonthTotal > 0
+      ? Math.round(((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100)
+      : null;
+
+    const quotaProgress = repQuota > 0 ? Math.round((ytdTotal / repQuota) * 100) : null;
+
+    // Rolling trends (vs prior equivalent window)
+    const rolling = (months: number) => {
+      const rows: typeof repAllMonthlyStats = [];
+      for (let i = 0; i < months; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        rows.push(...repAllMonthlyStats.filter(r => r.year === d.getFullYear() && r.month === d.getMonth() + 1));
+      }
+      const prior: typeof repAllMonthlyStats = [];
+      for (let i = months; i < months * 2; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        prior.push(...repAllMonthlyStats.filter(r => r.year === d.getFullYear() && r.month === d.getMonth() + 1));
+      }
+      const cur = sum(rows);
+      const priorSum = sum(prior);
+      const pct = priorSum > 0 ? Math.round(((cur - priorSum) / priorSum) * 100) : null;
+      return { total: cur, pct, dir: pct === null ? 'flat' : pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat' } as const;
+    };
+
+    return {
+      thisMonthTotal,
+      lastMonthTotal,
+      ytdTotal,
+      prevYearSamePeriod,
+      prevYearFull,
+      allTimeTotal,
+      ytdVsPriorPct,
+      ytdVsPriorDir,
+      monthVsLastMonthPct,
+      quotaProgress,
+      rolling3: rolling(3),
+      rolling6: rolling(6),
+      rolling12: rolling(12),
+    };
+  }, [viewingRepId, repAllMonthlyStats, repQuota]);
+
+  // Peak stats for the rep
+  const repPeakStats = React.useMemo(() => {
+    if (repAllMonthlyStats.length === 0) return null;
+    const best = repAllMonthlyStats.reduce((a, b) => a.total_sales > b.total_sales ? a : b);
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // Best year
+    const byYear = new Map<number, number>();
+    repAllMonthlyStats.forEach(r => byYear.set(r.year, (byYear.get(r.year) || 0) + r.total_sales));
+    const [bestYear, bestYearTotal] = Array.from(byYear.entries()).reduce((a, b) => a[1] > b[1] ? a : b);
+
+    const careerAvg = repAllMonthlyStats.length > 0
+      ? repAllMonthlyStats.reduce((s, r) => s + r.total_sales, 0) / repAllMonthlyStats.length
+      : 0;
+
+    return {
+      bestMonth: { month: monthNames[best.month - 1], year: best.year, total: best.total_sales },
+      bestYear: { year: bestYear, total: bestYearTotal },
+      careerAvg,
+      monthsOfData: repAllMonthlyStats.length,
+    };
+  }, [repAllMonthlyStats]);
+
+  // Year-by-year breakdown for the rep trend section
+  const repYearCards = React.useMemo(() => {
+    const byYear = new Map<number, number>();
+    repAllMonthlyStats.forEach(r => byYear.set(r.year, (byYear.get(r.year) || 0) + r.total_sales));
+    const sorted = Array.from(byYear.entries()).sort((a, b) => a[0] - b[0]);
+    return sorted.map(([year, total], idx) => {
+      if (idx === 0) return { year, total, yoy: null, dir: 'neutral' as const };
+      const prev = sorted[idx - 1][1];
+      const pct = prev > 0 ? Math.round(((total - prev) / prev) * 100 * 10) / 10 : null;
+      return { year, total, yoy: pct, dir: pct === null ? 'neutral' as const : pct > 0 ? 'up' as const : 'down' as const };
+    });
+  }, [repAllMonthlyStats]);
+
+  // Last-24-months bar data for the trend chart
+  const repBarData = React.useMemo(() => {
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const now = new Date();
+    const result: Array<{ label: string; total: number; isCurrentMonth: boolean; aboveAvg: boolean }> = [];
+    const avg = repAllMonthlyStats.length > 0
+      ? repAllMonthlyStats.reduce((s, r) => s + r.total_sales, 0) / repAllMonthlyStats.length
+      : 0;
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const yr = d.getFullYear();
+      const mo = d.getMonth() + 1;
+      const row = repAllMonthlyStats.find(r => r.year === yr && r.month === mo);
+      result.push({
+        label: `${monthNames[mo - 1]} ${yr}`,
+        total: row?.total_sales || 0,
+        isCurrentMonth: i === 0,
+        aboveAvg: (row?.total_sales || 0) >= avg,
+      });
+    }
+    return result;
+  }, [repAllMonthlyStats]);
+
   const CHIP_COLORS = [
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#06b6d4', '#ec4899', '#14b8a6', '#84cc16',
@@ -1139,6 +1405,244 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         <ManagerCheckInCompliance />
       )}
 
+      {/* ── REP PERFORMANCE CARD — shown instead of hero when a single rep is selected ── */}
+      {viewingRepId && repPerfMetrics ? (
+        <div className="space-y-4">
+          {repMonthlyStatsLoading ? (
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-8 flex items-center justify-center">
+              <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mr-2" />
+              <span className="text-gray-400">Loading performance data…</span>
+            </div>
+          ) : (
+            <>
+              {/* Top KPI Row */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* This Month */}
+                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-1">
+                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">This Month</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                    {formatCurrency(repPerfMetrics.thisMonthTotal)}
+                  </div>
+                  {repPerfMetrics.monthVsLastMonthPct !== null && (
+                    <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${
+                      repPerfMetrics.monthVsLastMonthPct > 0 ? 'text-green-400' :
+                      repPerfMetrics.monthVsLastMonthPct < 0 ? 'text-red-400' : 'text-gray-400'
+                    }`}>
+                      {repPerfMetrics.monthVsLastMonthPct > 0
+                        ? <TrendingUp className="w-3 h-3" />
+                        : repPerfMetrics.monthVsLastMonthPct < 0
+                        ? <TrendingDown className="w-3 h-3" />
+                        : null}
+                      {repPerfMetrics.monthVsLastMonthPct > 0 ? '+' : ''}{repPerfMetrics.monthVsLastMonthPct}% vs last month
+                    </div>
+                  )}
+                </div>
+
+                {/* This Year YTD */}
+                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-1">
+                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                    {new Date().getFullYear()} YTD
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                    {formatCurrency(repPerfMetrics.ytdTotal)}
+                  </div>
+                  {repPerfMetrics.ytdVsPriorPct !== null && (
+                    <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${
+                      repPerfMetrics.ytdVsPriorDir === 'up' ? 'text-green-400' :
+                      repPerfMetrics.ytdVsPriorDir === 'down' ? 'text-red-400' : 'text-gray-400'
+                    }`}>
+                      {repPerfMetrics.ytdVsPriorDir === 'up'
+                        ? <TrendingUp className="w-3 h-3" />
+                        : repPerfMetrics.ytdVsPriorDir === 'down'
+                        ? <TrendingDown className="w-3 h-3" />
+                        : null}
+                      {repPerfMetrics.ytdVsPriorPct > 0 ? '+' : ''}{repPerfMetrics.ytdVsPriorPct}% vs {new Date().getFullYear() - 1} same period
+                    </div>
+                  )}
+                </div>
+
+                {/* Last Year Full */}
+                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-1">
+                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                    {new Date().getFullYear() - 1} Full Year
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                    {formatCurrency(repPerfMetrics.prevYearFull)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    vs {formatCurrency(repPerfMetrics.prevYearSamePeriod)} same period
+                  </div>
+                </div>
+
+                {/* Annual Quota Progress */}
+                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-2">
+                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                    {new Date().getFullYear()} Quota Progress
+                  </div>
+                  {repQuota > 0 ? (
+                    <>
+                      <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                        {repPerfMetrics.quotaProgress}%
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-2.5">
+                        <div
+                          className={`h-2.5 rounded-full transition-all duration-700 ${
+                            (repPerfMetrics.quotaProgress || 0) >= 100 ? 'bg-green-500' :
+                            (repPerfMetrics.quotaProgress || 0) >= 75 ? 'bg-emerald-500' :
+                            (repPerfMetrics.quotaProgress || 0) >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${Math.min(repPerfMetrics.quotaProgress || 0, 100)}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {formatCurrency(repPerfMetrics.ytdTotal)} of {formatCurrency(repQuota)}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-500 mt-1">No quota set</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Rolling Trend Indicators */}
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+                <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-400" />
+                  Rolling Sales Trend
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {([
+                    { label: '3-Month', data: repPerfMetrics.rolling3 },
+                    { label: '6-Month', data: repPerfMetrics.rolling6 },
+                    { label: '12-Month', data: repPerfMetrics.rolling12 },
+                  ] as const).map(({ label, data }) => (
+                    <div key={label} className="text-center">
+                      <div className="text-xs text-gray-500 mb-1">{label}</div>
+                      <div className="text-lg font-bold text-white tabular-nums">
+                        {formatCurrency(data.total)}
+                      </div>
+                      {data.pct !== null ? (
+                        <div className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded mt-1 ${
+                          data.dir === 'up' ? 'bg-green-500/20 text-green-400' :
+                          data.dir === 'down' ? 'bg-red-500/20 text-red-400' :
+                          'bg-gray-700 text-gray-400'
+                        }`}>
+                          {data.dir === 'up' ? <TrendingUp className="w-3 h-3" /> : data.dir === 'down' ? <TrendingDown className="w-3 h-3" /> : null}
+                          {data.pct > 0 ? '+' : ''}{data.pct}% vs prior
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-600 mt-1">No prior data</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 24-Month Bar Chart */}
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+                <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-blue-400" />
+                  Last 24 Months
+                </h3>
+                {repBarData.length > 0 && (() => {
+                  const maxVal = Math.max(...repBarData.map(b => b.total), 1);
+                  return (
+                    <div className="flex items-end gap-0.5 sm:gap-1 h-36">
+                      {repBarData.map((bar, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative" title={`${bar.label}: ${formatCurrency(bar.total)}`}>
+                          <div
+                            className={`w-full rounded-sm transition-all duration-300 ${
+                              bar.isCurrentMonth
+                                ? 'bg-blue-500'
+                                : bar.aboveAvg
+                                ? 'bg-emerald-500/70 group-hover:bg-emerald-400'
+                                : 'bg-gray-600 group-hover:bg-gray-500'
+                            }`}
+                            style={{ height: `${Math.max((bar.total / maxVal) * 100, bar.total > 0 ? 3 : 0)}%` }}
+                          />
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
+                            <div className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white whitespace-nowrap shadow-lg">
+                              <div className="font-semibold">{bar.label}</div>
+                              <div>{formatCurrency(bar.total)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500/70 inline-block" /> Above avg</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-gray-600 inline-block" /> Below avg</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" /> Current month</span>
+                </div>
+              </div>
+
+              {/* Year-by-Year Cards + Peak Stats */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Year cards */}
+                <div className="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700 p-5">
+                  <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    Year-over-Year
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {repYearCards.map(card => (
+                      <div key={card.year} className="bg-gray-900/60 rounded-lg p-3">
+                        <div className="text-xs text-gray-400 mb-1">{card.year}</div>
+                        <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(card.total)}</div>
+                        {card.yoy !== null ? (
+                          <div className={`inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded mt-1.5 ${
+                            card.dir === 'up' ? 'bg-green-500/20 text-green-400' :
+                            card.dir === 'down' ? 'bg-red-500/20 text-red-400' :
+                            'bg-gray-700 text-gray-400'
+                          }`}>
+                            {card.dir === 'up' ? <TrendingUp className="w-3 h-3" /> : card.dir === 'down' ? <TrendingDown className="w-3 h-3" /> : null}
+                            {card.yoy > 0 ? '+' : ''}{card.yoy}%
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-600 mt-1.5">Baseline</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Peak / career stats */}
+                {repPeakStats && (
+                  <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-4">
+                    <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                      <Star className="w-4 h-4 text-yellow-400" />
+                      Career Highlights
+                    </h3>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5">Best Single Month</div>
+                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPeakStats.bestMonth.total)}</div>
+                      <div className="text-xs text-gray-400">{repPeakStats.bestMonth.month} {repPeakStats.bestMonth.year}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5">Best Full Year</div>
+                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPeakStats.bestYear.total)}</div>
+                      <div className="text-xs text-gray-400">{repPeakStats.bestYear.year}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5">Career Monthly Avg</div>
+                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPeakStats.careerAvg)}</div>
+                      <div className="text-xs text-gray-400">over {repPeakStats.monthsOfData} months</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5">All-Time Total</div>
+                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPerfMetrics.allTimeTotal)}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      ) : !viewingRepId ? (
+        <>
       {/* Monthly Goal Hero Card */}
       <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl p-4 sm:p-6 text-white shadow-lg">
         <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
@@ -1224,6 +1728,8 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
           </div>
         )}
       </div>
+        </>
+      ) : null}
 
       {/* Multi-Rep Comparison Grid — shown when 2+ reps selected */}
       {isComparingMultiple && (
@@ -1555,8 +2061,8 @@ export function SalesDashboard({ onProposalClick }: SalesDashboardProps) {
         </div>
       )}
 
-      {/* Historical Performance Section */}
-      {(historicalSales.length > 0 || isAdmin) && (
+      {/* Historical Performance Section — hidden when viewing a specific rep (shown inline in rep section) */}
+      {!viewingRepId && (historicalSales.length > 0 || isAdmin) && (
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">

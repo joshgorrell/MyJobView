@@ -12,6 +12,7 @@ import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { SalesRepAIContext } from './components/Sales/SalesDashboard';
 import { getIcon } from './lib/iconMap';
 import { X, LogOut, FileText, Bug, MessageSquare } from 'lucide-react';
 import { QuickActionModal } from './components/Shared/QuickActionModal';
@@ -164,6 +165,7 @@ function AppContent() {
   const [aiSecurityContractPrefill, setAiSecurityContractPrefill] = useState<SecurityContractPrefill | null>(null);
   const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(null);
   const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(null);
+  const [salesRepAIContext, setSalesRepAIContext] = useState<SalesRepAIContext | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(() => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('workOrderId');
@@ -931,6 +933,7 @@ function AppContent() {
                 setOpenProposalId(proposalId);
                 setActiveTab('proposals');
               }}
+              onRepContextChange={setSalesRepAIContext}
             />
           )}
           {activeTab === 'sales_orders' && checkModuleAccess('sales_orders') && (
@@ -1272,6 +1275,7 @@ function AppContent() {
       {!isStandalone && (
         <AIAssistant
           activeTab={activeTab}
+          salesRepContext={activeTab === 'sales_dashboard' ? salesRepAIContext : null}
           onRegisterOpen={(fn) => { openAIAssistantRef.current = fn; }}
           onAction={(action) => {
             if (action.type === 'CREATE_CONTACT') {

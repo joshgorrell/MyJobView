@@ -120,6 +120,22 @@ interface AIAssistantProps {
   proposalTitle?: string;
   contactName?: string;
   contactId?: string;
+  salesRepContext?: {
+    repName: string;
+    thisMonthTotal: number;
+    ytdTotal: number;
+    prevYearFull: number;
+    ytdVsPriorPct: number | null;
+    ytdVsPriorDir: string;
+    rolling3Pct: number | null;
+    rolling3Dir: string;
+    rolling12Pct: number | null;
+    rolling12Dir: string;
+    careerAvg: number;
+    annualQuota: number;
+    quotaProgress: number | null;
+    allTimeTotal: number;
+  } | null;
   onAction?: (action: ActionPayload) => void;
   /** When provided, the floating trigger button is hidden and this callback is set to open the panel */
   onRegisterOpen?: (openFn: () => void) => void;
@@ -141,6 +157,7 @@ export function AIAssistant({
   proposalTitle,
   contactName,
   contactId,
+  salesRepContext,
   onAction,
   onRegisterOpen,
 }: AIAssistantProps) {
@@ -226,7 +243,7 @@ export function AIAssistant({
           },
           body: JSON.stringify({
             messages: history,
-            context: { activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId },
+            context: { activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext },
           }),
         }
       );
@@ -259,7 +276,7 @@ export function AIAssistant({
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, isOpen, isMinimized]);
+  }, [input, loading, messages, activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext, isOpen, isMinimized]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
