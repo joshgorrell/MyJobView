@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, ArrowRight, MapPin, Lock, Camera, Shield, ListTodo, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Calendar, Clock, Building2, Mail, Phone } from 'lucide-react';
+import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Calendar, Clock, Building2, Mail, Phone, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Contact, ContactTag, Profile, CompanyOffice } from '../../lib/types';
 import { ContactForm } from './ContactForm';
@@ -8,12 +8,13 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface ContactsViewProps {
   onNavigateToProposal?: (proposalId: string) => void;
+  onNavigateToInvoices?: (contactId: string) => void;
 }
 
-export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
+export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: ContactsViewProps) {
   const { profile, loading: authLoading } = useAuth();
   const canEdit = profile?.can_edit_contacts ?? true;
-  const [contacts, setContacts] = useState<(Contact & { tags?: ContactTag[], creator?: Profile, assigned_rep?: Profile, office?: CompanyOffice })[]>([]);
+  const [contacts, setContacts] = useState<(Contact & { tags?: ContactTag[], creator?: Profile, assigned_rep?: Profile, office?: CompanyOffice, invoices?: { amount_due: number; status: string }[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showContactForm, setShowContactForm] = useState(false);
@@ -114,7 +115,8 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
           tags:contact_tags(*),
           creator:profiles!contacts_created_by_fkey(id, first_name, last_name),
           assigned_rep:profiles!contacts_assigned_to_fkey(id, first_name, last_name),
-          office:company_offices(id, office_name)
+          office:company_offices(id, office_name),
+          invoices(amount_due, status)
         `);
 
       // When searching, search all contacts (not just mine) so nothing is hidden
@@ -301,6 +303,17 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
     if (contact.last_name) return contact.last_name.toLowerCase();
     if (contact.first_name) return contact.first_name.toLowerCase();
     return (contact.contact_name || '').toLowerCase();
+  };
+
+  const getBalanceDue = (contact: any): number => {
+    if (!contact.invoices?.length) return 0;
+    return contact.invoices
+      .filter((inv: any) => inv.status !== 'voided' && inv.status !== 'paid')
+      .reduce((sum: number, inv: any) => sum + (inv.amount_due || 0), 0);
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
   };
 
   const filteredContacts = contacts.slice().sort((a, b) => getSortName(a).localeCompare(getSortName(b)));
@@ -676,21 +689,39 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                       {contact.company_name && (
                         <div className="flex items-start gap-2">
                           <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="flex-1">{contact.company_name}</span>
+                          <span className="flex-1 truncate">{contact.company_name}</span>
                         </div>
                       )}
                       {contact.email && (
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
                           <Mail className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="flex-1 truncate">{contact.email}</span>
+                          <a href={`mailto:${contact.email}`} className="flex-1 truncate text-blue-600 hover:underline">{contact.email}</a>
                         </div>
                       )}
                       {contact.phone && (
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
                           <Phone className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="flex-1">{contact.phone}</span>
+                          <a href={`tel:${contact.phone}`} className="flex-1 text-blue-600 hover:underline">{contact.phone}</a>
                         </div>
                       )}
+                      {(() => {
+                        const bal = getBalanceDue(contact);
+                        if (bal > 0) {
+                          return (
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              <DollarSign className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                              {onNavigateToInvoices ? (
+                                <button onClick={() => onNavigateToInvoices(contact.id)} className="text-sm font-medium text-amber-600 hover:text-amber-700 hover:underline">
+                                  {formatCurrency(bal)} balance due
+                                </button>
+                              ) : (
+                                <span className="text-sm font-medium text-amber-600">{formatCurrency(bal)} balance due</span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       {contact.last_contact_date && (
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -791,17 +822,35 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                   {(contact.email || contact.phone || contact.last_contact_date || contact.next_follow_up) && (
                     <div className="text-sm text-gray-600 space-y-1.5 pt-3 border-t border-gray-200">
                       {contact.email && (
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
                           <Mail className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="flex-1 truncate">{contact.email}</span>
+                          <a href={`mailto:${contact.email}`} className="flex-1 truncate text-blue-600 hover:underline">{contact.email}</a>
                         </div>
                       )}
                       {contact.phone && (
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
                           <Phone className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="flex-1">{contact.phone}</span>
+                          <a href={`tel:${contact.phone}`} className="flex-1 text-blue-600 hover:underline">{contact.phone}</a>
                         </div>
                       )}
+                      {(() => {
+                        const bal = getBalanceDue(contact);
+                        if (bal > 0) {
+                          return (
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              <DollarSign className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                              {onNavigateToInvoices ? (
+                                <button onClick={() => onNavigateToInvoices(contact.id)} className="text-sm font-medium text-amber-600 hover:text-amber-700 hover:underline">
+                                  {formatCurrency(bal)} balance due
+                                </button>
+                              ) : (
+                                <span className="text-sm font-medium text-amber-600">{formatCurrency(bal)} balance due</span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       {contact.last_contact_date && (
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -841,18 +890,19 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                   <tr>
                     <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Name</th>
                     <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Phone</th>
-                    <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">Email</th>
+                    <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Email</th>
+                    <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell whitespace-nowrap">Balance Due</th>
                     <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell whitespace-nowrap">Last</th>
                     <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell whitespace-nowrap">Next</th>
-                    <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">Rep</th>
-                    <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">Office</th>
+                    <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell whitespace-nowrap">Rep</th>
+                    <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell whitespace-nowrap">Office</th>
                     <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-8"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {personContacts.length > 0 && (
                     <tr>
-                      <td colSpan={8} className="px-3 py-1 bg-gray-50 border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-gray-50 border-b border-gray-100">
                         <div className="flex items-center gap-1.5">
                           <Users className="w-3 h-3 text-gray-400" />
                           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">People</span>
@@ -870,11 +920,11 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                       <td className="px-3 py-1.5">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                            <span className="font-medium text-gray-900 text-sm truncate">
+                            <span className="font-medium text-gray-900 text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
                               {getDisplayName(contact)}
                             </span>
                             {contact.company_name && (
-                              <span className="text-xs text-gray-400 truncate hidden xl:inline">{contact.company_name}</span>
+                              <span className="text-xs text-gray-400 truncate hidden xl:inline max-w-[120px]" title={contact.company_name}>{contact.company_name}</span>
                             )}
                             {(() => {
                               const contactType = getContactType(contact);
@@ -928,11 +978,37 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap">
-                        <span className="text-xs text-gray-600">{contact.phone || <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {contact.phone ? (
+                          <a href={`tel:${contact.phone}`} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">{contact.phone}</a>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
                       </td>
-                      <td className="px-3 py-1.5 hidden lg:table-cell">
-                        <span className="text-xs text-gray-600 truncate max-w-[200px] block">{contact.email || <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                        {contact.email ? (
+                          <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[160px] block">{contact.email}</a>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 hidden sm:table-cell text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                          const bal = getBalanceDue(contact);
+                          if (bal > 0) {
+                            return onNavigateToInvoices ? (
+                              <button
+                                onClick={() => onNavigateToInvoices(contact.id)}
+                                className="text-xs font-medium text-amber-600 hover:text-amber-700 hover:underline"
+                              >
+                                {formatCurrency(bal)}
+                              </button>
+                            ) : (
+                              <span className="text-xs font-medium text-amber-600">{formatCurrency(bal)}</span>
+                            );
+                          }
+                          return <span className="text-gray-300 text-xs">—</span>;
+                        })()}
                       </td>
                       <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
                         <span className="text-xs text-gray-600">
@@ -944,20 +1020,20 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                           {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5 hidden lg:table-cell whitespace-nowrap">
-                        <span className="text-xs text-gray-600">{contact.assigned_rep?.full_name || <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
+                        <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.assigned_rep?.full_name || ''}>{contact.assigned_rep?.full_name || <span className="text-gray-300">—</span>}</span>
                       </td>
-                      <td className="px-3 py-1.5 hidden lg:table-cell whitespace-nowrap">
-                        <span className="text-xs text-gray-600">{contact.office?.office_name ?? <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
+                        <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.office?.office_name || ''}>{contact.office?.office_name ?? <span className="text-gray-300">—</span>}</span>
                       </td>
                       <td className="px-3 py-1.5 text-right w-8">
-                        <ArrowRight className="w-3.5 h-3.5 text-gray-400 inline-block" />
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 inline-block" />
                       </td>
                     </tr>
                   ))}
                   {businessContacts.length > 0 && (
                     <tr>
-                      <td colSpan={8} className="px-3 py-1 bg-gray-50 border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-gray-50 border-b border-gray-100">
                         <div className="flex items-center gap-1.5">
                           <Building2 className="w-3 h-3 text-gray-400" />
                           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Businesses</span>
@@ -975,7 +1051,7 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                       <td className="px-3 py-1.5">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                            <span className="font-medium text-gray-900 text-sm truncate">
+                            <span className="font-medium text-gray-900 text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
                               {getDisplayName(contact)}
                             </span>
                             {(() => {
@@ -1030,11 +1106,37 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap">
-                        <span className="text-xs text-gray-600">{contact.phone || <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {contact.phone ? (
+                          <a href={`tel:${contact.phone}`} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">{contact.phone}</a>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
                       </td>
-                      <td className="px-3 py-1.5 hidden lg:table-cell">
-                        <span className="text-xs text-gray-600 truncate max-w-[200px] block">{contact.email || <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                        {contact.email ? (
+                          <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[160px] block">{contact.email}</a>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 hidden sm:table-cell text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                          const bal = getBalanceDue(contact);
+                          if (bal > 0) {
+                            return onNavigateToInvoices ? (
+                              <button
+                                onClick={() => onNavigateToInvoices(contact.id)}
+                                className="text-xs font-medium text-amber-600 hover:text-amber-700 hover:underline"
+                              >
+                                {formatCurrency(bal)}
+                              </button>
+                            ) : (
+                              <span className="text-xs font-medium text-amber-600">{formatCurrency(bal)}</span>
+                            );
+                          }
+                          return <span className="text-gray-300 text-xs">—</span>;
+                        })()}
                       </td>
                       <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
                         <span className="text-xs text-gray-600">
@@ -1046,14 +1148,14 @@ export function ContactsView({ onNavigateToProposal }: ContactsViewProps) {
                           {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5 hidden lg:table-cell whitespace-nowrap">
-                        <span className="text-xs text-gray-600">{contact.assigned_rep?.full_name || <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
+                        <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.assigned_rep?.full_name || ''}>{contact.assigned_rep?.full_name || <span className="text-gray-300">—</span>}</span>
                       </td>
-                      <td className="px-3 py-1.5 hidden lg:table-cell whitespace-nowrap">
-                        <span className="text-xs text-gray-600">{contact.office?.office_name ?? <span className="text-gray-300">—</span>}</span>
+                      <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
+                        <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.office?.office_name || ''}>{contact.office?.office_name ?? <span className="text-gray-300">—</span>}</span>
                       </td>
                       <td className="px-3 py-1.5 text-right w-8">
-                        <ArrowRight className="w-3.5 h-3.5 text-gray-400 inline-block" />
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 inline-block" />
                       </td>
                     </tr>
                   ))}

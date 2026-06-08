@@ -164,6 +164,7 @@ function AppContent() {
   const [showAiSecurityContractModal, setShowAiSecurityContractModal] = useState(false);
   const [aiSecurityContractPrefill, setAiSecurityContractPrefill] = useState<SecurityContractPrefill | null>(null);
   const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(null);
+  const [invoiceContactFilter, setInvoiceContactFilter] = useState<string | null>(null);
   const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(null);
   const [salesRepAIContext, setSalesRepAIContext] = useState<SalesRepAIContext | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(() => {
@@ -837,6 +838,10 @@ function AppContent() {
                 setOpenProposalId(proposalId);
                 setActiveTab('proposals');
               }}
+              onNavigateToInvoices={(contactId) => {
+                setInvoiceContactFilter(contactId);
+                setActiveTab('invoices');
+              }}
             />
           )}
           {activeTab === 'leads' && checkModuleAccess('leads') && <LeadsHistory key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
@@ -876,6 +881,8 @@ function AppContent() {
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
             <InvoicesView
               key={activeTab}
+              contactIdFilter={invoiceContactFilter ?? undefined}
+              onClearContactFilter={() => setInvoiceContactFilter(null)}
               onNavigateToContact={(contactId) => {
                 const url = new URL(window.location.href);
                 url.searchParams.set('contactId', contactId);

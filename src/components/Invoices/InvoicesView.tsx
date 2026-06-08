@@ -35,9 +35,11 @@ type ActiveTab = 'invoices' | 'stats';
 
 interface InvoicesViewProps {
   onNavigateToContact?: (contactId: string) => void;
+  contactIdFilter?: string;
+  onClearContactFilter?: () => void;
 }
 
-export function InvoicesView({ onNavigateToContact }: InvoicesViewProps = {}) {
+export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearContactFilter }: InvoicesViewProps = {}) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [openStats, setOpenStats] = useState<Record<string, InvoiceOpenStats>>({});
@@ -145,8 +147,9 @@ export function InvoicesView({ onNavigateToContact }: InvoicesViewProps = {}) {
       (invoice.project_number && invoice.project_number.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+    const matchesContact = !contactIdFilter || invoice.contact_id === contactIdFilter;
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesContact;
   });
 
   function handleSendInvoice(invoice: Invoice) {
@@ -279,6 +282,18 @@ export function InvoicesView({ onNavigateToContact }: InvoicesViewProps = {}) {
                 <option value="overdue">Overdue</option>
               </select>
             </div>
+            {contactIdFilter && (
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <span className="text-xs text-amber-700 font-medium flex-1">Filtered by contact</span>
+                <button
+                  onClick={onClearContactFilter}
+                  className="text-amber-500 hover:text-amber-700 transition-colors"
+                  title="Clear filter"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {filteredInvoices.length === 0 ? (
