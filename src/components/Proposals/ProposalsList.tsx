@@ -49,6 +49,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [activityTab, setActivityTab] = useState<'summary' | 'timeline'>('summary');
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuOpenAbove, setMenuOpenAbove] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
@@ -1537,6 +1538,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setMenuOpenAbove(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 320);
                           setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
                         }}
                         className="menu-button p-2.5 min-w-[44px] min-h-[44px] text-gray-400 hover:text-white hover:bg-gray-700 active:bg-gray-600 rounded-lg transition-colors flex items-center justify-center"
@@ -1545,7 +1547,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         <MoreVertical className="w-4 h-4" />
                       </button>
                       {openMenuId === proposal.id && (
-                        <div className="menu-dropdown absolute right-0 top-full mt-1 w-52 max-w-[calc(100vw-1rem)] bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-[200]">
+                        <div className={`menu-dropdown absolute right-0 w-52 max-w-[calc(100vw-1rem)] bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-[200] max-h-[80vh] overflow-y-auto ${menuOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                           {proposal.status === 'expired' && (
                             <button
                               onClick={(e) => {
@@ -1829,6 +1831,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setMenuOpenAbove(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 320);
                         setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
                       }}
                       className="menu-button p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
@@ -1837,7 +1840,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       <MoreVertical className="w-4 h-4" />
                     </button>
                     {openMenuId === proposal.id && (
-                      <div className="menu-dropdown absolute right-0 top-full mt-1 w-52 max-w-[calc(100vw-1rem)] bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-[200]">
+                      <div className={`menu-dropdown absolute right-0 w-52 max-w-[calc(100vw-1rem)] bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-[200] max-h-[80vh] overflow-y-auto ${menuOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                         {proposal.status === 'expired' && (
                           <button
                             onClick={(e) => {
