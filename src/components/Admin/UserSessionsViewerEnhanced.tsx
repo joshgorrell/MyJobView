@@ -93,6 +93,14 @@ interface LogoutSchedule {
   last_run_count: number;
 }
 
+interface CleanupLogEntry {
+  id: string;
+  execution_time: string;
+  sessions_closed: number;
+  success: boolean;
+  error_message: string | null;
+}
+
 const COMMON_TIMEZONES = [
   { value: 'UTC', label: 'UTC' },
   { value: 'America/New_York', label: 'Eastern (ET)' },
@@ -195,6 +203,7 @@ export function UserSessionsViewerEnhanced() {
   const [forceLogoutConfirm, setForceLogoutConfirm] = useState(false);
   const [forceLogoutRunning, setForceLogoutRunning] = useState(false);
   const [forceLogoutResult, setForceLogoutResult] = useState<{ users: number; sessions: number } | null>(null);
+  const [cleanupHistory, setCleanupHistory] = useState<CleanupLogEntry[]>([]);
 
   const [ipNicknamePopover, setIpNicknamePopover] = useState<{ ip: string; sessionId: string } | null>(null);
   const [ipNicknameCustom, setIpNicknameCustom] = useState('');
@@ -835,18 +844,28 @@ export function UserSessionsViewerEnhanced() {
     setScheduleLoading(true);
     setScheduleError(null);
     try {
-      const { data, error } = await supabase
-        .from('session_logout_schedule')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      if (data) {
-        setSchedule(data);
-        setEditEnabled(data.enabled);
-        setEditTime(data.logout_time?.slice(0, 5) || '00:00');
-        setEditTimezone(data.timezone || 'UTC');
-        setEditLabel(data.label || 'Daily Session Logout');
+      const [scheduleRes, historyRes] = await Promise.all([
+        supabase
+          .from('session_logout_schedule')
+          .select('*')
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('session_cleanup_log')
+          .select('id, execution_time, sessions_closed, success, error_message')
+          .order('execution_time', { ascending: false })
+          .limit(10),
+      ]);
+      if (scheduleRes.error) throw scheduleRes.error;
+      if (scheduleRes.data) {
+        setSchedule(scheduleRes.data);
+        setEditEnabled(scheduleRes.data.enabled);
+        setEditTime(scheduleRes.data.logout_time?.slice(0, 5) || '00:00');
+        setEditTimezone(scheduleRes.data.timezone || 'UTC');
+        setEditLabel(scheduleRes.data.label || 'Daily Session Logout');
+      }
+      if (!historyRes.error && historyRes.data) {
+        setCleanupHistory(historyRes.data);
       }
     } catch (e: any) {
       setScheduleError(e.message || 'Failed to load schedule settings');
@@ -1892,20 +1911,61 @@ export function UserSessionsViewerEnhanced() {
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-600">Last Ran</span>
                             <span className="text-sm text-gray-900">
-                              {schedule.last_run_at
-                                ? formatDistanceToNow(schedule.last_run_at)
-                                : <span className="text-gray-400 italic text-xs">Never</span>}
+                              {cleanupHistory.length > 0 && cleanupHistory[0].success
+                                ? formatDistanceToNow(cleanupHistory[0].execution_time)
+                                : schedule.last_run_at
+                                  ? formatDistanceToNow(schedule.last_run_at)
+                                  : <span className="text-gray-400 italic text-xs">Never</span>}
                             </span>
                           </div>
-                          {schedule.last_run_at && (
+                          {(cleanupHistory.length > 0 || schedule.last_run_at) && (
                             <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">Sessions Closed</span>
-                              <span className="text-sm font-medium text-gray-900">{schedule.last_run_count ?? 0}</span>
+                              <span className="text-sm text-gray-600">Sessions Closed (last run)</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {cleanupHistory.length > 0 ? cleanupHistory[0].sessions_closed : schedule.last_run_count ?? 0}
+                              </span>
                             </div>
                           )}
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-600">Currently Active Sessions</span>
                             <span className="text-sm font-medium text-gray-900">{activeSessions.length}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {cleanupHistory.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <Clock className="w-3.5 h-3.5 text-gray-500" />
+                            Cleanup History
+                          </h4>
+                          <div className="rounded-lg border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+                            {cleanupHistory.map((entry) => (
+                              <div key={entry.id} className="flex items-center justify-between px-3 py-2 text-xs bg-white hover:bg-gray-50">
+                                <div className="flex items-center gap-2">
+                                  {entry.success ? (
+                                    <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                  ) : (
+                                    <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                  )}
+                                  <span className="text-gray-700">
+                                    {new Date(entry.execution_time).toLocaleString(undefined, {
+                                      month: 'short', day: 'numeric', year: 'numeric',
+                                      hour: '2-digit', minute: '2-digit',
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  {entry.success ? (
+                                    <span className="text-gray-500">{entry.sessions_closed} session{entry.sessions_closed !== 1 ? 's' : ''} closed</span>
+                                  ) : (
+                                    <span className="text-red-600 truncate max-w-[160px]" title={entry.error_message || ''}>
+                                      {entry.error_message || 'Error'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
