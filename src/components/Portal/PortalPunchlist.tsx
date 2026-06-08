@@ -897,7 +897,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
           </div>
 
           {/* Search Bar */}
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 w-full sm:min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -911,11 +911,11 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             {selectedTaskIds.size > 0 && (
               <button
                 onClick={() => handleSubmitTasks(Array.from(selectedTaskIds))}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 text-sm font-medium shadow-sm hover:shadow transition-all whitespace-nowrap"
+                className="w-full sm:w-auto px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-1.5 text-sm font-medium shadow-sm hover:shadow transition-all whitespace-nowrap"
               >
                 <Send className="w-4 h-4" />
                 <span className="hidden sm:inline">Create service request</span>
@@ -925,7 +925,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
             )}
             <button
               onClick={() => setIsCreating(true)}
-              className="px-4 py-1.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-lg flex items-center gap-1.5 font-semibold shadow-sm hover:shadow-md transition-all text-sm whitespace-nowrap"
+              className="w-full sm:w-auto px-4 py-1.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-lg flex items-center justify-center gap-1.5 font-semibold shadow-sm hover:shadow-md transition-all text-sm whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               Add Task

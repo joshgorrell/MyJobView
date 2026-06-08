@@ -437,9 +437,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-3 sm:px-0">
       {/* Header - Compact */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <ClipboardList className="w-5 h-5" />
           Punchlist Management
@@ -582,7 +582,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setSelectedTaskIds(new Set())}
               className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
@@ -700,7 +700,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     >
                       {task.title}
                     </button>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-400 min-w-0">
                       <div className="flex items-center gap-1">
                         <User className="w-3.5 h-3.5" />
                         <span>{task.contact.full_name}</span>

@@ -233,21 +233,21 @@ function CustomerDetailModal({
                   onClick={() => { onViewTasks('all'); onClose(); }}
                   className="flex flex-col items-center py-3 bg-gray-800 hover:bg-gray-750 active:bg-gray-700 rounded-xl border border-gray-700 hover:border-blue-600 transition-colors"
                 >
-                  <span className="text-xl font-bold text-blue-400">{customer.taskStats.total}</span>
+                  <span className="text-xl font-bold text-blue-400 truncate">{customer.taskStats.total}</span>
                   <span className="text-[10px] text-gray-500 mt-0.5">Total</span>
                 </button>
                 <button
                   onClick={() => { onViewTasks('requested'); onClose(); }}
                   className="flex flex-col items-center py-3 bg-gray-800 hover:bg-gray-750 active:bg-gray-700 rounded-xl border border-gray-700 hover:border-yellow-600 transition-colors"
                 >
-                  <span className="text-xl font-bold text-yellow-400">{customer.taskStats.submitted}</span>
+                  <span className="text-xl font-bold text-yellow-400 truncate">{customer.taskStats.submitted}</span>
                   <span className="text-[10px] text-gray-500 mt-0.5">Pending</span>
                 </button>
                 <button
                   onClick={() => { onViewTasks('completed'); onClose(); }}
                   className="flex flex-col items-center py-3 bg-gray-800 hover:bg-gray-750 active:bg-gray-700 rounded-xl border border-gray-700 hover:border-green-600 transition-colors"
                 >
-                  <span className="text-xl font-bold text-green-400">{customer.taskStats.completed}</span>
+                  <span className="text-xl font-bold text-green-400 truncate">{customer.taskStats.completed}</span>
                   <span className="text-[10px] text-gray-500 mt-0.5">Done</span>
                 </button>
               </div>
