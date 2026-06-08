@@ -210,12 +210,14 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
 
   // Line item modal state
   const [lineItemModal, setLineItemModal] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
 
   const roomScopeRef = useRef<HTMLTextAreaElement>(null);
 
   const loadScope = useCallback(async () => {
     try {
       setLoading(true);
+      setScopeError(null);
 
       const TEMPLATE_COLS = `id, name, description, is_default, is_personal,
         show_quantity, show_unit_price, show_line_item_total,
@@ -308,8 +310,12 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
       const effectiveId = overrideId ?? fallbackId;
       const effective = effectiveId ? allTemplates.find(t => t.id === effectiveId) ?? null : null;
       setPortalTemplate(effective);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error loading proposal scope:', err);
+      const msg = err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: unknown }).message)
+        : 'Unknown error loading scope data';
+      setScopeError(msg);
     } finally {
       setLoading(false);
     }
@@ -832,7 +838,25 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
         </div>
       )}
 
-      {displayRooms.length === 0 ? (
+      {scopeError ? (
+        <div className="rounded-lg border border-red-700/60 bg-red-900/20 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center mt-0.5">
+              <X className="w-3 h-3 text-red-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-red-300 font-medium text-sm mb-1">Failed to load scope data</p>
+              <p className="text-red-400/80 text-xs font-mono break-all">{scopeError}</p>
+            </div>
+            <button
+              onClick={loadScope}
+              className="flex-shrink-0 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : displayRooms.length === 0 ? (
         <div className="text-center py-12 text-gray-400">No areas or items found on this proposal.</div>
       ) : viewMode === 'portal' ? (
         <PortalView
