@@ -47,6 +47,9 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
     monthly_sales_target: (user as any).monthly_sales_target || '0',
     yearly_escalation_percentage: (user as any).yearly_escalation_percentage || '0',
     previous_year_sales: (user as any).previous_year_sales || '0',
+    sales_rep_start_date: (user as any).sales_rep_start_date
+      ? new Date((user as any).sales_rep_start_date + 'T12:00:00').toISOString().split('T')[0]
+      : '',
   });
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -208,6 +211,7 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
         monthly_sales_target: parseFloat(formData.monthly_sales_target as string) || 0,
         yearly_escalation_percentage: parseFloat(formData.yearly_escalation_percentage as string) || 0,
         previous_year_sales: parseFloat(formData.previous_year_sales as string) || 0,
+        sales_rep_start_date: formData.sales_rep_start_date || null,
       };
 
       console.log('Update data to be saved:', JSON.stringify(updateData, null, 2));
@@ -236,6 +240,11 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
 
       console.log('=== PROFILE UPDATED SUCCESSFULLY ===');
       console.log('Updated profile:', JSON.stringify(updatedProfile, null, 2));
+
+      // Recalculate quota cache for sales roles
+      if (['sales', 'admin', 'manager', 'sales_manager'].includes(formData.role)) {
+        await supabase.rpc('recalculate_sales_quota_for_user', { p_user_id: user.id });
+      }
 
       // Verify the update by reading back the data
       console.log('=== VERIFYING UPDATE ===');
@@ -871,6 +880,22 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
                   <Target className="w-4 h-4 text-cyan-400" />
                   Sales Target Settings
                 </h3>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Sales Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.sales_rep_start_date}
+                    onChange={(e) => setFormData({ ...formData, sales_rep_start_date: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Drives automatic annual quota calculation. For the full 30-year trajectory and growth rate overrides, go to{' '}
+                    <span className="text-cyan-400 font-medium">Settings &rarr; Sales Targets</span>.
+                  </p>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
