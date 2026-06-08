@@ -564,7 +564,7 @@ export default function DesignBriefModal({
                 ) : (
                   <div className="relative">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${selectedContact ? 'text-green-500' : 'text-gray-400'}`} />
                       <input
                         type="text"
                         value={contactSearch}
@@ -578,6 +578,8 @@ export default function DesignBriefModal({
                         className={`w-full pl-9 pr-10 py-3 border rounded-xl text-sm focus:ring-2 focus:border-transparent outline-none disabled:bg-gray-50 ${
                           contactError
                             ? 'border-red-400 bg-red-50 focus:ring-red-400'
+                            : selectedContact
+                            ? 'border-green-400 bg-green-50 focus:ring-green-500'
                             : 'border-gray-200 focus:ring-blue-500'
                         }`}
                         autoComplete="off"
@@ -594,23 +596,6 @@ export default function DesignBriefModal({
                         </button>
                       )}
                     </div>
-
-                    {selectedContact && (
-                      <div className="mt-2 flex items-center gap-2.5 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
-                        <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-xs font-semibold">
-                            {getDisplayName(selectedContact).charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-blue-900 truncate">{getDisplayName(selectedContact)}</p>
-                          {selectedContact.company_name && (
-                            <p className="text-xs text-blue-600 truncate">{selectedContact.company_name}</p>
-                          )}
-                        </div>
-                        <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                      </div>
-                    )}
 
                     {showContactDropdown && !selectedContact && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-56 overflow-y-auto">
@@ -882,7 +867,7 @@ export default function DesignBriefModal({
                 onClick={handleProcess}
                 disabled={!isReady || openAIConfigured === false}
                 title={openAIConfigured === false ? 'OpenAI API key not configured — go to Admin > Integrations' : undefined}
-                className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-200 disabled:cursor-not-allowed text-white disabled:text-gray-400 text-sm font-semibold rounded-xl transition-colors"
               >
                 {alreadyProcessed ? (
                   <RefreshCw className="w-4 h-4" />
@@ -892,6 +877,13 @@ export default function DesignBriefModal({
                 {alreadyProcessed ? 'Regenerate with AI' : 'Build with AI'}
                 {!alreadyProcessed && <ArrowRight className="w-4 h-4" />}
               </button>
+              {(!isReady && openAIConfigured !== false) && (
+                <p className="text-xs text-center text-amber-600 -mt-1">
+                  {!selectedContact
+                    ? 'Select a customer above to continue'
+                    : 'Add more project notes to continue'}
+                </p>
+              )}
 
               {/* Secondary row: voice + save draft + cancel */}
               <div className="flex items-center gap-2">
