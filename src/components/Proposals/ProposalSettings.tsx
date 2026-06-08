@@ -111,6 +111,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
   const [columnOrder, setColumnOrder] = useState<string[]>([]);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [proposal, setProposal] = useState<any>(null);
+  const [proposalLoadError, setProposalLoadError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -485,6 +486,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
         supabase
           .from('proposal_area_templates')
           .select('*')
+          .eq('organization_id', profile.organization_id)
           .order('sort_order'),
         supabase
           .from('proposals')
@@ -494,6 +496,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
         supabase
           .from('contacts')
           .select('id, full_name, company_name, email, phone, street_address, city, state, zip')
+          .eq('organization_id', profile.organization_id)
           .order('full_name'),
         supabase
           .from('sales_orders')
@@ -521,7 +524,10 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       }
 
       // Load proposal data and tax settings
-      if (proposalRes.data) {
+      if (proposalRes.error) {
+        console.error('Proposal load error:', proposalRes.error);
+        setProposalLoadError(proposalRes.error.message);
+      } else if (proposalRes.data) {
         setProposal(proposalRes.data);
         setTaxEnvironment(proposalRes.data.tax_environment || 'residential');
         setTaxProjectType(proposalRes.data.tax_project_type || 'general_installation_repair');
@@ -1995,11 +2001,23 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
             )}
 
             {/* DETAILS TAB */}
-            {activeTab === 'details' && !proposal && (
+            {activeTab === 'details' && !proposal && loading && (
               <div className="flex items-center justify-center py-16">
                 <div className="text-center">
                   <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
                   <p className="text-gray-500 text-sm">Loading proposal details...</p>
+                </div>
+              </div>
+            )}
+            {activeTab === 'details' && !proposal && !loading && (
+              <div className="flex items-center justify-center py-16">
+                <div className="text-center">
+                  <p className="text-red-600 text-sm font-medium mb-2">
+                    {proposalLoadError ? 'Failed to load proposal' : 'Proposal not found'}
+                  </p>
+                  {proposalLoadError && (
+                    <p className="text-gray-500 text-xs">{proposalLoadError}</p>
+                  )}
                 </div>
               </div>
             )}
