@@ -44,9 +44,6 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
     travel_bonus_enabled: (user as any).travel_bonus_enabled || false,
     travel_bonus_rate: (user as any).travel_bonus_rate || '0.50',
     travel_bonus_method: (user as any).travel_bonus_method || 'round_trip',
-    monthly_sales_target: (user as any).monthly_sales_target || '0',
-    yearly_escalation_percentage: (user as any).yearly_escalation_percentage || '0',
-    previous_year_sales: (user as any).previous_year_sales || '0',
     sales_rep_start_date: (user as any).sales_rep_start_date
       ? new Date((user as any).sales_rep_start_date + 'T12:00:00').toISOString().split('T')[0]
       : '',
@@ -208,9 +205,6 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
         travel_bonus_enabled: formData.travel_bonus_enabled,
         travel_bonus_rate: formData.travel_bonus_enabled ? parseFloat(formData.travel_bonus_rate as string) : null,
         travel_bonus_method: formData.travel_bonus_enabled ? formData.travel_bonus_method : null,
-        monthly_sales_target: parseFloat(formData.monthly_sales_target as string) || 0,
-        yearly_escalation_percentage: parseFloat(formData.yearly_escalation_percentage as string) || 0,
-        previous_year_sales: parseFloat(formData.previous_year_sales as string) || 0,
         sales_rep_start_date: formData.sales_rep_start_date || null,
       };
 
@@ -896,75 +890,6 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
                     <span className="text-cyan-400 font-medium">Settings &rarr; Sales Targets</span>.
                   </p>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Monthly Sales Target ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="1000"
-                    min="0"
-                    value={formData.monthly_sales_target}
-                    onChange={(e) => setFormData({ ...formData, monthly_sales_target: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="0"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Goal for sales this rep should achieve each month
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
-                      Yearly Escalation (%)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="100"
-                      value={formData.yearly_escalation_percentage}
-                      onChange={(e) => setFormData({ ...formData, yearly_escalation_percentage: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      placeholder="0"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      % increase over last year (e.g., 5% growth)
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
-                      Previous Year Sales ($)
-                    </label>
-                    <input
-                      type="number"
-                      step="1000"
-                      min="0"
-                      value={formData.previous_year_sales}
-                      onChange={(e) => setFormData({ ...formData, previous_year_sales: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      placeholder="0"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Total sales from previous year
-                    </p>
-                  </div>
-                </div>
-
-                {parseFloat(formData.previous_year_sales) > 0 && parseFloat(formData.yearly_escalation_percentage) > 0 && (
-                  <div className="bg-gray-700 border border-gray-600 rounded-lg p-3">
-                    <p className="text-xs text-gray-400 mb-1">Escalated Target:</p>
-                    <p className="text-lg font-bold text-cyan-400">
-                      ${(parseFloat(formData.previous_year_sales) * (1 + parseFloat(formData.yearly_escalation_percentage) / 100)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {parseFloat(formData.yearly_escalation_percentage)}% increase over ${parseFloat(formData.previous_year_sales).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
-                )}
               </div>
             )}
 
