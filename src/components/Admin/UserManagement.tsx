@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Plus, Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, Briefcase, Lock, Layout } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, Briefcase, Lock, LayoutGrid as Layout } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile } from '../../lib/types';
 import { formatDistanceToNow, formatRoleName } from '../../lib/utils';
@@ -9,7 +9,7 @@ import { UserDepartmentAccess } from './UserDepartmentAccess';
 import { UserModuleAccess } from './UserModuleAccess';
 import { useToast } from '../Shared/Toast';
 
-export function UserManagement() {
+export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,6 +315,7 @@ export function UserManagement() {
             setEditingUser(null);
             loadUsers();
           }}
+          onNavigate={onNavigate}
         />
       )}
 

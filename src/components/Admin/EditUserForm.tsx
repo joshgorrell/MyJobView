@@ -7,6 +7,7 @@ interface EditUserFormProps {
   user: Profile;
   onClose: () => void;
   onSuccess: () => void;
+  onNavigate?: (tab: string) => void;
 }
 
 interface Role {
@@ -16,7 +17,7 @@ interface Role {
   description: string;
 }
 
-export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
+export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserFormProps) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [formData, setFormData] = useState({
     full_name: user.full_name,
@@ -886,8 +887,14 @@ export function EditUserForm({ user, onClose, onSuccess }: EditUserFormProps) {
                     className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-400 mt-1">
-                    Drives automatic annual quota calculation. For the full 30-year trajectory and growth rate overrides, go to{' '}
-                    <span className="text-cyan-400 font-medium">Settings &rarr; Sales Targets</span>.
+                    Drives automatic annual quota calculation. For the full 30-year trajectory and growth rate overrides,{' '}
+                    <button
+                      type="button"
+                      onClick={() => { onNavigate?.('settings_salestargets'); onClose(); }}
+                      className="text-cyan-400 font-medium hover:text-cyan-300 underline underline-offset-2 transition-colors"
+                    >
+                      go to Settings &rarr; Sales Targets
+                    </button>.
                   </p>
                 </div>
               </div>

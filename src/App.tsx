@@ -1026,7 +1026,11 @@ function AppContent() {
           )}
 
           {(activeTab === 'settings' || activeTab.startsWith('settings_')) && profile.role === 'admin' && (
-            <Settings key={activeTab} />
+            <Settings
+              key={activeTab}
+              initialTab={activeTab.startsWith('settings_') ? activeTab.slice('settings_'.length) : undefined}
+              onNavigate={setActiveTab}
+            />
           )}
 
           {activeTab === 'test_tune_settings' && checkModuleAccess('test_tune_settings') && <TestTuneSettings key={activeTab} />}

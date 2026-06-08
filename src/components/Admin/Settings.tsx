@@ -37,10 +37,10 @@ function SettingsLoadingFallback() {
   );
 }
 
-export function Settings() {
+export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNavigate?: (tab: string) => void } = {}) {
   const { jobModuleEnabled, profile } = useAuth();
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
-  const [activeTab, setActiveTab] = useState<'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import'>((initialTab as any) || 'users');
 
   return (
     <div className="space-y-6">
@@ -404,7 +404,7 @@ export function Settings() {
 
         <div className="p-4 sm:p-6 bg-white">
           <Suspense fallback={<SettingsLoadingFallback />}>
-            {activeTab === 'users' && <UserManagement />}
+            {activeTab === 'users' && <UserManagement onNavigate={onNavigate} />}
             {activeTab === 'sessions' && <UserSessionsViewerEnhanced />}
             {activeTab === 'roles' && <RolePermissionManagement />}
             {activeTab === 'permissions' && <PermissionsManagement />}
