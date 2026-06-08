@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Proposal } from '../../lib/types';
-import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film } from 'lucide-react';
+import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, Users } from 'lucide-react';
 import { ProposalActivityPanel } from './ProposalActivityPanel';
 import { DuplicateProposalModal } from './DuplicateProposalModal';
 import { CreateRevisionModal } from './CreateRevisionModal';
@@ -63,6 +63,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineModalMode, setDeclineModalMode] = useState<'decline' | 'cancel'>('decline');
 
+  // Rep selector — visible to admin / manager / sales_manager
+  const isAdminOrManager = ['admin', 'manager', 'sales_manager'].includes(profile?.role || '');
+  const [salesReps, setSalesReps] = useState<{ id: string; full_name: string; first_name: string }[]>([]);
+  const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
+
   // Load user preferences once on mount, then trigger proposal load
   useEffect(() => {
     if (profile && !preferencesLoaded) {
@@ -97,7 +102,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     } else {
       setLoading(false);
     }
-  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, preferencesLoaded]);
+  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, preferencesLoaded, selectedRepId]);
 
   // Reset to page 1 when filter/sort criteria change (but not when currentPage itself changes).
   const skipNextLoadRef = useRef(false);
@@ -106,7 +111,18 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       skipNextLoadRef.current = true;
       setCurrentPage(1);
     }
-  }, [debouncedSearch, filterStatus, showExpired, itemsPerPage, sortField, sortDirection]);
+  }, [debouncedSearch, filterStatus, showExpired, itemsPerPage, sortField, sortDirection, selectedRepId]);
+
+  useEffect(() => {
+    if (!isAdminOrManager || !profile) return;
+    supabase
+      .from('profiles')
+      .select('id, full_name, first_name')
+      .eq('organization_id', profile.organization_id)
+      .in('role', ['sales', 'sales_manager', 'manager', 'admin', 'finance', 'service_manager'])
+      .order('full_name')
+      .then(({ data }) => setSalesReps(data || []));
+  }, [isAdminOrManager, profile?.id]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -192,8 +208,12 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       // Apply user-scope filter based on proposal_visibility_scope setting
       // Admin always sees all; others respect their visibility scope (default: own)
       const visibilityScope = (profile as any).proposal_visibility_scope || 'own';
-      const isAdmin = profile.role === 'admin';
-      if (!isAdmin) {
+      if (isAdminOrManager) {
+        if (selectedRepId) {
+          query = query.eq('created_by', selectedRepId);
+        }
+        // No filter when selectedRepId is null — show all org proposals
+      } else {
         if (visibilityScope === 'own') {
           query = query.eq('created_by', profile.id);
         }
@@ -277,7 +297,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
     try {
       const visibilityScope = (profile as any).proposal_visibility_scope || 'own';
-      const isAdmin = profile.role === 'admin';
 
       let depositQuery = supabase
         .from('proposals')
@@ -291,7 +310,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         .order('approval_completed_at', { ascending: false })
         .limit(10);
 
-      if (!isAdmin && visibilityScope === 'own') {
+      if (isAdminOrManager) {
+        if (selectedRepId) {
+          depositQuery = depositQuery.eq('created_by', selectedRepId);
+        }
+      } else if (visibilityScope === 'own') {
         depositQuery = depositQuery.eq('created_by', profile.id);
       }
 
@@ -1247,6 +1270,39 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
+          </div>
+        </div>
+      )}
+
+      {/* Rep Selector — admin / manager / sales_manager only */}
+      {isAdminOrManager && salesReps.length > 0 && (
+        <div className="flex-shrink-0 px-3 sm:px-6 py-2 border-b border-gray-700 bg-gray-800/50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <span className="text-xs text-gray-400 font-medium flex-shrink-0">Rep:</span>
+            <button
+              onClick={() => setSelectedRepId(null)}
+              className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                selectedRepId === null
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              All Reps
+            </button>
+            {salesReps.map(rep => (
+              <button
+                key={rep.id}
+                onClick={() => setSelectedRepId(rep.id === selectedRepId ? null : rep.id)}
+                className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                  selectedRepId === rep.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {rep.full_name || rep.first_name || 'Unknown'}
+              </button>
+            ))}
           </div>
         </div>
       )}
