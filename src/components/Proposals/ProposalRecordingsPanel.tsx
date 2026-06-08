@@ -289,6 +289,12 @@ function InlineRecorder({
     };
   }, []);
 
+  useEffect(() => {
+    if (showPreview && previewVideoRef.current && streamRef.current && videoEnabled) {
+      previewVideoRef.current.srcObject = streamRef.current;
+    }
+  }, [showPreview, videoEnabled]);
+
   function stopStream() {
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
@@ -310,12 +316,6 @@ function InlineRecorder({
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-
-      // Show preview
-      if (previewVideoRef.current && videoEnabled) {
-        previewVideoRef.current.srcObject = stream;
-        previewVideoRef.current.muted = true;
-      }
 
       // Choose best supported format
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
