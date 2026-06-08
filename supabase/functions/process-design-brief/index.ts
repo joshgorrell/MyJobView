@@ -37,6 +37,7 @@ interface RequestBody {
   notes: string;
   contactId?: string;
   contactName?: string;
+  regenerate?: boolean;
 }
 
 Deno.serve(async (req: Request) => {
@@ -98,6 +99,7 @@ Deno.serve(async (req: Request) => {
       .update({ status: "building" })
       .eq("id", briefId);
 
+    // Fetch active product catalog
     const { data: products } = await supabase
       .from("products")
       .select("name, item_type, unit, our_price, cost, default_qty")
@@ -112,9 +114,61 @@ Deno.serve(async (req: Request) => {
       productCatalogSection = `\n\nPRODUCT CATALOG (use EXACT names from this list when building the proposal):\n${lines}\n\nCRITICAL: Always use the exact product name from the catalog above as the "description" in line items. If no catalog match exists, use the name as stated in the notes.`;
     }
 
+    // Fetch customer history if a contact is linked
+    let customerHistorySection = "";
+    if (contactId) {
+      const { data: previousProposals } = await supabase
+        .from("proposals")
+        .select(`
+          id,
+          title,
+          status,
+          created_at,
+          proposal_rooms (
+            name,
+            sort_order,
+            proposal_line_items (
+              description,
+              quantity,
+              unit,
+              item_type,
+              unit_price,
+              line_total,
+              sort_order
+            )
+          )
+        `)
+        .eq("contact_id", contactId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (previousProposals && previousProposals.length > 0) {
+        const proposalSummaries = previousProposals.map((p) => {
+          const rooms = (p.proposal_rooms || [])
+            .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+            .map((room: { name: string; proposal_line_items: Array<{ description: string; quantity: number; unit: string; item_type: string; sort_order: number }> }) => {
+              const items = (room.proposal_line_items || [])
+                .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+                .map((li: { description: string; quantity: number; unit: string; item_type: string }) =>
+                  `    - ${li.description} (${li.quantity} ${li.unit}, ${li.item_type})`
+                )
+                .join("\n");
+              return `  Room: ${room.name}\n${items}`;
+            })
+            .join("\n");
+          const date = new Date(p.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          return `Proposal: "${p.title}" (${p.status}, ${date})\n${rooms}`;
+        });
+
+        customerHistorySection = `\n\nCUSTOMER'S PREVIOUS PROPOSALS (for reference — the rep may ask you to copy or modify one of these):\n${proposalSummaries.join("\n\n")}`;
+      }
+    }
+
     const systemPrompt = `You are an expert AV/smart home proposal builder for a high-end installation company.
 Your job is to parse a sales rep's field notes about a customer's project and produce a structured JSON proposal prefill.
-${productCatalogSection}
+
+The rep may reference previous proposals, e.g. "make it like the Johnson job" or "same as last time but swap the projector for a 75-inch TV". Use the customer history below to understand what they mean.
+${productCatalogSection}${customerHistorySection}
 
 RESPONSE REQUIREMENTS:
 - Respond ONLY with valid JSON — no markdown, no explanation, no code fences
@@ -155,7 +209,8 @@ PARSING RULES:
 5. Tax environment: home/house/residence/bedroom → residential; office/warehouse/commercial → commercial
 6. Tax project type: new construction → original_construction; renovations → remodel; most residential installs → general_installation_repair
 7. Put any extra rep instructions, customer preferences, or context into the "notes" field
-8. Generate a descriptive title from the project type and customer name`;
+8. Generate a descriptive title from the project type and customer name
+9. If the rep asks to copy a previous proposal, replicate that proposal's rooms and items exactly, applying any stated modifications`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -172,7 +227,7 @@ PARSING RULES:
             content: `Parse these field notes and produce the ProposalPrefill JSON:\n\n${notes}${contactName ? `\n\nCustomer name: ${contactName}` : ""}`,
           },
         ],
-        max_tokens: 2000,
+        max_tokens: 4000,
         temperature: 0.2,
       }),
     });

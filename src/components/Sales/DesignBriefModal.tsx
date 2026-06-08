@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  X, Mic, MicOff, Send, Loader, CheckCircle, FileText, ChevronRight,
+  X, Mic, MicOff, Loader, CheckCircle, FileText, ChevronRight,
   AlertCircle, Home, Layers, Package, Clock, ArrowRight, Sparkles, Search,
-  User, Save, RefreshCw, ArrowLeft
+  User, RefreshCw, ArrowLeft, Send
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -136,8 +136,16 @@ export default function DesignBriefModal({
   const [openAIConfigured, setOpenAIConfigured] = useState<boolean | null>(null);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-grow textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(160, el.scrollHeight)}px`;
+  }, [notes, interimTranscript]);
 
   useEffect(() => {
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -234,9 +242,8 @@ export default function DesignBriefModal({
       .eq('id', id)
       .maybeSingle();
     if (data) {
-      const name = data.full_name || data.contact_name || [data.first_name, data.last_name].filter(Boolean).join(' ') || '';
       setSelectedContact(data);
-      setContactSearch(name);
+      setContactSearch(data.full_name || data.contact_name || [data.first_name, data.last_name].filter(Boolean).join(' ') || '');
     }
   }
 
@@ -315,11 +322,7 @@ export default function DesignBriefModal({
   }
 
   async function handleSaveDraft() {
-    if (!notes.trim()) {
-      setError('Please enter some notes before saving.');
-      return;
-    }
-
+    if (!notes.trim()) return;
     setError('');
     setSavingDraft(true);
 
@@ -366,7 +369,7 @@ export default function DesignBriefModal({
 
     if (!selectedContact) {
       setContactError(true);
-      setError('A customer is required. Select an existing contact from the dropdown, or add a new contact first.');
+      setError('A customer is required. Search and select a contact, lead, or prospect above.');
       return;
     }
 
@@ -480,39 +483,34 @@ export default function DesignBriefModal({
   }
 
   const charCount = notes.length;
-  const isReady = notes.trim().length > 20;
+  const isReady = notes.trim().length > 20 && !!selectedContact;
   const alreadyProcessed = !!(prefillResult || hasExistingAI);
-
   const isLockedStatus = existingBrief && !['draft', 'submitted', 'building', 'ready'].includes(existingBrief.status);
 
-  const getSubtitle = () => {
-    if (!isEditing) return 'Save as draft or submit directly to the design team';
-    if (existingBrief.status === 'draft') return 'Draft — save your progress or submit to the design team';
-    if (existingBrief.status === 'archived') return 'Archived brief — view only';
-    if (alreadyProcessed) return 'Edit notes and regenerate with AI anytime';
-    return 'Submitted — edit your notes and regenerate if needed';
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95dvh] sm:max-h-[90vh]">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                {isEditing ? 'Design Brief' : 'New Design Brief'}
-              </h2>
-              <p className="text-xs text-gray-500">{getSubtitle()}</p>
-            </div>
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-semibold text-gray-900 leading-tight">
+              {isEditing ? 'Design Brief' : 'New Design Brief'}
+            </h2>
+            <p className="text-xs text-gray-500 truncate">
+              {isLockedStatus
+                ? `${existingBrief.status} — view only`
+                : alreadyProcessed
+                ? 'Edit notes and regenerate anytime'
+                : 'Describe the project — AI will draft the proposal'}
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+            className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-600 flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -521,10 +519,10 @@ export default function DesignBriefModal({
         {/* Step: Input */}
         {step === 'input' && (
           <div className="flex-1 overflow-y-auto">
-            <div className="p-6 space-y-5">
+            <div className="p-5 space-y-4">
 
               {isLockedStatus && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+                <div className="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   This brief is {existingBrief.status} and can no longer be edited.
                 </div>
@@ -533,36 +531,20 @@ export default function DesignBriefModal({
               {openAIConfigured === false && (
                 <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
                   <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-amber-800">OpenAI API key not configured</p>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">OpenAI key not configured</p>
                     <p className="text-xs text-amber-700 mt-0.5">
-                      AI generation requires an OpenAI key. Go to{' '}
-                      <strong>Admin &gt; Settings &gt; Integrations &gt; OpenAI</strong> to add your key.
+                      Go to <strong>Admin &gt; Settings &gt; Integrations</strong> to add your OpenAI key.
                       You can still save a draft without it.
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Brief Title <span className="text-gray-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="e.g. Home Theater & Whole-Home Audio"
-                  disabled={!!isLockedStatus}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 disabled:text-gray-400"
-                />
-              </div>
-
               {/* Customer */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Customer <span className="text-gray-400 font-normal">(required)</span>
+                  Customer
                 </label>
                 {selectedContact && (contactId || leadId || existingBrief?.contact_id || existingBrief?.lead_id) ? (
                   <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
@@ -571,12 +553,13 @@ export default function DesignBriefModal({
                         {getDisplayName(selectedContact).charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{getDisplayName(selectedContact)}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{getDisplayName(selectedContact)}</p>
                       {selectedContact.company_name && (
-                        <p className="text-xs text-gray-500">{selectedContact.company_name}</p>
+                        <p className="text-xs text-gray-500 truncate">{selectedContact.company_name}</p>
                       )}
                     </div>
+                    <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
                   </div>
                 ) : (
                   <div className="relative">
@@ -592,7 +575,7 @@ export default function DesignBriefModal({
                         }}
                         placeholder="Search customers, contacts, or leads..."
                         disabled={!!isLockedStatus}
-                        className={`w-full pl-9 pr-10 py-2.5 border rounded-xl text-sm focus:ring-2 focus:border-transparent outline-none disabled:bg-gray-50 ${
+                        className={`w-full pl-9 pr-10 py-3 border rounded-xl text-sm focus:ring-2 focus:border-transparent outline-none disabled:bg-gray-50 ${
                           contactError
                             ? 'border-red-400 bg-red-50 focus:ring-red-400'
                             : 'border-gray-200 focus:ring-blue-500'
@@ -602,7 +585,7 @@ export default function DesignBriefModal({
                       {contactsLoading && (
                         <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
                       )}
-                      {selectedContact && (
+                      {selectedContact && !contactId && !leadId && (
                         <button
                           onClick={() => { setSelectedContact(null); setContactSearch(''); }}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -611,9 +594,10 @@ export default function DesignBriefModal({
                         </button>
                       )}
                     </div>
+
                     {selectedContact && (
-                      <div className="mt-1.5 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <div className="mt-2 flex items-center gap-2.5 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+                        <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
                           <span className="text-white text-xs font-semibold">
                             {getDisplayName(selectedContact).charAt(0).toUpperCase()}
                           </span>
@@ -627,13 +611,14 @@ export default function DesignBriefModal({
                         <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
                       </div>
                     )}
+
                     {showContactDropdown && !selectedContact && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-52 overflow-y-auto">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-56 overflow-y-auto">
                         {contacts.length === 0 && !contactsLoading && contactSearch.length > 0 && (
                           <div className="p-3 space-y-2">
-                            <div className="flex items-center gap-2 px-1 py-1 text-sm text-gray-400">
+                            <div className="flex items-center gap-2 px-1 text-sm text-gray-400">
                               <User className="w-4 h-4 flex-shrink-0" />
-                              No contacts found for "{contactSearch}"
+                              No results for "{contactSearch}"
                             </div>
                             <a
                               href="/contacts"
@@ -663,10 +648,10 @@ export default function DesignBriefModal({
                                 setContactError(false);
                                 setError('');
                               }}
-                              className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0"
+                              className="w-full text-left px-4 py-3 hover:bg-blue-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0"
                             >
-                              <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-blue-700 text-xs font-semibold">
+                              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span className="text-blue-700 text-sm font-semibold">
                                   {name.charAt(0).toUpperCase()}
                                 </span>
                               </div>
@@ -674,7 +659,7 @@ export default function DesignBriefModal({
                                 <p className="text-sm font-medium text-gray-800 truncate">{name}</p>
                                 {c.company_name && <p className="text-xs text-gray-500 truncate">{c.company_name}</p>}
                               </div>
-                              <span className={`text-xs font-medium px-1.5 py-0.5 rounded flex-shrink-0 ${badge.cls}`}>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${badge.cls}`}>
                                 {badge.label}
                               </span>
                             </button>
@@ -686,111 +671,68 @@ export default function DesignBriefModal({
                 )}
               </div>
 
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Brief Title <span className="text-gray-400 font-normal text-xs">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="e.g. Home Theater & Whole-Home Audio"
+                  disabled={!!isLockedStatus}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+
               {/* Notes */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-gray-700">
                     Project Notes
                   </label>
-                  {voiceSupported && !isLockedStatus && (
-                    <button
-                      onClick={toggleRecording}
-                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
-                        isRecording
-                          ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse'
-                          : 'bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600 border border-gray-200'
-                      }`}
-                    >
-                      {isRecording ? (
-                        <>
-                          <MicOff className="w-3.5 h-3.5" />
-                          Stop Recording
-                        </>
-                      ) : (
-                        <>
-                          <Mic className="w-3.5 h-3.5" />
-                          Voice Input
-                        </>
-                      )}
-                    </button>
-                  )}
+                  <span className={`text-xs font-medium ${charCount > 50 ? 'text-green-600' : 'text-gray-400'}`}>
+                    {charCount} chars
+                  </span>
                 </div>
 
                 <div className="relative">
                   <textarea
-                    ref={notesRef}
+                    ref={textareaRef}
                     value={notes + (interimTranscript ? ' ' + interimTranscript : '')}
                     onChange={e => setNotes(e.target.value)}
                     disabled={!!isLockedStatus}
-                    placeholder="Describe the customer's project in detail. Include rooms, systems, products, and any customer preferences or special requests.
-
-Example: 'Client is John Smith at 123 Main St. He wants a home theater in his basement family room — 4K projector, 140 inch screen, 7.2 surround sound with in-ceiling speakers. Also wants whole-home audio in the kitchen and master bedroom. They have a new construction home going in next spring.'"
-                    rows={8}
-                    className={`w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none leading-relaxed disabled:bg-gray-50 disabled:text-gray-400 ${
-                      isRecording ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    placeholder={`Describe the project — be as detailed as you like.\n\nTip: mention rooms, systems, products, customer preferences, and any special requests. You can also say things like "Make it similar to the Johnson proposal but swap the projector for a 75-inch TV."`}
+                    className={`w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none leading-relaxed disabled:bg-gray-50 disabled:text-gray-400 transition-colors ${
+                      isRecording ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
                     }`}
+                    style={{ minHeight: 160 }}
                   />
                   {isRecording && (
-                    <div className="absolute bottom-3 right-3 flex items-center gap-1.5 text-red-500">
-                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-xs font-medium">Listening...</span>
+                    <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-red-500 text-white rounded-full px-2.5 py-1">
+                      <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                      <span className="text-xs font-medium">Listening</span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between mt-1.5">
-                  <p className="text-xs text-gray-400">
-                    The more detail you provide, the better the proposal will be
-                  </p>
-                  <span className={`text-xs ${charCount > 50 ? 'text-green-600' : 'text-gray-400'}`}>
-                    {charCount} characters
-                  </span>
-                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  More detail = better proposal. You can reference previous projects by customer name.
+                </p>
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   {error}
                 </div>
               )}
 
               {draftSaved && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+                <div className="flex items-center gap-2.5 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
                   <CheckCircle className="w-4 h-4 flex-shrink-0" />
                   Draft saved — you can close and come back later
-                </div>
-              )}
-
-              {!isLockedStatus && !alreadyProcessed && (
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <p className="text-xs font-medium text-blue-800 mb-1.5">Two ways to proceed</p>
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <Save className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-blue-700">
-                        <strong>Save Draft</strong> — keep working on this over multiple sessions. Designers can see it but won't start until you submit.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-blue-700">
-                        <strong>Generate with AI</strong> — AI builds the proposal structure and notifies the design team to refine and finalize.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!isLockedStatus && alreadyProcessed && (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                  <p className="text-xs font-medium text-amber-800 mb-1.5 flex items-center gap-1.5">
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    AI has already processed this brief
-                  </p>
-                  <p className="text-xs text-amber-700">
-                    You can update your notes and click <strong>Regenerate with AI</strong> — the AI will reprocess and create a fresh proposal structure. Any previous AI output will be replaced.
-                  </p>
                 </div>
               )}
             </div>
@@ -800,7 +742,7 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
         {/* Step: Processing */}
         {step === 'processing' && (
           <div className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center space-y-6 max-w-sm">
+            <div className="text-center space-y-6 max-w-xs">
               <div className="relative w-20 h-20 mx-auto">
                 <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-40" />
                 <div className="relative w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center">
@@ -809,14 +751,14 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {isRegenerating ? 'Regenerating Your Brief' : 'Building Your Brief'}
+                  {isRegenerating ? 'Regenerating Brief' : 'Building Your Brief'}
                 </h3>
                 <p className="text-sm text-gray-500 animate-pulse">{processingMessage}</p>
               </div>
-              <div className="flex items-center gap-2 justify-center text-xs text-gray-400">
+              <p className="text-xs text-gray-400 flex items-center justify-center gap-1.5">
                 <Loader className="w-3.5 h-3.5 animate-spin" />
-                This usually takes 10–20 seconds
-              </div>
+                Usually takes 10–20 seconds
+              </p>
             </div>
           </div>
         )}
@@ -824,24 +766,23 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
         {/* Step: Preview */}
         {step === 'preview' && prefillResult && (
           <div className="flex-1 overflow-y-auto">
-            <div className="p-6 space-y-5">
-              <div className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
-                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                <div className="flex-1">
+            <div className="p-5 space-y-4">
+              <div className="flex items-start gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-green-800">Brief processed successfully</p>
                   <p className="text-xs text-green-600 mt-0.5">
                     {createdProposalId
-                      ? 'A draft proposal has been created and the design team has been notified.'
-                      : 'The brief has been saved. A proposal will be built once a customer is linked.'}
+                      ? 'Draft proposal created and design team notified.'
+                      : 'Brief saved. A proposal will be built once a customer is linked.'}
                   </p>
                 </div>
                 <button
                   onClick={handleBackToEdit}
-                  className="flex items-center gap-1.5 text-xs text-green-700 hover:text-green-900 border border-green-300 hover:border-green-400 bg-white hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                  title="Edit notes and regenerate"
+                  className="flex items-center gap-1 text-xs text-green-700 hover:text-green-900 border border-green-300 bg-white hover:bg-green-50 px-2.5 py-1.5 rounded-lg transition-colors flex-shrink-0 whitespace-nowrap"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Edit & Regenerate
+                  Edit
                 </button>
               </div>
 
@@ -852,7 +793,7 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
                 </div>
               )}
 
-              <div className="flex items-center gap-4 text-sm text-gray-600">
+              <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
                 {prefillResult.taxEnvironment && (
                   <div className="flex items-center gap-1.5">
                     <Home className="w-4 h-4 text-gray-400" />
@@ -869,16 +810,16 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
 
               {prefillResult.rooms && prefillResult.rooms.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
                     Rooms & Items ({prefillResult.rooms.length} area{prefillResult.rooms.length !== 1 ? 's' : ''})
                   </p>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {prefillResult.rooms.map((room, ri) => (
                       <div key={ri} className="border border-gray-200 rounded-xl overflow-hidden">
                         <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
                           <Layers className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium text-gray-800">{room.name}</span>
-                          <span className="ml-auto text-xs text-gray-400">
+                          <span className="text-sm font-medium text-gray-800 flex-1">{room.name}</span>
+                          <span className="text-xs text-gray-400">
                             {room.lineItems.length} item{room.lineItems.length !== 1 ? 's' : ''}
                           </span>
                         </div>
@@ -916,7 +857,7 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
         {/* Step: Done */}
         {step === 'done' && (
           <div className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center space-y-4 max-w-sm">
+            <div className="text-center space-y-4 max-w-xs">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle className="w-10 h-10 text-green-600" />
               </div>
@@ -932,53 +873,93 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
         )}
 
         {/* Footer */}
-        <div className="border-t border-gray-100 px-6 py-4 flex items-center justify-between flex-shrink-0 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            {step === 'done' ? 'Close' : draftSaved ? 'Close' : 'Cancel'}
-          </button>
+        <div className="border-t border-gray-100 px-5 py-4 flex-shrink-0 bg-white safe-area-bottom">
 
-          <div className="flex items-center gap-3">
-            {step === 'input' && !isLockedStatus && (
-              <>
-                {!alreadyProcessed && (
+          {step === 'input' && !isLockedStatus && (
+            <div className="flex flex-col gap-2.5">
+              {/* Primary CTA */}
+              <button
+                onClick={handleProcess}
+                disabled={!isReady || openAIConfigured === false}
+                title={openAIConfigured === false ? 'OpenAI API key not configured — go to Admin > Integrations' : undefined}
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                {alreadyProcessed ? (
+                  <RefreshCw className="w-4 h-4" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {alreadyProcessed ? 'Regenerate with AI' : 'Build with AI'}
+                {!alreadyProcessed && <ArrowRight className="w-4 h-4" />}
+              </button>
+
+              {/* Secondary row: voice + save draft + cancel */}
+              <div className="flex items-center gap-2">
+                {voiceSupported && (
                   <button
-                    onClick={handleSaveDraft}
-                    disabled={savingDraft || !notes.trim()}
-                    className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 text-sm font-medium rounded-xl transition-colors"
+                    onClick={toggleRecording}
+                    className={`flex items-center justify-center gap-2 flex-1 py-3 rounded-xl text-sm font-medium border transition-all ${
+                      isRecording
+                        ? 'bg-red-50 text-red-600 border-red-200 animate-pulse'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 active:bg-gray-200'
+                    }`}
                   >
-                    {savingDraft ? (
-                      <Loader className="w-4 h-4 animate-spin" />
-                    ) : draftSaved ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    {isRecording ? (
+                      <>
+                        <MicOff className="w-4 h-4" />
+                        Stop
+                      </>
                     ) : (
-                      <Save className="w-4 h-4" />
+                      <>
+                        <Mic className="w-4 h-4" />
+                        Voice
+                      </>
                     )}
-                    {draftSaved ? 'Saved!' : isEditing && briefId ? 'Save Changes' : 'Save Draft'}
                   </button>
                 )}
 
                 <button
-                  onClick={handleProcess}
-                  disabled={!isReady || openAIConfigured === false}
-                  title={openAIConfigured === false ? 'OpenAI API key not configured — go to Admin > Integrations' : undefined}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft || !notes.trim()}
+                  className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl text-sm font-medium border border-gray-200 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 transition-colors"
                 >
-                  {alreadyProcessed ? (
-                    <RefreshCw className="w-4 h-4" />
-                  ) : (
-                    <Sparkles className="w-4 h-4" />
-                  )}
-                  {alreadyProcessed ? 'Regenerate with AI' : 'Generate with AI'}
-                  <ArrowRight className="w-4 h-4" />
+                  {savingDraft ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : draftSaved ? (
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  ) : null}
+                  {draftSaved ? 'Saved!' : isEditing && briefId ? 'Save' : 'Save Draft'}
                 </button>
-              </>
-            )}
 
-            {step === 'preview' && (
-              <>
+                <button
+                  onClick={onClose}
+                  className="flex items-center justify-center py-3 px-4 rounded-xl text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 'input' && isLockedStatus && (
+            <button
+              onClick={onClose}
+              className="w-full py-3 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Close
+            </button>
+          )}
+
+          {step === 'preview' && (
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={handleDone}
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Submit to Design Team
+              </button>
+              <div className="flex items-center gap-2">
                 {createdProposalId && (
                   <button
                     onClick={() => {
@@ -987,22 +968,31 @@ Example: 'Client is John Smith at 123 Main St. He wants a home theater in his ba
                       }
                       onClose();
                     }}
-                    className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-xl transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm font-medium rounded-xl transition-colors"
                   >
                     <ChevronRight className="w-4 h-4" />
                     Open Draft Proposal
                   </button>
                 )}
                 <button
-                  onClick={handleDone}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors"
+                  onClick={onClose}
+                  className="flex items-center justify-center py-3 px-4 rounded-xl text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  <Send className="w-4 h-4" />
-                  Submit to Design Team
+                  Close
                 </button>
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
+
+          {(step === 'processing' || step === 'done') && (
+            <button
+              onClick={onClose}
+              disabled={step === 'processing'}
+              className="w-full py-3 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {step === 'done' ? 'Close' : 'Please wait...'}
+            </button>
+          )}
         </div>
       </div>
     </div>
