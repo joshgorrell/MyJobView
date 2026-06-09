@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { FileText, DollarSign, Calendar, User, Search, CheckCircle, Clock, AlertCircle, ChevronRight } from 'lucide-react';
+import { FileText, DollarSign, Calendar, User, Search, CheckCircle, Clock, AlertCircle, ChevronRight, Building2, X } from 'lucide-react';
 import { SalesOrderDetail } from './SalesOrderDetail';
 
 interface InvoiceSummary {
@@ -39,6 +39,9 @@ interface SalesOrdersViewProps {
   openOrderId?: string | null;
   onOrderOpened?: () => void;
   onRevertToProposal?: (proposalId: string) => void;
+  officeIdFilter?: string | null;
+  onClearOfficeFilter?: () => void;
+  officeNameFilter?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string; icon: typeof Clock }> = {
@@ -56,7 +59,7 @@ function getBalanceDue(order: SalesOrder): number {
   return order.invoices.reduce((sum, inv) => sum + (inv.amount_due || 0), 0);
 }
 
-export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal }: SalesOrdersViewProps = {}) {
+export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal, officeIdFilter, onClearOfficeFilter, officeNameFilter }: SalesOrdersViewProps = {}) {
   const { profile } = useAuth();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +131,8 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
       order.proposal?.title?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     const matchesRep = !selectedRepId || order.sales_rep_id === selectedRepId;
-    return matchesSearch && matchesStatus && matchesRep;
+    const matchesOffice = !officeIdFilter || (order as any).office_id === officeIdFilter;
+    return matchesSearch && matchesStatus && matchesRep && matchesOffice;
   });
 
   if (loading) {
@@ -161,6 +165,25 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           )}
         </div>
       </div>
+
+      {/* Office filter banner */}
+      {officeIdFilter && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-lg text-sm">
+          <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
+          <span className="text-blue-300 flex-1">
+            Showing orders for <span className="font-semibold text-blue-200">{officeNameFilter || 'selected office'}</span>
+          </span>
+          {onClearOfficeFilter && (
+            <button
+              onClick={onClearOfficeFilter}
+              className="flex items-center gap-1.5 text-blue-400 hover:text-blue-200 transition-colors text-xs font-medium"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear filter
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Search + Status filter */}
       <div className="flex items-center gap-2">

@@ -13,6 +13,8 @@ import { SalesServiceRequestsView } from './SalesServiceRequestsView';
 import { StaffSalesComparison } from './StaffSalesComparison';
 import { CommissionDashboard } from '../Commissions/CommissionDashboard';
 import VideoLibrary from './VideoLibrary';
+import { OfficeSalesBreakdown } from './OfficeSalesBreakdown';
+import { SalesOrdersView } from './SalesOrdersView';
 import {
   LayoutDashboard,
   Target,
@@ -22,12 +24,12 @@ import {
   FileText,
   FolderOpen,
   DollarSign,
-  TrendingDown,
   Percent,
   Receipt,
   PhoneCall,
   LineChart,
-  Film
+  Film,
+  Building2
 } from 'lucide-react';
 
 interface SalesViewProps {
@@ -47,6 +49,7 @@ interface QuickStats {
 export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
   const { profile } = useAuth();
   const [activeView, setActiveView] = useState(initialView);
+  const [officeFilter, setOfficeFilter] = useState<{ id: string; name: string } | null>(null);
   const [quickStats, setQuickStats] = useState<QuickStats>({
     pipelineValue: 0,
     openOpportunities: 0,
@@ -238,6 +241,14 @@ export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
       component: StaffSalesComparison,
       badge: 0
     }] : []),
+    // By Office tab - only visible to admin/manager/sales_manager
+    ...(profile?.role && ['admin', 'manager', 'sales_manager'].includes(profile.role) ? [{
+      id: 'by_office',
+      name: 'By Office',
+      icon: Building2,
+      component: SalesDashboard as React.ComponentType,
+      badge: 0
+    }] : []),
     // Commissions tab - visible to all sales-eligible roles (personal view of own commissions)
     ...(profile?.role && !['admin', 'manager', 'service_manager'].includes(profile.role) ? [{
       id: 'commissions',
@@ -259,6 +270,11 @@ export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
 
   const ActiveComponent = views.find(v => v.id === activeView)?.component || SalesDashboard;
 
+  function handleNavigateToOffice(officeId: string, officeName: string) {
+    setOfficeFilter({ id: officeId, name: officeName });
+    setActiveView('orders');
+  }
+
   return (
     <div className="h-full flex flex-col">
       <div className="border-b border-gray-200 bg-white">
@@ -269,9 +285,12 @@ export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
               return (
                 <button
                   key={view.id}
-                  onClick={() => setActiveView(view.id)}
+                  onClick={() => {
+                    if (view.id !== 'by_office') setOfficeFilter(null);
+                    setActiveView(view.id);
+                  }}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap relative ${
-                    activeView === view.id
+                    activeView === view.id || (view.id === 'by_office' && activeView === 'orders')
                       ? 'border-blue-600 text-blue-600'
                       : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
                   }`}
@@ -292,7 +311,20 @@ export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
 
       <div className="flex-1 overflow-auto">
         <div className="p-6">
-          <ActiveComponent />
+          {activeView === 'by_office' ? (
+            <OfficeSalesBreakdown onNavigateToOffice={handleNavigateToOffice} />
+          ) : activeView === 'orders' ? (
+            <SalesOrdersView
+              officeIdFilter={officeFilter?.id}
+              officeNameFilter={officeFilter?.name}
+              onClearOfficeFilter={() => {
+                setOfficeFilter(null);
+                setActiveView('by_office');
+              }}
+            />
+          ) : (
+            <ActiveComponent />
+          )}
         </div>
       </div>
     </div>
