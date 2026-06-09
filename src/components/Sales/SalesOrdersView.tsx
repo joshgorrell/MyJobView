@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { FileText, DollarSign, Calendar, User, Search, CheckCircle, Clock, AlertCircle, ChevronRight, Building2, X } from 'lucide-react';
 import { SalesOrderDetail } from './SalesOrderDetail';
+import { ErrorBoundary } from '../Shared/ErrorBoundary';
 
 interface InvoiceSummary {
   amount_due: number;
@@ -93,7 +94,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           contact:contacts(id, full_name, email, phone),
           proposal:proposals!sales_orders_proposal_id_fkey(id, proposal_number, title, approved_at),
           sales_rep:profiles!sales_orders_sales_rep_id_fkey(id, full_name),
-          invoices(amount_due)
+          invoices!invoices_sales_order_id_fkey(amount_due)
         `)
         .order('created_at', { ascending: false });
 
@@ -145,11 +146,23 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
 
   if (selectedOrderId) {
     return (
-      <SalesOrderDetail
-        orderId={selectedOrderId}
-        onBack={() => setSelectedOrderId(null)}
-        onRevertToProposal={onRevertToProposal}
-      />
+      <ErrorBoundary fallback={
+        <div className="text-center py-16">
+          <p className="text-gray-400 mb-4">Something went wrong loading this sales order.</p>
+          <button
+            onClick={() => setSelectedOrderId(null)}
+            className="text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            &larr; Back to Sales Orders
+          </button>
+        </div>
+      }>
+        <SalesOrderDetail
+          orderId={selectedOrderId}
+          onBack={() => setSelectedOrderId(null)}
+          onRevertToProposal={onRevertToProposal}
+        />
+      </ErrorBoundary>
     );
   }
 
