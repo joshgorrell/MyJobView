@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Shield, Check, X, Save, AlertCircle, Building, Layers, Plus, Edit2, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Shield, Check, X, Save, AlertCircle, Building, Layers, Plus, CreditCard as Edit2, Trash2, LayoutGrid, PenLine, Copy } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -62,6 +62,10 @@ export function RolePermissionManagement() {
     display_name: '',
     description: ''
   });
+  const [viewMode, setViewMode] = useState<'edit' | 'matrix'>('edit');
+  const [allRoleModuleAccess, setAllRoleModuleAccess] = useState<Map<string, Set<string>>>(new Map());
+  const [loadingMatrix, setLoadingMatrix] = useState(false);
+  const [matrixLoaded, setMatrixLoaded] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -72,6 +76,10 @@ export function RolePermissionManagement() {
       loadRolePermissions(selectedRole);
     }
   }, [selectedRole]);
+
+  useEffect(() => {
+    if (viewMode === 'matrix') loadMatrixData();
+  }, [viewMode, loadMatrixData]);
 
   async function loadData() {
     try {
@@ -100,8 +108,30 @@ export function RolePermissionManagement() {
     }
   }
 
-  async function loadRolePermissions(roleId: string) {
+  const loadMatrixData = useCallback(async () => {
+    if (matrixLoaded) return;
+    setLoadingMatrix(true);
     try {
+      const { data, error } = await supabase
+        .from('role_module_access')
+        .select('role_id, module_id, has_access');
+      if (error) throw error;
+      const map = new Map<string, Set<string>>();
+      (data || []).forEach(row => {
+        if (!row.has_access) return;
+        if (!map.has(row.role_id)) map.set(row.role_id, new Set());
+        map.get(row.role_id)!.add(row.module_id);
+      });
+      setAllRoleModuleAccess(map);
+      setMatrixLoaded(true);
+    } catch (err) {
+      console.error('Error loading matrix data:', err);
+    } finally {
+      setLoadingMatrix(false);
+    }
+  }, [matrixLoaded]);
+
+  async function loadRolePermissions(roleId: string) {    try {
       const [deptAccessRes, moduleAccessRes] = await Promise.all([
         supabase
           .from('role_department_access')
@@ -347,9 +377,42 @@ export function RolePermissionManagement() {
     modules: modules.filter(m => m.department_id === dept.id && !m.parent_module_id)
   }));
 
+  // Compute duplicate role groups for matrix view
+  const roleSignatures = roles.reduce<Record<string, string>>((acc, role) => {
+    const granted = allRoleModuleAccess.get(role.id);
+    const key = granted
+      ? [...granted].sort().join(',')
+      : '';
+    acc[role.id] = key;
+    return acc;
+  }, {});
+  const signatureGroups = new Map<string, string[]>();
+  Object.entries(roleSignatures).forEach(([roleId, sig]) => {
+    if (!signatureGroups.has(sig)) signatureGroups.set(sig, []);
+    signatureGroups.get(sig)!.push(roleId);
+  });
+  const duplicateGroupColor: Record<string, string> = {};
+  const groupColors = [
+    'bg-amber-100 text-amber-800 ring-amber-300',
+    'bg-rose-100 text-rose-800 ring-rose-300',
+    'bg-sky-100 text-sky-800 ring-sky-300',
+    'bg-emerald-100 text-emerald-800 ring-emerald-300',
+    'bg-violet-100 text-violet-800 ring-violet-300',
+  ];
+  let colorIdx = 0;
+  signatureGroups.forEach((roleIds, sig) => {
+    if (sig !== '' && roleIds.length > 1) {
+      const color = groupColors[colorIdx % groupColors.length];
+      colorIdx++;
+      roleIds.forEach(id => { duplicateGroupColor[id] = color; });
+    }
+  });
+  const hasDuplicates = Object.keys(duplicateGroupColor).length > 0;
+  const activeRoles = roles.filter(r => r.is_active);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Role Permission Management</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -357,21 +420,50 @@ export function RolePermissionManagement() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={openCreateRoleModal}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Role
-          </button>
-          <button
-            onClick={handleSavePermissions}
-            disabled={saving || !selectedRole}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving...' : 'Save Permissions'}
-          </button>
+          {/* View mode toggle */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1">
+            <button
+              onClick={() => setViewMode('edit')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                viewMode === 'edit'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <PenLine className="w-3.5 h-3.5" />
+              Edit
+            </button>
+            <button
+              onClick={() => setViewMode('matrix')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                viewMode === 'matrix'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              Matrix
+            </button>
+          </div>
+          {viewMode === 'edit' && (
+            <>
+              <button
+                onClick={openCreateRoleModal}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                New Role
+              </button>
+              <button
+                onClick={handleSavePermissions}
+                disabled={saving || !selectedRole}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving...' : 'Save Permissions'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -384,6 +476,131 @@ export function RolePermissionManagement() {
         </div>
       )}
 
+      {/* ── MATRIX VIEW ── */}
+      {viewMode === 'matrix' && (
+        <div className="space-y-4">
+          {loadingMatrix ? (
+            <div className="flex items-center justify-center py-16 text-gray-500">
+              Loading permissions matrix...
+            </div>
+          ) : (
+            <>
+              {hasDuplicates && (
+                <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                  <Copy className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>
+                    <strong>Duplicate roles detected.</strong> Roles sharing the same color badge have identical module permissions and may be redundant.
+                  </span>
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-md">
+                <table className="min-w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-4 py-3 text-left font-semibold text-gray-700 min-w-[200px] w-[200px]">
+                        Module
+                      </th>
+                      {activeRoles.map(role => {
+                        const dupColor = duplicateGroupColor[role.id];
+                        const grantedCount = allRoleModuleAccess.get(role.id)?.size ?? 0;
+                        return (
+                          <th
+                            key={role.id}
+                            className="border-b border-r last:border-r-0 border-gray-200 px-3 py-3 text-center min-w-[110px] w-[110px]"
+                          >
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={`font-semibold text-xs leading-tight ${dupColor ? 'text-gray-800' : 'text-gray-700'}`}>
+                                {role.display_name}
+                              </span>
+                              {dupColor && (
+                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ring-1 ${dupColor}`}>
+                                  Duplicate
+                                </span>
+                              )}
+                              <span className="text-[10px] text-gray-400 font-normal">
+                                {matrixLoaded ? `${grantedCount} / ${modules.filter(m => !m.parent_module_id).length}` : '—'}
+                              </span>
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modulesByDepartment.map(({ department, modules: deptModules }) => (
+                      <>
+                        {/* Department separator row */}
+                        <tr key={`dept-${department.id}`} className="bg-gray-100">
+                          <td
+                            colSpan={activeRoles.length + 1}
+                            className="sticky left-0 px-4 py-2 border-b border-gray-200"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: department.color }}
+                              />
+                              <span className="font-semibold text-xs uppercase tracking-wider text-gray-600">
+                                {department.display_name}
+                              </span>
+                              <span className="text-[10px] text-gray-400">
+                                {deptModules.length} module{deptModules.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                        {deptModules.map((mod, modIdx) => (
+                          <tr
+                            key={mod.id}
+                            className={modIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
+                          >
+                            <td className="sticky left-0 z-10 border-b border-r border-gray-200 px-4 py-2.5 font-medium text-gray-800 bg-inherit min-w-[200px] w-[200px]">
+                              <div className="flex items-center gap-2">
+                                <Layers className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                <span className="truncate text-xs">{mod.display_name}</span>
+                              </div>
+                            </td>
+                            {activeRoles.map(role => {
+                              const hasAccess = allRoleModuleAccess.get(role.id)?.has(mod.id) ?? false;
+                              const dupColor = duplicateGroupColor[role.id];
+                              return (
+                                <td
+                                  key={role.id}
+                                  className={`border-b border-r last:border-r-0 border-gray-200 px-3 py-2.5 text-center ${
+                                    dupColor ? 'bg-amber-50/30' : ''
+                                  }`}
+                                >
+                                  {hasAccess ? (
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100">
+                                      <Check className="w-3.5 h-3.5 text-green-600" />
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100">
+                                      <X className="w-3 h-3 text-gray-300" />
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-gray-400 text-right">
+                Matrix is read-only. Switch to Edit mode to modify permissions.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── EDIT VIEW ── */}
+      {viewMode === 'edit' && (
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Role Selection Sidebar */}
         <div className="lg:col-span-1">
@@ -554,6 +771,7 @@ export function RolePermissionManagement() {
           )}
         </div>
       </div>
+      )}
 
       {/* Create/Edit Role Modal */}
       {showRoleModal && (
