@@ -56,7 +56,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string;
 const DEFAULT_STATUS = { label: 'Unknown', color: 'bg-gray-700 text-gray-400 border border-gray-600/40', dot: 'bg-gray-500', icon: AlertCircle };
 
 function getBalanceDue(order: SalesOrder): number {
-  if (!order.invoices || order.invoices.length === 0) return 0;
+  if (!order.invoices || order.invoices.length === 0) {
+    return order.contract_total || 0;
+  }
   return order.invoices.reduce((sum, inv) => sum + (inv.amount_due || 0), 0);
 }
 
@@ -146,17 +148,25 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
 
   if (selectedOrderId) {
     return (
-      <ErrorBoundary fallback={
-        <div className="text-center py-16">
-          <p className="text-gray-400 mb-4">Something went wrong loading this sales order.</p>
-          <button
-            onClick={() => setSelectedOrderId(null)}
-            className="text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            &larr; Back to Sales Orders
-          </button>
-        </div>
-      }>
+      <ErrorBoundary
+        key={selectedOrderId}
+        fallback={(error) => (
+          <div className="text-center py-16 px-4">
+            <p className="text-gray-400 mb-2">Something went wrong loading this sales order.</p>
+            {error?.message && (
+              <p className="text-red-400 text-xs font-mono mb-4 max-w-lg mx-auto break-all bg-gray-800/60 rounded-lg px-3 py-2">
+                {error.message}
+              </p>
+            )}
+            <button
+              onClick={() => setSelectedOrderId(null)}
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              &larr; Back to Sales Orders
+            </button>
+          </div>
+        )}
+      >
         <SalesOrderDetail
           orderId={selectedOrderId}
           onBack={() => setSelectedOrderId(null)}

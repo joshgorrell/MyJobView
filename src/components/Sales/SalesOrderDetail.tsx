@@ -13,6 +13,7 @@ import { SalesOrderPrimaryScopeTab } from './SalesOrderPrimaryScopeTab';
 import { SalesOrderProductsTab } from './SalesOrderProductsTab';
 import { TestTuneStatusPanel } from './TestTuneStatusPanel';
 import { CompleteSalesOrderModal } from './CompleteSalesOrderModal';
+import { ErrorBoundary } from '../Shared/ErrorBoundary';
 
 export interface SalesOrderFull {
   id: string;
@@ -436,6 +437,25 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
       </div>
 
       <div className="bg-gray-800 rounded-b-lg border border-gray-700 border-t-0 p-3 sm:p-6">
+        <ErrorBoundary
+          key={activeTab}
+          fallback={(error) => (
+            <div className="py-12 text-center">
+              <p className="text-gray-400 mb-2">Something went wrong loading the <span className="font-semibold text-white">{activeTab}</span> tab.</p>
+              {error?.message && (
+                <p className="text-red-400 text-xs font-mono mt-2 max-w-lg mx-auto break-all bg-gray-800/60 border border-red-700/30 rounded-lg px-3 py-2">
+                  {error.message}
+                </p>
+              )}
+              <button
+                onClick={() => setActiveTab('scope')}
+                className="mt-4 text-blue-400 hover:text-blue-300 transition-colors text-sm"
+              >
+                Go to Sales Order tab
+              </button>
+            </div>
+          )}
+        >
         {activeTab === 'scope' && (
           <SalesOrderScopeTab order={order} onRefresh={loadChangeOrders} />
         )}
@@ -471,6 +491,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
         {activeTab === 'commissions' && showCommissions && (
           <SalesOrderCommissionsTab order={order} changeOrders={changeOrders} />
         )}
+        </ErrorBoundary>
       </div>
 
       {showCompleteModal && (
