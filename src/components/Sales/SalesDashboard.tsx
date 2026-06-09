@@ -1317,8 +1317,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           </button>
         </div>
 
-        {/* Date Range Selector */}
-        <div className="flex flex-wrap gap-2">
+        {/* Date Range Selector + View Switcher */}
+        <div className="flex flex-wrap items-center gap-2">
           {[
             { value: 'this_month', label: 'This Month' },
             { value: 'last_month', label: 'Last Month' },
@@ -1338,36 +1338,34 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               {option.label}
             </button>
           ))}
+          {isAdmin && (
+            <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-xl p-1 ml-auto">
+              <button
+                onClick={() => setActiveView('dashboard')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeView === 'dashboard'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActiveView('offices')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeView === 'offices'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                By Office
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Tab Switcher — admin/manager/sales_manager only */}
-      {isAdmin && (
-        <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-xl p-1 w-fit">
-          <button
-            onClick={() => setActiveView('dashboard')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeView === 'dashboard'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            Dashboard
-          </button>
-          <button
-            onClick={() => setActiveView('offices')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeView === 'offices'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            By Office
-          </button>
-        </div>
-      )}
 
       {/* Offices View */}
       {isAdmin && activeView === 'offices' && (
