@@ -95,18 +95,17 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
         .select('id, office_name')
         .order('office_name');
 
-      // Query sales orders with office_id, joining contact and rep
+      // Query sales orders joining contact (for office_id) and rep
       let soQuery = supabase
         .from('sales_orders')
         .select(`
           id,
           order_number,
-          office_id,
           contract_total,
           status,
           created_at,
           sales_rep_id,
-          contact:contacts(full_name),
+          contact:contacts(full_name, office_id),
           sales_rep:profiles!sales_orders_sales_rep_id_fkey(full_name),
           invoices(amount_due, status)
         `)
@@ -129,8 +128,8 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
       const orders = soData || [];
       const proposals = pData || [];
 
-      // Count orphaned orders (no office_id)
-      const orphaned = orders.filter(o => !o.office_id).length;
+      // Count orphaned orders (contact has no office assigned)
+      const orphaned = orders.filter(o => !(o.contact as any)?.office_id).length;
       setOrphanedCount(orphaned);
 
       // Build per-office summaries
@@ -151,8 +150,8 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
       }
 
       for (const order of orders) {
-        if (!order.office_id) continue;
-        const summary = officeMap.get(order.office_id);
+        if (!(order.contact as any)?.office_id) continue;
+        const summary = officeMap.get((order.contact as any)?.office_id);
         if (!summary) continue;
 
         summary.orderCount++;
