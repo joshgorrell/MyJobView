@@ -82,6 +82,9 @@ interface ProposalSettings {
   custom_modifier_1_label: string | null;
   custom_modifier_2_label: string | null;
   scope_of_work: string | null;
+  system_design_percent: number | null;
+  credit_card_fee_percent: number | null;
+  misc_parts_percent: number | null;
 }
 
 interface PortalTemplate {
@@ -241,15 +244,15 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
           .from('proposals')
           .select(`subtotal, parts_total, labor_total, tax_amount, total, tax_rate,
             discount_amount, discount_percent, project_management_amount, project_management_percent,
-            project_design_amount, project_design_percent, system_design_amount, system_design_percent,
-            credit_card_fee_amount, credit_card_fee_percent, misc_parts_amount, misc_parts_percent,
+            project_design_amount, project_design_percent, system_design_amount,
+            credit_card_fee_amount, misc_parts_amount,
             custom_modifier_1_amount, custom_modifier_1_percent, custom_modifier_2_amount, custom_modifier_2_percent,
             deposit_amount, deposit_percent, is_portal_visible, report_template_id`)
           .eq('id', order.proposal_id)
           .maybeSingle(),
         supabase
           .from('proposal_settings')
-          .select('id, custom_modifier_1_label, custom_modifier_2_label, scope_of_work')
+          .select('id, custom_modifier_1_label, custom_modifier_2_label, scope_of_work, system_design_percent, credit_card_fee_percent, misc_parts_percent')
           .eq('proposal_id', order.proposal_id)
           .maybeSingle(),
         supabase
@@ -289,7 +292,13 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
 
       setRooms(builtRooms);
       if (proposalRes.data) {
-        setProposalTotals(proposalRes.data as ProposalTotals);
+        const settings = settingsRes.data;
+        setProposalTotals({
+          ...(proposalRes.data as Omit<ProposalTotals, 'system_design_percent' | 'credit_card_fee_percent' | 'misc_parts_percent'>),
+          system_design_percent: settings?.system_design_percent ?? 0,
+          credit_card_fee_percent: settings?.credit_card_fee_percent ?? 0,
+          misc_parts_percent: settings?.misc_parts_percent ?? 0,
+        } as ProposalTotals);
         setPortalVisible(proposalRes.data.is_portal_visible ?? false);
         setProposalTemplateId(proposalRes.data.report_template_id ?? null);
       }
