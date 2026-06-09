@@ -230,7 +230,7 @@ export function PortalLimitedDashboard() {
                 Subscribe to our VIP Membership to access your full customer portal including project tracking,
                 invoices, appointments, service history, and your personal punchlist system.
               </p>
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="flex items-start gap-3">
                   <Shield className="w-5 h-5 text-yellow-300 flex-shrink-0 mt-1" />
                   <div>

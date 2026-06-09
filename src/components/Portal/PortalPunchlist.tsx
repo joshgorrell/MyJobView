@@ -24,6 +24,7 @@ import {
   Upload,
   ExternalLink,
   ArrowLeft,
+  LogOut,
   Phone,
   Mail,
   Sparkles,
@@ -966,7 +967,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
             />
 
             {newTaskPhotos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {newTaskPhotos.map((photo, index) => (
                   <div key={index} className="relative group">
                     <img
@@ -1083,7 +1084,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
                       {task.details && <p className="text-sm text-gray-600">{task.details}</p>}
 
                       {task.photos && task.photos.length > 0 && (
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {task.photos.map((photo) => (
                             <img key={photo.id} src={photo.photo_url} alt="Task photo" className="w-full h-20 object-cover rounded border border-gray-300" />
                           ))}
@@ -1341,7 +1342,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
                       </div>
 
                       {task.photos && task.photos.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {task.photos.map((photo) => (
                             <div key={photo.id} className="relative group">
                               <img src={photo.photo_url} alt="Task photo" className="w-full h-20 object-cover rounded border border-gray-300" />
@@ -1760,19 +1761,23 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
       <header className="bg-[#0f2347] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (isAdminImpersonating) {
-                  window.close();
-                } else {
-                  window.location.href = appUrl;
-                }
-              }}
-              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-              title={isAdminImpersonating ? 'Close preview tab' : 'Back to main site'}
-            >
-              <ArrowLeft className="w-5 h-5 text-white" />
-            </button>
+            {isAdminImpersonating ? (
+              <button
+                onClick={() => window.close()}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                title="Close preview tab"
+              >
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+            ) : (
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-5 h-5 text-white" />
+              </button>
+            )}
             <img
               src="/el_logo_color_(2).png"
               alt="Electronic Life"
