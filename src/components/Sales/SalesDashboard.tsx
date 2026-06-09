@@ -409,7 +409,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               .from('proposals')
               .select('id, status, total')
               .eq('created_by', repId)
-              .in('status', ['approved', 'approved_pending_action', 'declined', 'cancelled', 'expired', 'sent', 'viewed']),
+              .in('status', ['approved', 'approved_pending_action', 'declined', 'cancelled', 'expired', 'sent', 'portal']),
             supabase
               .from('profiles')
               .select('monthly_sales_target, current_annual_quota')
@@ -420,7 +420,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           const salesOrders = soResult.data || [];
           const salesOrdersRevenue = salesOrders.reduce((s, so) => s + parseFloat(so.contract_total || '0'), 0);
           const proposals = proposalsResult.data || [];
-          const proposalsOut = proposals.filter(p => ['sent', 'viewed'].includes(p.status)).length;
+          const proposalsOut = proposals.filter(p => ['sent', 'portal'].includes(p.status)).length;
           const approved = proposals.filter(p => ['approved', 'approved_pending_action'].includes(p.status)).length;
           const declined = proposals.filter(p => ['declined', 'cancelled'].length > 0 && ['declined', 'cancelled'].includes(p.status)).length;
           const closedUniverse = approved + declined + proposals.filter(p => p.status === 'expired').length;
@@ -673,7 +673,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           .from('proposals')
           .select('id, status, total')
           .eq('created_by', targetId)
-          .in('status', ['designing', 'ready_to_submit', 'sent', 'viewed']),
+          .in('status', ['designing', 'ready_to_submit', 'sent', 'portal']),
 
         // Contacts added (filtered by range or all time)
         contactsQuery,
@@ -805,7 +805,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       // Proposals out with customers = sent/viewed from the live pipeline
       const proposalsOut = activePipelineProposals.filter(p =>
-        ['sent', 'viewed'].includes(p.status)
+        ['sent', 'portal'].includes(p.status)
       ).length;
 
       // Count deals closed this month
@@ -2433,7 +2433,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   <span className={`px-2 py-0.5 rounded font-medium text-xs whitespace-nowrap ${
                     proposal.status === 'approved' || proposal.status === 'approved_pending_action'
                       ? 'bg-green-500/20 text-green-400'
-                      : proposal.status === 'sent' || proposal.status === 'viewed'
+                      : proposal.status === 'sent' || proposal.status === 'portal'
                       ? 'bg-blue-500/20 text-blue-400'
                       : 'bg-gray-500/20 text-gray-400'
                   }`}>
