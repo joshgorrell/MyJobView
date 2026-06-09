@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { TrendingUp, TrendingDown, DollarSign, Target, FileText, Users, Calendar, Clock, AlertCircle, Award, Phone, Mail, MapPin, CheckCircle, XCircle, Eye, Plus, ArrowRight, Sparkles, Activity, BarChart3, Flame, RefreshCw, MessageSquare, CreditCard as Edit, ShoppingCart, ClipboardList, Layers, Ban, Zap, Star } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Target, FileText, Users, Calendar, Clock, AlertCircle, Award, Phone, Mail, MapPin, CheckCircle, XCircle, Eye, Plus, ArrowRight, Sparkles, Activity, BarChart3, Flame, RefreshCw, MessageSquare, CreditCard as Edit, ShoppingCart, ClipboardList, Layers, Ban, Zap, Star, Building2 } from 'lucide-react';
 import { LeadDetail } from '../Leads/LeadDetail';
 import { WeeklyCheckInBanner } from './WeeklyCheckInBanner';
 import { ManagerCheckInCompliance } from './ManagerCheckInCompliance';
 import { MonthlySalesStats } from './MonthlySalesStats';
 import { StaffSalesComparison } from './StaffSalesComparison';
+import { OfficeSalesBreakdown } from './OfficeSalesBreakdown';
 
 interface DashboardMetrics {
   pipelineValue: number;
@@ -191,6 +192,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
   const [repAllMonthlyStats, setRepAllMonthlyStats] = useState<Array<{ year: number; month: number; total_sales: number }>>([]);
   const [repQuota, setRepQuota] = useState<number>(0);
   const [repMonthlyStatsLoading, setRepMonthlyStatsLoading] = useState(false);
+
+  const [activeView, setActiveView] = useState<'dashboard' | 'offices'>('dashboard');
 
   const isAdmin = profile?.role && ['admin', 'manager', 'sales_manager'].includes(profile.role);
 
@@ -1338,6 +1341,43 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         </div>
       </div>
 
+      {/* Tab Switcher — admin/manager/sales_manager only */}
+      {isAdmin && (
+        <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-xl p-1 w-fit">
+          <button
+            onClick={() => setActiveView('dashboard')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeView === 'dashboard'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveView('offices')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeView === 'offices'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            By Office
+          </button>
+        </div>
+      )}
+
+      {/* Offices View */}
+      {isAdmin && activeView === 'offices' && (
+        <OfficeSalesBreakdown />
+      )}
+
+      {/* Dashboard content — hidden when Offices tab is active */}
+      {activeView === 'dashboard' && (
+        <div className="space-y-6">
+
       {/* Rep Selector — visible to admin/manager/sales_manager only */}
       {isAdmin && salesRepsForSelector.length > 0 && (
         <div className="bg-gray-800 rounded-xl border border-gray-700 px-4 py-3">
@@ -2417,6 +2457,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           leadId={selectedLeadId}
           onClose={() => setSelectedLeadId(null)}
         />
+      )}
+        </div>
       )}
     </div>
   );
