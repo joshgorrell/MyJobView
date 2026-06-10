@@ -348,7 +348,6 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   }
 
   const approvedCOs = changeOrders.filter(co => co.status === 'approved' && co.is_billable !== false);
-  const pendingCOs = changeOrders.filter(co => co.status !== 'approved');
   const nonBillableApprovedCOs = changeOrders.filter(co => co.status === 'approved' && co.is_billable === false);
 
   const totalCOAmount = approvedCOs.reduce((sum, co) => {
@@ -620,21 +619,6 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
           );
           return { els: [...els, el], running: runningAfter };
         }, { els: [], running: originalTotal }).els}
-
-        {/* Pending COs */}
-        {pendingCOs.length > 0 && (
-          <div className="px-4 py-3 bg-gray-800/30 border-t border-gray-700/40">
-            <div className="flex items-start gap-2 text-xs text-gray-500">
-              <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              <span>
-                {pendingCOs.length} pending CO{pendingCOs.length > 1 ? 's' : ''} — not billable until approved
-                <span className="block mt-0.5 font-medium text-gray-400">
-                  {pendingCOs.map(co => co.change_order_number || 'Draft').join(', ')}
-                </span>
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Non-billable approved COs */}
         {nonBillableApprovedCOs.length > 0 && (
