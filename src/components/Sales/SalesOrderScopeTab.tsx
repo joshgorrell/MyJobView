@@ -625,7 +625,10 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   return (
     <div className="space-y-4">
       {/* Single toolbar row — Live toggle | Eye | Customer sees (portal only) | —— | Portal/Grid toggle */}
-      <div className="flex items-center gap-2 flex-wrap min-w-0">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+
+        {/* Left zone: Live toggle | Eye | Customer sees (portal only) */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
 
         {/* Live / Not Live toggle */}
         <button
@@ -782,8 +785,10 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           </div>
         )}
 
-        {/* Flex spacer — pushes view-mode toggle to the right */}
-        <div className="flex-1" />
+        </div>{/* end left zone */}
+
+        {/* Right zone: CO filter | view mode toggle */}
+        <div className="flex items-center gap-2 flex-shrink-0">
 
         {/* CO Filter dropdown — only shown when there are non-draft COs */}
         {filterableCOs.length > 0 && (
@@ -837,6 +842,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
             <span className="hidden sm:inline">Grid</span>
           </button>
         </div>
+        </div>{/* end right zone */}
       </div>
 
       {editingTaskItem && (
