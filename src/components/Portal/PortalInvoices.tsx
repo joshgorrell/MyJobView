@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw } from 'lucide-react';
+import { DollarSign, ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
+import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
 
 interface Invoice {
   id: string;
@@ -62,6 +63,7 @@ export function PortalInvoices() {
   const [detailInvoiceId, setDetailInvoiceId] = useState<string | null>(null);
   const [confirmPayAll, setConfirmPayAll] = useState(false);
   const [paymentWindowsOpened, setPaymentWindowsOpened] = useState(false);
+  const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
 
   const dissatisfactionReasons = ['too_expensive', 'not_using_service', 'switching_provider', 'service_quality', 'financial_reasons', 'other'];
 
@@ -256,6 +258,82 @@ export function PortalInvoices() {
     }
 
     setConfirmPayAll(true);
+  }
+
+  async function handlePrintInvoice(invoice: Invoice) {
+    setPrintingInvoiceId(invoice.id);
+    try {
+      const [itemsRes, paymentsRes, settingsRes, officeRes, contactRes] = await Promise.all([
+        supabase
+          .from('invoice_line_items')
+          .select('description, quantity, unit_price, amount, notes, notes_visible_on_invoice')
+          .eq('invoice_id', invoice.id)
+          .order('sort_order'),
+        supabase
+          .from('invoice_payments')
+          .select('payment_date, payment_method, amount')
+          .eq('invoice_id', invoice.id)
+          .order('payment_date'),
+        supabase
+          .from('company_settings')
+          .select('company_name, company_logo_url, phone, email')
+          .maybeSingle(),
+        supabase
+          .from('office_addresses')
+          .select('address_line1, address_line2, city, state, zip, phone')
+          .eq('is_primary', true)
+          .maybeSingle(),
+        supabase
+          .from('invoices')
+          .select(`
+            invoice_title, billing_name, billing_address_line1, billing_address_line2,
+            billing_city, billing_state, billing_zip,
+            contacts(full_name, contact_name, first_name, last_name, street_address, city, state, zip_code)
+          `)
+          .eq('id', invoice.id)
+          .maybeSingle(),
+      ]);
+
+      const extra = contactRes.data as any;
+      const contact = extra?.contacts;
+      const contactName = contact?.full_name || contact?.contact_name ||
+        `${contact?.first_name || ''} ${contact?.last_name || ''}`.trim() || '';
+
+      const company: PrintableCompanyInfo = {
+        company_name: settingsRes.data?.company_name,
+        logo_url: settingsRes.data?.company_logo_url,
+        phone: officeRes.data?.phone || settingsRes.data?.phone,
+        email: settingsRes.data?.email,
+        address_line1: officeRes.data?.address_line1,
+        address_line2: officeRes.data?.address_line2,
+        city: officeRes.data?.city,
+        state: officeRes.data?.state,
+        zip: officeRes.data?.zip,
+      };
+
+      const printable = {
+        ...invoice,
+        invoice_title: extra?.invoice_title || null,
+        billing_name: extra?.billing_name || contactName || null,
+        billing_address_line1: extra?.billing_address_line1 || contact?.street_address || null,
+        billing_address_line2: extra?.billing_address_line2 || null,
+        billing_city: extra?.billing_city || contact?.city || null,
+        billing_state: extra?.billing_state || contact?.state || null,
+        billing_zip: extra?.billing_zip || contact?.zip_code || null,
+      };
+
+      const html = buildPortalInvoicePrintHTML(
+        printable,
+        itemsRes.data || [],
+        paymentsRes.data || [],
+        company,
+      );
+      openInvoicePrint(html);
+    } catch (err) {
+      console.error('Error generating print:', err);
+    } finally {
+      setPrintingInvoiceId(null);
+    }
   }
 
   function openCancelModal(subscription: RecurringSubscription) {
@@ -541,13 +619,23 @@ export function PortalInvoices() {
                         Selected for Batch Payment
                       </div>
                     ) : (
-                      <button
-                        onClick={() => handlePayment(invoice)}
-                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium transition-colors"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        Pay ${invoice.amount_due.toFixed(2)} via QuickBooks
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handlePayment(invoice)}
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium transition-colors"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          Pay ${invoice.amount_due.toFixed(2)}
+                        </button>
+                        <button
+                          onClick={() => handlePrintInvoice(invoice)}
+                          disabled={printingInvoiceId === invoice.id}
+                          title="Print invoice"
+                          className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -617,6 +705,15 @@ export function PortalInvoices() {
                         >
                           <FileText className="w-4 h-4" />
                           View
+                        </button>
+                        <button
+                          onClick={() => handlePrintInvoice(invoice)}
+                          disabled={printingInvoiceId === invoice.id}
+                          title="Print invoice"
+                          className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors font-medium min-h-[40px] disabled:opacity-50"
+                        >
+                          <Printer className="w-4 h-4" />
+                          Print
                         </button>
                       </div>
                     </div>

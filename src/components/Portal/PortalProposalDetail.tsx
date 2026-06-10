@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
+import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
 
 interface ProposalRecording {
   id: string;
@@ -165,6 +166,27 @@ interface ReportTemplate {
   show_product_images: boolean;
 }
 
+interface PortalInvoice {
+  id: string;
+  invoice_number: string;
+  invoice_title: string | null;
+  invoice_date: string;
+  due_date: string | null;
+  status: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  amount_paid: number;
+  amount_due: number;
+  qbo_invoice_id: string | null;
+  billing_name: string | null;
+  billing_address_line1: string | null;
+  billing_address_line2: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_zip: string | null;
+}
+
 interface PortalProposalDetailProps {
   proposalId: string;
   onBack: () => void;
@@ -194,6 +216,9 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
   const [recordings, setRecordings] = useState<ProposalRecording[]>([]);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
+  const [relatedInvoices, setRelatedInvoices] = useState<PortalInvoice[]>([]);
+  const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
+  const [paymentUnavailableInvoice, setPaymentUnavailableInvoice] = useState<PortalInvoice | null>(null);
 
   useEffect(() => {
     loadProposalDetails();
@@ -425,6 +450,28 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
             setSignedUrls(urls);
           }
         }
+
+        // Load invoices linked to any sales orders for this proposal
+        const { data: salesOrders } = await supabase
+          .from('sales_orders')
+          .select('id')
+          .eq('proposal_id', proposalId);
+
+        if (salesOrders && salesOrders.length > 0) {
+          const soIds = salesOrders.map((so: { id: string }) => so.id);
+          const { data: invoicesData } = await supabase
+            .from('invoices')
+            .select(`
+              id, invoice_number, invoice_title, invoice_date, due_date, status,
+              subtotal, tax, total, amount_paid, amount_due, qbo_invoice_id,
+              billing_name, billing_address_line1, billing_address_line2,
+              billing_city, billing_state, billing_zip
+            `)
+            .in('sales_order_id', soIds)
+            .not('status', 'eq', 'void')
+            .order('invoice_date');
+          setRelatedInvoices(invoicesData || []);
+        }
       }
     } catch (error) {
       console.error('Error loading proposal details:', error);
@@ -440,6 +487,73 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
   function handleApprovalSuccess() {
     setShowApprovalModal(false);
     loadProposalDetails(); // Reload to show updated status
+  }
+
+  async function handleInvoicePayment(invoice: PortalInvoice) {
+    if (!invoice.qbo_invoice_id) {
+      setPaymentUnavailableInvoice(invoice);
+      return;
+    }
+    const { data: settings } = await supabase
+      .from('company_settings')
+      .select('qbo_realm_id')
+      .maybeSingle();
+    if (!settings?.qbo_realm_id) {
+      setPaymentUnavailableInvoice(invoice);
+      return;
+    }
+    window.open(`https://app.qbo.intuit.com/app/paynow?invoiceId=${invoice.qbo_invoice_id}`, '_blank');
+  }
+
+  async function handleInvoicePrint(invoice: PortalInvoice) {
+    setPrintingInvoiceId(invoice.id);
+    try {
+      const [itemsRes, paymentsRes, settingsRes, officeRes] = await Promise.all([
+        supabase
+          .from('invoice_line_items')
+          .select('description, quantity, unit_price, amount, notes, notes_visible_on_invoice')
+          .eq('invoice_id', invoice.id)
+          .order('sort_order'),
+        supabase
+          .from('invoice_payments')
+          .select('payment_date, payment_method, amount')
+          .eq('invoice_id', invoice.id)
+          .order('payment_date'),
+        supabase
+          .from('company_settings')
+          .select('company_name, company_logo_url, phone, email')
+          .maybeSingle(),
+        supabase
+          .from('office_addresses')
+          .select('address_line1, address_line2, city, state, zip, phone')
+          .eq('is_primary', true)
+          .maybeSingle(),
+      ]);
+
+      const company: PrintableCompanyInfo = {
+        company_name: settingsRes.data?.company_name,
+        logo_url: settingsRes.data?.company_logo_url,
+        phone: officeRes.data?.phone || settingsRes.data?.phone,
+        email: settingsRes.data?.email,
+        address_line1: officeRes.data?.address_line1,
+        address_line2: officeRes.data?.address_line2,
+        city: officeRes.data?.city,
+        state: officeRes.data?.state,
+        zip: officeRes.data?.zip,
+      };
+
+      const html = buildPortalInvoicePrintHTML(
+        invoice,
+        itemsRes.data || [],
+        paymentsRes.data || [],
+        company,
+      );
+      openInvoicePrint(html);
+    } catch (err) {
+      console.error('Error generating invoice print:', err);
+    } finally {
+      setPrintingInvoiceId(null);
+    }
   }
 
   async function handleDecline() {
@@ -1093,6 +1207,106 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                 </p>
               </div>
             )}
+
+            {/* Related Invoices Panel */}
+            {relatedInvoices.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2 rounded-xl">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    Invoice{relatedInvoices.length !== 1 ? 's' : ''}
+                  </h3>
+                  <span className="ml-auto text-xs font-semibold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                    {relatedInvoices.length}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {relatedInvoices.map((inv) => {
+                    const isPaid = inv.status === 'paid';
+                    const isOverdue = inv.status === 'overdue';
+                    const statusColors: Record<string, string> = {
+                      sent: 'bg-blue-100 text-blue-700',
+                      partial: 'bg-amber-100 text-amber-700',
+                      paid: 'bg-green-100 text-green-700',
+                      overdue: 'bg-red-100 text-red-700',
+                      draft: 'bg-gray-100 text-gray-600',
+                    };
+                    const badgeClass = statusColors[inv.status] || 'bg-gray-100 text-gray-600';
+
+                    return (
+                      <div
+                        key={inv.id}
+                        className={`rounded-xl border p-4 ${isOverdue ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-gray-50/50'}`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-gray-900 leading-tight">
+                              #{inv.invoice_number}
+                            </p>
+                            {inv.invoice_title && (
+                              <p className="text-xs text-gray-500 mt-0.5 truncate">{inv.invoice_title}</p>
+                            )}
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(inv.invoice_date).toLocaleDateString()}
+                              {inv.due_date && ` · Due ${new Date(inv.due_date).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                          <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full capitalize ${badgeClass}`}>
+                            {inv.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              {isPaid ? 'Total Paid' : 'Amount Due'}
+                            </p>
+                            <p className={`text-lg font-bold ${isPaid ? 'text-green-600' : isOverdue ? 'text-red-600' : 'text-gray-900'}`}>
+                              ${(isPaid ? inv.total : inv.amount_due).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          {!isPaid && inv.amount_paid > 0 && (
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">Paid</p>
+                              <p className="text-sm font-semibold text-green-600">
+                                ${inv.amount_paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          {!isPaid && (
+                            <button
+                              onClick={() => handleInvoicePayment(inv)}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors"
+                            >
+                              <CreditCard className="w-3.5 h-3.5" />
+                              Pay Now
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleInvoicePrint(inv)}
+                            disabled={printingInvoiceId === inv.id}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            {printingInvoiceId === inv.id ? 'Preparing...' : 'Print'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-4 text-xs text-gray-400 text-center leading-relaxed">
+                  Pay online via QuickBooks or print to mail a check.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -1115,6 +1329,32 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
           customerName={customerName}
           onClose={() => setShowQA(false)}
         />
+      )}
+
+      {/* Payment unavailable modal */}
+      {paymentUnavailableInvoice && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-amber-100 p-2.5 rounded-xl">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <h3 className="text-base font-bold text-gray-900">Online Payment Unavailable</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+              Invoice <span className="font-semibold">#{paymentUnavailableInvoice.invoice_number}</span> is not yet set up for online payment. Please contact us to pay by phone or mail a check.
+            </p>
+            <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+              You can also <button onClick={() => { handleInvoicePrint(paymentUnavailableInvoice); setPaymentUnavailableInvoice(null); }} className="text-blue-600 underline font-medium">print this invoice</button> for remittance by mail.
+            </p>
+            <button
+              onClick={() => setPaymentUnavailableInvoice(null)}
+              className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       <style>{`
