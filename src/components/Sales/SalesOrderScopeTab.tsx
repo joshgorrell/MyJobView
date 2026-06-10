@@ -913,6 +913,67 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
       {proposalTotals && displayRooms.length > 0 && (
         <TotalsFooter totals={proposalTotals} settings={proposalSettings} formatCurrency={formatCurrency} />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal !== null}
+        title={confirmModal?.title ?? ''}
+        message={confirmModal?.message ?? ''}
+        onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
+        onCancel={() => setConfirmModal(null)}
+      />
+
+      {/* Line Item Detail / Edit Modal */}
+      {lineItemModal && (
+        <SalesOrderLineItemModal
+          lineItemId={lineItemModal.id}
+          initialMode={lineItemModal.mode}
+          onClose={() => setLineItemModal(null)}
+          onSaved={() => { setLineItemModal(null); loadScope(); }}
+        />
+      )}
+
+      {/* Portal Preview Modal — rendered via portal to escape overflow:hidden containers */}
+      {showPortalPreview && createPortal(
+        <div className="fixed inset-0 z-[9999] flex flex-col bg-gray-950">
+          {/* Preview header bar */}
+          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 bg-gray-900 border-b border-gray-700 shrink-0 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Eye className={`w-4 h-4 ${portalVisible ? 'text-green-400' : 'text-blue-400'}`} />
+              <span className="text-sm font-semibold text-white">Customer Portal Preview</span>
+            </div>
+            {portalVisible ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-xs text-green-300 font-medium">Live — customer can see this now</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="text-xs text-amber-300 font-medium">Not live — customer cannot see this yet</span>
+              </div>
+            )}
+            <div className="flex-1" />
+            <button
+              onClick={() => setShowPortalPreview(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600 hover:border-gray-500 rounded-lg transition-all"
+            >
+              <X className="w-3.5 h-3.5" />
+              Close Preview
+            </button>
+          </div>
+
+          {/* Portal content — scrollable */}
+          <div className="flex-1 overflow-y-auto bg-gray-50">
+            <PortalProposalDetail
+              proposalId={order.proposal_id}
+              onBack={() => setShowPortalPreview(false)}
+              previewMode={true}
+              templateOverrideId={soTemplateOverrideId ?? proposalTemplateId}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -1971,67 +2032,6 @@ function TotalsFooter({ totals, settings, formatCurrency }: { totals: ProposalTo
           </div>
         )}
       </div>
-
-      <ConfirmModal
-        isOpen={confirmModal !== null}
-        title={confirmModal?.title ?? ''}
-        message={confirmModal?.message ?? ''}
-        onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
-        onCancel={() => setConfirmModal(null)}
-      />
-
-      {/* Line Item Detail / Edit Modal */}
-      {lineItemModal && (
-        <SalesOrderLineItemModal
-          lineItemId={lineItemModal.id}
-          initialMode={lineItemModal.mode}
-          onClose={() => setLineItemModal(null)}
-          onSaved={() => { setLineItemModal(null); loadScope(); }}
-        />
-      )}
-
-      {/* Portal Preview Modal — rendered via portal to escape overflow:hidden containers */}
-      {showPortalPreview && createPortal(
-        <div className="fixed inset-0 z-[9999] flex flex-col bg-gray-950">
-          {/* Preview header bar */}
-          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 bg-gray-900 border-b border-gray-700 shrink-0 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Eye className={`w-4 h-4 ${portalVisible ? 'text-green-400' : 'text-blue-400'}`} />
-              <span className="text-sm font-semibold text-white">Customer Portal Preview</span>
-            </div>
-            {portalVisible ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-xs text-green-300 font-medium">Live — customer can see this now</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                <span className="text-xs text-amber-300 font-medium">Not live — customer cannot see this yet</span>
-              </div>
-            )}
-            <div className="flex-1" />
-            <button
-              onClick={() => setShowPortalPreview(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600 hover:border-gray-500 rounded-lg transition-all"
-            >
-              <X className="w-3.5 h-3.5" />
-              Close Preview
-            </button>
-          </div>
-
-          {/* Portal content — scrollable */}
-          <div className="flex-1 overflow-y-auto bg-gray-50">
-            <PortalProposalDetail
-              proposalId={order.proposal_id}
-              onBack={() => setShowPortalPreview(false)}
-              previewMode={true}
-              templateOverrideId={soTemplateOverrideId ?? proposalTemplateId}
-            />
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }
