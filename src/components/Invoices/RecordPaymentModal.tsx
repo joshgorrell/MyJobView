@@ -24,7 +24,7 @@ const METHOD_OPTIONS = [
 ];
 
 export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymentModalProps) {
-  const [amount, setAmount] = useState(invoice.amount_due.toString());
+  const [amount, setAmount] = useState(invoice.amount_due.toFixed(2));
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMethod, setPaymentMethod] = useState('check');
   const [referenceNumber, setReferenceNumber] = useState('');

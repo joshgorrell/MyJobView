@@ -1,0 +1,1 @@
+ALTER TABLE payments ALTER COLUMN company_id SET DEFAULT get_user_org_id();
