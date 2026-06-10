@@ -34,6 +34,7 @@ interface CreateSOInvoiceModalProps {
   preSelectedIds?: string[];
   billingScheduleAmount?: number;
   billingScheduleTitle?: string;
+  billingSchedulePhaseId?: string;
   onClose: () => void;
   onSuccess: (invoiceId: string) => void;
 }
@@ -50,6 +51,7 @@ export function CreateSOInvoiceModal({
   preSelectedIds = [],
   billingScheduleAmount,
   billingScheduleTitle,
+  billingSchedulePhaseId,
   onClose,
   onSuccess,
 }: CreateSOInvoiceModalProps) {
@@ -400,12 +402,13 @@ export function CreateSOInvoiceModal({
           amount_due: finalTotals.total,
           notes: notes || null,
           invoice_title: invoiceTitle || autoTitle,
-          source_type: selectedCORows.length > 0 ? 'change_order' : 'progress',
+          source_type: billingSchedulePhaseId ? 'billing_phase' : selectedCORows.length > 0 ? 'change_order' : 'progress',
           includes_change_orders: selectedCORows.length > 0,
           tax_environment: taxEnv,
           tax_project_type: taxProjType,
           payment_terms: paymentTerms || null,
           invoice_type: invoiceType,
+          billing_phase_id: billingSchedulePhaseId || null,
           created_by: user.id,
           created_by_name: profile?.full_name || null,
         })

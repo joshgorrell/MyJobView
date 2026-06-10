@@ -44,6 +44,8 @@ export interface SalesOrderFull {
     title: string;
     tax_environment?: string;
     tax_project_type?: string;
+    total?: number;
+    deposit_amount?: number;
   };
   project?: {
     id: string;
@@ -165,7 +167,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
         .select(`
           *,
           contact:contacts(id, full_name, company_name, email, phone, tax_rate, default_payment_terms),
-          proposal:proposals!sales_orders_proposal_id_fkey(id, proposal_number, title, tax_environment, tax_project_type),
+          proposal:proposals!sales_orders_proposal_id_fkey(id, proposal_number, title, tax_environment, tax_project_type, total, deposit_amount),
           project:projects!projects_sales_order_id_fkey(
             id, project_number, name, status, assigned_pm,
             start_date, target_completion_date, substantial_completion_date,

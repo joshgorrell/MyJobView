@@ -1,0 +1,2 @@
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS billing_phase_id uuid REFERENCES proposal_billing_phases(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_invoices_billing_phase_id ON invoices(billing_phase_id);

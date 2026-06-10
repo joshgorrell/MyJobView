@@ -24,6 +24,7 @@ interface BillingScheduleEntry {
   resolvedAmount: number;
   status: 'unbilled' | 'invoiced';
   invoiceId?: string;
+  isSynthetic?: boolean;
 }
 
 interface Invoice {
@@ -44,6 +45,7 @@ interface Invoice {
   created_at: string;
   created_by_name: string;
   linked_cos?: COLinkDetail[];
+  billing_phase_id?: string | null;
 }
 
 interface COLinkDetail {
@@ -67,6 +69,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   const [preSelectedIds, setPreSelectedIds] = useState<string[]>([]);
   const [billingScheduleAmount, setBillingScheduleAmount] = useState<number | undefined>(undefined);
   const [billingScheduleTitle, setBillingScheduleTitle] = useState<string | undefined>(undefined);
+  const [billingSchedulePhaseId, setBillingSchedulePhaseId] = useState<string | undefined>(undefined);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [showVoided, setShowVoided] = useState(false);
@@ -158,33 +161,77 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
         .order('phase_order');
 
       if (error) throw error;
-      if (!phases || phases.length === 0) {
-        setBillingSchedule([]);
-        return;
-      }
-
-      const contractTotal = order.original_contract_total || order.contract_total || 0;
 
       const activeInvoiceList = currentInvoices.filter(inv => inv.status !== 'void');
 
+      if (!phases || phases.length === 0) {
+        // No custom billing phases — synthesize deposit + balance rows if a deposit was configured
+        const depositAmount = order.proposal?.deposit_amount;
+        const proposalTotal = order.proposal?.total;
+        if (depositAmount && depositAmount > 0 && proposalTotal && proposalTotal > 0) {
+          const balance = proposalTotal - depositAmount;
+          // Best-effort: match deposit invoice by title or amount
+          const depositInvoice = activeInvoiceList.find(inv => {
+            const titleMatch = inv.invoice_title?.toLowerCase().includes('deposit');
+            const amountMatch = Math.abs((inv.total || 0) - depositAmount) < 1;
+            return titleMatch || amountMatch;
+          });
+          const balanceInvoice = !depositInvoice && balance > 0
+            ? activeInvoiceList.find(inv => Math.abs((inv.total || 0) - balance) < 1)
+            : undefined;
+
+          setBillingSchedule([
+            {
+              id: 'synthetic-deposit',
+              phase_order: 1,
+              title: 'Deposit',
+              amount_type: 'fixed',
+              amount: depositAmount,
+              resolvedAmount: depositAmount,
+              status: depositInvoice ? 'invoiced' : 'unbilled',
+              invoiceId: depositInvoice?.id,
+              isSynthetic: true,
+            },
+            {
+              id: 'synthetic-balance',
+              phase_order: 2,
+              title: 'Balance Due',
+              amount_type: 'fixed',
+              amount: balance,
+              resolvedAmount: balance,
+              status: balanceInvoice ? 'invoiced' : 'unbilled',
+              invoiceId: balanceInvoice?.id,
+              isSynthetic: true,
+            },
+          ]);
+        } else {
+          setBillingSchedule([]);
+        }
+        return;
+      }
+
+      // Use proposal total (tax-inclusive) as the baseline for percentage phases,
+      // matching how DepositConfiguration sets them up.
+      const phaseBaseline = order.proposal?.total || order.original_contract_total || order.contract_total || 0;
+
       const entries: BillingScheduleEntry[] = phases.map(phase => {
         const resolvedAmount = phase.amount_type === 'percentage'
-          ? (contractTotal * phase.amount) / 100
+          ? (phaseBaseline * phase.amount) / 100
           : phase.amount;
 
-        const matchingInvoice = activeInvoiceList.find(inv => {
-          if (inv.source_type === 'billing_phase') return false;
-          const titleMatch = inv.invoice_title && phase.title &&
-            inv.invoice_title.toLowerCase().includes(phase.title.toLowerCase());
+        // Primary match: billing_phase_id FK (set when invoice is created from a phase)
+        const phaseInvoice = activeInvoiceList.find(inv => inv.billing_phase_id === phase.id);
+
+        // Fallback: title/amount match for invoices created before billing_phase_id existed
+        const fallbackInvoice = phaseInvoice ? undefined : activeInvoiceList.find(inv => {
+          if (inv.billing_phase_id) return false; // already linked to a different phase
+          const titleMatch = !!(inv.invoice_title && phase.title &&
+            inv.invoice_title.toLowerCase().includes(phase.title.toLowerCase()));
           const amountMatch = Math.abs((inv.total || 0) - resolvedAmount) < 1;
           return titleMatch || amountMatch;
         });
 
-        const scheduleInvoice = activeInvoiceList.find(inv =>
-          inv.source_type === 'billing_phase' && (inv as any).billing_phase_id === phase.id
-        );
-
-        const linkedInvoice = scheduleInvoice || matchingInvoice;
+        const linkedInvoice = phaseInvoice || fallbackInvoice;
 
         return {
           id: phase.id,
@@ -305,7 +352,13 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   const nonBillableApprovedCOs = changeOrders.filter(co => co.status === 'approved' && co.is_billable === false);
 
   const originalTotal = order.original_contract_total || order.contract_total || 0;
-  const totalCOAmount = approvedCOs.reduce((sum, co) => sum + (co.change_amount || 0) + (co.tax_amount || 0), 0);
+  const totalCOAmount = approvedCOs.reduce((sum, co) => {
+    const isNeg = (co.change_amount || 0) < 0;
+    const coVal = isNeg
+      ? (co.change_amount || 0) - Math.abs(co.tax_amount || 0)
+      : Math.abs(co.change_amount || 0) + (co.tax_amount || 0);
+    return sum + coVal;
+  }, 0);
   const fullContractWithCOs = originalTotal + totalCOAmount;
 
   const activeInvoices = invoices.filter(inv => inv.status !== 'void');
@@ -360,6 +413,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
     setPreSelectedIds(['contract']);
     setBillingScheduleAmount(undefined);
     setBillingScheduleTitle(undefined);
+    setBillingSchedulePhaseId(undefined);
     setShowCreateModal(true);
   }
 
@@ -367,6 +421,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
     setPreSelectedIds(['contract']);
     setBillingScheduleAmount(entry.resolvedAmount);
     setBillingScheduleTitle(entry.title);
+    setBillingSchedulePhaseId(entry.isSynthetic ? undefined : entry.id);
     setShowCreateModal(true);
   }
 
@@ -374,6 +429,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
     setPreSelectedIds([]);
     setBillingScheduleAmount(undefined);
     setBillingScheduleTitle(undefined);
+    setBillingSchedulePhaseId(undefined);
     setShowCreateModal(true);
   }
 
@@ -382,6 +438,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
     setPreSelectedIds([]);
     setBillingScheduleAmount(undefined);
     setBillingScheduleTitle(undefined);
+    setBillingSchedulePhaseId(undefined);
     loadInvoices();
     onRefresh();
     setViewingInvoiceId(invoiceId);
@@ -696,13 +753,15 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
                                 <DollarSign className="w-3 h-3" />
                                 Bill
                               </button>
-                              <button
-                                onClick={() => setDeleteScheduleConfirm(entry)}
-                                className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors touch-manipulation"
-                                title="Remove this billing schedule entry"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {!entry.isSynthetic && (
+                                <button
+                                  onClick={() => setDeleteScheduleConfirm(entry)}
+                                  className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors touch-manipulation"
+                                  title="Remove this billing schedule entry"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -990,7 +1049,8 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
           preSelectedIds={preSelectedIds}
           billingScheduleAmount={billingScheduleAmount}
           billingScheduleTitle={billingScheduleTitle}
-          onClose={() => { setShowCreateModal(false); setPreSelectedIds([]); setBillingScheduleAmount(undefined); setBillingScheduleTitle(undefined); }}
+          billingSchedulePhaseId={billingSchedulePhaseId}
+          onClose={() => { setShowCreateModal(false); setPreSelectedIds([]); setBillingScheduleAmount(undefined); setBillingScheduleTitle(undefined); setBillingSchedulePhaseId(undefined); }}
           onSuccess={handleInvoiceCreated}
         />
       )}
