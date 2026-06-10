@@ -40,9 +40,22 @@ interface LineItem {
   _coAction?: 'add' | 'remove' | 'modify_quantity' | 'modify_price' | null;
 }
 
-interface Room {
+interface CoAddedItem {
   id: string;
-  name: string;
+  room_name: string | null;
+  product_name: string | null;
+  product_description: string | null;
+  new_quantity: number | null;
+  new_unit_price: number | null;
+  new_total: number | null;
+  labor_hours: number | null;
+  labor_rate: number | null;
+  labor_total: number | null;
+  item_type: string | null;
+  sku: string | null;
+}
+
+interface Room {
   description: string | null;
   sort_order: number;
   show_scope: boolean;
@@ -221,6 +234,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   // CO filter state
   const [selectedCOId, setSelectedCOId] = useState<string | null>(null);
   const [coLineItemMap, setCoLineItemMap] = useState<Map<string, string>>(new Map());
+  const [coAddedItems, setCoAddedItems] = useState<CoAddedItem[]>([]);
   const [coFilterLoading, setCoFilterLoading] = useState(false);
 
   const roomScopeRef = useRef<HTMLTextAreaElement>(null);
@@ -361,21 +375,26 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   useEffect(() => {
     if (!selectedCOId) {
       setCoLineItemMap(new Map());
+      setCoAddedItems([]);
       return;
     }
     setCoFilterLoading(true);
     supabase
       .from('change_order_line_items')
-      .select('proposal_line_item_id, action_type')
+      .select('id, proposal_line_item_id, action_type, room_name, product_name, product_description, new_quantity, new_unit_price, new_total, labor_hours, labor_rate, labor_total, item_type, sku')
       .eq('change_order_id', selectedCOId)
       .then(({ data }) => {
         const map = new Map<string, string>();
+        const added: CoAddedItem[] = [];
         data?.forEach(item => {
           if (item.proposal_line_item_id) {
             map.set(item.proposal_line_item_id, item.action_type);
+          } else if (item.action_type === 'add') {
+            added.push(item as CoAddedItem);
           }
         });
         setCoLineItemMap(map);
+        setCoAddedItems(added);
         setCoFilterLoading(false);
       });
   }, [selectedCOId]);
@@ -976,6 +995,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           onRoomShowScopeChange={setRoomShowScope}
           onEditTask={startEditTask}
           coLineItemMap={selectedCOId ? coLineItemMap : null}
+          coAddedItems={selectedCOId ? coAddedItems : []}
           getActionBadge={getActionBadge}
         />
       ) : (
@@ -999,6 +1019,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           onEditTask={startEditTask}
           onPhaseChange={handleLineItemPhaseChange}
           coLineItemMap={selectedCOId ? coLineItemMap : null}
+          coAddedItems={selectedCOId ? coAddedItems : []}
           getActionBadge={getActionBadge}
         />
       )}
@@ -1105,13 +1126,14 @@ interface PortalViewProps {
   onRoomShowScopeChange: (v: boolean) => void;
   onEditTask: (item: LineItem) => void;
   coLineItemMap: Map<string, string> | null;
+  coAddedItems: CoAddedItem[];
   getActionBadge: (actionType: string) => React.ReactNode;
 }
 
 function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, formatCurrency,
   editingRoomId, roomScopeText, roomShowScope, roomScopeRef, savingRoomScope,
   onToggleRoom, onStartEditRoom, onCancelEditRoom, onSaveRoomScope,
-  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, coLineItemMap, getActionBadge }: PortalViewProps) {
+  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, coLineItemMap, coAddedItems, getActionBadge }: PortalViewProps) {
   // Resolve effective settings — template takes precedence, otherwise show all
   const tmpl = portalTemplate ?? ALL_SHOWING;
   const allRoomsSubtotal = rooms.reduce((s, r) => {
@@ -1129,7 +1151,8 @@ function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, f
           const hasTax = taxTotal > 0.005;
           const isEditingThisRoom = editingRoomId === room.id;
           const visibleItems = room.line_items.filter(i => !i.is_hidden && (!coLineItemMap || coLineItemMap.has(i.id)));
-          if (coLineItemMap && visibleItems.length === 0) return null;
+          const roomAddedItems = coAddedItems.filter(i => i.room_name === room.name);
+          if (coLineItemMap && visibleItems.length === 0 && roomAddedItems.length === 0) return null;
 
           return (
             <div key={room.id} className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden"
@@ -1208,7 +1231,7 @@ function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, f
               )}
 
               <div className="px-5 pb-5 pt-2">
-                {visibleItems.length === 0 ? (
+                {visibleItems.length === 0 && roomAddedItems.length === 0 ? (
                   <p className="py-4 text-sm text-gray-400 italic">No items in this area.</p>
                 ) : (
                   <div className="overflow-x-auto -mx-5 px-5">
@@ -1233,6 +1256,33 @@ function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, f
                             actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null}
                           />
                         ))}
+                        {roomAddedItems.map(item => {
+                          const isLabor = item.item_type === 'labor';
+                          const qty = item.new_quantity ?? 0;
+                          const price = item.new_unit_price ?? 0;
+                          const laborTotal = item.labor_total ?? 0;
+                          const rowTotal = (qty * price) + laborTotal;
+                          return (
+                            <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                              <td className="py-3.5">
+                                <div className="flex items-start gap-2">
+                                  {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" /> : <Package className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-gray-900">
+                                      {item.product_description || item.product_name || ''}
+                                      {getActionBadge('add')}
+                                    </div>
+                                    {item.sku && <div className="text-xs text-cyan-600 font-mono mt-0.5">{item.sku}</div>}
+                                  </div>
+                                </div>
+                              </td>
+                              {tmpl.show_quantity && <td className="text-center py-3.5 px-3 text-sm text-gray-700 whitespace-nowrap">{qty}</td>}
+                              {tmpl.show_unit_price && <td className="text-right py-3.5 px-3 text-sm text-gray-600 whitespace-nowrap tabular-nums">{formatCurrency(price)}</td>}
+                              {tmpl.show_line_item_total && <td className="text-right py-3.5 text-sm font-bold whitespace-nowrap tabular-nums text-gray-900">{formatCurrency(rowTotal)}</td>}
+                              <td />
+                            </tr>
+                          );
+                        })}
                       </tbody>
                       {tmpl.show_area_subtotals && (
                         <tfoot className="bg-gray-50">
@@ -1301,13 +1351,14 @@ interface GridViewProps {
   onEditTask: (item: LineItem) => void;
   onPhaseChange: (itemId: string, phaseId: string | null) => Promise<void>;
   coLineItemMap: Map<string, string> | null;
+  coAddedItems: CoAddedItem[];
   getActionBadge: (actionType: string) => React.ReactNode;
 }
 
 function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
   editingRoomId, roomScopeText, roomShowScope, roomScopeRef, savingRoomScope,
   laborPhases, onToggleRoom, onStartEditRoom, onCancelEditRoom, onSaveRoomScope,
-  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onPhaseChange, coLineItemMap, getActionBadge }: GridViewProps) {
+  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onPhaseChange, coLineItemMap, coAddedItems, getActionBadge }: GridViewProps) {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(DEFAULT_VISIBLE_COLUMNS));
   const [showColumnMenu, setShowColumnMenu] = useState(false);
 
@@ -1336,13 +1387,14 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
         {rooms.map(room => {
           const isEditingThisRoom = editingRoomId === room.id;
           const filteredItems = room.line_items.filter(i => !i.is_hidden && (!coLineItemMap || coLineItemMap.has(i.id)));
-          if (coLineItemMap && filteredItems.length === 0) return null;
+          const roomAddedItems = coAddedItems.filter(i => i.room_name === room.name);
+          if (coLineItemMap && filteredItems.length === 0 && roomAddedItems.length === 0) return null;
           const { parts: gridPartsTotal, labor: gridLaborTotal } = getRoomItemsSubtotal(room);
           const gridItemsSubtotal = gridPartsTotal + gridLaborTotal;
           const { modifiersTotal: gridModifiers, taxTotal: gridTax, areaTotal: gridRoomTotal } = computeRoomTotal(gridItemsSubtotal, allRoomsSubtotal, proposalTotals);
           const gridHasModifiers = Math.abs(gridModifiers) > 0.005;
           const gridHasTax = gridTax > 0.005;
-          const visibleItemCount = filteredItems.length;
+          const visibleItemCount = filteredItems.length + roomAddedItems.length;
 
           return (
             <div key={room.id} className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
@@ -1465,6 +1517,38 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                             {filteredItems.map(item => (
                               <GridLineItemRow key={item.id} item={item} formatCurrency={formatCurrency} onEditTask={() => onEditTask(item)} visibleColumns={visibleColumns} laborPhases={laborPhases} onPhaseChange={onPhaseChange} onViewItem={(id) => setLineItemModal({ id, mode: 'view' })} onEditItem={(id) => setLineItemModal({ id, mode: 'edit' })} actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null} />
                             ))}
+                            {roomAddedItems.map(item => {
+                              const isLabor = item.item_type === 'labor';
+                              const qty = item.new_quantity ?? 0;
+                              const price = item.new_unit_price ?? 0;
+                              const laborTotal = item.labor_total ?? 0;
+                              const rowTotal = (qty * price) + laborTotal;
+                              return (
+                                <tr key={item.id} className="border-b border-gray-700/30 hover:bg-gray-800/20 transition-colors">
+                                  <td className="py-2 px-2 w-7 text-center" />
+                                  {visibleColumns.has('manufacturer') && <td className="py-2 px-3 text-xs text-gray-500" />}
+                                  {visibleColumns.has('sku') && <td className="py-2 px-3 text-xs text-cyan-400 font-mono">{item.sku ?? ''}</td>}
+                                  {visibleColumns.has('description') && (
+                                    <td className="py-2 px-3">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {isLabor ? <Wrench className="w-3 h-3 text-blue-400 flex-shrink-0" /> : <Package className="w-3 h-3 text-gray-400 flex-shrink-0" />}
+                                        <span className="text-xs text-gray-200">{item.product_description || item.product_name || ''}</span>
+                                        {getActionBadge('add')}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.has('qty') && <td className="py-2 px-3 text-xs text-gray-300 text-right tabular-nums">{qty}</td>}
+                                  {visibleColumns.has('cost') && <td className="py-2 px-3 text-xs text-gray-600 text-right" />}
+                                  {visibleColumns.has('price') && <td className="py-2 px-3 text-xs text-gray-300 text-right tabular-nums border-r border-gray-700/60">{formatCurrency(price)}</td>}
+                                  {visibleColumns.has('laborPhase') && <td className="py-2 px-3" />}
+                                  {visibleColumns.has('laborHrs') && <td className="py-2 px-3 text-xs text-cyan-400 text-right tabular-nums">{item.labor_hours ?? ''}</td>}
+                                  {visibleColumns.has('laborRate') && <td className="py-2 px-3 text-xs text-cyan-400 text-right tabular-nums">{item.labor_rate ? formatCurrency(item.labor_rate) : ''}</td>}
+                                  {visibleColumns.has('laborTotal') && <td className="py-2 px-3 text-xs text-cyan-400 text-right tabular-nums border-r border-gray-700/60">{laborTotal > 0 ? formatCurrency(laborTotal) : ''}</td>}
+                                  {visibleColumns.has('lineTotal') && <td className="py-2 px-3 text-xs font-semibold text-white text-right tabular-nums">{formatCurrency(rowTotal)}</td>}
+                                  <td className="py-2 px-2 w-8" />
+                                </tr>
+                              );
+                            })}
                           </tbody>
                           <tfoot>
                             <tr className="border-t-2 border-gray-600/60 bg-gray-800/40">
@@ -1577,6 +1661,51 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                                   })}
                                 </div>
                               )}
+                            </div>
+                          );
+                        })}
+                        {roomAddedItems.map(item => {
+                          const isLabor = item.item_type === 'labor';
+                          const qty = item.new_quantity ?? 0;
+                          const price = item.new_unit_price ?? 0;
+                          const laborTotal = item.labor_total ?? 0;
+                          const rowTotal = (qty * price) + laborTotal;
+                          return (
+                            <div key={item.id} className="px-4 py-3">
+                              <div className="flex items-start gap-2">
+                                <div className="mt-0.5 flex-shrink-0">
+                                  {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400" /> : <Package className="w-3.5 h-3.5 text-gray-400" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap text-sm font-medium text-white leading-snug">
+                                    {item.product_description || item.product_name || ''}
+                                    {getActionBadge('add')}
+                                  </div>
+                                  {item.sku && <div className="text-cyan-400 text-xs mt-0.5 font-mono">{item.sku}</div>}
+                                </div>
+                              </div>
+                              <div className="mt-2.5 grid grid-cols-2 gap-2">
+                                <div className="bg-gray-800/60 rounded-lg px-2.5 py-2">
+                                  <div className="text-xs text-gray-500 mb-0.5">Qty × Price</div>
+                                  <div className="text-sm text-gray-300 tabular-nums">{qty} × {formatCurrency(price)}</div>
+                                  <div className="text-xs text-gray-500 mt-0.5 tabular-nums">= {formatCurrency(qty * price)}</div>
+                                </div>
+                                {laborTotal > 0 ? (
+                                  <div className="bg-gray-800/60 rounded-lg px-2.5 py-2">
+                                    <div className="text-xs text-cyan-600/80 mb-0.5">Labor</div>
+                                    <div className="text-sm text-cyan-400 tabular-nums">{item.labor_hours}h × {formatCurrency(item.labor_rate || 0)}</div>
+                                    <div className="text-xs text-cyan-600/70 mt-0.5 tabular-nums">= {formatCurrency(laborTotal)}</div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-gray-800/60 rounded-lg px-2.5 py-2 flex items-center justify-center">
+                                    <span className="text-xs text-gray-600">No labor</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-2 flex items-center justify-end">
+                                <span className="text-xs text-gray-500 mr-1.5">Row Total</span>
+                                <span className="text-sm font-semibold text-white tabular-nums">{formatCurrency(rowTotal)}</span>
+                              </div>
                             </div>
                           );
                         })}
