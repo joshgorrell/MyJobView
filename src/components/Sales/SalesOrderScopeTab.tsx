@@ -1308,6 +1308,75 @@ function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, f
             </div>
         );
       })}
+
+      {/* Synthetic room cards for CO-added rooms not in the base proposal */}
+      {coLineItemMap && (() => {
+        const existingRoomNames = new Set(rooms.map(r => r.name));
+        const orphanItems = coAddedItems.filter(i => !existingRoomNames.has(i.room_name ?? ''));
+        if (orphanItems.length === 0) return null;
+        const groups = new Map<string, CoAddedItem[]>();
+        orphanItems.forEach(item => {
+          const key = item.room_name ?? 'Unassigned';
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)!.push(item);
+        });
+        return Array.from(groups.entries()).map(([roomName, items]) => (
+          <div key={`co-room-${roomName}`} className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-500/20 p-2 rounded-lg flex-shrink-0">
+                  <Package className="w-4 h-4 text-blue-400" />
+                </div>
+                <h3 className="text-base font-bold text-white">{roomName}</h3>
+              </div>
+            </div>
+            <div className="px-5 pb-5 pt-2">
+              <div className="overflow-x-auto -mx-5 px-5">
+                <table className="w-full min-w-[280px]">
+                  <thead>
+                    <tr className="border-b-2 border-gray-100">
+                      <th className="text-left py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Item</th>
+                      {tmpl.show_quantity && <th className="text-center py-3 text-xs font-bold text-gray-500 uppercase tracking-wider px-3 whitespace-nowrap">Qty</th>}
+                      {tmpl.show_unit_price && <th className="text-right py-3 text-xs font-bold text-gray-500 uppercase tracking-wider px-3 whitespace-nowrap">Price</th>}
+                      {tmpl.show_line_item_total && <th className="text-right py-3 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total</th>}
+                      <th className="py-3 w-8" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(item => {
+                      const isLabor = item.item_type === 'labor';
+                      const qty = item.new_quantity ?? 0;
+                      const price = item.new_unit_price ?? 0;
+                      const laborTotal = item.labor_total ?? 0;
+                      const rowTotal = (qty * price) + laborTotal;
+                      return (
+                        <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="py-3.5">
+                            <div className="flex items-start gap-2">
+                              {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" /> : <Package className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-gray-900">
+                                  {item.product_description || item.product_name || ''}
+                                  {getActionBadge('add')}
+                                </div>
+                                {item.sku && <div className="text-xs text-cyan-600 font-mono mt-0.5">{item.sku}</div>}
+                              </div>
+                            </div>
+                          </td>
+                          {tmpl.show_quantity && <td className="text-center py-3.5 px-3 text-sm text-gray-700 whitespace-nowrap">{qty}</td>}
+                          {tmpl.show_unit_price && <td className="text-right py-3.5 px-3 text-sm text-gray-600 whitespace-nowrap tabular-nums">{formatCurrency(price)}</td>}
+                          {tmpl.show_line_item_total && <td className="text-right py-3.5 text-sm font-bold whitespace-nowrap tabular-nums text-gray-900">{formatCurrency(rowTotal)}</td>}
+                          <td />
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ));
+      })()}
     </div>
   );
 }
@@ -1729,6 +1798,134 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
             </div>
           );
         })}
+
+        {/* Synthetic room cards for CO-added rooms not in the base proposal */}
+        {coLineItemMap && (() => {
+          const existingRoomNames = new Set(rooms.map(r => r.name));
+          const orphanItems = coAddedItems.filter(i => !existingRoomNames.has(i.room_name ?? ''));
+          if (orphanItems.length === 0) return null;
+          const groups = new Map<string, CoAddedItem[]>();
+          orphanItems.forEach(item => {
+            const key = item.room_name ?? 'Unassigned';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(item);
+          });
+          return Array.from(groups.entries()).map(([roomName, items]) => (
+            <div key={`co-room-${roomName}`} className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/50 border-b border-gray-700 select-none">
+                <ChevronDown className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                <span className="text-sm font-semibold text-blue-400">{roomName}</span>
+                <span className="ml-auto text-xs text-gray-500 tabular-nums">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+              </div>
+              <div>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-800/80 text-gray-400 border-b border-gray-700">
+                      <tr>
+                        <th className="py-2 px-2 w-7 text-center" />
+                        {visibleColumns.has('manufacturer') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium">Manufacturer</th>}
+                        {visibleColumns.has('sku') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium">SKU</th>}
+                        {visibleColumns.has('description') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium w-[28%]">Description</th>}
+                        {visibleColumns.has('qty') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium">Qty</th>}
+                        {visibleColumns.has('cost') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-gray-500">Cost</th>}
+                        {visibleColumns.has('price') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium border-r border-gray-700/60">Price</th>}
+                        {visibleColumns.has('laborPhase') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80">Phase</th>}
+                        {visibleColumns.has('laborHrs') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80"><span className="flex items-center justify-end gap-1"><Wrench className="w-3 h-3" />Hrs</span></th>}
+                        {visibleColumns.has('laborRate') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80">Labor Rate</th>}
+                        {visibleColumns.has('laborTotal') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80 border-r border-gray-700/60">Labor Total</th>}
+                        {visibleColumns.has('lineTotal') && <th className="text-right py-2 px-3 whitespace-nowrap font-semibold text-white">Line Total</th>}
+                        <th className="py-2 px-2 w-8" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map(item => {
+                        const isLabor = item.item_type === 'labor';
+                        const qty = item.new_quantity ?? 0;
+                        const price = item.new_unit_price ?? 0;
+                        const laborTotal = item.labor_total ?? 0;
+                        const rowTotal = (qty * price) + laborTotal;
+                        return (
+                          <tr key={item.id} className="border-b border-gray-700/30 hover:bg-gray-800/20 transition-colors">
+                            <td className="py-2 px-2 w-7 text-center" />
+                            {visibleColumns.has('manufacturer') && <td className="py-2 px-3 text-xs text-gray-500" />}
+                            {visibleColumns.has('sku') && <td className="py-2 px-3 text-xs text-cyan-400 font-mono">{item.sku ?? ''}</td>}
+                            {visibleColumns.has('description') && (
+                              <td className="py-2 px-3">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {isLabor ? <Wrench className="w-3 h-3 text-blue-400 flex-shrink-0" /> : <Package className="w-3 h-3 text-gray-400 flex-shrink-0" />}
+                                  <span className="text-xs text-gray-200">{item.product_description || item.product_name || ''}</span>
+                                  {getActionBadge('add')}
+                                </div>
+                              </td>
+                            )}
+                            {visibleColumns.has('qty') && <td className="py-2 px-3 text-xs text-gray-300 text-right tabular-nums">{qty}</td>}
+                            {visibleColumns.has('cost') && <td className="py-2 px-3 text-xs text-gray-600 text-right" />}
+                            {visibleColumns.has('price') && <td className="py-2 px-3 text-xs text-gray-300 text-right tabular-nums border-r border-gray-700/60">{formatCurrency(price)}</td>}
+                            {visibleColumns.has('laborPhase') && <td className="py-2 px-3" />}
+                            {visibleColumns.has('laborHrs') && <td className="py-2 px-3 text-xs text-cyan-400 text-right tabular-nums">{item.labor_hours ?? ''}</td>}
+                            {visibleColumns.has('laborRate') && <td className="py-2 px-3 text-xs text-cyan-400 text-right tabular-nums">{item.labor_rate ? formatCurrency(item.labor_rate) : ''}</td>}
+                            {visibleColumns.has('laborTotal') && <td className="py-2 px-3 text-xs text-cyan-400 text-right tabular-nums border-r border-gray-700/60">{laborTotal > 0 ? formatCurrency(laborTotal) : ''}</td>}
+                            {visibleColumns.has('lineTotal') && <td className="py-2 px-3 text-xs font-semibold text-white text-right tabular-nums">{formatCurrency(rowTotal)}</td>}
+                            <td className="py-2 px-2 w-8" />
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile card list */}
+                <div className="md:hidden divide-y divide-gray-700/30">
+                  {items.map(item => {
+                    const isLabor = item.item_type === 'labor';
+                    const qty = item.new_quantity ?? 0;
+                    const price = item.new_unit_price ?? 0;
+                    const laborTotal = item.labor_total ?? 0;
+                    const rowTotal = (qty * price) + laborTotal;
+                    return (
+                      <div key={item.id} className="px-4 py-3">
+                        <div className="flex items-start gap-2">
+                          <div className="mt-0.5 flex-shrink-0">
+                            {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400" /> : <Package className="w-3.5 h-3.5 text-gray-400" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap text-sm font-medium text-white leading-snug">
+                              {item.product_description || item.product_name || ''}
+                              {getActionBadge('add')}
+                            </div>
+                            {item.sku && <div className="text-cyan-400 text-xs mt-0.5 font-mono">{item.sku}</div>}
+                          </div>
+                        </div>
+                        <div className="mt-2.5 grid grid-cols-2 gap-2">
+                          <div className="bg-gray-800/60 rounded-lg px-2.5 py-2">
+                            <div className="text-xs text-gray-500 mb-0.5">Qty × Price</div>
+                            <div className="text-sm text-gray-300 tabular-nums">{qty} × {formatCurrency(price)}</div>
+                            <div className="text-xs text-gray-500 mt-0.5 tabular-nums">= {formatCurrency(qty * price)}</div>
+                          </div>
+                          {laborTotal > 0 ? (
+                            <div className="bg-gray-800/60 rounded-lg px-2.5 py-2">
+                              <div className="text-xs text-cyan-600/80 mb-0.5">Labor</div>
+                              <div className="text-sm text-cyan-400 tabular-nums">{item.labor_hours}h × {formatCurrency(item.labor_rate || 0)}</div>
+                              <div className="text-xs text-cyan-600/70 mt-0.5 tabular-nums">= {formatCurrency(laborTotal)}</div>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-800/60 rounded-lg px-2.5 py-2 flex items-center justify-center">
+                              <span className="text-xs text-gray-600">No labor</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-2 flex items-center justify-end">
+                          <span className="text-xs text-gray-500 mr-1.5">Row Total</span>
+                          <span className="text-sm font-semibold text-white tabular-nums">{formatCurrency(rowTotal)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ));
+        })()}
       </div>
 
     </div>
