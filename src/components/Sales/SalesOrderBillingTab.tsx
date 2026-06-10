@@ -539,12 +539,13 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
         </div>
 
         {/* Approved Billable Change Orders */}
-        {approvedCOs.map(co => {
+        {approvedCOs.reduce<{ els: JSX.Element[]; running: number }>(({ els, running }, co) => {
           const badge = getCOBillingBadge(co);
           const isNegCO = (co.change_amount || 0) < 0;
           const coTotal = isNegCO
             ? (co.change_amount || 0) - Math.abs(co.tax_amount || 0)
             : Math.abs(co.change_amount || 0) + (co.tax_amount || 0);
+          const runningAfter = running + coTotal;
           const remaining = isNegCO
             ? Math.min(0, coTotal - (co.amount_billed || 0))
             : Math.max(0, coTotal - (co.amount_billed || 0));
@@ -555,7 +556,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
           const hasUnbilledCredit = isNegCO && !isFullyBilled && remaining < -0.001;
           const hasUnbilledPositive = !isNegCO && !isFullyBilled && remaining > 0.001;
 
-          return (
+          const el = (
             <div key={co.id} className={`px-4 py-3.5 border-b border-gray-700/40 last:border-b-0 transition-colors ${isFullyBilled ? 'opacity-60' : ''}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isNegCO ? 'bg-red-500/15' : 'bg-green-500/15'}`}>
@@ -597,6 +598,9 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
                       {(co.tax_amount || 0) > 0 ? `+$${fmt(co.tax_amount)} tax` : `-$${fmt(Math.abs(co.tax_amount))} tax`}
                     </span>
                   )}
+                  <span className="text-xs text-gray-500 block mt-0.5">
+                    =${fmt(runningAfter)} total
+                  </span>
                 </div>
                 <div className="shrink-0 w-14 flex justify-end">
                   {(hasUnbilledPositive || hasUnbilledCredit) && !isFullyBilled ? (
@@ -614,7 +618,8 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
               </div>
             </div>
           );
-        })}
+          return { els: [...els, el], running: runningAfter };
+        }, { els: [], running: originalTotal }).els}
 
         {/* Pending COs */}
         {pendingCOs.length > 0 && (
