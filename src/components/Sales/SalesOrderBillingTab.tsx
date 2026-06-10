@@ -351,7 +351,6 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   const pendingCOs = changeOrders.filter(co => co.status !== 'approved');
   const nonBillableApprovedCOs = changeOrders.filter(co => co.status === 'approved' && co.is_billable === false);
 
-  const originalTotal = order.original_contract_total || order.contract_total || 0;
   const totalCOAmount = approvedCOs.reduce((sum, co) => {
     const isNeg = (co.change_amount || 0) < 0;
     const coVal = isNeg
@@ -359,7 +358,8 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
       : Math.abs(co.change_amount || 0) + (co.tax_amount || 0);
     return sum + coVal;
   }, 0);
-  const fullContractWithCOs = originalTotal + totalCOAmount;
+  const fullContractWithCOs = order.contract_total || 0;
+  const originalTotal = fullContractWithCOs - totalCOAmount;
 
   const activeInvoices = invoices.filter(inv => inv.status !== 'void');
   const voidedInvoices = invoices.filter(inv => inv.status === 'void');

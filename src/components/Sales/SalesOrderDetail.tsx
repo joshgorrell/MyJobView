@@ -289,8 +289,13 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
   }
 
   const approvedCOs = changeOrders.filter(co => co.status === 'approved');
-  const totalChangeAmount = approvedCOs.reduce((sum, co) => sum + (co.change_amount || 0), 0);
-  const adjustedTotal = (order.contract_total || 0) + totalChangeAmount;
+  const totalChangeAmount = approvedCOs.reduce((sum, co) => {
+    const isNeg = (co.change_amount || 0) < 0;
+    return sum + (isNeg
+      ? (co.change_amount || 0) - Math.abs(co.tax_amount || 0)
+      : Math.abs(co.change_amount || 0) + (co.tax_amount || 0));
+  }, 0);
+  const adjustedTotal = order.contract_total || 0;
   const coCount = changeOrders.length;
   const cfg = statusConfig[order.status] || statusConfig.planning;
   const StatusIcon = cfg.icon;
