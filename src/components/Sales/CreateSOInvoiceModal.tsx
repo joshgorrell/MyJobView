@@ -212,34 +212,44 @@ export function CreateSOInvoiceModal({
 
   const selectedRows = rows.filter(r => r.isSelected);
 
-  // For each selected row, compute labor and material portions using the proposal split
-  function getRowLaborMaterialAmounts(row: BillingRow): { laborAmt: number; materialAmt: number } {
-    const absAmt = Math.abs(row.selectedAmount);
-    const sign = row.isNegative ? -1 : 1;
-    return {
-      laborAmt: sign * absAmt * proposalLaborPct,
-      materialAmt: sign * absAmt * (1 - proposalLaborPct),
-    };
-  }
-
-  // Compute invoice totals using the tax matrix
-  function computeInvoiceTotals() {
-    if (selectedRows.length === 0) return { subtotal: 0, taxAmount: 0, total: 0 };
-
-    const lineInputs = selectedRows.flatMap(row => {
-      const { laborAmt, materialAmt } = getRowLaborMaterialAmounts(row);
-      return [
-        { amount: laborAmt, itemType: 'labor' as const },
-        { amount: materialAmt, itemType: 'material' as const },
-      ];
-    });
-
-    return computeInvoiceTax({
-      lineItems: lineInputs,
+  // Compute the effective blended tax rate for back-calculation.
+  // Run a $1.00 forward calc split by labor/material ratio to get the effective rate on the total.
+  function getEffectiveBlendedRate(): number {
+    const probe = computeInvoiceTax({
+      lineItems: [
+        { amount: proposalLaborPct, itemType: 'labor' as const },
+        { amount: 1 - proposalLaborPct, itemType: 'material' as const },
+      ],
       environment: taxEnv,
       projectType: taxProjType,
       taxRate,
     });
+    // probe.total = 1 + tax on $1 subtotal; effective rate on subtotal = probe.taxAmount / probe.subtotal
+    return probe.subtotal > 0 ? probe.taxAmount / probe.subtotal : 0;
+  }
+
+  // Given the desired tax-inclusive total, back-calculate subtotal and tax.
+  function backCalcTotals(desiredTotal: number): { subtotal: number; taxAmount: number; total: number } {
+    const r = getEffectiveBlendedRate();
+    const subtotal = r > 0 ? desiredTotal / (1 + r) : desiredTotal;
+    return { subtotal, taxAmount: desiredTotal - subtotal, total: desiredTotal };
+  }
+
+  // For each selected row, compute labor and material portions from the back-calculated subtotal.
+  function getRowLaborMaterialAmounts(row: BillingRow): { laborAmt: number; materialAmt: number } {
+    const sign = row.isNegative ? -1 : 1;
+    const { subtotal } = backCalcTotals(Math.abs(row.selectedAmount));
+    return {
+      laborAmt: sign * subtotal * proposalLaborPct,
+      materialAmt: sign * subtotal * (1 - proposalLaborPct),
+    };
+  }
+
+  // Compute invoice totals — entered amounts are tax-inclusive; back-calculate subtotal and tax.
+  function computeInvoiceTotals() {
+    if (selectedRows.length === 0) return { subtotal: 0, taxAmount: 0, total: 0 };
+    const desiredTotal = selectedRows.reduce((s, r) => s + r.selectedAmount, 0);
+    return backCalcTotals(desiredTotal);
   }
 
   const totals = computeInvoiceTotals();
@@ -257,8 +267,8 @@ export function CreateSOInvoiceModal({
   const isCreditMemoInvoice = invoiceTotal < -0.001;
   const absoluteInvoiceTotal = Math.abs(invoiceTotal);
 
-  const remainingAfterInvoice = remainingToInvoice - invoiceSubtotal;
-  const isOverBilling = !isCreditMemoInvoice && invoiceSubtotal > remainingToInvoice + 0.01;
+  const remainingAfterInvoice = remainingToInvoice - invoiceTotal;
+  const isOverBilling = !isCreditMemoInvoice && invoiceTotal > remainingToInvoice + 0.01;
 
   const futureBillingCapacity = Math.max(0, remainingToInvoice - positiveTotal);
   const absorbedByThisInvoice = Math.min(totalNegCOCredit, positiveTotal);
@@ -589,7 +599,7 @@ export function CreateSOInvoiceModal({
             <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">
               {isCreditMemoInvoice
                 ? 'Net total is negative — this will create a credit memo.'
-                : 'Enter the pre-tax amount to bill — tax is computed from the proposal\'s labor/material split.'}
+                : 'Enter the amount to bill the customer — tax is included in the number you enter.'}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-lg transition-colors shrink-0">
@@ -604,7 +614,7 @@ export function CreateSOInvoiceModal({
             <ContractStat label="Invoiced" value={totalInvoiced} color="default" />
             <ContractStat label="Remaining" value={remainingToInvoice} color={remainingToInvoice > 0 ? 'blue' : 'green'} />
           </div>
-          <p className="text-xs text-gray-500 sm:hidden">Enter the pre-tax amount — tax is added based on the labor/material split.</p>
+          <p className="text-xs text-gray-500 sm:hidden">Enter the amount to bill — tax is already included.</p>
 
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -795,7 +805,7 @@ export function CreateSOInvoiceModal({
               </div>
               <div className="flex justify-between text-gray-400">
                 <span>
-                  Sales tax
+                  Includes sales tax
                   {invoiceSubtotal > 0 && (
                     <span className="ml-1 text-gray-600 text-xs">
                       ({(effectiveTaxRateOnSubtotal * 100).toFixed(2)}% effective)
