@@ -174,9 +174,11 @@ interface PortalProposalDetailProps {
   templateOverrideId?: string | null;
   /** When true, suppress expiration checks and validity dates (Sales Order context) */
   hideExpiration?: boolean;
+  /** Override the display number shown in the header (e.g. Sales Order number instead of proposal number) */
+  overrideDisplayNumber?: string;
 }
 
-export function PortalProposalDetail({ proposalId, onBack, previewMode = false, templateOverrideId, hideExpiration = false }: PortalProposalDetailProps) {
+export function PortalProposalDetail({ proposalId, onBack, previewMode = false, templateOverrideId, hideExpiration = false, overrideDisplayNumber }: PortalProposalDetailProps) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [rooms, setRooms] = useState<ProposalRoom[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -576,7 +578,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
               <div>
                 <div className="flex items-center gap-3 mb-1 flex-wrap">
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    {proposal.proposal_number}
+                    {overrideDisplayNumber ?? proposal.proposal_number}
                   </h1>
                   {proposal.renewal_count > 0 && (
                     <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg">

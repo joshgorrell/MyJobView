@@ -969,6 +969,7 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
               onBack={() => setShowPortalPreview(false)}
               previewMode={true}
               hideExpiration={true}
+              overrideDisplayNumber={order.order_number}
               templateOverrideId={soTemplateOverrideId ?? proposalTemplateId}
             />
           </div>
