@@ -172,9 +172,11 @@ interface PortalProposalDetailProps {
   previewMode?: boolean;
   /** Override the template used for display (internal preview use) */
   templateOverrideId?: string | null;
+  /** When true, suppress expiration checks and validity dates (Sales Order context) */
+  hideExpiration?: boolean;
 }
 
-export function PortalProposalDetail({ proposalId, onBack, previewMode = false, templateOverrideId }: PortalProposalDetailProps) {
+export function PortalProposalDetail({ proposalId, onBack, previewMode = false, templateOverrideId, hideExpiration = false }: PortalProposalDetailProps) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [rooms, setRooms] = useState<ProposalRoom[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -507,7 +509,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
     );
   }
 
-  const isProposalExpired = proposal.expires_at && new Date(proposal.expires_at) < new Date();
+  const isProposalExpired = !hideExpiration && proposal.expires_at && new Date(proposal.expires_at) < new Date();
 
   if (isProposalExpired) {
     return (
@@ -923,7 +925,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                 </div>
               </div>
 
-              {proposal.valid_until && (
+              {!hideExpiration && proposal.valid_until && (
                 <div className="mb-6 flex items-center gap-2 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
                   <Clock className="w-3.5 h-3.5" />
                   <span>Valid until: {new Date(proposal.valid_until).toLocaleDateString()}</span>
