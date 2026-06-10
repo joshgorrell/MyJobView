@@ -464,7 +464,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
           )}
         >
         {activeTab === 'scope' && (
-          <SalesOrderScopeTab order={order} onRefresh={loadChangeOrders} />
+          <SalesOrderScopeTab order={order} onRefresh={loadChangeOrders} changeOrders={changeOrders} />
         )}
         {activeTab === 'primary_scope' && (
           <SalesOrderPrimaryScopeTab order={order} />

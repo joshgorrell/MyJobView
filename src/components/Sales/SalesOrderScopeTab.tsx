@@ -138,9 +138,12 @@ const ALL_SHOWING: PortalTemplate = {
   show_scope_of_work: true,
 };
 
+import type { ChangeOrderSummary } from './SalesOrderDetail';
+
 interface SalesOrderScopeTabProps {
   order: SalesOrderFull;
   onRefresh?: () => void;
+  changeOrders?: ChangeOrderSummary[];
 }
 
 function getRoomItemsSubtotal(room: Room): { parts: number; labor: number } {
@@ -179,7 +182,7 @@ function computeRoomTotal(
   return { modifiersTotal, taxTotal, areaTotal: itemsSubtotal + modifiersTotal + taxTotal };
 }
 
-export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps) {
+export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrderScopeTabProps) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [proposalTotals, setProposalTotals] = useState<ProposalTotals | null>(null);
@@ -214,6 +217,11 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
   // Line item modal state
   const [lineItemModal, setLineItemModal] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null);
   const [scopeError, setScopeError] = useState<string | null>(null);
+
+  // CO filter state
+  const [selectedCOId, setSelectedCOId] = useState<string | null>(null);
+  const [coLineItemMap, setCoLineItemMap] = useState<Map<string, string>>(new Map());
+  const [coFilterLoading, setCoFilterLoading] = useState(false);
 
   const roomScopeRef = useRef<HTMLTextAreaElement>(null);
 
@@ -349,6 +357,28 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
       roomScopeRef.current.focus();
     }
   }, [editingRoomId]);
+
+  useEffect(() => {
+    if (!selectedCOId) {
+      setCoLineItemMap(new Map());
+      return;
+    }
+    setCoFilterLoading(true);
+    supabase
+      .from('change_order_line_items')
+      .select('proposal_line_item_id, action_type')
+      .eq('change_order_id', selectedCOId)
+      .then(({ data }) => {
+        const map = new Map<string, string>();
+        data?.forEach(item => {
+          if (item.proposal_line_item_id) {
+            map.set(item.proposal_line_item_id, item.action_type);
+          }
+        });
+        setCoLineItemMap(map);
+        setCoFilterLoading(false);
+      });
+  }, [selectedCOId]);
 
   // Wraps any save action that modifies the live portal proposal.
   // If the portal is currently live, shows a confirmation first, hides the portal,
@@ -548,6 +578,30 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
     return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  const selectedCO = changeOrders?.find(co => co.id === selectedCOId) ?? null;
+  const filterableCOs = (changeOrders ?? []).filter(co => co.status !== 'draft');
+
+  function isItemInCOFilter(itemId: string): boolean {
+    return !selectedCOId || coLineItemMap.has(itemId);
+  }
+
+  function getActionBadge(actionType: string) {
+    const configs: Record<string, { label: string; className: string }> = {
+      add: { label: 'Added', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
+      remove: { label: 'Removed', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
+      modify_quantity: { label: 'Qty Changed', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+      modify_price: { label: 'Price Changed', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+      modify_labor: { label: 'Labor Changed', className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+      modify_modifiers: { label: 'Modifiers', className: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+    };
+    const config = configs[actionType] || { label: actionType, className: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
+    return (
+      <span className={`text-xs px-1.5 py-0.5 rounded border ${config.className}`}>
+        {config.label}
+      </span>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -731,6 +785,35 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
         {/* Flex spacer — pushes view-mode toggle to the right */}
         <div className="flex-1" />
 
+        {/* CO Filter dropdown — only shown when there are non-draft COs */}
+        {filterableCOs.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {coFilterLoading && <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
+            <select
+              value={selectedCOId || ''}
+              onChange={e => setSelectedCOId(e.target.value || null)}
+              className="text-xs bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 cursor-pointer"
+              title="Filter by change order"
+            >
+              <option value="">All items</option>
+              {filterableCOs.map(co => (
+                <option key={co.id} value={co.id}>
+                  {co.change_order_number} — {co.title}
+                </option>
+              ))}
+            </select>
+            {selectedCOId && (
+              <button
+                onClick={() => setSelectedCOId(null)}
+                className="flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                title="Clear filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* View mode toggle */}
         <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
           <button
@@ -886,6 +969,8 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
           onRoomScopeTextChange={setRoomScopeText}
           onRoomShowScopeChange={setRoomShowScope}
           onEditTask={startEditTask}
+          coLineItemMap={selectedCOId ? coLineItemMap : null}
+          getActionBadge={getActionBadge}
         />
       ) : (
         <GridView
@@ -907,11 +992,27 @@ export function SalesOrderScopeTab({ order, onRefresh }: SalesOrderScopeTabProps
           onRoomShowScopeChange={setRoomShowScope}
           onEditTask={startEditTask}
           onPhaseChange={handleLineItemPhaseChange}
+          coLineItemMap={selectedCOId ? coLineItemMap : null}
+          getActionBadge={getActionBadge}
         />
       )}
 
-      {proposalTotals && displayRooms.length > 0 && (
-        <TotalsFooter totals={proposalTotals} settings={proposalSettings} formatCurrency={formatCurrency} />
+      {displayRooms.length > 0 && (
+        selectedCOId && selectedCO ? (
+          <div className="rounded-xl border border-gray-700/60 bg-gray-800/50 overflow-hidden">
+            <div className="px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-0.5">Change Order Total</p>
+                <p className="text-sm text-gray-300">{selectedCO.change_order_number} — {selectedCO.title}</p>
+              </div>
+              <span className={`text-2xl font-bold tabular-nums ${(selectedCO.change_amount || 0) < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                {(selectedCO.change_amount || 0) < 0 ? '−' : '+'}${Math.abs(selectedCO.change_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        ) : proposalTotals ? (
+          <TotalsFooter totals={proposalTotals} settings={proposalSettings} formatCurrency={formatCurrency} />
+        ) : null
       )}
 
       <ConfirmModal
@@ -997,12 +1098,14 @@ interface PortalViewProps {
   onRoomScopeTextChange: (v: string) => void;
   onRoomShowScopeChange: (v: boolean) => void;
   onEditTask: (item: LineItem) => void;
+  coLineItemMap: Map<string, string> | null;
+  getActionBadge: (actionType: string) => React.ReactNode;
 }
 
 function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, formatCurrency,
   editingRoomId, roomScopeText, roomShowScope, roomScopeRef, savingRoomScope,
   onToggleRoom, onStartEditRoom, onCancelEditRoom, onSaveRoomScope,
-  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask }: PortalViewProps) {
+  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, coLineItemMap, getActionBadge }: PortalViewProps) {
   // Resolve effective settings — template takes precedence, otherwise show all
   const tmpl = portalTemplate ?? ALL_SHOWING;
   const allRoomsSubtotal = rooms.reduce((s, r) => {
@@ -1019,7 +1122,8 @@ function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, f
           const hasModifiers = Math.abs(modifiersTotal) > 0.005;
           const hasTax = taxTotal > 0.005;
           const isEditingThisRoom = editingRoomId === room.id;
-          const visibleItems = room.line_items.filter(i => !i.is_hidden);
+          const visibleItems = room.line_items.filter(i => !i.is_hidden && (!coLineItemMap || coLineItemMap.has(i.id)));
+          if (coLineItemMap && visibleItems.length === 0) return null;
 
           return (
             <div key={room.id} className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden"
@@ -1120,6 +1224,7 @@ function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, f
                             tmpl={tmpl}
                             formatCurrency={formatCurrency}
                             onEditTask={() => onEditTask(item)}
+                            actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null}
                           />
                         ))}
                       </tbody>
@@ -1189,12 +1294,14 @@ interface GridViewProps {
   onRoomShowScopeChange: (v: boolean) => void;
   onEditTask: (item: LineItem) => void;
   onPhaseChange: (itemId: string, phaseId: string | null) => Promise<void>;
+  coLineItemMap: Map<string, string> | null;
+  getActionBadge: (actionType: string) => React.ReactNode;
 }
 
 function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
   editingRoomId, roomScopeText, roomShowScope, roomScopeRef, savingRoomScope,
   laborPhases, onToggleRoom, onStartEditRoom, onCancelEditRoom, onSaveRoomScope,
-  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onPhaseChange }: GridViewProps) {
+  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onPhaseChange, coLineItemMap, getActionBadge }: GridViewProps) {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(DEFAULT_VISIBLE_COLUMNS));
   const [showColumnMenu, setShowColumnMenu] = useState(false);
 
@@ -1222,12 +1329,14 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
       <div className="flex-1 min-w-0 space-y-2">
         {rooms.map(room => {
           const isEditingThisRoom = editingRoomId === room.id;
+          const filteredItems = room.line_items.filter(i => !i.is_hidden && (!coLineItemMap || coLineItemMap.has(i.id)));
+          if (coLineItemMap && filteredItems.length === 0) return null;
           const { parts: gridPartsTotal, labor: gridLaborTotal } = getRoomItemsSubtotal(room);
           const gridItemsSubtotal = gridPartsTotal + gridLaborTotal;
           const { modifiersTotal: gridModifiers, taxTotal: gridTax, areaTotal: gridRoomTotal } = computeRoomTotal(gridItemsSubtotal, allRoomsSubtotal, proposalTotals);
           const gridHasModifiers = Math.abs(gridModifiers) > 0.005;
           const gridHasTax = gridTax > 0.005;
-          const visibleItemCount = room.line_items.filter(i => !i.is_hidden).length;
+          const visibleItemCount = filteredItems.length;
 
           return (
             <div key={room.id} className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
@@ -1347,8 +1456,8 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                             </tr>
                           </thead>
                           <tbody>
-                            {room.line_items.filter(i => !i.is_hidden).map(item => (
-                              <GridLineItemRow key={item.id} item={item} formatCurrency={formatCurrency} onEditTask={() => onEditTask(item)} visibleColumns={visibleColumns} laborPhases={laborPhases} onPhaseChange={onPhaseChange} onViewItem={(id) => setLineItemModal({ id, mode: 'view' })} onEditItem={(id) => setLineItemModal({ id, mode: 'edit' })} />
+                            {filteredItems.map(item => (
+                              <GridLineItemRow key={item.id} item={item} formatCurrency={formatCurrency} onEditTask={() => onEditTask(item)} visibleColumns={visibleColumns} laborPhases={laborPhases} onPhaseChange={onPhaseChange} onViewItem={(id) => setLineItemModal({ id, mode: 'view' })} onEditItem={(id) => setLineItemModal({ id, mode: 'edit' })} actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null} />
                             ))}
                           </tbody>
                           <tfoot>
@@ -1389,7 +1498,7 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
 
                       {/* Mobile card list */}
                       <div className="md:hidden divide-y divide-gray-700/30">
-                        {room.line_items.filter(i => !i.is_hidden).map(item => {
+                        {filteredItems.map(item => {
                           const isLabor = item.item_type === 'labor';
                           const hasLabor = (item.labor_total ?? 0) > 0;
                           const partsTotal = (item.quantity || 0) * (item.unit_price || 0);
@@ -1402,7 +1511,10 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                                   {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400" /> : <Package className="w-3.5 h-3.5 text-gray-400" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-medium text-white leading-snug">{item.description}</div>
+                                  <div className="flex items-center gap-1.5 flex-wrap text-sm font-medium text-white leading-snug">
+                                    {item.description}
+                                    {coLineItemMap && getActionBadge(coLineItemMap.get(item.id) ?? '')}
+                                  </div>
                                   {item.products?.sku && <div className="text-cyan-400 text-xs mt-0.5 font-mono">{item.products.sku}</div>}
                                   {item.products?.manufacturers?.name && <div className="text-gray-500 text-xs">{item.products.manufacturers.name}</div>}
                                   {item.proposal_classes && (
@@ -1489,12 +1601,13 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
 }
 
 function PortalLineItemRow({
-  item, tmpl, formatCurrency, onEditTask,
+  item, tmpl, formatCurrency, onEditTask, actionBadge,
 }: {
   item: LineItem;
   tmpl: PortalTemplate;
   formatCurrency: (v: number) => string;
   onEditTask: () => void;
+  actionBadge?: React.ReactNode;
 }) {
   const rowTotal = (item.line_total || 0) + (item.labor_total || 0);
   const visibleAccessories = item.accessories?.filter(a => !a.is_hidden) ?? [];
@@ -1511,6 +1624,7 @@ function PortalLineItemRow({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-gray-900">
                 {item.description}
+                {actionBadge}
               </div>
               {tmpl.show_manufacturer && item.products?.manufacturers?.name && (
                 <p className="text-xs text-gray-400 mt-0.5">{item.products.manufacturers.name}</p>
@@ -1571,7 +1685,7 @@ function PortalLineItemRow({
   );
 }
 
-function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, laborPhases, onPhaseChange, onViewItem, onEditItem }: {
+function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, laborPhases, onPhaseChange, onViewItem, onEditItem, actionBadge }: {
   item: LineItem;
   formatCurrency: (v: number) => string;
   onEditTask: () => void;
@@ -1580,6 +1694,7 @@ function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, lab
   onPhaseChange: (itemId: string, phaseId: string | null) => Promise<void>;
   onViewItem: (id: string) => void;
   onEditItem: (id: string) => void;
+  actionBadge?: React.ReactNode;
 }) {
   const [savingPhase, setSavingPhase] = useState(false);
   const isLabor = item.item_type === 'labor';
@@ -1630,13 +1745,16 @@ function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, lab
                 ? <Wrench className="w-3 h-3 text-blue-400 flex-shrink-0" />
                 : <Package className="w-3 h-3 text-gray-500 flex-shrink-0" />}
               <div className="min-w-0 flex-1">
-                <button
-                  onClick={() => onViewItem(item.id)}
-                  className="text-white text-xs whitespace-nowrap overflow-hidden text-ellipsis block max-w-[260px] hover:text-cyan-300 transition-colors text-left cursor-pointer"
-                  title={item.description}
-                >
-                  {item.description}
-                </button>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => onViewItem(item.id)}
+                    className="text-white text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[260px] hover:text-cyan-300 transition-colors text-left cursor-pointer"
+                    title={item.description}
+                  >
+                    {item.description}
+                  </button>
+                  {actionBadge}
+                </div>
                 {item.proposal_classes && (
                   <span className="inline-flex items-center gap-1 mt-0.5 px-1 py-0.5 rounded text-xs font-medium" style={{ background: item.proposal_classes.color + '25', color: item.proposal_classes.color }}>
                     <Tag className="w-2 h-2" />{item.proposal_classes.name}
