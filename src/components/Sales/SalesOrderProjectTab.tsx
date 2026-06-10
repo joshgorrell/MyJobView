@@ -1056,7 +1056,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
                                         <span className="text-amber-400 tabular-nums font-semibold">{src.hours.toFixed(1)}h</span>
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0">
+                                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
                                       <select
                                         value=""
                                         disabled={assigningPhaseId === src.id}
@@ -1235,7 +1235,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <div className="text-gray-500 mb-0.5">Work Order</div>
                       <div className="text-gray-400 font-mono">{p.work_order_number}</div>

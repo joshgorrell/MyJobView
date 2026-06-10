@@ -625,7 +625,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   return (
     <div className="space-y-4">
       {/* Single toolbar row — Live toggle | Eye | Customer sees (portal only) | —— | Portal/Grid toggle */}
-      <div className="flex items-center justify-between gap-2 min-w-0">
+      <div className="flex items-center justify-between gap-2 min-w-0 flex-wrap">
 
         {/* Left zone: Live toggle | Eye | Customer sees (portal only) */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -703,7 +703,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
             {showTemplatePicker && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => { setShowTemplatePicker(false); }} />
-                <div className="absolute top-full left-0 mt-1.5 bg-gray-800 border border-gray-600 rounded-xl shadow-2xl z-20 min-w-[280px] sm:min-w-[320px] max-w-[calc(100vw-1rem)] py-1.5 overflow-hidden">
+                <div className="absolute top-full left-0 mt-1.5 bg-gray-800 border border-gray-600 rounded-xl shadow-2xl z-20 min-w-[220px] sm:min-w-[280px] max-w-[calc(100vw-1rem)] py-1.5 overflow-hidden">
                 <div className="px-3 py-2 border-b border-gray-700/50">
                   <p className="text-xs font-semibold text-gray-300">Customer Portal Display</p>
                   <p className="text-xs text-gray-500 mt-0.5">Choose what pricing details the customer sees</p>
@@ -1436,7 +1436,7 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                     <>
                       {/* Desktop table — compact flat rows matching ProposalBuilderCompact */}
                       <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full min-w-[1200px] text-xs">
+                        <table className="w-full min-w-[900px] text-xs">
                           <thead className="bg-gray-800/80 text-gray-400 border-b border-gray-700">
                             <tr>
                               {/* Lock / drag handle — always visible, read-only indicator */}
