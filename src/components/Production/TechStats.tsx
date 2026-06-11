@@ -202,9 +202,14 @@ export function TechStats({ onNavigate }: TechStatsProps) {
   const [startDate, setStartDate] = useState<string>(defaultDates.start);
   const [endDate, setEndDate] = useState<string>(defaultDates.end);
   const [activePreset, setActivePreset] = useState<PresetKey>('last_month');
-  const [expandedTech, setExpandedTech] = useState<string | null>(null);
-  const [dailyBreakdown, setDailyBreakdown] = useState<DailyBreakdown[]>([]);
+  const [expandedTechs, setExpandedTechs] = useState<Set<string>>(new Set());
   const [allDailyBreakdowns, setAllDailyBreakdowns] = useState<Record<string, DailyBreakdown[]>>({});
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [printOptions, setPrintOptions] = useState({
+    includeBreakdowns: true,
+    includeSummary: true,
+    includeTable: true,
+  });
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [showCustomDates, setShowCustomDates] = useState(false);
   const customRef = useRef<HTMLDivElement>(null);
@@ -433,7 +438,6 @@ export function TechStats({ onNavigate }: TechStatsProps) {
           };
         });
 
-      setDailyBreakdown(breakdown);
       return breakdown;
     } catch (error) {
       console.error('Error loading daily breakdown:', error);
@@ -442,27 +446,54 @@ export function TechStats({ onNavigate }: TechStatsProps) {
   }
 
   function toggleExpanded(techId: string) {
-    if (expandedTech === techId) {
-      setExpandedTech(null);
-      setDailyBreakdown([]);
-    } else {
-      setExpandedTech(techId);
-      loadDailyBreakdown(techId);
-    }
+    setExpandedTechs(prev => {
+      const next = new Set(prev);
+      if (next.has(techId)) {
+        next.delete(techId);
+      } else {
+        next.add(techId);
+        if (!allDailyBreakdowns[techId]) {
+          loadDailyBreakdown(techId).then(bd => {
+            setAllDailyBreakdowns(p => ({ ...p, [techId]: bd }));
+          });
+        }
+      }
+      return next;
+    });
+  }
+
+  function expandAll() {
+    const ids = techStats.map(t => t.technician_id);
+    setExpandedTechs(new Set(ids));
+    ids.forEach(id => {
+      if (!allDailyBreakdowns[id]) {
+        loadDailyBreakdown(id).then(bd => {
+          setAllDailyBreakdowns(p => ({ ...p, [id]: bd }));
+        });
+      }
+    });
+  }
+
+  function collapseAll() {
+    setExpandedTechs(new Set());
   }
 
   async function handlePrint() {
     const statsToprint = techStats;
     if (statsToprint.length === 0) return;
 
+    setShowPrintOptions(false);
+
     const breakdownMap: Record<string, DailyBreakdown[]> = { ...allDailyBreakdowns };
 
-    for (const tech of statsToprint) {
-      if (!breakdownMap[tech.technician_id]) {
-        breakdownMap[tech.technician_id] = await loadDailyBreakdown(tech.technician_id);
+    if (printOptions.includeBreakdowns && expandedTechs.size > 0) {
+      for (const techId of Array.from(expandedTechs)) {
+        if (!breakdownMap[techId]) {
+          breakdownMap[techId] = await loadDailyBreakdown(techId);
+        }
       }
+      setAllDailyBreakdowns(breakdownMap);
     }
-    setAllDailyBreakdowns(breakdownMap);
 
     const isSingleTech = selectedTech !== 'all';
     const techLabel = isSingleTech
@@ -501,41 +532,76 @@ export function TechStats({ onNavigate }: TechStatsProps) {
         </tr>`;
     }).join('');
 
-    const breakdownSections = statsToprint.map(tech => {
-      const bd = breakdownMap[tech.technician_id] || [];
-      if (bd.length === 0) return '';
-      const rows = bd.map(day => {
-        const dateStr = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {
-          weekday: 'short', month: 'short', day: 'numeric',
-        });
-        const effColor = getEfficiencyPrintColor(day.efficiency);
-        return `
-          <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:5px 10px;">${dateStr}${day.payroll_hours_only ? ' <span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px;">Payroll</span>' : ''}</td>
-            <td style="padding:5px 10px;text-align:right;">${day.daily_hours.toFixed(1)}h</td>
-            <td style="padding:5px 10px;text-align:right;">${day.job_hours.toFixed(1)}h</td>
-            <td style="padding:5px 10px;text-align:right;font-weight:600;color:${effColor};">${day.efficiency.toFixed(0)}%</td>
-          </tr>`;
-      }).join('');
+    const breakdownSections = printOptions.includeBreakdowns
+      ? statsToprint
+          .filter(tech => expandedTechs.has(tech.technician_id))
+          .map(tech => {
+            const bd = breakdownMap[tech.technician_id] || [];
+            if (bd.length === 0) return '';
+            const rows = bd.map(day => {
+              const dateStr = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric',
+              });
+              const effColor = getEfficiencyPrintColor(day.efficiency);
+              const payrollBadge = day.payroll_hours_only
+                ? ' <span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px;">Payroll</span>'
+                : '';
+              return '<tr style="border-bottom:1px solid #f3f4f6;">' +
+                '<td style="padding:5px 10px;">' + dateStr + payrollBadge + '</td>' +
+                '<td style="padding:5px 10px;text-align:right;">' + day.daily_hours.toFixed(1) + 'h</td>' +
+                '<td style="padding:5px 10px;text-align:right;">' + day.job_hours.toFixed(1) + 'h</td>' +
+                '<td style="padding:5px 10px;text-align:right;font-weight:600;color:' + effColor + ';">' + day.efficiency.toFixed(0) + '%</td>' +
+                '</tr>';
+            }).join('');
 
-      return `
-        <div style="margin-top:24px;page-break-inside:avoid;">
-          <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 6px 0;padding:6px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;">
-            ${tech.technician_name} — Daily Breakdown
-          </h3>
-          <table style="width:100%;border-collapse:collapse;font-size:12px;">
-            <thead>
-              <tr style="background:#f3f4f6;">
-                <th style="padding:5px 10px;text-align:left;color:#6b7280;">Date</th>
-                <th style="padding:5px 10px;text-align:right;color:#6b7280;">Clock Hrs</th>
-                <th style="padding:5px 10px;text-align:right;color:#6b7280;">Job Hrs</th>
-                <th style="padding:5px 10px;text-align:right;color:#6b7280;">Efficiency</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>`;
-    }).join('');
+            return '<div style="margin-top:24px;page-break-inside:avoid;">' +
+              '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 6px 0;padding:6px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;">' +
+              tech.technician_name + ' \u2014 Daily Breakdown</h3>' +
+              '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+              '<thead><tr style="background:#f3f4f6;">' +
+              '<th style="padding:5px 10px;text-align:left;color:#6b7280;">Date</th>' +
+              '<th style="padding:5px 10px;text-align:right;color:#6b7280;">Clock Hrs</th>' +
+              '<th style="padding:5px 10px;text-align:right;color:#6b7280;">Job Hrs</th>' +
+              '<th style="padding:5px 10px;text-align:right;color:#6b7280;">Efficiency</th>' +
+              '</tr></thead>' +
+              '<tbody>' + rows + '</tbody>' +
+              '</table></div>';
+          }).join('')
+      : '';
+
+    const summarySection = printOptions.includeSummary ? (
+      '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;">' +
+      [
+        ['Clock Hrs', totClockHrs.toFixed(1)],
+        ['Job Hrs', totJobHrs.toFixed(1)],
+        ['Avg Efficiency', avgEff.toFixed(1) + '%'],
+        ['Total Miles', totMiles.toFixed(0)],
+        ['Total Trips', totTrips.toString()],
+        ['Travel Bonus', '$' + totBonus.toFixed(0)],
+      ].map(([label, val]) =>
+        '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;">' +
+        '<div style="font-size:10px;color:#6b7280;margin-bottom:3px;">' + label + '</div>' +
+        '<div style="font-size:18px;font-weight:700;">' + val + '</div>' +
+        '</div>'
+      ).join('') +
+      '</div>'
+    ) : '';
+
+    const tableSection = printOptions.includeTable ? (
+      '<h2 style="font-size:14px;font-weight:700;margin:0 0 8px 0;color:#111827;">Technician Rankings</h2>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;">' +
+      '<thead><tr style="background:#f3f4f6;border-bottom:2px solid #e5e7eb;">' +
+      '<th style="padding:8px 10px;text-align:left;color:#374151;">Technician</th>' +
+      '<th style="padding:8px 10px;text-align:center;color:#374151;">Days</th>' +
+      '<th style="padding:8px 10px;text-align:right;color:#374151;">Clock Hrs</th>' +
+      '<th style="padding:8px 10px;text-align:right;color:#374151;">Job Hrs</th>' +
+      '<th style="padding:8px 10px;text-align:right;color:#374151;">Miles</th>' +
+      '<th style="padding:8px 10px;text-align:right;color:#374151;">Trips</th>' +
+      '<th style="padding:8px 10px;text-align:right;color:#374151;">Efficiency</th>' +
+      '</tr></thead>' +
+      '<tbody>' + summaryRows + '</tbody>' +
+      '</table>'
+    ) : '';
 
     const html = `
       <!DOCTYPE html>
@@ -562,38 +628,8 @@ export function TechStats({ onNavigate }: TechStatsProps) {
             Printed ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;">
-          ${[
-            ['Clock Hrs', totClockHrs.toFixed(1)],
-            ['Job Hrs', totJobHrs.toFixed(1)],
-            ['Avg Efficiency', `${avgEff.toFixed(1)}%`],
-            ['Total Miles', totMiles.toFixed(0)],
-            ['Total Trips', totTrips.toString()],
-            ['Travel Bonus', `$${totBonus.toFixed(0)}`],
-          ].map(([label, val]) => `
-            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;">
-              <div style="font-size:10px;color:#6b7280;margin-bottom:3px;">${label}</div>
-              <div style="font-size:18px;font-weight:700;">${val}</div>
-            </div>`).join('')}
-        </div>
-
-        <h2 style="font-size:14px;font-weight:700;margin:0 0 8px 0;color:#111827;">Technician Rankings</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;">
-          <thead>
-            <tr style="background:#f3f4f6;border-bottom:2px solid #e5e7eb;">
-              <th style="padding:8px 10px;text-align:left;color:#374151;">Technician</th>
-              <th style="padding:8px 10px;text-align:center;color:#374151;">Days</th>
-              <th style="padding:8px 10px;text-align:right;color:#374151;">Clock Hrs</th>
-              <th style="padding:8px 10px;text-align:right;color:#374151;">Job Hrs</th>
-              <th style="padding:8px 10px;text-align:right;color:#374151;">Miles</th>
-              <th style="padding:8px 10px;text-align:right;color:#374151;">Trips</th>
-              <th style="padding:8px 10px;text-align:right;color:#374151;">Efficiency</th>
-            </tr>
-          </thead>
-          <tbody>${summaryRows}</tbody>
-        </table>
-
+        ${summarySection}
+        ${tableSection}
         ${breakdownSections}
       </body>
       </html>`;
@@ -672,14 +708,73 @@ export function TechStats({ onNavigate }: TechStatsProps) {
             </button>
           )}
           {activeView === 'stats' && (
-            <button
-              onClick={handlePrint}
-              disabled={techStats.length === 0}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              Print Report
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowPrintOptions(v => !v)}
+                disabled={techStats.length === 0}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <Printer className="w-4 h-4" />
+                Print Report
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showPrintOptions ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showPrintOptions && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 p-4">
+                  <h4 className="text-sm font-semibold text-white mb-3">Print Options</h4>
+                  <div className="space-y-2.5 mb-4">
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={printOptions.includeSummary}
+                        onChange={e => setPrintOptions(p => ({ ...p, includeSummary: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                      />
+                      <span className="text-sm text-gray-300 group-hover:text-white transition-colors">Summary KPIs</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={printOptions.includeTable}
+                        onChange={e => setPrintOptions(p => ({ ...p, includeTable: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                      />
+                      <span className="text-sm text-gray-300 group-hover:text-white transition-colors">Rankings Table</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={printOptions.includeBreakdowns}
+                        onChange={e => setPrintOptions(p => ({ ...p, includeBreakdowns: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                      />
+                      <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
+                        Daily Breakdowns
+                        <span className="ml-1 text-xs text-gray-500">({expandedTechs.size} expanded)</span>
+                      </span>
+                    </label>
+                  </div>
+                  {printOptions.includeBreakdowns && expandedTechs.size === 0 && (
+                    <p className="text-xs text-amber-400 mb-3">Expand technician rows to include their daily breakdowns.</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handlePrint}
+                      className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Print
+                    </button>
+                    <button
+                      onClick={() => setShowPrintOptions(false)}
+                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -833,6 +928,24 @@ export function TechStats({ onNavigate }: TechStatsProps) {
           <Award className="w-5 h-5 text-yellow-400" />
           <h3 className="text-base font-bold text-white">Technician Rankings</h3>
           {loading && <span className="text-xs text-gray-500 ml-auto">Refreshing...</span>}
+          {!loading && techStats.length > 0 && (
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                onClick={expandAll}
+                className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+              >
+                <ChevronDown className="w-3 h-3" />
+                Expand All
+              </button>
+              <button
+                onClick={collapseAll}
+                className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+              >
+                <ChevronUp className="w-3 h-3" />
+                Collapse All
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="divide-y divide-gray-700/60">
@@ -899,25 +1012,27 @@ export function TechStats({ onNavigate }: TechStatsProps) {
                       </div>
                     </div>
 
-                    {expandedTech === tech.technician_id
+                    {expandedTechs.has(tech.technician_id)
                       ? <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" />
                       : <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
                     }
                   </div>
                 </div>
 
-                {expandedTech === tech.technician_id && (
+                {expandedTechs.has(tech.technician_id) && (
                   <div className="px-5 pb-4 bg-gray-900/50 border-t border-gray-700/60">
                     <h5 className="text-sm font-semibold text-gray-300 mt-4 mb-3 flex items-center gap-2">
                       <BarChart3 className="w-4 h-4" />
                       Daily Breakdown
                     </h5>
 
-                    {dailyBreakdown.length === 0 ? (
+                    {!allDailyBreakdowns[tech.technician_id] ? (
                       <div className="text-center py-4 text-gray-500 text-sm">Loading breakdown...</div>
+                    ) : allDailyBreakdowns[tech.technician_id].length === 0 ? (
+                      <div className="text-center py-4 text-gray-500 text-sm">No daily data for this period</div>
                     ) : (
                       <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
-                        {dailyBreakdown.map(day => (
+                        {allDailyBreakdowns[tech.technician_id].map(day => (
                           <div
                             key={day.date}
                             className="flex items-center justify-between gap-3 bg-gray-800/70 rounded-lg px-3 py-2.5"
