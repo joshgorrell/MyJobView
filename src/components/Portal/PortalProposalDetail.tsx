@@ -692,7 +692,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
               <div>
                 <div className="flex items-center gap-3 mb-1 flex-wrap">
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    {overrideDisplayNumber ?? proposal.proposal_number}
+                    {proposal.title}
                   </h1>
                   {proposal.renewal_count > 0 && (
                     <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg">
@@ -706,7 +706,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-600 font-medium">{proposal.title}</p>
+                <p className="text-sm text-gray-600 font-medium">{overrideDisplayNumber ?? proposal.proposal_number}</p>
               </div>
             </div>
             <button
