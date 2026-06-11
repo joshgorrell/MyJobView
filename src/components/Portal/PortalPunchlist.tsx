@@ -1030,57 +1030,62 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
           <div className="space-y-2">
             {scheduledTasks.map(task => {
               const isExpanded = expandedTasks.has(task.id);
-              const truncatedTitle = task.title.length > 60 ? task.title.substring(0, 60) + '...' : task.title;
 
               return (
                 <div
                   key={task.id}
-                  className={`bg-white border-l-4 rounded-lg transition-all ${
-                    isExpanded
-                      ? 'border-blue-500 shadow-md p-4'
-                      : 'border-blue-400 shadow-sm p-3 hover:shadow cursor-pointer'
-                  }`}
-                  onClick={() => !isExpanded && toggleTaskExpansion(task.id)}
+                  className="bg-white border-l-4 border-blue-400 rounded-lg shadow-sm p-3 hover:shadow transition-all cursor-pointer"
+                  onClick={() => toggleTaskExpansion(task.id)}
                 >
-                  {!isExpanded && (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 truncate text-sm">{truncatedTitle}</div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-gray-500">{new Date(task.created_at).toLocaleDateString()}</span>
-                          {task.photos && task.photos.length > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-gray-600">
-                              <Camera className="w-3 h-3" />
-                              {task.photos.length}
-                            </span>
-                          )}
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            Scheduled
-                          </span>
-                          {task.service_request?.work_order && (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                              WO #{task.service_request.work_order.work_order_number}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  {/* Row 1: title + badge + chevron */}
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{task.title}</span>
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1 flex-shrink-0">
+                      <Calendar className="w-3 h-3" />
+                      Scheduled
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
+                      className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+                    >
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    </button>
+                  </div>
+
+                  {/* Row 2: description preview — always visible */}
+                  {task.details
+                    ? <p className="text-xs text-gray-500 mt-1 line-clamp-1">{task.details}</p>
+                    : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
+                  }
+
+                  {/* Row 3: metadata + primary action — always visible */}
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-400">{new Date(task.created_at).toLocaleDateString()}</span>
+                      {task.photos && task.photos.length > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Camera className="w-3 h-3" />
+                          {task.photos.length}
+                        </span>
+                      )}
+                      {task.service_request?.work_order && (
+                        <span className="text-xs text-blue-600">WO #{task.service_request.work_order.work_order_number}</span>
+                      )}
                     </div>
-                  )}
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleMarkComplete(task)}
+                        className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Mark Complete
+                      </button>
+                    </div>
+                  </div>
 
+                  {/* Expanded content */}
                   {isExpanded && (
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-base font-semibold text-gray-900">{task.title}</h4>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
-                          className="p-1 hover:bg-gray-100 rounded"
-                        >
-                          <ChevronUp className="w-5 h-5 text-gray-400" />
-                        </button>
-                      </div>
-
+                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
                       {task.details && <p className="text-sm text-gray-600">{task.details}</p>}
 
                       {task.photos && task.photos.length > 0 && (
@@ -1091,35 +1096,17 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
                         </div>
                       )}
 
-                      <div className="flex items-center gap-2 text-xs flex-wrap">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          Scheduled
-                        </span>
-                        {task.service_request?.work_order && (
-                          <a
-                            href={`/work-order/${task.service_request.work_order.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-2 py-1 bg-green-100 text-green-700 rounded flex items-center gap-1 hover:bg-green-200 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            Work Order {task.service_request.work_order.work_order_number}
-                          </a>
-                        )}
-                        <span className="text-gray-400 ml-auto">Added {new Date(task.created_at).toLocaleDateString()}</span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center gap-1"
+                      {task.service_request?.work_order && (
+                        <a
+                          href={`/work-order/${task.service_request.work_order.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 transition-colors"
                         >
-                          <CheckCircle2 className="w-3 h-3" />
-                          Mark Complete
-                        </button>
-                      </div>
+                          <ExternalLink className="w-3 h-3" />
+                          Work Order {task.service_request.work_order.work_order_number}
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1143,93 +1130,124 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
             {requestedTasks.map(task => {
               const hasWorkOrder = !!(task.service_request?.work_order_id || task.work_order_id);
               const canAct = !hasWorkOrder;
+              const isExpanded = expandedTasks.has(task.id);
 
               return (
                 <div
                   key={task.id}
-                  className="bg-white border-l-4 border-amber-300 rounded-lg shadow-sm p-3 hover:shadow transition-shadow"
+                  className="bg-white border-l-4 border-amber-400 rounded-lg shadow-sm p-3 hover:shadow transition-all cursor-pointer"
+                  onClick={() => toggleTaskExpansion(task.id)}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      {/* Clickable title opens detail modal */}
+                  {/* Row 1: title + badge + chevron */}
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{task.title}</span>
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs flex items-center gap-1 flex-shrink-0">
+                      <Send className="w-3 h-3" />
+                      Requested
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
+                      className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+                    >
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    </button>
+                  </div>
+
+                  {/* Row 2: description preview — always visible */}
+                  {task.details
+                    ? <p className="text-xs text-gray-500 mt-1 line-clamp-1">{task.details}</p>
+                    : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
+                  }
+
+                  {/* Row 3: metadata + primary actions — always visible */}
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-400">
+                        {task.requested_at
+                          ? new Date(task.requested_at).toLocaleDateString()
+                          : new Date(task.created_at).toLocaleDateString()}
+                      </span>
+                      {task.photos && task.photos.length > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Camera className="w-3 h-3" />
+                          {task.photos.length}
+                        </span>
+                      )}
+                      {task.service_request?.work_order && (
+                        <span className="text-xs text-blue-600">WO #{task.service_request.work_order.work_order_number}</span>
+                      )}
+                      {task.customer_notes && (
+                        <span className="flex items-center gap-1 text-xs text-blue-600">
+                          <MessageSquare className="w-3 h-3" />
+                          Notes
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      {canAct && (
+                        <button
+                          onClick={() => handleCancelServiceRequest(task.service_request_id!, task)}
+                          title="Recall request — return to drafts"
+                          className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Recall
+                        </button>
+                      )}
                       <button
-                        onClick={() => setDetailTask(task)}
-                        className="text-left font-semibold text-gray-900 text-sm hover:text-amber-700 hover:underline transition-colors leading-snug"
+                        onClick={() => handleMarkComplete(task)}
+                        className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center gap-1"
                       >
-                        {task.title}
+                        <CheckCircle2 className="w-3 h-3" />
+                        Mark Complete
                       </button>
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className="text-xs text-amber-600">
-                          {task.requested_at
-                            ? new Date(task.requested_at).toLocaleDateString()
-                            : new Date(task.created_at).toLocaleDateString()}
-                        </span>
-                        {task.photos && task.photos.length > 0 && (
-                          <span className="flex items-center gap-1 text-xs text-gray-500">
-                            <Camera className="w-3 h-3" />
-                            {task.photos.length}
-                          </span>
-                        )}
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs flex items-center gap-1">
-                          <Send className="w-3 h-3" />
-                          Requested
-                        </span>
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
+                      {task.details && <p className="text-sm text-gray-600">{task.details}</p>}
+
+                      {task.photos && task.photos.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {task.photos.map((photo) => (
+                            <img key={photo.id} src={photo.photo_url} alt="Task photo" className="w-full h-20 object-cover rounded border border-gray-300" />
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2">
                         {task.service_request?.work_order && (
                           <a
                             href={`/work-order/${task.service_request.work_order.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1 hover:bg-blue-200 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 transition-colors"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            WO #{task.service_request.work_order.work_order_number}
+                            Work Order {task.service_request.work_order.work_order_number}
                           </a>
                         )}
-                        {task.customer_notes && (
-                          <span className="flex items-center gap-1 text-xs text-blue-600">
-                            <MessageSquare className="w-3 h-3" />
-                            Notes added
-                          </span>
+                        <button
+                          onClick={() => setDetailTask(task)}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-xs"
+                        >
+                          <MessageSquare className="w-3 h-3" />
+                          View Details &amp; Add Notes
+                        </button>
+                        {canAct && (
+                          <button
+                            onClick={() => handleDeleteRequestedTask(task)}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Delete
+                          </button>
                         )}
                       </div>
                     </div>
-                    {/* Quick action buttons */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {canAct && (
-                        <>
-                          <button
-                            onClick={() => handleCancelServiceRequest(task.service_request_id!, task)}
-                            title="Recall request — return to drafts"
-                            className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRequestedTask(task)}
-                            title="Delete task"
-                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleMarkComplete(task)}
-                        title="Mark complete"
-                        className="p-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 transition-colors"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDetailTask(task)}
-                        title="View details & add notes"
-                        className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 transition-colors"
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
@@ -1261,68 +1279,78 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
           <div className="space-y-2">
             {draftTasks.map((task) => {
               const isExpanded = expandedTasks.has(task.id);
-              const truncatedTitle = task.title.length > 60 ? task.title.substring(0, 60) + '...' : task.title;
 
               return (
                 <div
                   key={task.id}
-                  className={`bg-white border-l-4 rounded-lg transition-all ${
-                    isExpanded
-                      ? 'border-orange-400 shadow-md p-4'
-                      : 'border-gray-200 hover:border-gray-300 shadow-sm p-3 hover:shadow cursor-pointer'
-                  }`}
-                  onClick={() => !isExpanded && toggleTaskExpansion(task.id)}
+                  className="bg-white border-l-4 border-orange-400 rounded-lg shadow-sm p-3 hover:shadow transition-all cursor-pointer"
+                  onClick={() => toggleTaskExpansion(task.id)}
                 >
-                  {!isExpanded && (
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedTaskIds.has(task.id)}
-                        onChange={(e) => { e.stopPropagation(); toggleTaskSelection(task.id); }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 truncate text-sm">{truncatedTitle}</div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-gray-500">{new Date(task.created_at).toLocaleDateString()}</span>
-                          {task.photos && task.photos.length > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-gray-600">
-                              <Camera className="w-3 h-3" />
-                              {task.photos.length}
-                            </span>
-                          )}
-                          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">Draft</span>
-                        </div>
-                      </div>
-                      <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                    </div>
-                  )}
+                  {/* Row 1: checkbox + title + badge + chevron */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedTaskIds.has(task.id)}
+                      onChange={(e) => { e.stopPropagation(); toggleTaskSelection(task.id); }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                    />
+                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{task.title}</span>
+                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs flex-shrink-0">Draft</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
+                      className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+                    >
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    </button>
+                  </div>
 
+                  {/* Row 2: description preview — always visible */}
+                  {task.details
+                    ? <p className="text-xs text-gray-500 mt-1 line-clamp-1">{task.details}</p>
+                    : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
+                  }
+
+                  {/* Row 3: metadata + primary actions — always visible */}
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-400">{new Date(task.created_at).toLocaleDateString()}</span>
+                      {task.photos && task.photos.length > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Camera className="w-3 h-3" />
+                          {task.photos.length}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleSubmitTasks([task.id])}
+                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
+                      >
+                        <Send className="w-3 h-3" />
+                        Create Service Request
+                      </button>
+                      <button
+                        onClick={() => handleMarkComplete(task)}
+                        className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Complete
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
                   {isExpanded && (
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedTaskIds.has(task.id)}
-                          onChange={(e) => { e.stopPropagation(); toggleTaskSelection(task.id); }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0 mt-1"
-                        />
-                        <input
-                          type="text"
-                          value={task.title}
-                          onChange={e => handleTaskChange(task.id, 'title', e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex-1 text-base font-semibold text-gray-900 bg-transparent border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
-                          className="p-1 hover:bg-gray-100 rounded"
-                        >
-                          <ChevronUp className="w-5 h-5 text-gray-400" />
-                        </button>
-                      </div>
+                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={task.title}
+                        onChange={e => handleTaskChange(task.id, 'title', e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Task title"
+                        className="w-full text-sm font-semibold text-gray-900 border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
 
                       <textarea
                         value={task.details || ''}
@@ -1330,11 +1358,10 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
                         onClick={(e) => e.stopPropagation()}
                         placeholder="Add details..."
                         rows={2}
-                        className="w-full text-sm text-gray-600 bg-transparent border border-gray-200 rounded px-2 py-1 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full text-sm text-gray-600 border border-gray-200 rounded px-2 py-1 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
 
-                      <div className="flex items-center gap-3 text-xs text-gray-500">
-                        <span>{new Date(task.created_at).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span className="flex items-center gap-1 text-orange-600">
                           <Clock className="w-3 h-3" />
                           Auto-saving
@@ -1383,24 +1410,10 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
                         )}
                       </div>
 
-                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleSubmitTasks([task.id]); }}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-1"
-                        >
-                          <Send className="w-3 h-3" />
-                          Create service request
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center gap-1"
-                        >
-                          <CheckCircle2 className="w-3 h-3" />
-                          Mark Complete
-                        </button>
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
-                          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm flex items-center gap-1"
+                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-sm flex items-center gap-1"
                         >
                           <Trash2 className="w-3 h-3" />
                           Delete
@@ -1430,48 +1443,62 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
           </div>
 
           {showCompleted && (
-            <div className="space-y-2">
+          <div className="space-y-2">
               {completedTasks.map(task => {
                 const isExpanded = expandedTasks.has(task.id);
-                const truncatedTitle = task.title.length > 60 ? task.title.substring(0, 60) + '...' : task.title;
 
                 return (
                   <div
                     key={task.id}
-                    className={`bg-white border-l-4 rounded-lg transition-all ${
-                      isExpanded
-                        ? 'border-green-400 shadow-md p-4'
-                        : 'border-green-300 shadow-sm p-3 hover:shadow cursor-pointer'
-                    }`}
-                    onClick={() => !isExpanded && toggleTaskExpansion(task.id)}
+                    className="bg-white border-l-4 border-green-400 rounded-lg shadow-sm p-3 hover:shadow transition-all cursor-pointer"
+                    onClick={() => toggleTaskExpansion(task.id)}
                   >
-                    {!isExpanded && (
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-500 truncate text-sm line-through">{truncatedTitle}</div>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className="flex items-center gap-1 text-xs text-gray-500">
-                              <CheckCircle2 className="w-3 h-3 text-green-600" />
-                              {task.completed_at ? new Date(task.completed_at).toLocaleDateString() : ''}
-                            </span>
-                          </div>
-                        </div>
-                        <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    {/* Row 1: title + badge + chevron */}
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1 font-semibold text-sm text-gray-500 truncate line-through">{task.title}</span>
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs flex items-center gap-1 flex-shrink-0">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Completed
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
+                        className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                      </button>
+                    </div>
+
+                    {/* Row 2: description preview — always visible */}
+                    {task.details
+                      ? <p className="text-xs text-gray-400 mt-1 line-clamp-1">{task.details}</p>
+                      : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
+                    }
+
+                    {/* Row 3: metadata + primary action — always visible */}
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                          <CheckCircle2 className="w-3 h-3 text-green-500" />
+                          {task.completed_at ? new Date(task.completed_at).toLocaleDateString() : ''}
+                        </span>
+                        {task.service_request?.work_order && (
+                          <span className="text-xs text-blue-600">WO #{task.service_request.work_order.work_order_number}</span>
+                        )}
                       </div>
-                    )}
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleReopenTask(task.id)}
+                          className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Reopen
+                        </button>
+                      </div>
+                    </div>
 
+                    {/* Expanded content */}
                     {isExpanded && (
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-base font-semibold text-gray-700 line-through">{task.title}</h4>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
-                            className="p-1 hover:bg-gray-100 rounded"
-                          >
-                            <ChevronUp className="w-5 h-5 text-gray-400" />
-                          </button>
-                        </div>
-
+                      <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
                         {task.details && <p className="text-sm text-gray-500">{task.details}</p>}
 
                         {task.installer_notes && (
@@ -1481,34 +1508,17 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
                           </div>
                         )}
 
-                        <div className="flex items-center gap-2 text-xs flex-wrap">
-                          <span className="flex items-center gap-1 text-gray-600">
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                            Completed {task.completed_at ? new Date(task.completed_at).toLocaleDateString() : ''}
-                          </span>
-                          {task.service_request?.work_order && (
-                            <a
-                              href={`/work-order/${task.service_request.work_order.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2 py-1 bg-green-100 text-green-700 rounded flex items-center gap-1 hover:bg-green-200 transition-colors"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              Work Order {task.service_request.work_order.work_order_number}
-                            </a>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleReopenTask(task.id); }}
-                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm flex items-center gap-1"
+                        {task.service_request?.work_order && (
+                          <a
+                            href={`/work-order/${task.service_request.work_order.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 transition-colors"
                           >
-                            <RotateCcw className="w-3 h-3" />
-                            Reopen
-                          </button>
-                        </div>
+                            <ExternalLink className="w-3 h-3" />
+                            Work Order {task.service_request.work_order.work_order_number}
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>
