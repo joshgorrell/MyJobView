@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Proposal } from '../../lib/types';
-import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, Users } from 'lucide-react';
+import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, Users, Settings } from 'lucide-react';
 import { ProposalActivityPanel } from './ProposalActivityPanel';
 import { DuplicateProposalModal } from './DuplicateProposalModal';
 import { CreateRevisionModal } from './CreateRevisionModal';
@@ -68,6 +68,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const isAdminOrManager = ['admin', 'manager', 'sales_manager'].includes(profile?.role || '');
   const [salesReps, setSalesReps] = useState<{ id: string; full_name: string; first_name: string }[]>([]);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
+  const [visibleRepIds, setVisibleRepIds] = useState<string[] | null>(null);
+  const [showRepManager, setShowRepManager] = useState(false);
+  const repManagerRef = useRef<HTMLDivElement>(null);
 
   // Load user preferences once on mount, then trigger proposal load
   useEffect(() => {
@@ -125,6 +128,13 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       .then(({ data }) => setSalesReps(data || []));
   }, [isAdminOrManager, profile?.id]);
 
+  // If the active rep filter becomes hidden by the visibility preference, clear it
+  useEffect(() => {
+    if (selectedRepId && visibleRepIds !== null && !visibleRepIds.includes(selectedRepId)) {
+      setSelectedRepId(null);
+    }
+  }, [visibleRepIds, selectedRepId]);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement;
@@ -134,19 +144,22 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       if (!target.closest('.filter-panel') && !target.closest('.filter-button')) {
         setShowFilterPanel(false);
       }
+      if (repManagerRef.current && !repManagerRef.current.contains(target)) {
+        setShowRepManager(false);
+      }
     }
 
-    if (openMenuId || showFilterPanel) {
+    if (openMenuId || showFilterPanel || showRepManager) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [openMenuId, showFilterPanel]);
+  }, [openMenuId, showFilterPanel, showRepManager]);
 
   async function loadPreferences() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('proposals_hide_declined, proposals_hide_archived, proposals_hide_approved')
+        .select('proposals_hide_declined, proposals_hide_archived, proposals_hide_approved, proposals_visible_rep_ids')
         .eq('id', profile?.id)
         .single();
 
@@ -158,6 +171,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         setHideDeclined(data.proposals_hide_declined || false);
         setHideArchived(data.proposals_hide_archived || false);
         setHideApproved(data.proposals_hide_approved !== false);
+        setVisibleRepIds((data as any).proposals_visible_rep_ids ?? null);
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -178,6 +192,21 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       }
     } catch (error) {
       console.error('Error saving preference:', error);
+    }
+  }
+
+  async function saveVisibleRepIds(ids: string[] | null) {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ proposals_visible_rep_ids: ids } as any)
+        .eq('id', profile?.id);
+
+      if (error) {
+        console.error('Error saving visible rep ids:', error);
+      }
+    } catch (error) {
+      console.error('Error saving visible rep ids:', error);
     }
   }
 
@@ -1276,37 +1305,107 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       )}
 
       {/* Rep Selector — admin / manager / sales_manager only */}
-      {isAdminOrManager && salesReps.length > 0 && (
-        <div className="flex-shrink-0 px-3 sm:px-6 py-2 border-b border-gray-700 bg-gray-800/50">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span className="text-xs text-gray-400 font-medium flex-shrink-0">Rep:</span>
-            <button
-              onClick={() => setSelectedRepId(null)}
-              className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
-                selectedRepId === null
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              All Reps
-            </button>
-            {salesReps.map(rep => (
+      {isAdminOrManager && salesReps.length > 0 && (() => {
+        const displayedReps = visibleRepIds === null
+          ? salesReps
+          : salesReps.filter(r => visibleRepIds.includes(r.id));
+
+        return (
+          <div className="flex-shrink-0 px-3 sm:px-6 py-2 border-b border-gray-700 bg-gray-800/50">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="text-xs text-gray-400 font-medium flex-shrink-0">Rep:</span>
               <button
-                key={rep.id}
-                onClick={() => setSelectedRepId(rep.id === selectedRepId ? null : rep.id)}
+                onClick={() => setSelectedRepId(null)}
                 className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
-                  selectedRepId === rep.id
+                  selectedRepId === null
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
-                {rep.full_name || rep.first_name || 'Unknown'}
+                All Reps
               </button>
-            ))}
+              {displayedReps.map(rep => (
+                <button
+                  key={rep.id}
+                  onClick={() => setSelectedRepId(rep.id === selectedRepId ? null : rep.id)}
+                  className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                    selectedRepId === rep.id
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {rep.full_name || rep.first_name || 'Unknown'}
+                </button>
+              ))}
+              {/* Manage visible reps button */}
+              <div className="relative ml-auto" ref={repManagerRef}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowRepManager(v => !v); }}
+                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md font-medium transition-colors ${
+                    showRepManager
+                      ? 'bg-gray-600 text-white'
+                      : 'bg-gray-700/60 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                  }`}
+                  title="Manage visible reps"
+                >
+                  <Settings size={12} />
+                  <span className="hidden sm:inline">Manage</span>
+                </button>
+                {showRepManager && (
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 py-1" onClick={e => e.stopPropagation()}>
+                    <div className="px-3 py-2 border-b border-gray-700">
+                      <p className="text-xs font-semibold text-gray-300">Visible Reps</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Choose which reps show as filters</p>
+                    </div>
+                    <div className="py-1">
+                      <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={visibleRepIds === null}
+                          onChange={() => {
+                            setVisibleRepIds(null);
+                            saveVisibleRepIds(null);
+                          }}
+                          className="rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                        />
+                        <span className="text-xs text-gray-200 font-medium">Show All Reps</span>
+                      </label>
+                    </div>
+                    <div className="border-t border-gray-700 py-1 max-h-52 overflow-y-auto">
+                      {salesReps.map(rep => {
+                        const isChecked = visibleRepIds === null || visibleRepIds.includes(rep.id);
+                        return (
+                          <label key={rep.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                const next = visibleRepIds === null
+                                  ? salesReps.map(r => r.id).filter(id => id !== rep.id)
+                                  : isChecked
+                                    ? visibleRepIds.filter(id => id !== rep.id)
+                                    : [...visibleRepIds, rep.id];
+                                const normalized = next.length === salesReps.length ? null : next;
+                                setVisibleRepIds(normalized);
+                                saveVisibleRepIds(normalized);
+                              }}
+                              className="rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                            />
+                            <span className="text-xs text-gray-300 truncate">
+                              {rep.full_name || rep.first_name || 'Unknown'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Pending Deposits Alert Section */}
       {pendingDeposits.length > 0 && (
