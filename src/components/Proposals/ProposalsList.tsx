@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Proposal } from '../../lib/types';
-import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, Users, Settings } from 'lucide-react';
+import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, Users } from 'lucide-react';
 import { ProposalActivityPanel } from './ProposalActivityPanel';
 import { DuplicateProposalModal } from './DuplicateProposalModal';
 import { CreateRevisionModal } from './CreateRevisionModal';
@@ -68,8 +68,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const isAdminOrManager = ['admin', 'manager', 'sales_manager'].includes(profile?.role || '');
   const [salesReps, setSalesReps] = useState<{ id: string; full_name: string; first_name: string }[]>([]);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
-  const [visibleRepIds, setVisibleRepIds] = useState<string[] | null>(null);
-  const [showRepSettings, setShowRepSettings] = useState(false);
 
   // Load user preferences once on mount, then trigger proposal load
   useEffect(() => {
@@ -136,12 +134,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       if (!target.closest('.filter-panel') && !target.closest('.filter-button')) {
         setShowFilterPanel(false);
       }
-      if (!target.closest('.rep-settings-dropdown') && !target.closest('.rep-settings-button')) {
-        setShowRepSettings(false);
-      }
     }
 
-    if (openMenuId || showFilterPanel || showRepSettings) {
+    if (openMenuId || showFilterPanel) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
@@ -151,7 +146,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('proposals_hide_declined, proposals_hide_archived, proposals_hide_approved, proposals_visible_rep_ids')
+        .select('proposals_hide_declined, proposals_hide_archived, proposals_hide_approved')
         .eq('id', profile?.id)
         .single();
 
@@ -163,7 +158,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         setHideDeclined(data.proposals_hide_declined || false);
         setHideArchived(data.proposals_hide_archived || false);
         setHideApproved(data.proposals_hide_approved !== false);
-        setVisibleRepIds((data as any).proposals_visible_rep_ids ?? null);
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -185,31 +179,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     } catch (error) {
       console.error('Error saving preference:', error);
     }
-  }
-
-  async function saveVisibleRepIds(ids: string[] | null) {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ proposals_visible_rep_ids: ids })
-        .eq('id', profile?.id);
-
-      if (error) {
-        console.error('Error saving rep visibility preference:', error);
-      }
-    } catch (error) {
-      console.error('Error saving rep visibility preference:', error);
-    }
-  }
-
-  function toggleRepVisibility(repId: string) {
-    const current = visibleRepIds ?? salesReps.map(r => r.id);
-    const next = current.includes(repId)
-      ? current.filter(id => id !== repId)
-      : [...current, repId];
-    const newValue = next.length === salesReps.length ? null : next;
-    setVisibleRepIds(newValue);
-    saveVisibleRepIds(newValue);
   }
 
   async function loadProposals() {
@@ -1322,7 +1291,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             >
               All Reps
             </button>
-            {(visibleRepIds === null ? salesReps : salesReps.filter(r => visibleRepIds.includes(r.id))).map(rep => (
+            {salesReps.map(rep => (
               <button
                 key={rep.id}
                 onClick={() => setSelectedRepId(rep.id === selectedRepId ? null : rep.id)}
@@ -1335,54 +1304,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                 {rep.full_name || rep.first_name || 'Unknown'}
               </button>
             ))}
-            {/* Gear button to configure which reps are shown as pills */}
-            <div className="relative ml-auto">
-              <button
-                onClick={() => setShowRepSettings(v => !v)}
-                className="rep-settings-button text-gray-500 hover:text-gray-300 p-1 rounded transition-colors"
-                title="Configure visible reps"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
-              {showRepSettings && (
-                <div className="rep-settings-dropdown absolute right-0 top-7 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl min-w-[200px] py-2">
-                  <div className="px-3 pb-1.5 pt-0.5 border-b border-gray-700 mb-1">
-                    <span className="text-xs font-semibold text-gray-300">Visible Rep Pills</span>
-                  </div>
-                  <div className="px-2 space-y-0.5 max-h-64 overflow-y-auto">
-                    {salesReps.map(rep => {
-                      const checked = visibleRepIds === null || visibleRepIds.includes(rep.id);
-                      return (
-                        <label
-                          key={rep.id}
-                          className="flex items-center gap-2.5 px-1.5 py-1.5 rounded hover:bg-gray-700 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleRepVisibility(rep.id)}
-                            className="w-3.5 h-3.5 rounded accent-blue-500 flex-shrink-0"
-                          />
-                          <span className="text-xs text-gray-200 truncate">
-                            {rep.full_name || rep.first_name || 'Unknown'}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {visibleRepIds !== null && (
-                    <div className="px-3 pt-1.5 mt-1 border-t border-gray-700">
-                      <button
-                        onClick={() => { setVisibleRepIds(null); saveVisibleRepIds(null); }}
-                        className="text-xs text-blue-400 hover:text-blue-300 font-medium"
-                      >
-                        Show all reps
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
