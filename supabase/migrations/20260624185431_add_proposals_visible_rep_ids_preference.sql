@@ -1,0 +1,1 @@
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS proposals_visible_rep_ids uuid[] DEFAULT NULL;
