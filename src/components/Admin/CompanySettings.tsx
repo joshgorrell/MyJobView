@@ -43,6 +43,7 @@ export function CompanySettings() {
   const [portalMessagesEnabled, setPortalMessagesEnabled] = useState(false);
   const [portalVipServicesEnabled, setPortalVipServicesEnabled] = useState(false);
   const [portalTasksEnabled, setPortalTasksEnabled] = useState(true);
+  const [portalSalesOrdersEnabled, setPortalSalesOrdersEnabled] = useState(true);
   const [enablePublicVipSignup, setEnablePublicVipSignup] = useState(false);
 
   // Project Task Auto-Completion Settings
@@ -106,6 +107,7 @@ export function CompanySettings() {
         setPortalMessagesEnabled(data.portal_messages_enabled ?? false);
         setPortalVipServicesEnabled(data.portal_vip_services_enabled ?? false);
         setPortalTasksEnabled(data.portal_tasks_enabled ?? true);
+        setPortalSalesOrdersEnabled(data.portal_sales_orders_enabled ?? true);
         setEnablePublicVipSignup(data.enable_public_vip_signup ?? false);
 
         // Auto-completion settings
@@ -360,6 +362,7 @@ export function CompanySettings() {
             portal_messages_enabled: portalMessagesEnabled,
             portal_vip_services_enabled: portalVipServicesEnabled,
             portal_tasks_enabled: portalTasksEnabled,
+            portal_sales_orders_enabled: portalSalesOrdersEnabled,
             enable_public_vip_signup: enablePublicVipSignup,
             auto_completion_enabled: autoCompletionEnabled,
             auto_completion_requires_approval: autoCompletionRequiresApproval,
@@ -402,6 +405,7 @@ export function CompanySettings() {
             portal_messages_enabled: portalMessagesEnabled,
             portal_vip_services_enabled: portalVipServicesEnabled,
             portal_tasks_enabled: portalTasksEnabled,
+            portal_sales_orders_enabled: portalSalesOrdersEnabled,
             enable_public_vip_signup: enablePublicVipSignup,
             auto_completion_enabled: autoCompletionEnabled,
             auto_completion_requires_approval: autoCompletionRequiresApproval,
@@ -1132,6 +1136,22 @@ export function CompanySettings() {
                 Tasks
               </label>
               <p className="text-sm text-gray-600">Allow customers to submit and track punchlist items</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <input
+              type="checkbox"
+              id="portal-sales-orders"
+              checked={portalSalesOrdersEnabled}
+              onChange={(e) => setPortalSalesOrdersEnabled(e.target.checked)}
+              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <label htmlFor="portal-sales-orders" className="font-medium text-gray-900 cursor-pointer">
+                Sales Orders
+              </label>
+              <p className="text-sm text-gray-600">Allow customers to view their approved proposals (sales orders)</p>
             </div>
           </div>
 

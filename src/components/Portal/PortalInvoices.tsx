@@ -45,7 +45,7 @@ interface RecurringSubscription {
 
 type ViewMode = 'outstanding' | 'history' | 'subscriptions';
 
-export function PortalInvoices() {
+export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } = {}) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [recurringSubscriptions, setRecurringSubscriptions] = useState<RecurringSubscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -396,7 +396,7 @@ export function PortalInvoices() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-500">Loading invoices...</p>
@@ -405,24 +405,8 @@ export function PortalInvoices() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-3">
-            <a href="/portal" className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center">
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </a>
-            <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-8 sm:h-10 object-contain flex-shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">My Invoices</h1>
-              <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">View and pay your invoices and subscriptions</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+  const mainContent = (
+    <>
         {/* Tab Navigation */}
         <div className="mb-6 border-b border-gray-200">
           <nav className="flex gap-1 -mb-px overflow-x-auto scrollbar-none" style={{WebkitOverflowScrolling: 'touch'}}>
@@ -845,11 +829,14 @@ export function PortalInvoices() {
             )}
           </>
         )}
-      </main>
+      </>
+  );
 
+  const modals = (
+    <>
       {/* Cancel Subscription Modal */}
       {cancelModalOpen && selectedSubscription && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center sm:p-4 z-50">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto">
             <div className="p-5 sm:p-6">
               <div className="flex items-start justify-between mb-4">
@@ -962,7 +949,7 @@ export function PortalInvoices() {
 
       {/* Batch Payment Confirmation Modal */}
       {confirmPayAll && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center sm:p-4 z-50">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-start justify-between mb-5">
@@ -1033,7 +1020,7 @@ export function PortalInvoices() {
 
       {/* Payment Unavailable Modal */}
       {paymentUnavailableInvoice && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center sm:p-4 z-50">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-sm p-5 sm:p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -1077,6 +1064,44 @@ export function PortalInvoices() {
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (isEmbedded) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-900">My Invoices</h2>
+          <p className="text-sm text-gray-500 mt-0.5">View and pay your invoices and subscriptions</p>
+        </div>
+        {mainContent}
+        {modals}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16 sm:h-20 gap-3">
+            <a href="/portal" className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px]">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm font-medium">Dashboard</span>
+            </a>
+            <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-8 sm:h-10 object-contain flex-shrink-0" />
+            <div className="hidden sm:block border-l border-white/20 pl-4">
+              <p className="text-white font-semibold text-sm leading-tight">My Invoices</p>
+              <p className="text-blue-300 text-xs">View and pay your invoices and subscriptions</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        {mainContent}
+      </main>
+      {modals}
     </div>
   );
 }

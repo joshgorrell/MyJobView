@@ -15,7 +15,11 @@ interface Proposal {
   renewal_count: number;
 }
 
-export function PortalProposals() {
+interface PortalProposalsProps {
+  isEmbedded?: boolean;
+}
+
+export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {}) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProposal, setSelectedProposal] = useState<string | null>(null);
@@ -27,14 +31,12 @@ export function PortalProposals() {
   }, []);
 
   useEffect(() => {
-    // Check if there's a proposal ID in the URL path
     const path = window.location.pathname;
     const proposalIdMatch = path.match(/\/portal\/proposals\/([a-f0-9-]+)/i);
     if (proposalIdMatch && proposalIdMatch[1]) {
       setSelectedProposal(proposalIdMatch[1]);
     }
 
-    // Handle browser back/forward buttons
     const handlePopState = () => {
       const path = window.location.pathname;
       const proposalIdMatch = path.match(/\/portal\/proposals\/([a-f0-9-]+)/i);
@@ -51,7 +53,6 @@ export function PortalProposals() {
 
   async function loadProposals() {
     try {
-      // Check for admin impersonation first
       const urlParams = new URLSearchParams(window.location.search);
       const urlContactId = urlParams.get('contact');
       const urlName = urlParams.get('name');
@@ -70,7 +71,6 @@ export function PortalProposals() {
         setIsImpersonating(true);
         setImpersonatingName(impersonatingNameStorage || null);
       } else {
-        // Normal portal user flow
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           const destination = window.location.pathname;
@@ -90,7 +90,6 @@ export function PortalProposals() {
 
       if (!targetContactId) return;
 
-      // Update last portal access
       await supabase.rpc('update_contact_portal_access', { p_contact_id: targetContactId });
 
       const { data, error } = await supabase
@@ -98,7 +97,7 @@ export function PortalProposals() {
         .select('id, proposal_number, title, status, total, created_at, valid_until, expires_at, renewal_count')
         .eq('contact_id', targetContactId)
         .eq('is_portal_visible', true)
-        .in('status', ['sent', 'viewed', 'approved'])
+        .in('status', ['sent', 'viewed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -116,7 +115,6 @@ export function PortalProposals() {
         proposalId={selectedProposal}
         onBack={() => {
           setSelectedProposal(null);
-          // Update URL when going back
           window.history.pushState({}, '', '/portal/proposals');
         }}
       />
@@ -125,7 +123,7 @@ export function PortalProposals() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading proposals...</p>
@@ -134,10 +132,94 @@ export function PortalProposals() {
     );
   }
 
+  const content = (
+    <>
+      {proposals.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+          <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Proposals Yet</h3>
+          <p className="text-gray-600">
+            You don't have any proposals at this time. Check back later or contact us if you're expecting one.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {proposals.map((proposal) => {
+            const accentColors: Record<string, string> = {
+              draft: 'bg-gray-400',
+              sent: 'bg-blue-500',
+              viewed: 'bg-cyan-500',
+              approved: 'bg-green-500',
+              declined: 'bg-red-500',
+              expired: 'bg-gray-400',
+            };
+            const accent = accentColors[proposal.status] || 'bg-gray-400';
+            return (
+              <div
+                key={proposal.id}
+                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative"
+              >
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
+                <div className="p-6 pl-7">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {proposal.proposal_number}
+                        </h3>
+                        <StatusBadge status={proposal.status} />
+                      </div>
+                      <p className="text-gray-600 mb-3">{proposal.title}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                        <span>Created: {new Date(proposal.created_at).toLocaleDateString()}</span>
+                        {proposal.expires_at && (
+                          <ExpirationBadge expiresAt={proposal.expires_at} renewalCount={proposal.renewal_count} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-4 flex-shrink-0">
+                      <div className="text-left sm:text-right">
+                        <p className="text-sm text-gray-500">Total</p>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                          ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedProposal(proposal.id);
+                          window.history.pushState({}, '', `/portal/proposals/${proposal.id}`);
+                        }}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      >
+                        <ChevronRight className="w-6 h-6 text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  if (isEmbedded) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-900">My Proposals</h2>
+          <p className="text-sm text-gray-500 mt-0.5">View and manage your proposals</p>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {isImpersonating && (
-        <div className="bg-purple-600 text-white px-4 py-2 text-center text-sm font-medium">
+        <div className="bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium">
           Admin View: Viewing portal as {impersonatingName || 'customer'}
         </div>
       )}
@@ -165,73 +247,7 @@ export function PortalProposals() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {proposals.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Proposals Yet</h3>
-            <p className="text-gray-600">
-              You don't have any proposals at this time. Check back later or contact us if you're expecting one.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {proposals.map((proposal) => {
-              const accentColors: Record<string, string> = {
-                draft: 'bg-gray-400',
-                sent: 'bg-blue-500',
-                viewed: 'bg-cyan-500',
-                approved: 'bg-green-500',
-                declined: 'bg-red-500',
-                expired: 'bg-gray-400',
-              };
-              const accent = accentColors[proposal.status] || 'bg-gray-400';
-              return (
-              <div
-                key={proposal.id}
-                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative"
-              >
-                <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
-                <div className="p-6 pl-7">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {proposal.proposal_number}
-                      </h3>
-                      <StatusBadge status={proposal.status} />
-                    </div>
-                    <p className="text-gray-600 mb-3">{proposal.title}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                      <span>Created: {new Date(proposal.created_at).toLocaleDateString()}</span>
-                      {proposal.expires_at && (
-                        <ExpirationBadge expiresAt={proposal.expires_at} renewalCount={proposal.renewal_count} />
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-4 flex-shrink-0">
-                    <div className="text-left sm:text-right">
-                      <p className="text-sm text-gray-500">Total</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                        ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedProposal(proposal.id);
-                        window.history.pushState({}, '', `/portal/proposals/${proposal.id}`);
-                      }}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                    >
-                      <ChevronRight className="w-6 h-6 text-gray-600" />
-                    </button>
-                  </div>
-                </div>
-                </div>
-              </div>
-              );
-            })}
-          </div>
-        )}
+        {content}
       </main>
     </div>
   );

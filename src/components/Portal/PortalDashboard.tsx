@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Briefcase, Calendar, DollarSign, MessageSquare, LogOut, Shield, XCircle, ClipboardList, Star, ArrowLeft, ChevronRight } from 'lucide-react';
+import { FileText, Briefcase, Calendar, DollarSign, MessageSquare, LogOut, Shield, XCircle, ClipboardList, Star, ArrowLeft, ChevronRight, CheckSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ContractCancellationForm } from './ContractCancellationForm';
 import { TrialStatusBanner } from './TrialStatusBanner';
@@ -12,6 +12,7 @@ import { PortalInvoices } from './PortalInvoices';
 import PortalMessages from './PortalMessages';
 import { PortalVIPServices } from './PortalVIPServices';
 import { PortalPunchlist } from './PortalPunchlist';
+import { PortalSalesOrders } from './PortalSalesOrders';
 
 interface DashboardStats {
   activeProposals: number;
@@ -21,6 +22,7 @@ interface DashboardStats {
   unreadMessages: number;
   vipWorkOrders: number;
   punchlistTasks: number;
+  activeSalesOrders: number;
 }
 
 interface TrialAccess {
@@ -38,10 +40,11 @@ interface PortalModuleSettings {
   portal_messages_enabled: boolean;
   portal_vip_services_enabled: boolean;
   portal_tasks_enabled: boolean;
+  portal_sales_orders_enabled: boolean;
 }
 
 interface PortalDashboardProps {
-  defaultModule?: 'dashboard' | 'proposals' | 'projects' | 'appointments' | 'invoices' | 'messages' | 'vip' | 'punchlist';
+  defaultModule?: 'dashboard' | 'proposals' | 'projects' | 'appointments' | 'invoices' | 'messages' | 'vip' | 'punchlist' | 'sales-orders';
 }
 
 export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboardProps = {}) {
@@ -54,6 +57,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
     unreadMessages: 0,
     vipWorkOrders: 0,
     punchlistTasks: 0,
+    activeSalesOrders: 0,
   });
   const [loading, setLoading] = useState(true);
   const [contactName, setContactName] = useState('');
@@ -72,6 +76,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
     portal_messages_enabled: false,
     portal_vip_services_enabled: false,
     portal_tasks_enabled: true,
+    portal_sales_orders_enabled: true,
   });
 
   useEffect(() => {
@@ -168,7 +173,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
 
       const { data: portalSettings } = await supabase
         .from('company_settings')
-        .select('portal_proposals_enabled, portal_projects_enabled, portal_appointments_enabled, portal_invoices_enabled, portal_messages_enabled, portal_vip_services_enabled, portal_tasks_enabled')
+        .select('portal_proposals_enabled, portal_projects_enabled, portal_appointments_enabled, portal_invoices_enabled, portal_messages_enabled, portal_vip_services_enabled, portal_tasks_enabled, portal_sales_orders_enabled')
         .limit(1)
         .maybeSingle();
 
@@ -214,7 +219,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         .maybeSingle();
       setHasVipMembership(!!vipSub);
 
-      const [proposalsRes, projectsRes, appointmentsRes, invoicesRes, messagesRes, vipWorkOrdersRes, punchlistRes] = await Promise.all([
+      const [proposalsRes, projectsRes, appointmentsRes, invoicesRes, messagesRes, vipWorkOrdersRes, punchlistRes, salesOrdersRes] = await Promise.all([
         supabase.from('proposals').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['sent', 'viewed']),
         supabase.from('projects').select('id', { count: 'exact', head: true }).eq('customer_id', contactId).in('status', ['planning', 'active']),
         supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).gte('appointment_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
@@ -222,6 +227,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         supabase.from('message_threads').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('is_internal', false),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('type', 'vip_program').gte('start_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
         supabase.from('punchlist_tasks').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['draft', 'requested', 'scheduled']),
+        supabase.from('sales_orders').select('id', { count: 'exact', head: true }).eq('contact_id', contactId),
       ]);
 
       setStats({
@@ -232,6 +238,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         unreadMessages: messagesRes.count || 0,
         vipWorkOrders: vipWorkOrdersRes.count || 0,
         punchlistTasks: punchlistRes.count || 0,
+        activeSalesOrders: salesOrdersRes.count || 0,
       });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -319,13 +326,14 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
       <div className="min-h-screen bg-gray-50">
         <PortalHeader showBack />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          {currentView === 'proposals' && <PortalProposals />}
-          {currentView === 'projects' && <PortalProjects />}
+          {currentView === 'proposals' && <PortalProposals isEmbedded />}
+          {currentView === 'projects' && <PortalProjects isEmbedded />}
           {currentView === 'appointments' && <PortalAppointments />}
-          {currentView === 'invoices' && <PortalInvoices />}
+          {currentView === 'invoices' && <PortalInvoices isEmbedded />}
           {currentView === 'messages' && <PortalMessages />}
-          {currentView === 'vip' && <PortalVIPServices />}
-          {currentView === 'punchlist' && <PortalPunchlist />}
+          {currentView === 'vip' && <PortalVIPServices isEmbedded />}
+          {currentView === 'punchlist' && <PortalPunchlist isEmbedded />}
+          {currentView === 'sales-orders' && <PortalSalesOrders isEmbedded />}
         </main>
       </div>
     );
@@ -365,6 +373,17 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
               description="Active proposals awaiting your review"
               color="blue"
               onClick={() => setCurrentView('proposals')}
+            />
+          )}
+
+          {moduleSettings.portal_sales_orders_enabled && (
+            <DashboardTile
+              icon={<CheckSquare className="w-5 h-5" />}
+              title="Sales Orders"
+              count={stats.activeSalesOrders}
+              description="Approved proposals and confirmed projects"
+              color="teal"
+              onClick={() => setCurrentView('sales-orders')}
             />
           )}
 

@@ -85,6 +85,7 @@ interface AccessInfo {
 
 interface PortalPunchlistProps {
   previewContactId?: string;
+  isEmbedded?: boolean;
 }
 
 async function markTaskComplete(taskId: string) {
@@ -95,7 +96,7 @@ async function markTaskComplete(taskId: string) {
   if (error) throw error;
 }
 
-export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {}) {
+export function PortalPunchlist({ previewContactId, isEmbedded = false }: PortalPunchlistProps = {}) {
   const { profile, user } = useAuth();
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
   const [tasks, setTasks] = useState<PunchlistTask[]>([]);
@@ -1567,7 +1568,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
       )}
 
       {showCamera && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full">
             <CameraCapture
               onCapture={(file) => handlePhotoCapture(showCamera, file)}
@@ -1578,7 +1579,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
       )}
 
       {showNewTaskCamera && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full">
             <CameraCapture
               onCapture={handleNewTaskPhotoCapture}
@@ -1589,7 +1590,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
       )}
 
       {showHelp && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1772,6 +1773,18 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
 
   if (previewContactId) {
     return content;
+  }
+
+  if (isEmbedded) {
+    return (
+      <div>
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-gray-900">My Punchlist</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Track your service items</p>
+        </div>
+        {content}
+      </div>
+    );
   }
 
   const isAdminImpersonating = urlParams.get('contact') || localStorage.getItem('admin_impersonating_contact');
