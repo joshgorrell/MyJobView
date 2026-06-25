@@ -255,6 +255,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         query = query.eq('status', filterStatus);
       }
 
+      // Proposals with a linked sales order have transitioned — never show them here
+      query = query.is('sales_order_id', null);
+
       // Apply user preference filters
       if (hideDeclined) {
         query = query.neq('status', 'declined');
@@ -262,7 +265,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       if (hideArchived) {
         query = query.neq('status', 'archived');
       }
-      if (hideApproved && filterStatus === 'all') {
+      if (hideApproved && filterStatus !== 'approved' && filterStatus !== 'approved_pending_action') {
         query = query
           .neq('status', 'approved')
           .neq('status', 'approved_pending_action');
