@@ -599,7 +599,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading proposal...</p>
@@ -610,7 +610,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
 
   if (!proposal) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md px-6">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-gray-400" />
@@ -629,19 +629,20 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
 
   if (isProposalExpired) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-        <header className="bg-white shadow-md border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center gap-4">
-              <button onClick={onBack} className="p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200">
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center h-16 sm:h-20 gap-3">
+              <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px]">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm font-medium">Proposals</span>
               </button>
-              <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-10 object-contain" />
+              <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-8 sm:h-10 object-contain" />
             </div>
           </div>
         </header>
         <div className="max-w-xl mx-auto px-4 py-20 text-center">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-10">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10">
             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
               <XCircle className="w-8 h-8 text-red-500" />
             </div>
@@ -659,7 +660,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
             </p>
             <button
               onClick={onBack}
-              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-bold hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 hover:scale-105 shadow-md"
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
             >
               Back to Proposals
             </button>
@@ -672,49 +673,48 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
   const canTakeAction = proposal.status === 'sent' || proposal.status === 'viewed';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-      {/* Premium Header */}
-      <header className="bg-white shadow-md border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 sm:h-20 gap-4">
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={onBack}
-                className="p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200 hover:scale-105"
+                className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px] flex-shrink-0"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm font-medium">Proposals</span>
               </button>
               <img
                 src="/el_logo_color_(2).png"
                 alt="Electronic Life"
-                className="h-10 object-contain"
+                className="h-8 sm:h-10 object-contain flex-shrink-0"
               />
-              <div>
-                <div className="flex items-center gap-3 mb-1 flex-wrap">
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    {proposal.title}
-                  </h1>
+              <div className="hidden sm:block border-l border-white/20 pl-4 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-white font-semibold text-sm leading-tight truncate">{proposal.title}</p>
                   {proposal.renewal_count > 0 && (
-                    <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg">
+                    <span className="px-2 py-0.5 bg-blue-500/30 text-blue-100 text-xs font-bold rounded">
                       Rev. {proposal.renewal_count}
                     </span>
                   )}
                   {(proposal.current_portal_version ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg border border-gray-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/10 text-blue-200 text-xs font-semibold rounded border border-white/20">
                       <Layers className="w-3 h-3" />
                       Version {proposal.current_portal_version}
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-600 font-medium">{overrideDisplayNumber ?? proposal.proposal_number}</p>
+                <p className="text-blue-300 text-xs mt-0.5">{overrideDisplayNumber ?? proposal.proposal_number}</p>
               </div>
             </div>
             <button
               onClick={trackProposalDownload}
-              className="flex items-center gap-2 px-5 py-2.5 text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-200 hover:scale-105 font-medium"
+              className="flex items-center gap-2 px-4 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-sm font-medium min-h-[44px] flex-shrink-0"
             >
               <Download className="w-4 h-4" />
-              Download PDF
+              <span className="hidden sm:inline">Download PDF</span>
             </button>
           </div>
         </div>
@@ -777,7 +777,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
               return (
                 <div
                   key={room.id}
-                  className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                  className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300"
                   style={{
                     animation: animate ? `slideInUp 0.5s ease-out ${roomIndex * 0.1}s both` : 'none'
                   }}
@@ -912,7 +912,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
               const unassignedSubtotal = unassignedItems.reduce((sum, item) => sum + (item.line_total || 0), 0);
               const showImages = template?.show_product_images !== false && unassignedItems.some(item => item.products?.image_url);
               return (
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
                   {hasRooms && (
                     <div className="bg-gradient-to-r from-amber-700 to-amber-800 px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -1021,20 +1021,20 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Proposal Summary Card */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sticky top-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2.5 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-white" />
+                <div className="bg-blue-100 p-2.5 rounded-xl">
+                  <DollarSign className="w-6 h-6 text-blue-600" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Proposal Summary</h3>
               </div>
 
               {/* Total Amount */}
               <div className="mb-6">
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-5 border border-blue-200">
+                <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
                   <div className="text-center">
                     <div className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Total Investment</div>
-                    <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                    <div className="text-4xl font-bold text-blue-600">
                       ${(proposal.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
@@ -1063,7 +1063,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                     <button
                       onClick={handleApprove}
                       disabled={submitting}
-                      className="w-full px-4 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold transition-all duration-200 hover:scale-105 shadow-lg"
+                      className="w-full px-4 py-3.5 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold transition-colors shadow-sm"
                     >
                       <CheckCircle className="w-5 h-5" />
                       Approve Proposal
@@ -1120,7 +1120,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
 
             {/* Request Changes / Comments Section */}
             {comment && comment !== '' && (
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   Request Changes / Questions
@@ -1134,7 +1134,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                 />
                 <button
                   disabled={submitting || !comment.trim() || comment === 'open'}
-                  className="w-full mt-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 font-bold transition-all duration-200"
+                  className="w-full mt-3 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 font-bold transition-colors"
                 >
                   Submit Feedback
                 </button>
@@ -1143,7 +1143,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
 
             {/* Decline Section */}
             {declineReason && (
-              <div className="bg-white rounded-2xl shadow-lg border-2 border-red-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-6">
                 <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
                   <XCircle className="w-4 h-4" />
                   Decline This Proposal
@@ -1210,10 +1210,10 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
 
             {/* Related Invoices Panel */}
             {relatedInvoices.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2 rounded-xl">
-                    <FileText className="w-5 h-5 text-white" />
+                  <div className="bg-blue-100 p-2 rounded-xl">
+                    <FileText className="w-5 h-5 text-blue-600" />
                   </div>
                   <h3 className="text-base font-bold text-gray-900">
                     Invoice{relatedInvoices.length !== 1 ? 's' : ''}
@@ -1333,7 +1333,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
 
       {/* Payment unavailable modal */}
       {paymentUnavailableInvoice && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-amber-100 p-2.5 rounded-xl">

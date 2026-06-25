@@ -141,23 +141,24 @@ export function PortalProposals() {
           Admin View: Viewing portal as {impersonatingName || 'customer'}
         </div>
       )}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-3">
+      <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16 sm:h-20 gap-3">
             <a
               href="/portal"
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px]"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-400" />
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm font-medium">Dashboard</span>
             </a>
             <img
               src="/el_logo_color_(2).png"
               alt="Electronic Life"
               className="h-8 sm:h-10 object-contain flex-shrink-0"
             />
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">My Proposals</h1>
-              <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">View and manage your proposals</p>
+            <div className="hidden sm:block border-l border-white/20 pl-4">
+              <p className="text-white font-semibold text-sm leading-tight">My Proposals</p>
+              <p className="text-blue-300 text-xs">View and manage your proposals</p>
             </div>
           </div>
         </div>
@@ -165,7 +166,7 @@ export function PortalProposals() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {proposals.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
             <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Proposals Yet</h3>
             <p className="text-gray-600">
@@ -174,11 +175,23 @@ export function PortalProposals() {
           </div>
         ) : (
           <div className="space-y-4">
-            {proposals.map((proposal) => (
+            {proposals.map((proposal) => {
+              const accentColors: Record<string, string> = {
+                draft: 'bg-gray-400',
+                sent: 'bg-blue-500',
+                viewed: 'bg-cyan-500',
+                approved: 'bg-green-500',
+                declined: 'bg-red-500',
+                expired: 'bg-gray-400',
+              };
+              const accent = accentColors[proposal.status] || 'bg-gray-400';
+              return (
               <div
                 key={proposal.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative"
               >
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
+                <div className="p-6 pl-7">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -213,8 +226,10 @@ export function PortalProposals() {
                     </button>
                   </div>
                 </div>
+                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

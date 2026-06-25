@@ -257,7 +257,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-5"></div>
           <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-10 object-contain mx-auto mb-3 opacity-60" />
@@ -316,7 +316,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
 
   if (currentView !== 'dashboard') {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-gray-50">
         <PortalHeader showBack />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           {currentView === 'proposals' && <PortalProposals />}
@@ -336,7 +336,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-50">
       <PortalHeader />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 sm:pb-10">
