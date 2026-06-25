@@ -68,7 +68,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const isAdminOrManager = ['admin', 'manager', 'sales_manager'].includes(profile?.role || '');
   const [salesReps, setSalesReps] = useState<{ id: string; full_name: string; first_name: string }[]>([]);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
-  const [visibleRepIds, setVisibleRepIds] = useState<string[] | null>(null);
 
   // Load user preferences once on mount, then trigger proposal load
   useEffect(() => {
@@ -104,7 +103,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     } else {
       setLoading(false);
     }
-  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, preferencesLoaded, selectedRepId, visibleRepIds]);
+  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, preferencesLoaded, selectedRepId]);
 
   // Reset to page 1 when filter/sort criteria change (but not when currentPage itself changes).
   const skipNextLoadRef = useRef(false);
@@ -121,17 +120,10 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       .from('profiles')
       .select('id, full_name, first_name')
       .eq('organization_id', profile.organization_id)
-      .in('role', ['sales', 'sales_manager', 'manager', 'admin', 'finance', 'service_manager'])
+      .eq('can_create_proposals', true)
       .order('full_name')
       .then(({ data }) => setSalesReps(data || []));
   }, [isAdminOrManager, profile?.id]);
-
-  // If the active rep filter becomes hidden by the visibility preference, clear it
-  useEffect(() => {
-    if (selectedRepId && visibleRepIds !== null && !visibleRepIds.includes(selectedRepId)) {
-      setSelectedRepId(null);
-    }
-  }, [visibleRepIds, selectedRepId]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -154,7 +146,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('proposals_hide_declined, proposals_hide_archived, proposals_hide_approved, proposals_visible_rep_ids')
+        .select('proposals_hide_declined, proposals_hide_archived, proposals_hide_approved')
         .eq('id', profile?.id)
         .single();
 
@@ -166,7 +158,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         setHideDeclined(data.proposals_hide_declined || false);
         setHideArchived(data.proposals_hide_archived || false);
         setHideApproved(data.proposals_hide_approved !== false);
-        setVisibleRepIds((data as any).proposals_visible_rep_ids ?? null);
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -187,21 +178,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       }
     } catch (error) {
       console.error('Error saving preference:', error);
-    }
-  }
-
-  async function saveVisibleRepIds(ids: string[] | null) {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ proposals_visible_rep_ids: ids } as any)
-        .eq('id', profile?.id);
-
-      if (error) {
-        console.error('Error saving visible rep ids:', error);
-      }
-    } catch (error) {
-      console.error('Error saving visible rep ids:', error);
     }
   }
 
@@ -238,10 +214,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           query = query.eq('created_by', selectedRepId);
         }
         // No filter when selectedRepId is null — show all org proposals
-        // Apply visible-rep-ids preference when no specific rep is selected
-        if (!selectedRepId && visibleRepIds !== null) {
-          query = query.in('created_by', visibleRepIds);
-        }
       } else {
         if (visibilityScope === 'own') {
           query = query.eq('created_by', profile.id);
@@ -1004,46 +976,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               </option>
                             ))}
                           </select>
-                          <p className="text-xs font-medium text-gray-400 mb-2">Show in rep list</p>
-                          <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                              <input
-                                type="checkbox"
-                                checked={visibleRepIds === null}
-                                onChange={() => {
-                                  setVisibleRepIds(null);
-                                  saveVisibleRepIds(null);
-                                }}
-                                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                              />
-                              <span className="text-sm text-gray-300 group-hover:text-white font-medium">All Reps</span>
-                            </label>
-                            {salesReps.map(rep => {
-                              const isChecked = visibleRepIds === null || visibleRepIds.includes(rep.id);
-                              return (
-                                <label key={rep.id} className="flex items-center gap-2 cursor-pointer group">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      const next = visibleRepIds === null
-                                        ? salesReps.map(r => r.id).filter(id => id !== rep.id)
-                                        : isChecked
-                                          ? visibleRepIds.filter(id => id !== rep.id)
-                                          : [...visibleRepIds, rep.id];
-                                      const normalized = next.length === salesReps.length ? null : next;
-                                      setVisibleRepIds(normalized);
-                                      saveVisibleRepIds(normalized);
-                                    }}
-                                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                  />
-                                  <span className="text-sm text-gray-300 group-hover:text-white truncate">
-                                    {rep.full_name || rep.first_name || 'Unknown'}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
                         </div>
                       )}
                     </div>
@@ -1281,46 +1213,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               </option>
                             ))}
                           </select>
-                          <p className="text-xs font-medium text-gray-400 mb-2">Show in rep list</p>
-                          <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                              <input
-                                type="checkbox"
-                                checked={visibleRepIds === null}
-                                onChange={() => {
-                                  setVisibleRepIds(null);
-                                  saveVisibleRepIds(null);
-                                }}
-                                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                              />
-                              <span className="text-sm text-gray-300 group-hover:text-white font-medium">All Reps</span>
-                            </label>
-                            {salesReps.map(rep => {
-                              const isChecked = visibleRepIds === null || visibleRepIds.includes(rep.id);
-                              return (
-                                <label key={rep.id} className="flex items-center gap-2 cursor-pointer group">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      const next = visibleRepIds === null
-                                        ? salesReps.map(r => r.id).filter(id => id !== rep.id)
-                                        : isChecked
-                                          ? visibleRepIds.filter(id => id !== rep.id)
-                                          : [...visibleRepIds, rep.id];
-                                      const normalized = next.length === salesReps.length ? null : next;
-                                      setVisibleRepIds(normalized);
-                                      saveVisibleRepIds(normalized);
-                                    }}
-                                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                  />
-                                  <span className="text-sm text-gray-300 group-hover:text-white truncate">
-                                    {rep.full_name || rep.first_name || 'Unknown'}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
                         </div>
                       )}
                     </div>
