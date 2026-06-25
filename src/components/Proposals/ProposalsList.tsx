@@ -104,7 +104,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     } else {
       setLoading(false);
     }
-  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, preferencesLoaded, selectedRepId]);
+  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, preferencesLoaded, selectedRepId, visibleRepIds]);
 
   // Reset to page 1 when filter/sort criteria change (but not when currentPage itself changes).
   const skipNextLoadRef = useRef(false);
@@ -238,6 +238,10 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           query = query.eq('created_by', selectedRepId);
         }
         // No filter when selectedRepId is null — show all org proposals
+        // Apply visible-rep-ids preference when no specific rep is selected
+        if (!selectedRepId && visibleRepIds !== null) {
+          query = query.in('created_by', visibleRepIds);
+        }
       } else {
         if (visibilityScope === 'own') {
           query = query.eq('created_by', profile.id);

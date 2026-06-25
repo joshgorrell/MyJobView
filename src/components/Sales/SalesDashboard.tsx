@@ -233,23 +233,30 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
   // Load available sales reps for the selector (admin/manager/sales_manager only)
   useEffect(() => {
     if (!profile?.organization_id || !isAdmin) return;
-    supabase
-      .from('profiles')
-      .select('id, full_name, first_name, last_name')
-      .eq('organization_id', profile.organization_id)
-      .in('role', ['sales', 'sales_manager', 'manager', 'admin', 'finance', 'service_manager'])
-      .order('first_name', { ascending: true })
-      .then(({ data }) => {
-        const reps = (data || []).map(p => ({
-          id: p.id,
-          display_name: p.first_name && p.last_name
-            ? `${p.first_name} ${p.last_name}`
-            : p.full_name || 'Unknown',
-          first_name: p.first_name || (p.full_name ? p.full_name.split(' ')[0] : 'Unknown'),
-        }));
-        setSalesRepsForSelector(reps);
-      });
-  }, [profile?.organization_id, isAdmin]);
+    Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, full_name, first_name, last_name')
+        .eq('organization_id', profile.organization_id)
+        .in('role', ['sales', 'sales_manager', 'manager', 'admin', 'finance', 'service_manager'])
+        .order('first_name', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('proposals_visible_rep_ids')
+        .eq('id', profile.id)
+        .maybeSingle(),
+    ]).then(([repsResult, prefResult]) => {
+      const visibleIds: string[] | null = (prefResult.data as any)?.proposals_visible_rep_ids ?? null;
+      const reps = (repsResult.data || []).map(p => ({
+        id: p.id,
+        display_name: p.first_name && p.last_name
+          ? `${p.first_name} ${p.last_name}`
+          : p.full_name || 'Unknown',
+        first_name: p.first_name || (p.full_name ? p.full_name.split(' ')[0] : 'Unknown'),
+      }));
+      setSalesRepsForSelector(visibleIds !== null ? reps.filter(r => visibleIds.includes(r.id)) : reps);
+    });
+  }, [profile?.organization_id, profile?.id, isAdmin]);
 
   // Load comparison data when 2+ reps are selected
   useEffect(() => {
