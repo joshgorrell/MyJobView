@@ -350,15 +350,11 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   const approvedCOs = changeOrders.filter(co => co.status === 'approved' && co.is_billable !== false);
   const nonBillableApprovedCOs = changeOrders.filter(co => co.status === 'approved' && co.is_billable === false);
 
-  const totalCOAmount = approvedCOs.reduce((sum, co) => {
-    const isNeg = (co.change_amount || 0) < 0;
-    const coVal = isNeg
-      ? (co.change_amount || 0) - Math.abs(co.tax_amount || 0)
-      : Math.abs(co.change_amount || 0) + (co.tax_amount || 0);
-    return sum + coVal;
-  }, 0);
   const fullContractWithCOs = order.contract_total || 0;
-  const originalTotal = fullContractWithCOs - totalCOAmount;
+  // Use the stored proposal total as the authoritative original contract baseline.
+  // Never back-calculate from contract_total minus CO amounts — that produces wrong results
+  // when the DB stored a running CO total in original_contract_total instead of the proposal total.
+  const originalTotal = order.proposal?.total ?? order.original_contract_total ?? fullContractWithCOs;
 
   const activeInvoices = invoices.filter(inv => inv.status !== 'void');
   const voidedInvoices = invoices.filter(inv => inv.status === 'void');
