@@ -12,6 +12,7 @@ import DepositReminderButton from './DepositReminderButton';
 import { RecordPaymentModal } from '../Invoices/RecordPaymentModal';
 import { ReactivateProposalModalEnhanced } from './ReactivateProposalModalEnhanced';
 import { DeclineProposalModal } from './DeclineProposalModal';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface ProposalsListProps {
   onSelectProposal: (proposalId: string) => void;
@@ -63,6 +64,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [pendingDepositSalesOrders, setPendingDepositSalesOrders] = useState<Record<string, string>>({});
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineModalMode, setDeclineModalMode] = useState<'decline' | 'cancel'>('decline');
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   // Rep selector — visible to admin / manager / sales_manager
   const isAdminOrManager = ['admin', 'manager', 'sales_manager'].includes(profile?.role || '');
@@ -1446,9 +1448,18 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     <div className="flex-1 min-w-0">
                       {/* Customer name row */}
                       <div className="flex items-center gap-1.5 mb-0 min-w-0">
-                        <p className="text-sm font-bold text-white leading-snug truncate min-w-0 flex-1">
-                          {proposal.contacts?.full_name || proposal.contacts?.contact_name || 'No Customer'}
-                        </p>
+                        {(proposal.contacts as any)?.id ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
+                            className="text-sm font-bold text-blue-400 hover:text-blue-300 leading-snug truncate min-w-0 flex-1 text-left transition-colors"
+                          >
+                            {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
+                          </button>
+                        ) : (
+                          <p className="text-sm font-bold text-white leading-snug truncate min-w-0 flex-1">
+                            {proposal.contacts?.full_name || (proposal.contacts as any)?.contact_name || 'No Customer'}
+                          </p>
+                        )}
                         {(proposal.revision_count && proposal.revision_count > 1) && (
                           <span className="flex-shrink-0 px-1.5 h-4 bg-blue-900 text-blue-200 text-[10px] font-medium rounded flex items-center">
                             R:{proposal.revision_count}
@@ -1736,9 +1747,18 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   {getStatusIcon(proposal.status)}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 min-w-0">
-                      <span className="text-sm font-bold text-white flex-shrink-0 max-w-[35%] truncate">
-                        {proposal.contacts?.full_name || proposal.contacts?.contact_name || 'No Customer'}
-                      </span>
+                      {(proposal.contacts as any)?.id ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
+                          className="text-sm font-bold text-blue-400 hover:text-blue-300 flex-shrink-0 max-w-[35%] truncate text-left transition-colors"
+                        >
+                          {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
+                        </button>
+                      ) : (
+                        <span className="text-sm font-bold text-white flex-shrink-0 max-w-[35%] truncate">
+                          {proposal.contacts?.full_name || (proposal.contacts as any)?.contact_name || 'No Customer'}
+                        </span>
+                      )}
                       <span className="text-gray-500 flex-shrink-0 text-xs">—</span>
                       <h3 className="text-sm text-gray-300 truncate flex-1 min-w-0">{getDisplayTitle(proposal)}</h3>
                       {(proposal.revision_count && proposal.revision_count > 1) && (
@@ -2483,6 +2503,13 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             </div>
           </div>
         </div>
+      )}
+
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
+        />
       )}
 
     </div>

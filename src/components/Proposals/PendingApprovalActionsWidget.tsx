@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Clock, DollarSign, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ApprovalActionModal from './ApprovalActionModal';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 export default function PendingApprovalActionsWidget() {
   const [pendingProposals, setPendingProposals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPendingProposals();
@@ -230,7 +232,16 @@ export default function PendingApprovalActionsWidget() {
                     </div>
 
                     <p className="text-sm text-gray-700 mb-1">
-                      {proposal.contacts?.full_name || 'Unknown Customer'}
+                      {proposal.contacts?.id ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setQuickViewContactId(proposal.contacts.id); }}
+                          className="text-blue-600 hover:text-blue-800 hover:underline text-left font-medium transition-colors"
+                        >
+                          {proposal.contacts.full_name || 'Unknown Customer'}
+                        </button>
+                      ) : (
+                        proposal.contacts?.full_name || 'Unknown Customer'
+                      )}
                     </p>
 
                     <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -281,6 +292,13 @@ export default function PendingApprovalActionsWidget() {
           contact={selectedProposal.contacts}
           onClose={handleModalClose}
           onComplete={handleModalClose}
+        />
+      )}
+
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
         />
       )}
     </>

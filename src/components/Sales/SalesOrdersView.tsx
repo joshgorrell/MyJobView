@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { FileText, DollarSign, Calendar, User, Search, CheckCircle, Clock, AlertCircle, ChevronRight, Building2, X } from 'lucide-react';
 import { SalesOrderDetail } from './SalesOrderDetail';
 import { ErrorBoundary } from '../Shared/ErrorBoundary';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface InvoiceSummary {
   amount_due: number;
@@ -70,6 +71,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   const isAdminOrManager = ['admin', 'manager', 'sales_manager'].includes(profile?.role || '');
 
@@ -304,7 +306,16 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-white text-sm leading-tight truncate">{order.contact?.full_name || 'Unknown'}</div>
+                            {order.contact?.id ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setQuickViewContactId(order.contact.id); }}
+                                className="font-semibold text-blue-400 hover:text-blue-300 text-sm leading-tight truncate block text-left max-w-full transition-colors"
+                              >
+                                {order.contact.full_name}
+                              </button>
+                            ) : (
+                              <div className="font-semibold text-white text-sm leading-tight truncate">{order.contact?.full_name || 'Unknown'}</div>
+                            )}
                             {order.proposal?.title && (
                               <div className="text-gray-400 text-xs truncate mt-0.5">{order.proposal.title}</div>
                             )}
@@ -379,9 +390,18 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                           <div className="flex items-stretch min-h-[60px]">
                             <div className={`w-1 flex-shrink-0 ${cfg.dot}`} />
                             <div className="px-4 py-3 min-w-0 flex-1">
-                              <div className="font-semibold text-white text-sm leading-tight truncate max-w-[200px] md:max-w-[280px] lg:max-w-xs">
-                                {order.contact?.full_name || 'Unknown'}
-                              </div>
+                              {order.contact?.id ? (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setQuickViewContactId(order.contact.id); }}
+                                  className="font-semibold text-blue-400 hover:text-blue-300 text-sm leading-tight truncate block text-left max-w-[200px] md:max-w-[280px] lg:max-w-xs transition-colors"
+                                >
+                                  {order.contact.full_name}
+                                </button>
+                              ) : (
+                                <div className="font-semibold text-white text-sm leading-tight truncate max-w-[200px] md:max-w-[280px] lg:max-w-xs">
+                                  {order.contact?.full_name || 'Unknown'}
+                                </div>
+                              )}
                               {order.proposal?.title && (
                                 <div className="text-gray-400 text-xs truncate max-w-[200px] md:max-w-[280px] lg:max-w-xs mt-0.5">
                                   {order.proposal.title}
@@ -448,6 +468,13 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
           {orders.length !== filteredOrders.length && ` (filtered from ${orders.length})`}
         </p>
+      )}
+
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
+        />
       )}
     </div>
   );
