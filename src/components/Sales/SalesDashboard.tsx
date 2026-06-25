@@ -638,7 +638,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       // Parallel data fetching (all queries run simultaneously)
       // Each query uses .catch() so a single failure degrades gracefully instead of blanking the dashboard
-      const safe = (q: any) => q.catch(() => ({ data: null, count: null, error: null }));
+      const safe = (q: any) => Promise.resolve(q).catch(() => ({ data: null, count: null, error: null }));
       const [
         myLeadsResult,
         closedLeadsThisMonthResult,
