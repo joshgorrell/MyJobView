@@ -926,7 +926,7 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
             )}
             <button
               onClick={() => setIsCreating(true)}
-              className="w-full sm:w-auto px-4 py-1.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-lg flex items-center justify-center gap-1.5 font-semibold shadow-sm hover:shadow-md transition-all text-sm whitespace-nowrap"
+              className="w-full sm:w-auto px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center gap-1.5 font-semibold shadow-sm transition-colors text-sm whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               Add Task
@@ -936,83 +936,103 @@ export function PortalPunchlist({ previewContactId }: PortalPunchlistProps = {})
       </div>
 
       {isCreating && (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-gray-900 text-sm">New Task</h4>
-            <button
-              onClick={() => {
-                setIsCreating(false);
-                setNewTask({ title: '', details: '' });
-                setNewTaskPhotos([]);
-              }}
-              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={newTask.title}
-              onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-              placeholder="Task title *"
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <textarea
-              value={newTask.details}
-              onChange={e => setNewTask({ ...newTask, details: e.target.value })}
-              placeholder="Task details (optional)"
-              rows={2}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-
-            {newTaskPhotos.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {newTaskPhotos.map((photo, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={URL.createObjectURL(photo)}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-24 object-cover rounded border border-gray-300"
-                    />
-                    <button
-                      onClick={() => removeNewTaskPhoto(index)}
-                      className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-2">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-base font-semibold text-gray-900">Add a Task</h3>
               <button
-                onClick={() => setShowNewTaskCamera(true)}
-                className="flex items-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm"
+                onClick={() => {
+                  setIsCreating(false);
+                  setNewTask({ title: '', details: '' });
+                  setNewTaskPhotos([]);
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <Camera className="w-4 h-4" />
-                Take Photo
+                <X className="w-5 h-5" />
               </button>
-              <label className="flex items-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm cursor-pointer">
-                <Upload className="w-4 h-4" />
-                Upload Photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleNewTaskPhotoUpload}
-                  className="hidden"
-                />
-              </label>
             </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Title <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newTask.title}
+                  onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+                  placeholder="e.g. Doorbell camera not responding"
+                  autoFocus
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Details <span className="text-gray-400 font-normal">(optional)</span></label>
+                <textarea
+                  value={newTask.details}
+                  onChange={e => setNewTask({ ...newTask, details: e.target.value })}
+                  placeholder="Describe the issue or provide any helpful context"
+                  rows={3}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+              </div>
 
-            <button
-              onClick={handleCreateTask}
-              disabled={!newTask.title.trim()}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg"
-            >
-              Create Task
-            </button>
+              {newTaskPhotos.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {newTaskPhotos.map((photo, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg border border-gray-200"
+                      />
+                      <button
+                        onClick={() => removeNewTaskPhoto(index)}
+                        className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowNewTaskCamera(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors"
+                >
+                  <Camera className="w-4 h-4" />
+                  Take Photo
+                </button>
+                <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm cursor-pointer transition-colors">
+                  <Upload className="w-4 h-4" />
+                  Upload Photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleNewTaskPhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                onClick={() => {
+                  setIsCreating(false);
+                  setNewTask({ title: '', details: '' });
+                  setNewTaskPhotos([]);
+                }}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateTask}
+                disabled={!newTask.title.trim()}
+                className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors"
+              >
+                Create Task
+              </button>
+            </div>
           </div>
         </div>
       )}
