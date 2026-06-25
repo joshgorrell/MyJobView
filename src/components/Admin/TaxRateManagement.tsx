@@ -39,6 +39,7 @@ export default function TaxRateManagement() {
   const [savingNexus, setSavingNexus] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [activeRulesState, setActiveRulesState] = useState<string | null>(null);
+  const [activeRulesEnv, setActiveRulesEnv] = useState<'residential' | 'commercial'>('residential');
 
   useEffect(() => {
     loadJurisdictions();
@@ -386,13 +387,29 @@ export default function TaxRateManagement() {
             <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold text-gray-900">{activeRules.stateName} — {activeRulesState}</h4>
-                <div className="flex gap-2">
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">
-                    Filing: {activeRules.filingFormNumber}
-                  </span>
-                  <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded font-medium">
-                    Exemption: {activeRules.exemptionFormNumber}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+                    <button
+                      onClick={() => setActiveRulesEnv('residential')}
+                      className={`px-3 py-1.5 transition-colors ${activeRulesEnv === 'residential' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      Residential
+                    </button>
+                    <button
+                      onClick={() => setActiveRulesEnv('commercial')}
+                      className={`px-3 py-1.5 transition-colors border-l border-gray-300 ${activeRulesEnv === 'commercial' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      Commercial
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">
+                      Filing: {activeRules.filingFormNumber}
+                    </span>
+                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded font-medium">
+                      Exemption: {activeRules.exemptionFormNumber}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -403,7 +420,7 @@ export default function TaxRateManagement() {
                   { type: 'general_installation_repair', label: 'General Repair / Service' },
                 ].map(({ type, label }) => {
                   const applicability = activeRules.getApplicability(
-                    'taxable',
+                    activeRulesEnv,
                     type as 'original_construction' | 'remodel' | 'general_installation_repair'
                   );
                   return (
@@ -638,9 +655,9 @@ export default function TaxRateManagement() {
                 filteredJurisdictions.map((jurisdiction) => {
                   const stateCode = jurisdiction.state?.toUpperCase();
                   const hasKsCode = stateCode === 'KS' && jurisdiction.ks_jurisdiction_code;
-                  const hasMoCode = stateCode === 'MO' && (jurisdiction as any).mo_jurisdiction_code;
+                  const hasMoCode = stateCode === 'MO' && jurisdiction.mo_jurisdiction_code;
                   const missingCode = (stateCode === 'KS' && !jurisdiction.ks_jurisdiction_code) ||
-                                      (stateCode === 'MO' && !(jurisdiction as any).mo_jurisdiction_code);
+                                      (stateCode === 'MO' && !jurisdiction.mo_jurisdiction_code);
 
                   return (
                     <tr key={jurisdiction.id} className="hover:bg-gray-50">
@@ -684,7 +701,7 @@ export default function TaxRateManagement() {
                         {hasMoCode && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <Hash className="w-3 h-3" />
-                            MO: {(jurisdiction as any).mo_jurisdiction_code}
+                            MO: {jurisdiction.mo_jurisdiction_code}
                           </span>
                         )}
                         {missingCode && (
@@ -814,10 +831,16 @@ function JurisdictionModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
       const dataToSave = {
         ...formData,
         state: formData.state?.toUpperCase(),
-        company_id: user.id,
+        organization_id: profileData?.organization_id,
         updated_at: new Date().toISOString(),
       };
 

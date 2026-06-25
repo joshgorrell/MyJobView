@@ -53,10 +53,11 @@ export default function ProposalTaxReport({ proposalId, onClose }: ProposalTaxRe
       setProposal(proposalData);
 
       let currentTaxRate = 0;
+      let jurisdictionState: string | null = null;
       if (proposalData?.contacts?.zip_code) {
         const { data: taxRateData } = await supabase
           .from('tax_jurisdictions')
-          .select('combined_rate')
+          .select('combined_rate, state')
           .eq('zip_code', proposalData.contacts.zip_code)
           .eq('is_active', true)
           .order('effective_date', { ascending: false })
@@ -65,13 +66,14 @@ export default function ProposalTaxReport({ proposalId, onClose }: ProposalTaxRe
 
         if (taxRateData) {
           currentTaxRate = taxRateData.combined_rate;
+          jurisdictionState = taxRateData.state || 'KS';
         }
       }
 
       if (currentTaxRate === 0) {
         const { data: defaultRate } = await supabase
           .from('tax_jurisdictions')
-          .select('combined_rate')
+          .select('combined_rate, state')
           .eq('is_default', true)
           .eq('is_active', true)
           .limit(1)
@@ -79,6 +81,7 @@ export default function ProposalTaxReport({ proposalId, onClose }: ProposalTaxRe
 
         if (defaultRate) {
           currentTaxRate = defaultRate.combined_rate;
+          if (!jurisdictionState) jurisdictionState = defaultRate.state || 'KS';
         }
       }
 
@@ -86,7 +89,7 @@ export default function ProposalTaxReport({ proposalId, onClose }: ProposalTaxRe
 
       const taxEnvironment = (proposalData?.tax_environment || 'residential') as TaxEnvironment;
       const taxProjectType = (proposalData?.tax_project_type || 'general_installation_repair') as TaxProjectType;
-      const applicability = getTaxApplicability(taxEnvironment, taxProjectType);
+      const applicability = getTaxApplicability(taxEnvironment, taxProjectType, jurisdictionState || 'KS');
       setTaxInfo(applicability);
 
       const { data: settingsData } = await supabase

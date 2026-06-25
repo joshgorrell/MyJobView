@@ -1213,6 +1213,7 @@ function MO53Report() {
             <div><span className="font-semibold">Remodel (Res. &amp; Comm.):</span> Materials taxable; separately-stated labor exempt</div>
             <div><span className="font-semibold">General Installation / Repair (lump sum):</span> Both materials and labor taxable</div>
             <div><span className="font-semibold">Maintenance Agreements:</span> Both materials and labor taxable</div>
+            <div><span className="font-semibold">Membership:</span> Both materials and labor taxable</div>
             <div><span className="font-semibold">Design Services:</span> Non-taxable</div>
             <div><span className="font-semibold">Security Monitoring:</span> Non-taxable</div>
             <div><span className="font-semibold">Government / Non-Profit (Form 149):</span> Exempt with valid certificate</div>
@@ -1284,14 +1285,15 @@ function MO53Report() {
                   <th className="px-3 py-3 text-right text-xs font-semibold text-blue-900 uppercase tracking-wide whitespace-nowrap bg-blue-100">State Tax</th>
                   <th className="px-3 py-3 text-right text-xs font-semibold text-blue-900 uppercase tracking-wide whitespace-nowrap bg-blue-100">County Tax</th>
                   <th className="px-3 py-3 text-right text-xs font-semibold text-blue-900 uppercase tracking-wide whitespace-nowrap bg-blue-100">City Tax</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-blue-900 uppercase tracking-wide whitespace-nowrap bg-blue-100">Spec. Dist.</th>
                   <th className="px-3 py-3 text-right text-xs font-semibold text-green-900 uppercase tracking-wide whitespace-nowrap bg-green-100">Total Due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
-                  <tr><td colSpan={12} className="px-4 py-12 text-center text-gray-500"><div className="flex items-center justify-center gap-2"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />Loading...</div></td></tr>
+                  <tr><td colSpan={13} className="px-4 py-12 text-center text-gray-500"><div className="flex items-center justify-center gap-2"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />Loading...</div></td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={12} className="px-4 py-12 text-center">
+                  <tr><td colSpan={13} className="px-4 py-12 text-center">
                     <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                     <p className="text-gray-500">No Missouri payments found for selected period</p>
                     <p className="text-xs text-gray-400 mt-1">Make sure your Missouri jurisdictions have state = "MO" in Tax Rate Management</p>
@@ -1317,6 +1319,7 @@ function MO53Report() {
                       <td className="px-3 py-3 text-sm text-right text-blue-900 whitespace-nowrap bg-blue-50">${fmt(r.state_tax_due)}</td>
                       <td className="px-3 py-3 text-sm text-right text-blue-900 whitespace-nowrap bg-blue-50">${fmt(r.county_tax_due)}</td>
                       <td className="px-3 py-3 text-sm text-right text-blue-900 whitespace-nowrap bg-blue-50">${fmt(r.city_tax_due)}</td>
+                      <td className="px-3 py-3 text-sm text-right text-blue-900 whitespace-nowrap bg-blue-50">{r.special_tax_due > 0 ? `$${fmt(r.special_tax_due)}` : <span className="text-gray-400">—</span>}</td>
                       <td className="px-3 py-3 text-sm text-right font-bold text-green-900 whitespace-nowrap bg-green-100">${fmt(r.total_tax_due)}</td>
                     </tr>
                   ))
@@ -1336,6 +1339,7 @@ function MO53Report() {
                     <td className="px-3 py-3 text-right text-blue-900 font-bold bg-blue-100">${fmt(totals.state_tax_due)}</td>
                     <td className="px-3 py-3 text-right text-blue-900 font-bold bg-blue-100">${fmt(totals.county_tax_due)}</td>
                     <td className="px-3 py-3 text-right text-blue-900 font-bold bg-blue-100">${fmt(totals.city_tax_due)}</td>
+                    <td className="px-3 py-3 text-right text-blue-900 font-bold bg-blue-100">{totals.special_tax_due > 0 ? `$${fmt(totals.special_tax_due)}` : <span className="text-gray-400">—</span>}</td>
                     <td className="px-3 py-3 text-right text-green-900 font-bold bg-green-100 text-base">${fmt(totals.total_tax_due)}</td>
                   </tr>
                 </tfoot>

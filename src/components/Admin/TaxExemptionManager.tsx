@@ -13,7 +13,13 @@ import {
   HelpCircle,
   X,
 } from 'lucide-react';
-import { TaxExemptionCertificate, isValidCertificate } from '../../lib/taxCalculations';
+import {
+  TaxExemptionCertificate,
+  isValidCertificate,
+  EXEMPTION_CATEGORY_LABELS,
+  ExemptionCategory,
+  STATE_EXEMPTION_FORMS,
+} from '../../lib/taxCalculations';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Contact {
@@ -288,10 +294,14 @@ function UploadCertificateModal({
   const [formData, setFormData] = useState({
     certificate_number: '',
     certificate_type: 'resale',
+    exemption_category: '' as ExemptionCategory | '',
     issuing_authority: '',
     issuing_state: '',
+    state_form_number: '',
     issue_date: '',
     expiration_date: '',
+    buyer_name: '',
+    buyer_address: '',
     notes: '',
   });
   const [file, setFile] = useState<File | null>(null);
@@ -308,6 +318,12 @@ function UploadCertificateModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${contact.id}/${Date.now()}.${fileExt}`;
 
@@ -322,8 +338,12 @@ function UploadCertificateModal({
         .insert([
           {
             ...formData,
+            exemption_category: formData.exemption_category || null,
+            state_form_number: formData.state_form_number || null,
+            buyer_name: formData.buyer_name || null,
+            buyer_address: formData.buyer_address || null,
             contact_id: contact.id,
-            company_id: user.id,
+            organization_id: profileData?.organization_id,
             certificate_file_path: fileName,
             certificate_file_name: file.name,
             is_active: true,
@@ -410,7 +430,36 @@ function UploadCertificateModal({
                   <option value="other">Other</option>
                 </select>
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Exemption Category</label>
+                <select
+                  value={formData.exemption_category}
+                  onChange={(e) => setFormData({ ...formData, exemption_category: e.target.value as ExemptionCategory | '' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Select —</option>
+                  {(Object.entries(EXEMPTION_CATEGORY_LABELS) as [ExemptionCategory, string][]).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State Form Number</label>
+                <input
+                  type="text"
+                  value={formData.state_form_number}
+                  onChange={(e) => setFormData({ ...formData, state_form_number: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder={formData.issuing_state ? (STATE_EXEMPTION_FORMS[formData.issuing_state.toUpperCase()] || '') : 'e.g., ST-28'}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Issuing Authority *
@@ -433,7 +482,15 @@ function UploadCertificateModal({
                   type="text"
                   required
                   value={formData.issuing_state}
-                  onChange={(e) => setFormData({ ...formData, issuing_state: e.target.value })}
+                  onChange={(e) => {
+                    const st = e.target.value.toUpperCase().slice(0, 2);
+                    const autoForm = STATE_EXEMPTION_FORMS[st] || '';
+                    setFormData({
+                      ...formData,
+                      issuing_state: e.target.value,
+                      state_form_number: formData.state_form_number || autoForm,
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="TX"
                   maxLength={2}
@@ -464,6 +521,28 @@ function UploadCertificateModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
+              <input
+                type="text"
+                value={formData.buyer_name}
+                onChange={(e) => setFormData({ ...formData, buyer_name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Name on the exemption certificate"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buyer Address</label>
+              <textarea
+                value={formData.buyer_address}
+                onChange={(e) => setFormData({ ...formData, buyer_address: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Address on the exemption certificate"
+              />
             </div>
 
             <div>
