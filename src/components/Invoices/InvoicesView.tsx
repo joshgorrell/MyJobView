@@ -9,6 +9,7 @@ import { InvoiceDetailModal } from './InvoiceDetailModal';
 import { SelectCustomerModal } from './SelectCustomerModal';
 import { ApplyBulkPaymentModal } from './ApplyBulkPaymentModal';
 import { InvoiceStats } from './InvoiceStats';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface Invoice {
   id: string;
@@ -57,6 +58,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [showSelectCustomer, setShowSelectCustomer] = useState(false);
   const [bulkPaymentContact, setBulkPaymentContact] = useState<{ id: string; name: string } | null>(null);
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   useEffect(() => {
     loadInvoices();
@@ -330,13 +332,12 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{invoice.invoice_number}</p>
-                        {invoice.contact_id && onNavigateToContact ? (
+                        {invoice.contact_id ? (
                           <button
-                            onClick={(e) => { e.stopPropagation(); onNavigateToContact(invoice.contact_id!); }}
-                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 text-left"
+                            onClick={(e) => { e.stopPropagation(); setQuickViewContactId(invoice.contact_id!); }}
+                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left font-medium"
                           >
                             {invoice.customer_name}
-                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
                           </button>
                         ) : (
                           <p className="text-sm text-gray-600">{invoice.customer_name}</p>
@@ -410,13 +411,12 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                             </div>
                           </td>
                           <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                            {invoice.contact_id && onNavigateToContact ? (
+                            {invoice.contact_id ? (
                               <button
-                                onClick={() => onNavigateToContact(invoice.contact_id!)}
-                                className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 group"
+                                onClick={() => setQuickViewContactId(invoice.contact_id!)}
+                                className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left font-medium"
                               >
                                 {invoice.customer_name}
-                                <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                               </button>
                             ) : (
                               <p className="text-sm text-gray-900">{invoice.customer_name}</p>
@@ -637,6 +637,13 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           contactName={bulkPaymentContact.name}
           onClose={() => setBulkPaymentContact(null)}
           onSuccess={() => { setBulkPaymentContact(null); loadInvoices(); }}
+        />
+      )}
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
+          onNavigateToContact={onNavigateToContact}
         />
       )}
     </div>

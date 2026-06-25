@@ -924,13 +924,13 @@ export function PipelineBoard() {
                           )}
 
                           {item.email && (
-                            <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
                               <Mail className="w-3 h-3" />
                               <span className="truncate">{item.email}</span>
                             </div>
                           )}
                           {item.phone && (
-                            <div className="flex items-center gap-1 text-xs text-gray-600 mb-2">
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
                               <Phone className="w-3 h-3" />
                               <span>{item.phone}</span>
                             </div>

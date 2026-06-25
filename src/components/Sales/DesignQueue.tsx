@@ -3,6 +3,7 @@ import { Sparkles, Clock, CheckCircle, AlertCircle, User, Calendar, FileText, La
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow, format } from 'date-fns';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface CatalogProduct {
   id: string;
@@ -662,6 +663,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [rerunningAI, setRerunningAI] = useState(false);
   const [rerunError, setRerunError] = useState('');
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'service_manager';
 
@@ -1134,7 +1136,16 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                     >
                       <div className="flex items-start justify-between gap-2 mb-1.5">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{contactName}</p>
+                          {brief.contact_id ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setQuickViewContactId(brief.contact_id!); }}
+                              className="text-sm font-semibold text-blue-600 hover:text-blue-800 truncate block text-left max-w-full"
+                            >
+                              {contactName}
+                            </button>
+                          ) : (
+                            <p className="text-sm font-semibold text-gray-900 truncate">{contactName}</p>
+                          )}
                           {brief.contact?.company_name && (
                             <p className="text-xs text-gray-500 truncate">{brief.contact.company_name}</p>
                           )}
@@ -1729,6 +1740,12 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
           brief={selectedBrief}
           onClose={() => setShowConvertModal(false)}
           onCreated={handleConvertCreated}
+        />
+      )}
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
         />
       )}
     </div>

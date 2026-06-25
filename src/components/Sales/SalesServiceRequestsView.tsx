@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ContactLogModal } from '../Shared/ContactLogModal';
 import { ContactLogHistory } from '../Shared/ContactLogHistory';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface ServiceRequest {
   id: string;
@@ -142,6 +143,7 @@ export function SalesServiceRequestsView() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [contactLogTarget, setContactLogTarget] = useState<{ id: string; name: string; workOrderId?: string } | null>(null);
   const [contactLogRefreshKeys, setContactLogRefreshKeys] = useState<Record<string, number>>({});
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   const isManager = profile?.role === 'admin' || profile?.role === 'sales_manager' || profile?.role === 'manager';
 
@@ -360,7 +362,16 @@ export function SalesServiceRequestsView() {
                       </div>
 
                       {/* Customer + description */}
-                      <div className="font-semibold text-gray-900 text-base">{request.customer_name}</div>
+                      {request.contact_id ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
+                          className="font-semibold text-gray-900 text-base hover:text-blue-600 transition-colors text-left"
+                        >
+                          {request.customer_name}
+                        </button>
+                      ) : (
+                        <div className="font-semibold text-gray-900 text-base">{request.customer_name}</div>
+                      )}
                       <div className="text-sm text-gray-500 line-clamp-1 mt-0.5">{request.job_description}</div>
 
                       {/* Meta row */}
@@ -558,6 +569,12 @@ export function SalesServiceRequestsView() {
             }));
             loadRequests();
           }}
+        />
+      )}
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
         />
       )}
     </div>

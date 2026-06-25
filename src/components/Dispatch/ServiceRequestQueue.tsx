@@ -36,6 +36,7 @@ import {
   CheckSquare
 } from 'lucide-react';
 import { ServiceRequestForm } from '../Service/ServiceRequestForm';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface ServiceRequest {
   id: string;
@@ -109,6 +110,7 @@ export function ServiceRequestQueue() {
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [showCombineModal, setShowCombineModal] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   const isManager = profile?.role === 'admin' ||
     profile?.role === 'service_manager' ||
@@ -604,7 +606,16 @@ export function ServiceRequestQueue() {
                   >
                     {/* Top row: customer name + timestamp + desktop Convert button */}
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <div className="font-semibold text-white text-base leading-tight">{request.customer_name}</div>
+                      {request.contact_id ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
+                          className="font-semibold text-white text-base leading-tight hover:text-blue-300 transition-colors text-left"
+                        >
+                          {request.customer_name}
+                        </button>
+                      ) : (
+                        <div className="font-semibold text-white text-base leading-tight">{request.customer_name}</div>
+                      )}
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="flex flex-col items-end gap-0.5">
                           <span className="text-xs text-gray-500">
@@ -925,6 +936,12 @@ export function ServiceRequestQueue() {
         }}
         onCancel={() => setConfirmCancelId(null)}
       />
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
+        />
+      )}
     </div>
   );
 }
