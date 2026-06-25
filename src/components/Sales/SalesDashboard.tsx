@@ -161,6 +161,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
   const [declineBreakdown, setDeclineBreakdown] = useState<DeclineBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<string>('this_month'); // Always default to This Month
   const [hotLeads, setHotLeads] = useState<Lead[]>([]);
   const [staleLeads, setStaleLeads] = useState<Lead[]>([]);
@@ -471,6 +472,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     if (!profile?.id) return;
 
     try {
+      setLoadError(null);
       setRefreshing(true);
 
       // When a single rep is selected by admin, scope all queries to that rep
@@ -635,6 +637,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       }
 
       // Parallel data fetching (all queries run simultaneously)
+      // Each query uses .catch() so a single failure degrades gracefully instead of blanking the dashboard
+      const safe = (q: any) => q.catch(() => ({ data: null, count: null, error: null }));
       const [
         myLeadsResult,
         closedLeadsThisMonthResult,
@@ -656,95 +660,95 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         importedHistoricalResult
       ] = await Promise.all([
         // My open leads for pipeline value
-        supabase
+        safe(supabase
           .from('leads')
           .select('estimated_value, status, priority, company_name, contact_name, created_at, last_contact_date')
           .eq('assigned_to', targetId)
-          .in('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation']),
+          .in('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation'])),
 
         // Deals closed (filtered by range or all time)
-        closedLeadsQuery,
+        safe(closedLeadsQuery),
 
         // Proposals (filtered by range or all time)
-        proposalsQuery,
+        safe(proposalsQuery),
 
         // Active pipeline proposals — always all-time snapshot (no date filter)
-        supabase
+        safe(supabase
           .from('proposals')
           .select('id, status, total')
           .eq('created_by', targetId)
-          .in('status', ['designing', 'ready_to_submit', 'sent', 'portal']),
+          .in('status', ['designing', 'ready_to_submit', 'sent', 'portal'])),
 
         // Contacts added (filtered by range or all time)
-        contactsQuery,
+        safe(contactsQuery),
 
         // Connections logged (filtered by range or all time)
-        connectionsQuery,
+        safe(connectionsQuery),
 
         // Recent connections for activity feed
-        supabase
+        safe(supabase
           .from('connections')
           .select('id, connection_type, connection_date, notes, contact:contacts!proposals_contact_id_fkey(full_name, company_name)')
           .eq('user_id', targetId)
           .order('connection_date', { ascending: false })
-          .limit(10),
+          .limit(10)),
 
         // Recent leads for activity feed
-        supabase
+        safe(supabase
           .from('leads')
           .select('id, company_name, contact_name, status, estimated_value, created_at, updated_at')
           .or(`created_by.eq.${targetId},assigned_to.eq.${targetId}`)
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(10)),
 
         // Recent proposals for activity feed
-        supabase
+        safe(supabase
           .from('proposals')
           .select('id, proposal_number, status, total, created_at, updated_at, contact:contacts!proposals_contact_id_fkey(full_name, company_name)')
           .eq('created_by', targetId)
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(10)),
 
         // Fishbowl count — scoped to this org (always org-wide)
-        supabase
+        safe(supabase
           .from('leads')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', profile.organization_id)
           .eq('is_fishbowl', true)
-          .or('status.eq.unclaimed,assigned_to.is.null'),
+          .or('status.eq.unclaimed,assigned_to.is.null')),
 
         // All reps points for ranking — scoped to this org only
-        supabase
+        safe(supabase
           .from('profiles')
           .select('id, points_earned')
           .eq('organization_id', profile.organization_id)
           .gt('points_earned', 0)
-          .order('points_earned', { ascending: false }),
+          .order('points_earned', { ascending: false })),
 
         // Get fresh profile data (for the target rep's sales target)
-        supabase
+        safe(supabase
           .from('profiles')
           .select('monthly_sales_target, current_annual_quota')
           .eq('id', targetId)
-          .maybeSingle(),
+          .maybeSingle()),
 
         // Sales orders (filtered by range or all time)
-        salesOrdersQuery,
+        safe(salesOrdersQuery),
 
         // All-time sales orders count (for approval rate)
-        allTimeSalesOrdersQuery,
+        safe(allTimeSalesOrdersQuery),
 
         // All-time approved proposals count (for approval rate)
-        allTimeProposalsQuery,
+        safe(allTimeProposalsQuery),
 
         // Historical yearly sales (runs in parallel, not sequentially)
-        historicalQuery,
+        safe(historicalQuery),
 
         // Monthly sales stats for the selected range (manual + calculated totals)
-        monthlyStatsQuery,
+        safe(monthlyStatsQuery),
 
         // Imported historical data from sales_history_monthly (fills pre-live years)
-        importedHistoricalQuery
+        safe(importedHistoricalQuery)
       ]);
 
       const myLeads = myLeadsResult.data || [];
@@ -1048,6 +1052,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      setLoadError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -1270,6 +1275,30 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#06b6d4', '#ec4899', '#14b8a6', '#84cc16',
   ];
+
+  if (loadError && !loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] p-6">
+        <div className="text-center max-w-md">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-900/30 mb-4">
+            <AlertCircle className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-xl font-semibold text-white mb-2">Failed to Load Dashboard</h2>
+          <p className="text-gray-400 mb-6">{loadError}</p>
+          <button
+            onClick={() => {
+              setLoadError(null);
+              loadDashboardData();
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
