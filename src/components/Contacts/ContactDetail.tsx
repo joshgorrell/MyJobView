@@ -273,7 +273,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
       .from('invoices')
       .select('id, invoice_number, status, total, amount_paid, due_date, invoice_type')
       .eq('contact_id', contact.id)
-      .in('status', ['sent', 'partial', 'overdue'])
+      .not('status', 'in', '("paid","voided")')
       .order('due_date', { ascending: true });
     setOpenInvoices(data || []);
     setOpenInvoicesLoading(false);
