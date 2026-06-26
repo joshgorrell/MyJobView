@@ -103,7 +103,7 @@ export function PublicVIPMembership() {
         .from('recurring_plans')
         .select('*')
         .eq('is_active', true)
-        .eq('plan_type', 'vip')
+        .eq('plan_type', 'vip_plan')
         .eq('show_on_portal', true)
         .order('amount');
 

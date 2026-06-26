@@ -63,6 +63,14 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const [contactName, setContactName] = useState('');
   const [trialAccess, setTrialAccess] = useState<TrialAccess | null>(null);
   const [hasVipMembership, setHasVipMembership] = useState(false);
+  const [vipSubscription, setVipSubscription] = useState<{
+    status: string;
+    plan_name: string;
+    billing_frequency: string;
+    amount: number;
+    next_billing_date: string;
+    trial_end_date: string | null;
+  } | null>(null);
   const [showCancellationForm, setShowCancellationForm] = useState(false);
   const [contactId, setContactId] = useState<string | null>(null);
   const [hasActiveContract, setHasActiveContract] = useState(false);
@@ -213,11 +221,29 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
 
       const { data: vipSub } = await supabase
         .from('recurring_subscriptions')
-        .select('id')
+        .select(`
+          status,
+          next_billing_date,
+          trial_end_date,
+          plan:recurring_plans(plan_name, billing_frequency, amount)
+        `)
         .eq('contact_id', contactId)
         .in('status', ['active', 'trial'])
         .maybeSingle();
       setHasVipMembership(!!vipSub);
+      if (vipSub) {
+        const plan = Array.isArray(vipSub.plan) ? vipSub.plan[0] : vipSub.plan;
+        setVipSubscription({
+          status: vipSub.status,
+          plan_name: plan?.plan_name || 'VIP',
+          billing_frequency: plan?.billing_frequency || '',
+          amount: plan?.amount || 0,
+          next_billing_date: vipSub.next_billing_date,
+          trial_end_date: vipSub.trial_end_date,
+        });
+      } else {
+        setVipSubscription(null);
+      }
 
       const [proposalsRes, projectsRes, appointmentsRes, invoicesRes, messagesRes, vipWorkOrdersRes, punchlistRes, salesOrdersRes] = await Promise.all([
         supabase.from('proposals').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['sent', 'viewed']),
@@ -444,7 +470,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
 
           {!hasVipMembership && !trialAccess && (
             <button
-              onClick={() => { window.location.href = '/portal/vip-benefits'; }}
+              onClick={() => { window.location.href = '/portal/vip-membership'; }}
               className="group bg-gradient-to-br from-[#0f2347] to-[#1a3a6e] rounded-2xl p-5 sm:p-6 text-left shadow-sm hover:shadow-lg transition-all border border-[#1a3a6e] cursor-pointer"
             >
               <div className="flex items-start justify-between mb-3">
@@ -476,8 +502,81 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
           )}
         </div>
 
-        {hasActiveContract && (
-          <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+        {/* Membership Status — visible to all authenticated portal users */}
+        <div className="mt-6">
+          {vipSubscription ? (
+            <div className={`rounded-2xl border p-5 sm:p-6 shadow-sm ${
+              vipSubscription.status === 'trial'
+                ? 'bg-blue-50 border-blue-200'
+                : 'bg-gradient-to-r from-yellow-50 to-amber-50 border-amber-200'
+            }`}>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    vipSubscription.status === 'trial' ? 'bg-blue-100' : 'bg-amber-100'
+                  }`}>
+                    <Star className={`w-5 h-5 ${vipSubscription.status === 'trial' ? 'text-blue-600' : 'text-amber-600 fill-amber-500'}`} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-base font-bold text-gray-900">
+                        {vipSubscription.status === 'trial' ? 'VIP Trial Active' : vipSubscription.plan_name}
+                      </span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        vipSubscription.status === 'trial'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {vipSubscription.status === 'trial' ? 'Free Trial' : 'Active'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {vipSubscription.status === 'trial' && vipSubscription.trial_end_date
+                        ? (() => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const end = new Date(vipSubscription.trial_end_date);
+                            end.setHours(0, 0, 0, 0);
+                            const days = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            return `${days} day${days !== 1 ? 's' : ''} remaining — expires ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+                          })()
+                        : `Renews ${new Date(vipSubscription.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · $${vipSubscription.amount}/${vipSubscription.billing_frequency === 'yearly' ? 'yr' : vipSubscription.billing_frequency === 'monthly' ? 'mo' : vipSubscription.billing_frequency}`
+                      }
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="/portal/vip-membership"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl transition-colors flex-shrink-0 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                >
+                  Manage Membership
+                  <ChevronRight className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          ) : !trialAccess ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Star className="w-5 h-5 text-gray-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-base font-semibold text-gray-900 mb-0.5">No VIP Membership</div>
+                  <p className="text-sm text-gray-500">Join our VIP program for priority scheduling, punchlist access, and regular maintenance visits.</p>
+                </div>
+                <a
+                  href="/portal/vip-membership"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-[#0f2347] hover:bg-[#1a3a6e] text-white rounded-xl transition-colors flex-shrink-0"
+                >
+                  Join VIP
+                  <ChevronRight className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {hasActiveContract && (          <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-sm">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
                 <XCircle className="w-5 h-5 text-red-500" />

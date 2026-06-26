@@ -95,7 +95,6 @@ const BonusApprovalDashboard = lazy(() => import('./components/Finance/BonusAppr
 const TestTuneSettings = lazy(() => import('./components/Admin/TestTuneSettings').then(m => ({ default: m.TestTuneSettings })));
 const PortalPunchlist = lazy(() => import('./components/Portal/PortalPunchlist').then(m => ({ default: m.PortalPunchlist })));
 const PortalVIPMembership = lazy(() => import('./components/Portal/PortalVIPMembership').then(m => ({ default: m.PortalVIPMembership })));
-const PortalVIPBenefits = lazy(() => import('./components/Portal/PortalVIPBenefits').then(m => ({ default: m.PortalVIPBenefits })));
 const PublicVIPMembership = lazy(() => import('./components/Portal/PublicVIPMembership').then(m => ({ default: m.PublicVIPMembership })));
 const PortalSignup = lazy(() => import('./components/Portal/PortalSignup').then(m => ({ default: m.PortalSignup })));
 const PortalDashboard = lazy(() => import('./components/Portal/PortalDashboard').then(m => ({ default: m.PortalDashboard })));
@@ -430,7 +429,6 @@ function AppContent() {
     '/portal/punchlist',
     '/portal/proposals',
     '/portal/vip-membership',
-    '/portal/vip-benefits',
     '/portal/contact',
     '/portal/membership',
     '/portal/signup',
@@ -529,11 +527,8 @@ function AppContent() {
   }
 
   if (currentPath === '/portal/vip-benefits') {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PortalVIPBenefits />
-      </Suspense>
-    );
+    window.location.replace('/portal/vip-membership');
+    return null;
   }
 
   if (currentPath === '/portal/contact') {

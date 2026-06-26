@@ -8,7 +8,6 @@ import {
   Star,
   Check,
   Calendar,
-  DollarSign,
   Shield,
   X,
   AlertCircle,
@@ -20,8 +19,70 @@ import {
   Building2,
   Mail,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  ClipboardList,
+  Zap,
+  Headphones,
+  Award,
+  ChevronRight
 } from 'lucide-react';
+
+const BENEFITS = [
+  {
+    icon: ClipboardList,
+    title: 'Unlimited Punchlist Access',
+    description: 'Create, manage, and track all your service items in one place. Add photos, write details, and follow progress from request to completion.',
+    color: 'blue',
+  },
+  {
+    icon: Zap,
+    title: 'Priority Service Scheduling',
+    description: 'VIP members move to the front of the line. When you submit a service request, our team prioritizes your appointment above standard calls.',
+    color: 'amber',
+  },
+  {
+    icon: Calendar,
+    title: 'Regular Maintenance Visits',
+    description: 'Stay ahead of issues with proactive maintenance. Your system gets inspected and tuned on a regular schedule, so problems are caught early.',
+    color: 'green',
+  },
+  {
+    icon: Headphones,
+    title: 'Dedicated VIP Support',
+    description: 'Skip the general queue. VIP members reach a dedicated support line staffed by senior technicians who know your system.',
+    color: 'teal',
+  },
+  {
+    icon: Shield,
+    title: 'System Performance Monitoring',
+    description: "We keep a close eye on your system health between visits, flagging anomalies before they become expensive repairs.",
+    color: 'navy',
+  },
+  {
+    icon: Award,
+    title: '90-Day Test & Tune Trial',
+    description: 'New project customers get a complimentary 90-day trial so you can experience VIP benefits before committing to a plan.',
+    color: 'orange',
+  },
+];
+
+const HOW_IT_WORKS = [
+  { step: 1, title: 'Choose a Plan', description: 'Select the VIP membership level that fits your needs and budget.' },
+  { step: 2, title: 'Get Instant Access', description: 'Your punchlist unlocks immediately and your priority status is activated.' },
+  { step: 3, title: 'Enjoy Year-Round Service', description: 'Submit items, schedule visits, and relax knowing your system is in expert hands.' },
+];
+
+function benefitColorClasses(color: string) {
+  const map: Record<string, { bg: string; icon: string; border: string }> = {
+    blue:   { bg: 'bg-blue-50',   icon: 'text-blue-600',   border: 'border-blue-200' },
+    amber:  { bg: 'bg-amber-50',  icon: 'text-amber-600',  border: 'border-amber-200' },
+    green:  { bg: 'bg-green-50',  icon: 'text-green-600',  border: 'border-green-200' },
+    teal:   { bg: 'bg-teal-50',   icon: 'text-teal-600',   border: 'border-teal-200' },
+    navy:   { bg: 'bg-slate-50',  icon: 'text-slate-700',  border: 'border-slate-200' },
+    orange: { bg: 'bg-orange-50', icon: 'text-orange-600', border: 'border-orange-200' },
+  };
+  return map[color] || map.blue;
+}
 
 interface VIPPlan {
   id: string;
@@ -135,7 +196,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         .from('recurring_plans')
         .select('*')
         .eq('is_active', true)
-        .eq('plan_type', 'vip')
+        .eq('plan_type', 'vip_plan')
         .order('amount');
 
       if (plansError) throw plansError;
@@ -399,6 +460,74 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           </div>
         </div>
       </div>
+
+      {/* Benefits & How It Works — shown to non-members only */}
+      {!currentSubscription && (
+        <>
+          {/* Hero */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0f2347] to-[#1e4080] text-white p-8 sm:p-10 shadow-xl">
+            <div className="absolute top-0 right-0 w-56 h-56 bg-yellow-400/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-400/10 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-11 h-11 bg-yellow-400/20 rounded-xl flex items-center justify-center">
+                  <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
+                </div>
+                <span className="text-sm font-semibold text-yellow-300 tracking-wide uppercase">VIP Membership</span>
+              </div>
+              <h3 className="text-3xl font-bold text-white mb-3 leading-tight">
+                Priority Service. Total Peace of Mind.
+              </h3>
+              <p className="text-blue-200 text-base mb-6 max-w-xl leading-relaxed">
+                VIP members get unlimited punchlist access, jump-the-queue scheduling, regular maintenance, and a dedicated support team — all for one predictable rate.
+              </p>
+              <a
+                href="/portal/contact"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl border border-white/20 transition-colors text-sm"
+              >
+                Ask About Free Trial
+                <ChevronRight className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+
+          {/* Benefits grid */}
+          <div>
+            <h3 className="text-xl font-bold text-white mb-5">Everything VIP Includes</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {BENEFITS.map((benefit) => {
+                const Icon = benefit.icon;
+                const cls = benefitColorClasses(benefit.color);
+                return (
+                  <div key={benefit.title} className={`bg-white border ${cls.border} rounded-xl p-5 shadow-sm`}>
+                    <div className={`w-10 h-10 ${cls.bg} rounded-lg flex items-center justify-center mb-3`}>
+                      <Icon className={`w-5 h-5 ${cls.icon}`} />
+                    </div>
+                    <h4 className="font-semibold text-gray-900 mb-1.5">{benefit.title}</h4>
+                    <p className="text-gray-500 text-sm leading-relaxed">{benefit.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* How It Works */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+            <h3 className="text-xl font-bold text-gray-900 mb-7 text-center">How It Works</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-7">
+              {HOW_IT_WORKS.map((step) => (
+                <div key={step.step} className="flex flex-col items-center text-center">
+                  <div className="w-11 h-11 bg-[#0f2347] text-white rounded-full flex items-center justify-center text-base font-bold mb-3 shadow">
+                    {step.step}
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-1.5">{step.title}</h4>
+                  <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {currentSubscription && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-sm">

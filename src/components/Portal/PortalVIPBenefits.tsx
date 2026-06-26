@@ -122,7 +122,7 @@ export function PortalVIPBenefits() {
       .from('recurring_plans')
       .select('id, plan_name, description, billing_frequency, amount, is_active')
       .eq('is_active', true)
-      .eq('plan_type', 'vip')
+      .eq('plan_type', 'vip_plan')
       .order('amount')
       .then(({ data }) => {
         setPlans(data || []);
