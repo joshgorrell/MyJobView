@@ -116,7 +116,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           creator:profiles!contacts_created_by_fkey(id, first_name, last_name),
           assigned_rep:profiles!contacts_assigned_to_fkey(id, first_name, last_name),
           office:company_offices(id, office_name),
-          invoices(amount_due, status)
+          invoices!invoices_contact_id_fkey(amount_due, status)
         `);
 
       // When searching, search all contacts (not just mine) so nothing is hidden
