@@ -66,7 +66,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
           .from('invoices')
           .select('id, invoice_number, invoice_date, due_date, total, amount_paid, amount_due, status')
           .eq('contact_id', contactId)
-          .in('status', ['sent', 'partial', 'overdue'])
+          .not('status', 'in', '("paid","voided")')
           .order('invoice_date', { ascending: true }),
         supabase
           .from('contacts')
