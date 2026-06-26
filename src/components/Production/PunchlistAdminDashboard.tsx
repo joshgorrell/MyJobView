@@ -35,6 +35,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Shared/Toast';
 import { markPunchlistSeen } from '../../hooks/usePunchlistUnseenCount';
 import { PunchlistTaskDetailModal } from '../Portal/PunchlistTaskDetailModal';
+import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface PunchlistTask {
   id: string;
@@ -96,6 +97,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   const [showBatchRequestModal, setShowBatchRequestModal] = useState(false);
   const [contactFilter, setContactFilter] = useState<{ id: string; name: string } | null>(null);
   const [detailTask, setDetailTask] = useState<PunchlistTask | null>(null);
+  const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   useEffect(() => {
     // Wait for auth to complete before attempting to load
@@ -703,7 +705,16 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-400 min-w-0">
                       <div className="flex items-center gap-1">
                         <User className="w-3.5 h-3.5" />
-                        <span>{task.contact.full_name}</span>
+                        {task.contact_id ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setQuickViewContactId(task.contact_id); }}
+                            className="text-blue-400 hover:text-blue-300 text-left font-medium transition-colors"
+                          >
+                            {task.contact.full_name}
+                          </button>
+                        ) : (
+                          <span>{task.contact.full_name}</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <Mail className="w-3.5 h-3.5" />
@@ -1159,6 +1170,12 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
             setDetailTask(null);
             updateTaskStatus(t.id, 'completed');
           }}
+        />
+      )}
+      {quickViewContactId && (
+        <ContactQuickViewModal
+          contactId={quickViewContactId}
+          onClose={() => setQuickViewContactId(null)}
         />
       )}
     </div>
