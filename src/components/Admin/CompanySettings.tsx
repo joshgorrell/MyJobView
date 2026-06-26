@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Building2, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { CompanySettings as CompanySettingsType, CompanyOffice } from '../../lib/types';
 import { TIMEZONE_OPTIONS, clearTimezoneCache } from '../../lib/timezoneUtils';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -1058,13 +1059,13 @@ export function CompanySettings() {
                 <p className="text-sm text-amber-900">
                   <strong>Preview:</strong> When a customer pays a $1,000 invoice with a credit card,
                   {ccFeeType === 'percentage'
-                    ? ` they will be charged an additional $${(1000 * (ccFeePercentage / 100)).toFixed(2)} (${ccFeePercentage}%).`
-                    : ` they will be charged an additional $${ccFeeFlatAmount.toFixed(2)}.`
+                    ? ` they will be charged an additional ${formatCurrency(1000 * (ccFeePercentage / 100))} (${ccFeePercentage}%).`
+                    : ` they will be charged an additional ${formatCurrency(ccFeeFlatAmount)}.`
                   }
-                  {' '}Total: ${ccFeeType === 'percentage'
-                    ? (1000 + (1000 * (ccFeePercentage / 100))).toFixed(2)
-                    : (1000 + ccFeeFlatAmount).toFixed(2)
-                  }
+                  {' '}Total: {formatCurrency(ccFeeType === 'percentage'
+                    ? 1000 + (1000 * (ccFeePercentage / 100))
+                    : 1000 + ccFeeFlatAmount
+                  )}
                 </p>
               </div>
             </div>

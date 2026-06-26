@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Plus, ChevronDown, ChevronUp, Clock, FileText, User, History, PlusCircle, Pencil, ArrowRight, Trash2, Package, AlertTriangle, X, ArrowUpRight, CheckCircle, CreditCard as Edit2, Lock, Unlock, Banknote, Eye, EyeOff, Send, Check, MoreHorizontal } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 import { ChangeOrderReportModal } from './ChangeOrderReportModal';
 import { ChangeOrderProductReportModal } from './ChangeOrderProductReportModal';
 import { CreateChangeOrderModal } from '../Production/CreateChangeOrderModal';
@@ -965,7 +966,7 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                   <div className="border-t border-gray-700/50 p-4 space-y-4">
                     {co.status === 'approved' && (
                       <div className="grid grid-cols-1 gap-3">
-                        <MiniStat label="Amount Billed" value={`$${(co.amount_billed || 0).toFixed(2)}`} color={co.amount_billed >= Math.abs(co.change_amount) ? 'green' : 'amber'} />
+                        <MiniStat label="Amount Billed" value={formatCurrency(co.amount_billed || 0)} color={co.amount_billed >= Math.abs(co.change_amount) ? 'green' : 'amber'} />
                       </div>
                     )}
 
@@ -1012,8 +1013,8 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                           <p className="text-sm text-green-300 font-medium">Approved — Ready to Bill</p>
                           <p className="text-xs text-green-400/70 mt-0.5">
                             {co.billing_status === 'partially_billed'
-                              ? `$${(Math.abs(co.change_amount) - (co.amount_billed || 0)).toFixed(2)} remaining to bill`
-                              : `$${Math.abs(co.change_amount || 0).toFixed(2)} available to invoice`
+                              ? `${formatCurrency(Math.abs(co.change_amount) - (co.amount_billed || 0))} remaining to bill`
+                              : `${formatCurrency(Math.abs(co.change_amount || 0))} available to invoice`
                             }
                           </p>
                         </div>

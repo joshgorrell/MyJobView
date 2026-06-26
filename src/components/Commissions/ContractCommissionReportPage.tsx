@@ -23,6 +23,7 @@ import {
   Hash
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -501,7 +502,7 @@ export function ContractCommissionReportPage() {
           line.employeeName,
           line.effectiveRate.toFixed(2),
           line.commissionAmount.toFixed(2),
-          `${line.termMonths} × $${line.monthlyAmount.toFixed(2)} = $${line.totalContractValue.toFixed(2)} × ${line.effectiveRate}% = $${line.commissionAmount.toFixed(2)}`
+          `${line.termMonths} × ${formatCurrency(line.monthlyAmount)} = ${formatCurrency(line.totalContractValue)} × ${line.effectiveRate}% = ${formatCurrency(line.commissionAmount)}`
         ]);
       }
       const subtotal = group.lines.reduce((s, l) => s + l.commissionAmount, 0);

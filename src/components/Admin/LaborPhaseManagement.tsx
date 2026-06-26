@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit2, Trash2, Save, X, DollarSign, Wrench, AlertCircle } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Save, X, DollarSign, Wrench, AlertCircle } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface LaborPhase {
@@ -265,7 +266,7 @@ export function LaborPhaseManagement() {
                     {((formData.default_price - formData.default_cost) / formData.default_price * 100).toFixed(1)}%
                   </span>
                   <span className="text-gray-600 ml-2">
-                    (${(formData.default_price - formData.default_cost).toFixed(2)} profit per hour)
+                    ({formatCurrency(formData.default_price - formData.default_cost)} profit per hour)
                   </span>
                 </div>
               </div>
@@ -346,12 +347,12 @@ export function LaborPhaseManagement() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">
-                        ${phase.default_cost.toFixed(2)}/hr
+                        {formatCurrency(phase.default_cost)}/hr
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-semibold text-gray-900">
-                        ${phase.default_price.toFixed(2)}/hr
+                        {formatCurrency(phase.default_price)}/hr
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -364,7 +365,7 @@ export function LaborPhaseManagement() {
                           {profitMargin.toFixed(1)}%
                         </div>
                         <div className="text-xs text-gray-500">
-                          ${profitPerHour.toFixed(2)}/hr
+                          {formatCurrency(profitPerHour)}/hr
                         </div>
                       </div>
                     </td>

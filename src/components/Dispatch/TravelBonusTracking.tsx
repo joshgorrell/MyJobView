@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MapPin, DollarSign, Check, X, Clock, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
 
 interface TravelLog {
   id: string;
@@ -188,7 +189,7 @@ export function TravelBonusTracking() {
             <div>
               <div className="text-sm text-yellow-700 font-medium">Pending Approval</div>
               <div className="text-2xl font-bold text-yellow-900 mt-1">
-                ${stats.pending.total.toFixed(2)}
+                {formatCurrency(stats.pending.total)}
               </div>
               <div className="text-xs text-yellow-600 mt-1">{stats.pending.count} trips</div>
             </div>
@@ -200,7 +201,7 @@ export function TravelBonusTracking() {
             <div>
               <div className="text-sm text-green-700 font-medium">Approved</div>
               <div className="text-2xl font-bold text-green-900 mt-1">
-                ${stats.approved.total.toFixed(2)}
+                {formatCurrency(stats.approved.total)}
               </div>
               <div className="text-xs text-green-600 mt-1">{stats.approved.count} trips</div>
             </div>
@@ -212,7 +213,7 @@ export function TravelBonusTracking() {
             <div>
               <div className="text-sm text-blue-700 font-medium">Paid</div>
               <div className="text-2xl font-bold text-blue-900 mt-1">
-                ${stats.paid.total.toFixed(2)}
+                {formatCurrency(stats.paid.total)}
               </div>
               <div className="text-xs text-blue-600 mt-1">{stats.paid.count} trips</div>
             </div>
@@ -313,7 +314,7 @@ export function TravelBonusTracking() {
                     {log.travel_time_minutes} min
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                    ${log.bonus_amount.toFixed(2)}
+                    {formatCurrency(log.bonus_amount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

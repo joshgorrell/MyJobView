@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Download, Calendar, TrendingUp, DollarSign, Users, FileText, Filter } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 
 type ReportType = 'sales' | 'revenue' | 'proposals' | 'appointments' | 'commissions' | 'contacts';
 type ExportFormat = 'csv' | 'pdf';
@@ -266,7 +267,7 @@ export function ReportBuilder() {
             ${reportData.labels.map((label, index) => `
               <tr>
                 <td>${label}</td>
-                <td>$${reportData.values[index].toFixed(2)}</td>
+                <td>${formatCurrency(reportData.values[index])}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -276,11 +277,11 @@ export function ReportBuilder() {
           <h2>Summary</h2>
           <div class="summary-item">
             <span>Total:</span>
-            <strong>$${reportData.summary.total.toFixed(2)}</strong>
+            <strong>${formatCurrency(reportData.summary.total)}</strong>
           </div>
           <div class="summary-item">
             <span>Average:</span>
-            <strong>$${reportData.summary.average.toFixed(2)}</strong>
+            <strong>${formatCurrency(reportData.summary.average)}</strong>
           </div>
           <div class="summary-item">
             <span>Count:</span>

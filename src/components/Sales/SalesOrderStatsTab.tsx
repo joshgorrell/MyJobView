@@ -4,6 +4,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, Wrench, Package, Award,
   Target, Clock, BarChart3, Loader2, AlertCircle, ArrowUp, ArrowDown, Minus
 } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 import type { SalesOrderFull, ChangeOrderSummary } from './SalesOrderDetail';
 
 interface SalesOrderStatsTabProps {
@@ -409,13 +410,13 @@ export function SalesOrderStatsTab({ order, changeOrders }: SalesOrderStatsTabPr
               <div>
                 <div className="text-xs text-gray-500 mb-1">Revenue / Hour</div>
                 <div className="text-lg font-bold text-blue-400">
-                  ${revenuePerHour.toFixed(2)}
+                  {formatCurrency(revenuePerHour)}/hr
                 </div>
               </div>
               <div>
                 <div className="text-xs text-gray-500 mb-1">Profit / Hour</div>
                 <div className={`text-lg font-bold ${profitPerHour >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  ${profitPerHour.toFixed(2)}
+                  {formatCurrency(profitPerHour)}/hr
                 </div>
               </div>
               {totalEstHours > 0 && (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
 
@@ -515,12 +516,12 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                           Clear ({selectedInvoiceIds.length})
                         </button>
                         <button
-                          onClick={handlePayAll}
+                          onClick={() => handlePayAll}
                           disabled={payingAll}
                           className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium disabled:opacity-50 transition-colors min-h-[40px]"
                         >
                           <CreditCard className="w-4 h-4" />
-                          <span>Pay {selectedInvoiceIds.length} · ${selectedTotal.toFixed(2)}</span>
+                          <span>Pay {selectedInvoiceIds.length} · {formatCurrency(selectedTotal)}</span>
                         </button>
                       </>
                     ) : (
@@ -580,19 +581,19 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Total</p>
                         <p className="text-sm sm:text-base font-bold text-gray-900 truncate">
-                          ${invoice.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {formatCurrency(invoice.total)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Paid</p>
                         <p className="text-sm sm:text-base font-bold text-green-600 truncate">
-                          ${invoice.amount_paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {formatCurrency(invoice.amount_paid)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Due</p>
                         <p className="text-sm sm:text-base font-bold text-orange-600 truncate">
-                          ${invoice.amount_due.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {formatCurrency(invoice.amount_due)}
                         </p>
                       </div>
                     </div>
@@ -609,7 +610,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                           className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium transition-colors"
                         >
                           <CreditCard className="w-4 h-4" />
-                          Pay ${invoice.amount_due.toFixed(2)}
+                          Pay {formatCurrency(invoice.amount_due)}
                         </button>
                         <button
                           onClick={() => handlePrintInvoice(invoice)}
@@ -680,7 +681,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                         <div className="text-left sm:text-right">
                           <p className="text-xs text-gray-500 mb-0.5">Total Paid</p>
                           <p className="text-base sm:text-xl font-bold text-green-600">
-                            ${invoice.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            {formatCurrency(invoice.total)}
                           </p>
                         </div>
                         <button
@@ -974,13 +975,13 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                           <p className="text-xs text-gray-500">Project {inv.project_number}</p>
                         )}
                       </div>
-                      <p className="text-sm font-semibold text-orange-600">${inv.amount_due.toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-orange-600">{formatCurrency(inv.amount_due)}</p>
                     </div>
                   ))}
                 </div>
                 <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200">
                   <p className="text-sm font-semibold text-gray-900">Total Due</p>
-                  <p className="text-base font-bold text-gray-900">${selectedTotal.toFixed(2)}</p>
+                  <p className="text-base font-bold text-gray-900">{formatCurrency(selectedTotal)}</p>
                 </div>
               </div>
 

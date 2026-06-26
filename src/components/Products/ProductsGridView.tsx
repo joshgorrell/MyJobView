@@ -1,5 +1,6 @@
 import React from 'react';
 import { Product } from '../../lib/types';
+import { formatCurrency } from '../../lib/utils';
 import { Package, CreditCard as Edit2, Trash2, Copy, Eye } from 'lucide-react';
 
 interface ProductsGridViewProps {
@@ -92,7 +93,7 @@ export default function ProductsGridView({
                 {!hideCost && (
                   <div className="flex items-baseline justify-between text-xs">
                     <span className="text-gray-400">Cost:</span>
-                    <span className="text-gray-300">${cost.toFixed(2)}</span>
+                    <span className="text-gray-300">{formatCurrency(cost)}</span>
                   </div>
                 )}
               </div>

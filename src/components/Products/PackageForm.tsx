@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useOfflineStorage } from '../../hooks/useOfflineStorage';
+import { formatCurrency } from '../../lib/utils';
 import { X, Plus, Trash2, Save, Search, WifiOff, Upload, Image as ImageIcon } from 'lucide-react';
 
 interface PackageFormProps {
@@ -725,7 +726,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
                           >
                             <div className="font-medium">{product.manufacturer_model_number}</div>
                             <div className="text-xs text-gray-400">
-                              ${Number(product.our_price).toFixed(2)} • {product.sku}
+                              {formatCurrency(Number(product.our_price))} • {product.sku}
                             </div>
                           </button>
                         ))
@@ -755,12 +756,12 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
                                 {item.product?.manufacturer_model_number}
                               </div>
                               <div className="text-xs text-gray-400">
-                                ${Number(item.product?.our_price || 0).toFixed(2)} each
+                                {formatCurrency(Number(item.product?.our_price || 0))} each
                               </div>
                               {hasLabor && (
                                 <div className="text-xs text-blue-400 mt-1">
                                   Labor: {item.product?.labor_phases?.name} - {item.product?.default_labor_hours}h
-                                  {item.product?.labor_cost ? ` ($${item.product.labor_cost.toFixed(2)})` : ''}
+                                  {item.product?.labor_cost ? ` (${formatCurrency(item.product.labor_cost)})` : ''}
                                 </div>
                               )}
                             </div>
@@ -778,7 +779,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
                                 className="w-16 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-white text-sm text-center"
                               />
                               <span className="text-sm text-gray-400 w-20 text-right">
-                                ${(Number(item.product?.our_price || 0) * Math.max(item.quantity, 1)).toFixed(2)}
+                                {formatCurrency(Number(item.product?.our_price || 0) * Math.max(item.quantity, 1))}
                               </span>
                               <button
                                 type="button"
@@ -888,16 +889,16 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
                 <div className="space-y-1">
                   <div className="text-sm text-gray-400">Calculated Total (Items + Labor):</div>
                   <div className="text-lg font-semibold text-white">
-                    ${totalIndividualPrice.toFixed(2)}
+                    {formatCurrency(totalIndividualPrice)}
                   </div>
                   {savings > 0 && (
                     <div className="text-sm text-green-400">
-                      Package Discount: ${savings.toFixed(2)} ({savingsPercent.toFixed(0)}%)
+                      Package Discount: {formatCurrency(savings)} ({savingsPercent.toFixed(0)}%)
                     </div>
                   )}
                   {savings < 0 && (
                     <div className="text-sm text-yellow-400">
-                      Selling price is ${Math.abs(savings).toFixed(2)} above calculated total
+                      Selling price is {formatCurrency(Math.abs(savings))} above calculated total
                     </div>
                   )}
                 </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, AlertCircle, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Tag, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1379,9 +1380,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                         <td className="py-2.5 text-gray-900 font-medium">{part.part_name}</td>
                         <td className="py-2.5 text-gray-500">{part.part_sku || '—'}</td>
                         <td className="py-2.5 text-gray-700 text-right">{part.quantity}</td>
-                        <td className="py-2.5 text-gray-700 text-right">${part.unit_cost.toFixed(2)}</td>
-                        <td className="py-2.5 text-gray-700 text-right">${part.unit_price.toFixed(2)}</td>
-                        <td className="py-2.5 font-semibold text-gray-900 text-right">${part.total_price.toFixed(2)}</td>
+                        <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_cost)}</td>
+                        <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_price)}</td>
+                        <td className="py-2.5 font-semibold text-gray-900 text-right">{formatCurrency(part.total_price)}</td>
                         <td className="py-2.5 text-center">
                           {part.warranty_item ? (
                             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Warranty</span>
@@ -1396,7 +1397,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                     <tr className="border-t-2 border-gray-200">
                       <td colSpan={5} className="pt-3 text-sm font-semibold text-gray-700 text-right">Total:</td>
                       <td className="pt-3 text-sm font-bold text-gray-900 text-right">
-                        ${partsUsed.reduce((sum, p) => sum + p.total_price, 0).toFixed(2)}
+                        {formatCurrency(partsUsed.reduce((sum, p) => sum + p.total_price, 0))}
                       </td>
                       <td></td>
                     </tr>
@@ -1424,8 +1425,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                         <tr key={material.id}>
                           <td className="py-2.5 text-gray-900">{material.material_name}</td>
                           <td className="py-2.5 text-gray-600">{material.quantity} {material.unit}</td>
-                          <td className="py-2.5 text-gray-600 text-right">${material.unit_cost.toFixed(2)}</td>
-                          <td className="py-2.5 font-semibold text-gray-900 text-right">${material.total_cost.toFixed(2)}</td>
+                          <td className="py-2.5 text-gray-600 text-right">{formatCurrency(material.unit_cost)}</td>
+                          <td className="py-2.5 font-semibold text-gray-900 text-right">{formatCurrency(material.total_cost)}</td>
                           <td className="py-2.5 text-gray-600">{new Date(material.used_date).toLocaleDateString()}</td>
                         </tr>
                       ))}

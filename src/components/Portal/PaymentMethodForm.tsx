@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CreditCard, Building2, AlertCircle, Check, X } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 
 interface PaymentMethodFormProps {
   onSubmit: (paymentData: PaymentFormData) => Promise<void>;
@@ -283,17 +284,17 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
         <div className="space-y-2 text-sm">
           <div className="flex justify-between text-gray-700">
             <span>Subscription Amount</span>
-            <span>${amount.toFixed(2)}</span>
+            <span>{formatCurrency(amount)}</span>
           </div>
           {convenienceFee > 0 && (
             <div className="flex justify-between text-gray-700">
               <span>Convenience Fee (3%)</span>
-              <span>${convenienceFee.toFixed(2)}</span>
+              <span>{formatCurrency(convenienceFee)}</span>
             </div>
           )}
           <div className="flex justify-between text-gray-900 font-bold text-base pt-2 border-t border-gray-300">
             <span>Total Due Today</span>
-            <span>${totalAmount.toFixed(2)}</span>
+            <span>{formatCurrency(totalAmount)}</span>
           </div>
         </div>
       </div>
@@ -327,7 +328,7 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
           ) : (
             <>
               <Check className="w-5 h-5" />
-              Complete Signup - ${totalAmount.toFixed(2)}
+              Complete Signup - {formatCurrency(totalAmount)}
             </>
           )}
         </button>

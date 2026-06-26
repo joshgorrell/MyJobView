@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, Check, DollarSign, FileText, Save, AlertCircle, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 import type { SalesOrderFull, ChangeOrderSummary } from './SalesOrderDetail';
 import { getTaxApplicability, getEnvironmentDisplayName, getProjectTypeDisplayName, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
 
@@ -326,7 +327,7 @@ export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSucce
                         </div>
                       </div>
                       <span className={`text-sm font-semibold ${co.change_amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {co.change_amount >= 0 ? '+' : ''}${co.change_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {co.change_amount >= 0 ? '+' : ''}{formatCurrency(Math.abs(co.change_amount))}
                       </span>
                     </div>
                   </button>
@@ -359,7 +360,7 @@ export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSucce
                           <td className="p-3 text-right text-gray-300">{item.new_quantity}</td>
                           <td className="p-3 text-right text-gray-300">${(item.new_unit_price || 0).toFixed(2)}</td>
                           <td className="p-3 text-right text-white font-medium">
-                            ${((item.new_total || 0) + (item.labor_total || 0)).toFixed(2)}
+                            {formatCurrency((item.new_total || 0) + (item.labor_total || 0))}
                           </td>
                         </tr>
                       ))
@@ -407,15 +408,15 @@ export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSucce
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Subtotal</span>
-                  <span className="text-white">${totals.subtotal.toFixed(2)}</span>
+                  <span className="text-white">{formatCurrency(totals.subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Tax ({(totals.taxRate * 100).toFixed(2)}%)</span>
-                  <span className="text-white">${totals.tax.toFixed(2)}</span>
+                  <span className="text-white">{formatCurrency(totals.tax)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-gray-700">
                   <span className="text-white font-semibold">Total</span>
-                  <span className="text-xl font-bold text-green-400">${totals.total.toFixed(2)}</span>
+                  <span className="text-xl font-bold text-green-400">{formatCurrency(totals.total)}</span>
                 </div>
               </div>
             </div>

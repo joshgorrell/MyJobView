@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, MapPin, Check, X, Edit2, Navigation, User, Calendar, Building2, ArrowRight } from 'lucide-react';
+import { DollarSign, MapPin, Check, X, CreditCard as Edit2, Navigation, User, Calendar, Building2, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
 import { TripEstimator } from './TripEstimator';
 
 interface TravelBonusRequest {
@@ -241,7 +242,7 @@ export function TravelBonusQueue() {
             <DollarSign className="w-12 h-12 text-orange-600 opacity-20" />
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            Total: ${totalPending.toFixed(2)}
+            Total: {formatCurrency(totalPending)}
           </p>
         </div>
 
@@ -254,7 +255,7 @@ export function TravelBonusQueue() {
             <Check className="w-12 h-12 text-green-600 opacity-20" />
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            Total: ${totalApproved.toFixed(2)}
+            Total: {formatCurrency(totalApproved)}
           </p>
         </div>
 
@@ -404,7 +405,7 @@ export function TravelBonusQueue() {
                       <div className="flex justify-between pt-2 border-t border-gray-200">
                         <span className="font-medium text-gray-900">Bonus Amount:</span>
                         <span className="text-2xl font-bold text-green-600">
-                          ${(request.adjusted_amount || request.bonus_amount).toFixed(2)}
+                          {formatCurrency(request.adjusted_amount || request.bonus_amount)}
                         </span>
                       </div>
                     </div>

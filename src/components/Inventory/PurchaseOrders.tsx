@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, ShoppingCart, Package, Truck, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
 import { ReceivePOModal } from './ReceivePOModal';
 
@@ -285,7 +286,7 @@ function PurchaseOrderCard({
         </div>
         <div>
           <p className="text-xs text-gray-600">Total Amount</p>
-          <p className="text-sm font-medium text-gray-900">${po.total.toFixed(2)}</p>
+          <p className="text-sm font-medium text-gray-900">{formatCurrency(po.total)}</p>
         </div>
       </div>
 

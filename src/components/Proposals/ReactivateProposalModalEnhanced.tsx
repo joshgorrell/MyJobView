@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RotateCcw, AlertTriangle, Calendar, Globe, FileText, X, CheckCircle, TrendingUp, TrendingDown, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import type { ProposalPricingAnalysis } from '../../lib/types';
 
 interface ReactivateProposalModalEnhancedProps {
@@ -293,11 +294,11 @@ export function ReactivateProposalModalEnhanced({
                           <div className="grid grid-cols-3 gap-4 mt-2 text-xs">
                             <div>
                               <p className="text-gray-500">Old Price</p>
-                              <p className="font-medium">${item.old_unit_price.toFixed(2)}</p>
+                              <p className="font-medium">{formatCurrency(item.old_unit_price)}</p>
                             </div>
                             <div>
                               <p className="text-gray-500">New Price</p>
-                              <p className="font-medium">${item.new_unit_price.toFixed(2)}</p>
+                              <p className="font-medium">{formatCurrency(item.new_unit_price)}</p>
                             </div>
                             <div>
                               <p className="text-gray-500">Line Difference</p>
@@ -353,11 +354,11 @@ export function ReactivateProposalModalEnhanced({
                         <div className="grid grid-cols-3 gap-4 text-sm bg-white rounded p-3">
                           <div>
                             <p className="text-gray-600">Original Total</p>
-                            <p className="font-semibold text-gray-900">${pricingAnalysis.summary.old_total.toFixed(2)}</p>
+                            <p className="font-semibold text-gray-900">{formatCurrency(pricingAnalysis.summary.old_total)}</p>
                           </div>
                           <div>
                             <p className="text-gray-600">New Total</p>
-                            <p className="font-semibold text-gray-900">${pricingAnalysis.summary.new_total.toFixed(2)}</p>
+                            <p className="font-semibold text-gray-900">{formatCurrency(pricingAnalysis.summary.new_total)}</p>
                           </div>
                           <div>
                             <p className="text-gray-600">Difference</p>

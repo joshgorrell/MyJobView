@@ -21,6 +21,7 @@ import {
   Info,
   DollarSign
 } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 import { UserSelector } from '../Shared/UserSelector';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -659,7 +660,7 @@ export function TestTuneStatusPanel({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-400">Effective Labor Rate</span>
                     <span className={`font-semibold ${salesRepIneligible ? 'text-orange-400' : 'text-white'}`}>
-                      ${effectiveLaborRate.toFixed(2)}/hr
+                      {formatCurrency(effectiveLaborRate)}/hr
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500 mt-1">

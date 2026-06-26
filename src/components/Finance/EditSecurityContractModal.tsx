@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { X, Search, Save, User, Mail, DollarSign, Calendar } from 'lucide-react';
 
 interface Contact {
@@ -504,7 +505,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Monthly Price:</span>
-                <span className="font-semibold text-gray-900">${monthlyPrice.toFixed(2)}</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(monthlyPrice)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Initial Term:</span>

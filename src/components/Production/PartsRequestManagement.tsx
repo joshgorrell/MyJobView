@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Calendar, DollarSign, Search, Filter, Settings, Bell, X, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
 import { PartsRequestForm } from './PartsRequestForm';
 import { ChangeVendorModal } from './ChangeVendorModal';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -514,7 +515,7 @@ export function PartsRequestManagement() {
                           <div>
                             <h3 className="font-semibold text-gray-900">{vendor}</h3>
                             <p className="text-sm text-gray-600">
-                              {items.length} item(s) • Est. Total: ${totalCost.toFixed(2)}
+                              {items.length} item(s) • Est. Total: {formatCurrency(totalCost)}
                             </p>
                           </div>
                         </div>
@@ -549,7 +550,7 @@ export function PartsRequestManagement() {
                                       <span>Request #{item.requestNumber}</span>
                                       <span>Qty: {item.quantityRequested}</span>
                                       {item.estimatedCost && (
-                                        <span>Cost: ${item.estimatedCost.toFixed(2)}</span>
+                                        <span>Cost: {formatCurrency(item.estimatedCost)}</span>
                                       )}
                                       <span>By: {item.requester}</span>
                                       {item.priority === 'urgent' && (
@@ -763,7 +764,7 @@ export function PartsRequestManagement() {
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
                         Quantity: {item.quantity_requested}
-                        {item.estimated_cost && ` • Est. Cost: $${item.estimated_cost.toFixed(2)}`}
+                        {item.estimated_cost && ` • Est. Cost: ${formatCurrency(item.estimated_cost)}`}
                       </div>
                     </div>
                   ))}

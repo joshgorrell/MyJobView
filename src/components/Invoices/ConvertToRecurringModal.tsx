@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { X, RefreshCw } from 'lucide-react';
 
 interface ConvertToRecurringModalProps {
@@ -152,7 +153,7 @@ export default function ConvertToRecurringModal({ invoice, onClose, onConverted 
               </div>
               <div>
                 <span className="text-gray-400">Amount:</span>
-                <span className="text-white ml-2">${invoice.total.toFixed(2)}</span>
+                <span className="text-white ml-2">{formatCurrency(invoice.total)}</span>
               </div>
             </div>
           </div>

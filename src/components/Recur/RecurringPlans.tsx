@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit2, Trash2, DollarSign, Search } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, DollarSign, Search } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 import CreatePlanModal from './CreatePlanModal';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -189,7 +190,7 @@ export default function RecurringPlans({ planType }: RecurringPlansProps) {
                 <div className="flex justify-between">
                   <span className="text-gray-400">Amount:</span>
                   <span className="text-white font-semibold">
-                    ${plan.amount.toFixed(2)}
+                    {formatCurrency(plan.amount)}
                   </span>
                 </div>
                 <div className="flex justify-between">

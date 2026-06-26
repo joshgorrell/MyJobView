@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { Package, Check, X, Clock, AlertCircle, DollarSign, User, Calendar, Truck, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -347,8 +348,8 @@ export function PartsRequestQueue() {
                     <DollarSign className="w-4 h-4" />
                     <span>
                       {request.actual_cost
-                        ? `$${request.actual_cost.toFixed(2)}`
-                        : `~$${request.estimated_cost?.toFixed(2)}`
+                        ? formatCurrency(request.actual_cost)
+                        : `~${formatCurrency(request.estimated_cost ?? 0)}`
                       }
                     </span>
                   </div>

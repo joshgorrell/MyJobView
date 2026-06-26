@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { TrendingDown, AlertCircle, Calendar, User, FileText, BarChart3, Heart } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 
 interface CancellationRecord {
   id: string;
@@ -314,7 +315,7 @@ export function CancellationsAnalytics() {
                           {cancellation.subscription?.recurring_plans?.plan_name || 'N/A'}
                         </div>
                         <div className="text-xs text-gray-500">
-                          ${cancellation.subscription?.recurring_plans?.amount?.toFixed(2) || '0.00'} /{' '}
+                          {formatCurrency(cancellation.subscription?.recurring_plans?.amount || 0)} /{' '}
                           {cancellation.subscription?.recurring_plans?.billing_frequency}
                         </div>
                       </td>

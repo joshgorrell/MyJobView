@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, RefreshCw, Plus, Copy, Replace, ChevronDown, ChevronUp, CreditCard as Edit3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
 import { ProposalLineItem, Product, ProposalRoom } from '../../lib/types';
 import ProductSelector from './ProductSelector';
 import { ProductDetailModal } from '../Products/ProductDetailModal';
@@ -603,9 +604,9 @@ export default function ProposalLineItemModal({
 
                 {/* Financial Summary Bar */}
                 <div className="grid grid-cols-4 gap-0 bg-gray-800/80 border border-gray-700/50 rounded-xl overflow-hidden">
-                  <FinStat label="Material" value={`$${lineTotal.toFixed(2)}`} />
-                  <FinStat label="Labor" value={`$${laborTotalCalc.toFixed(2)}`} />
-                  <FinStat label="Profit" value={`$${profit.toFixed(2)}`} positive={profit >= 0} />
+                  <FinStat label="Material" value={formatCurrency(lineTotal)} />
+                  <FinStat label="Labor" value={formatCurrency(laborTotalCalc)} />
+                  <FinStat label="Profit" value={formatCurrency(profit)} positive={profit >= 0} />
                   <FinStat label="Margin" value={`${margin.toFixed(1)}%`} positive={margin >= 0} />
                 </div>
 
@@ -752,7 +753,7 @@ export default function ProposalLineItemModal({
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-white truncate">{acc.description}</p>
                             <p className="text-xs text-gray-500 mt-0.5">
-                              {acc.quantity} {acc.unit} × ${acc.unit_price.toFixed(2)} = ${acc.line_total.toFixed(2)}
+                              {acc.quantity} {acc.unit} × {formatCurrency(acc.unit_price)} = {formatCurrency(acc.line_total)}
                             </p>
                           </div>
                           <button onClick={() => removeAccessory(acc.id)}
@@ -789,11 +790,11 @@ export default function ProposalLineItemModal({
                     <div className="grid grid-cols-4 gap-3">
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Master Price</p>
-                        <p className="text-sm font-bold text-white">${Number((masterProduct as any).our_price || masterProduct.unit_price || 0).toFixed(2)}</p>
+                        <p className="text-sm font-bold text-white">{formatCurrency(Number((masterProduct as any).our_price || masterProduct.unit_price || 0))}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Master Cost</p>
-                        <p className="text-sm font-bold text-white">${Number(masterProduct.cost || 0).toFixed(2)}</p>
+                        <p className="text-sm font-bold text-white">{formatCurrency(Number(masterProduct.cost || 0))}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Master Margin</p>

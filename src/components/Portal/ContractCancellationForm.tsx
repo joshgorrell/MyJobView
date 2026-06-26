@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, AlertTriangle, DollarSign, Calendar, CheckCircle, Loader2, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 
 interface Contract {
   id: string;
@@ -192,7 +193,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
                 <div>
                   <p className="font-semibold text-gray-900 text-sm sm:text-base">{c.contract_number}</p>
                   <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                    ${c.monthly_rate.toFixed(2)}/mo &middot; Ends {new Date(c.end_date).toLocaleDateString()}
+                    {formatCurrency(c.monthly_rate)}/mo &middot; Ends {new Date(c.end_date).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -223,7 +224,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-left">
             <p className="text-sm text-orange-800 leading-relaxed">
               Your contract has an early termination buyout of{' '}
-              <strong>${calculatedData.buyout_amount.toFixed(2)}</strong>.
+              <strong>{formatCurrency(calculatedData.buyout_amount)}</strong>.
               Our team will provide payment instructions.
             </p>
           </div>
@@ -277,7 +278,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'Contract #', value: contract.contract_number },
-              { label: 'Monthly Rate', value: `$${contract.monthly_rate.toFixed(2)}` },
+              { label: 'Monthly Rate', value: formatCurrency(contract.monthly_rate) },
               { label: 'Contract Ends', value: new Date(contract.end_date).toLocaleDateString() },
               { label: 'Months Left', value: String(calculatedData.months_remaining) },
             ].map(({ label, value }) => (
@@ -305,13 +306,13 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
                   <div>
                     <p className="text-xs text-orange-700 font-medium">Total Buyout Amount</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {calculatedData.months_remaining} months &times; ${contract.monthly_rate.toFixed(2)}/mo
+                      {calculatedData.months_remaining} months &times; {formatCurrency(contract.monthly_rate)}/mo
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <DollarSign className="w-5 h-5 text-orange-600" />
                     <span className="text-2xl sm:text-3xl font-bold text-orange-900">
-                      {calculatedData.buyout_amount.toFixed(2)}
+                      {formatCurrency(calculatedData.buyout_amount).replace('$', '')}
                     </span>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { ArrowLeft, Send, CheckCircle, XCircle, Eye, Mail, Clock, AlertCircle, User, Shield, Phone, CreditCard, Ligature as FileSignature, MapPin, CreditCard as Edit, Printer, Trash2, Ban } from 'lucide-react';
 import ManualContractEntry from './ManualContractEntry';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -552,7 +553,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
     <div class="payment-grid">
       <div>
         <div class="field-label">Monthly Monitoring Fee</div>
-        <div class="field-value" style="font-weight:700;font-size:11pt;">$${parseFloat(d.monthly_price || 0).toFixed(2)}/month</div>
+        <div class="field-value" style="font-weight:700;font-size:11pt;">${formatCurrency(parseFloat(d.monthly_price || 0))}/month</div>
       </div>
       <div>
         <div class="field-label">Payment Method</div>
@@ -726,7 +727,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
       fields: [
         {
           label: 'Monthly Monitoring Fee',
-          value: contractData?.monthly_price ? `$${parseFloat(contractData.monthly_price).toFixed(2)}/month` : '$XX.XX/month',
+          value: contractData?.monthly_price ? `${formatCurrency(parseFloat(contractData.monthly_price))}/month` : '$XX.XX/month',
           prefilled: true
         },
         {

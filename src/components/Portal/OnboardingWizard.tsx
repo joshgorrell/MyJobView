@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import {
   ArrowRight, ArrowLeft, Check, User, Shield, Phone, CreditCard,
   Ligature as FileSignature, HelpCircle, Mail, Plus, Trash2, Lock,
@@ -541,7 +542,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                 <p className="text-white text-xs mt-0.5 opacity-70">Drafted on the 1st of each month</p>
               </div>
               <div className="text-3xl sm:text-4xl font-bold text-white">
-                ${contract.monthly_price ? parseFloat(contract.monthly_price).toFixed(2) : '—'}
+                {contract.monthly_price ? formatCurrency(parseFloat(contract.monthly_price)) : '—'}
               </div>
             </div>
 

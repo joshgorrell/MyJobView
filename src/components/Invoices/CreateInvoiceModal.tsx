@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import InlineProductSearch from '../Proposals/InlineProductSearch';
 import InvoiceCatalogBrowser from './InvoiceCatalogBrowser';
@@ -1122,7 +1123,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                         </div>
                         <div className="text-right">
                           <label className="block text-[11px] text-gray-400 mb-1">Total</label>
-                          <div className="py-2.5 text-sm text-green-400 font-semibold">${item.amount.toFixed(2)}</div>
+                          <div className="py-2.5 text-sm text-green-400 font-semibold">{formatCurrency(item.amount)}</div>
                         </div>
                       </div>
 
@@ -1172,15 +1173,15 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                 <div className="w-full sm:w-72 space-y-1.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Subtotal</span>
-                    <span className="font-medium text-white">${calculateSubtotal().toFixed(2)}</span>
+                    <span className="font-medium text-white">{formatCurrency(calculateSubtotal())}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Tax ({(getEffectiveTaxRate() * 100).toFixed(2)}%)</span>
-                    <span className="font-medium text-white">${calculateTax().toFixed(2)}</span>
+                    <span className="font-medium text-white">{formatCurrency(calculateTax())}</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-700">
                     <span className="font-semibold text-white">Total</span>
-                    <span className="text-xl font-bold text-green-400">${calculateTotal().toFixed(2)}</span>
+                    <span className="text-xl font-bold text-green-400">{formatCurrency(calculateTotal())}</span>
                   </div>
                 </div>
               </div>

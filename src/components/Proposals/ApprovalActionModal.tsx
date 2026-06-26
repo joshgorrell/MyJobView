@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, DollarSign, FileText, CheckCircle, Mail, Copy, AlertCircle, Clock, ChevronDown, ChevronUp, Save, Check, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import BillingConfigSummary from './BillingConfigSummary';
 
 interface ApprovalActionModalProps {
@@ -367,7 +368,7 @@ export default function ApprovalActionModal({ proposal, contact, onClose, onComp
       case 'deposit':
         return {
           title: 'Request Deposit Payment',
-          description: `Creates a deposit invoice for $${proposal.deposit_amount_due?.toFixed(2)} and sends it to the customer.`,
+          description: `Creates a deposit invoice for ${formatCurrency(proposal.deposit_amount_due ?? 0)} and sends it to the customer.`,
           nextSteps: [
             'Deposit invoice will be created',
             'Sales order will be marked as "Pending Deposit"',

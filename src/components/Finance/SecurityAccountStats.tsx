@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { Shield, Home, Building2, DollarSign, Clock, TrendingUp, RefreshCw } from 'lucide-react';
 
 interface ContractRow {
@@ -203,8 +204,8 @@ export default function SecurityAccountStats() {
         <StatCard icon={Building2} label="Commercial" value={commercialCount}
           sub={totalActive > 0 ? `${Math.round((commercialCount / totalActive) * 100)}% of active` : undefined}
           color="blue" />
-        <StatCard icon={DollarSign} label="Total Monthly RMR" value={`$${totalMrr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          sub={`Avg $${totalActive > 0 ? (totalMrr / totalActive).toFixed(2) : '0.00'}/acct`}
+        <StatCard icon={DollarSign} label="Total Monthly RMR" value={formatCurrency(totalMrr)}
+          sub={`Avg ${formatCurrency(totalActive > 0 ? totalMrr / totalActive : 0)}/acct`}
           color="amber" />
       </div>
 

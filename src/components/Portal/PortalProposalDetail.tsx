@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
@@ -868,12 +869,12 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                               )}
                               {template?.show_unit_price && (
                                 <td className="text-right py-4 text-sm text-gray-700">
-                                  ${item.unit_price.toFixed(2)}
+                                  {formatCurrency(item.unit_price)}
                                 </td>
                               )}
                               {template?.show_line_item_total && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
-                                  ${item.line_total.toFixed(2)}
+                                  {formatCurrency(item.line_total)}
                                 </td>
                               )}
                             </tr>
@@ -892,7 +893,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                                 Room Subtotal:
                               </td>
                               <td className="pt-4 pb-4 text-right font-bold text-blue-600 text-lg">
-                                ${roomSubtotal.toFixed(2)}
+                                {formatCurrency(roomSubtotal)}
                               </td>
                             </tr>
                           </tfoot>
@@ -966,12 +967,12 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                               )}
                               {template?.show_unit_price && (
                                 <td className="text-right py-4 text-sm text-gray-700">
-                                  ${item.unit_price.toFixed(2)}
+                                  {formatCurrency(item.unit_price)}
                                 </td>
                               )}
                               {template?.show_line_item_total && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
-                                  ${item.line_total.toFixed(2)}
+                                  {formatCurrency(item.line_total)}
                                 </td>
                               )}
                             </tr>
@@ -990,7 +991,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                                 Subtotal:
                               </td>
                               <td className="pt-4 pb-4 text-right font-bold text-blue-600 text-lg">
-                                ${unassignedSubtotal.toFixed(2)}
+                                {formatCurrency(unassignedSubtotal)}
                               </td>
                             </tr>
                           </tfoot>

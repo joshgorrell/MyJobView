@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
 import {
   X, CheckCircle, Mail, Globe, DollarSign, FileText, AlertCircle,
   Building2, Users, ChevronRight, Send, ExternalLink, Copy, Check,
@@ -78,7 +79,7 @@ export function ChangeOrderApprovalFlowModal({
       setEmailMessage(
         `Dear ${contact?.full_name || 'Valued Customer'},\n\n` +
         `Please review the attached Change Order ${changeOrder.change_order_number}: "${changeOrder.title}".\n\n` +
-        `This change order ${changeOrder.change_amount >= 0 ? 'adds' : 'reduces'} $${Math.abs(changeOrder.change_amount).toFixed(2)} to your contract, bringing the new total to $${changeOrder.new_contract_total.toFixed(2)}.\n\n` +
+        `This change order ${changeOrder.change_amount >= 0 ? 'adds' : 'reduces'} ${formatCurrency(Math.abs(changeOrder.change_amount))} to your contract, bringing the new total to ${formatCurrency(changeOrder.new_contract_total)}.\n\n` +
         `Please review the details and contact us with any questions.\n\nThank you`
       );
       setEmailCc('');
@@ -720,7 +721,7 @@ export function ChangeOrderApprovalFlowModal({
                           type="number"
                           value={depositAmount}
                           onChange={e => setDepositAmount(e.target.value)}
-                          placeholder={`e.g. ${(changeOrder.change_amount * 0.5).toFixed(2)}`}
+                          placeholder={`e.g. ${formatCurrency(changeOrder.change_amount * 0.5)}`}
                           min="0"
                           step="0.01"
                           className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
@@ -779,7 +780,7 @@ export function ChangeOrderApprovalFlowModal({
                 {requiresDeposit && depositAmount && (
                   <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-orange-600" />
-                    <p className="text-sm text-orange-800">Deposit required: <strong>${parseFloat(depositAmount).toFixed(2)}</strong></p>
+                    <p className="text-sm text-orange-800">Deposit required: <strong>{formatCurrency(parseFloat(depositAmount))}</strong></p>
                   </div>
                 )}
 

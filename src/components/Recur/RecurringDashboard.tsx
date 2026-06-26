@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { DollarSign, Users, TrendingUp, AlertCircle, Calendar, Shield, Award } from 'lucide-react';
 
 interface DashboardStats {
@@ -147,7 +148,7 @@ export default function RecurringDashboard() {
   const statCards = [
     {
       title: 'Monthly Recurring Revenue',
-      value: `$${stats.monthlyRecurringRevenue.toFixed(2)}`,
+      value: formatCurrency(stats.monthlyRecurringRevenue),
       icon: DollarSign,
       color: 'text-green-400',
       bgColor: 'bg-green-500/10',
@@ -161,7 +162,7 @@ export default function RecurringDashboard() {
     },
     {
       title: 'Avg Subscription Value',
-      value: `$${stats.avgSubscriptionValue.toFixed(2)}`,
+      value: formatCurrency(stats.avgSubscriptionValue),
       icon: TrendingUp,
       color: 'text-purple-400',
       bgColor: 'bg-purple-500/10',
@@ -224,11 +225,11 @@ export default function RecurringDashboard() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-300">Monthly Revenue</span>
-              <span className="text-2xl font-bold text-green-400">${securityStats.monthlyRecurringRevenue.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-green-400">{formatCurrency(securityStats.monthlyRecurringRevenue)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-300">Avg Contract Value</span>
-              <span className="text-xl font-semibold text-blue-300">${securityStats.avgSubscriptionValue.toFixed(2)}</span>
+              <span className="text-xl font-semibold text-blue-300">{formatCurrency(securityStats.avgSubscriptionValue)}</span>
             </div>
           </div>
         </div>
@@ -247,11 +248,11 @@ export default function RecurringDashboard() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-300">Monthly Revenue</span>
-              <span className="text-2xl font-bold text-green-400">${vipStats.monthlyRecurringRevenue.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-green-400">{formatCurrency(vipStats.monthlyRecurringRevenue)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-300">Avg Plan Value</span>
-              <span className="text-xl font-semibold text-purple-300">${vipStats.avgSubscriptionValue.toFixed(2)}</span>
+              <span className="text-xl font-semibold text-purple-300">{formatCurrency(vipStats.avgSubscriptionValue)}</span>
             </div>
           </div>
         </div>

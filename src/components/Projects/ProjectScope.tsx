@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 
 interface ProjectScopeProps {
   project: any;
@@ -146,7 +147,7 @@ export default function ProjectScope({ project }: ProjectScopeProps) {
         <div className="mt-6 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center text-xl font-bold">
             <span className="text-gray-400">Total Contract Value</span>
-            <span className="text-white">${proposal.total?.toFixed(2)}</span>
+            <span className="text-white">{proposal.total != null ? formatCurrency(proposal.total) : ''}</span>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { X, Trash2, Unlink, AlertTriangle, Package } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 
 interface AccessoryItem {
   product_name: string;
@@ -76,7 +77,7 @@ export function RemoveLineItemDialog({
             {accessoryTotal !== 0 && (
               <div className="flex justify-between px-3 pt-2 mt-2 border-t border-gray-200 text-sm">
                 <span className="text-gray-600">Accessories Total</span>
-                <span className="font-semibold text-gray-900">${accessoryTotal.toFixed(2)}</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(accessoryTotal)}</span>
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { Settings, Share2, MoreVertical, ChevronDown, ChevronUp, Plus, GripVertical, Image, DollarSign, ArrowLeft, Calendar, Activity, Eye, FileText, Wrench } from 'lucide-react';
 import ProposalSettings from './ProposalSettings';
@@ -499,11 +500,11 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
               <div className="border-t border-[#E5E5E5] pt-4 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-[#666666]">Cost per unit</span>
-                  <span className="font-mono text-[#222222]">${(detailItem.cost || 0).toFixed(2)}</span>
+                  <span className="font-mono text-[#222222]">{formatCurrency(detailItem.cost || 0)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-[#666666]">Sell price</span>
-                  <span className="font-mono font-semibold text-[#111111]">${detailItem.unit_price.toFixed(2)}</span>
+                  <span className="font-mono font-semibold text-[#111111]">{formatCurrency(detailItem.unit_price)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-[#666666]">Margin</span>
@@ -515,7 +516,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
 
               <div className="border-t border-[#E5E5E5] pt-4">
                 <div className="text-xs text-[#999999] uppercase tracking-wide mb-2">Line Total</div>
-                <div className="text-3xl font-bold text-[#0A1A2F] font-mono">${detailItem.line_total.toFixed(2)}</div>
+                <div className="text-3xl font-bold text-[#0A1A2F] font-mono">{formatCurrency(detailItem.line_total)}</div>
               </div>
 
               {selectedItem && (
@@ -549,11 +550,11 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
             <div className="flex items-center gap-8 font-mono">
               <div>
                 <span className="text-white/60 text-xs mr-2">Total Sell</span>
-                <span className="text-white font-bold text-lg">${totalSell.toFixed(2)}</span>
+                <span className="text-white font-bold text-lg">{formatCurrency(totalSell)}</span>
               </div>
               <div>
                 <span className="text-white/60 text-xs mr-2">Cost</span>
-                <span className="text-white">${totalCost.toFixed(2)}</span>
+                <span className="text-white">{formatCurrency(totalCost)}</span>
               </div>
               <div>
                 <span className="text-white/60 text-xs mr-2">Margin</span>
@@ -561,7 +562,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
               </div>
               <div>
                 <span className="text-white/60 text-xs mr-2">Profit</span>
-                <span className="text-[#88DD66] font-semibold">${totalProfit.toFixed(2)}</span>
+                <span className="text-[#88DD66] font-semibold">{formatCurrency(totalProfit)}</span>
               </div>
             </div>
             <button
@@ -593,11 +594,11 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Total Sell</div>
-                  <div className="text-4xl font-bold font-mono">${totalSell.toFixed(2)}</div>
+                  <div className="text-4xl font-bold font-mono">{formatCurrency(totalSell)}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Total Cost</div>
-                  <div className="text-4xl font-bold font-mono">${totalCost.toFixed(2)}</div>
+                  <div className="text-4xl font-bold font-mono">{formatCurrency(totalCost)}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Margin %</div>
@@ -605,7 +606,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Profit</div>
-                  <div className="text-4xl font-bold font-mono text-[#88DD66]">${totalProfit.toFixed(2)}</div>
+                  <div className="text-4xl font-bold font-mono text-[#88DD66]">{formatCurrency(totalProfit)}</div>
                 </div>
               </div>
             </div>
@@ -1656,7 +1657,7 @@ function CustomerPreview({
             <div className="border-t-2 border-gray-300 pt-4 mt-6">
               <div className="flex justify-end items-center">
                 <span className="text-lg font-semibold text-gray-700 mr-4">Total Investment:</span>
-                <span className="text-3xl font-bold text-blue-600">${total.toFixed(2)}</span>
+                <span className="text-3xl font-bold text-blue-600">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>

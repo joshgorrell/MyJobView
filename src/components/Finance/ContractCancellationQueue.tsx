@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, XCircle, DollarSign, Calendar, User, FileText, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 
 interface Cancellation {
   id: string;
@@ -256,7 +257,7 @@ export function ContractCancellationQueue() {
                   <p className="text-xs text-gray-500 mb-1">Buyout Amount</p>
                   <p className="text-sm text-white font-medium">
                     {cancellation.buyout_amount > 0
-                      ? `$${cancellation.buyout_amount.toFixed(2)}`
+                      ? formatCurrency(cancellation.buyout_amount)
                       : 'None'}
                   </p>
                 </div>
@@ -296,7 +297,7 @@ export function ContractCancellationQueue() {
                   </div>
                   <div>
                     <p className="text-gray-400">Monthly Rate</p>
-                    <p className="text-white font-medium">${selectedCancellation.monthly_rate.toFixed(2)}</p>
+                    <p className="text-white font-medium">{formatCurrency(selectedCancellation.monthly_rate)}</p>
                   </div>
                   <div>
                     <p className="text-gray-400">Contract End Date</p>
@@ -360,12 +361,11 @@ export function ContractCancellationQueue() {
                       <div className="flex items-center gap-2">
                         <DollarSign className="w-5 h-5 text-orange-400" />
                         <span className="text-2xl font-bold text-orange-200">
-                          {selectedCancellation.buyout_amount.toFixed(2)}
+                          {formatCurrency(selectedCancellation.buyout_amount).replace('$', '')}
                         </span>
                       </div>
                       <p className="text-sm text-orange-300 mt-2">
-                        Customer must pay {selectedCancellation.months_remaining} months at $
-                        {selectedCancellation.monthly_rate.toFixed(2)}/month
+                        Customer must pay {selectedCancellation.months_remaining} months at {formatCurrency(selectedCancellation.monthly_rate)}/month
                       </p>
                     </div>
                   </div>

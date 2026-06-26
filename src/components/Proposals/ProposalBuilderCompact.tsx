@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity } from 'lucide-react';
@@ -4718,7 +4719,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       step="0.01"
                                     />
                                   ) : (
-                                    `$${parseFloat(item.cost || 0).toFixed(2)}`
+                                    formatCurrency(parseFloat(item.cost || 0))
                                   )}
                                 </td>
                               )}
@@ -4742,7 +4743,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       step="0.01"
                                     />
                                   ) : (
-                                    `$${parseFloat(item.unit_price || 0).toFixed(2)}`
+                                    formatCurrency(parseFloat(item.unit_price || 0))
                                   )}
                                 </td>
                               )}
@@ -4829,7 +4830,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       step="0.01"
                                     />
                                   ) : (
-                                    `$${parseFloat(item.labor_rate || 0).toFixed(2)}`
+                                    formatCurrency(parseFloat(item.labor_rate || 0))
                                   )}
                                 </td>
                               )}
@@ -4854,11 +4855,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                     const materialTotal = parseFloat(item.unit_price || 0) * item.quantity;
                                     const laborTotal = parseFloat(item.labor_total || 0);
                                     const negativeAmt = isPartsOnlyRemoval ? materialTotal : (materialTotal + laborTotal);
-                                    return `−$${negativeAmt.toFixed(2)}`;
+                                    return `−${formatCurrency(negativeAmt)}`;
                                   })() : (() => {
                                     const materialTotal = parseFloat(item.unit_price || 0) * item.quantity;
                                     const laborTotal = parseFloat(item.labor_total || 0);
-                                    return `$${(materialTotal + laborTotal).toFixed(2)}`;
+                                    return formatCurrency(materialTotal + laborTotal);
                                   })()}
                                 </td>
                               )}
@@ -4927,8 +4928,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             className="w-full px-2 sm:px-4 py-2 flex items-center justify-between hover:bg-gray-750 transition-colors group"
           >
             <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-              <span className="text-gray-400">Subtotal: <span className="text-white font-medium">${pricing.subtotal.toFixed(2)}</span></span>
-              <span className="text-gray-400 hidden sm:inline">Tax: <span className="text-white font-medium">${pricing.taxAmount.toFixed(2)}</span></span>
+              <span className="text-gray-400">Subtotal: <span className="text-white font-medium">{formatCurrency(pricing.subtotal)}</span></span>
+              <span className="text-gray-400 hidden sm:inline">Tax: <span className="text-white font-medium">{formatCurrency(pricing.taxAmount)}</span></span>
               {isCoMode && (() => {
                 const nonModifierItems = coLineItems.filter(c => c.action_type !== 'modify_modifiers');
                 const coDelta = nonModifierItems.reduce((sum, c) => sum + (c.change_amount || 0), 0);
@@ -4936,7 +4937,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 if (coLineItems.length === 0 && !hasModifierAdj) return null;
                 return (
                   <span className={`font-semibold ${coDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    CO: {coDelta >= 0 ? '+' : ''}${coDelta.toFixed(2)}
+                    CO: {coDelta >= 0 ? '+' : ''}{formatCurrency(coDelta)}
                     {hasModifierAdj && <span className="ml-1 text-amber-400 text-[10px]">+modifiers</span>}
                   </span>
                 );
@@ -4944,7 +4945,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="text-right">
-                <div className="text-cyan-400 text-base sm:text-xl font-bold">${pricing.total.toFixed(2)}</div>
+                <div className="text-cyan-400 text-base sm:text-xl font-bold">{formatCurrency(pricing.total)}</div>
               </div>
               <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
             </div>
@@ -4975,7 +4976,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Materials:</span>
-                <span className="text-white font-medium">${pricing.totalMaterials.toFixed(2)}</span>
+                <span className="text-white font-medium">{formatCurrency(pricing.totalMaterials)}</span>
               </div>
               <div>
                 <button
@@ -4991,7 +4992,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     )}
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-medium">${pricing.totalLabor.toFixed(2)}</span>
+                    <span className="text-white font-medium">{formatCurrency(pricing.totalLabor)}</span>
                     {pricing.totalLaborHours > 0 && (
                       <ChevronRight className={`w-3 h-3 text-gray-500 transition-transform ${laborHoursExpanded ? 'rotate-90' : ''}`} />
                     )}
@@ -5010,7 +5011,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-700">
                 <span className="text-gray-400">Subtotal:</span>
-                <span className="text-white font-medium">${pricing.subtotal.toFixed(2)}</span>
+                <span className="text-white font-medium">{formatCurrency(pricing.subtotal)}</span>
               </div>
 
               {/* Modifiers Section */}
@@ -5028,35 +5029,35 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   {pricing.pmAmount !== 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">Project Management ({pricing.pmPercent}%):</span>
-                      <span className="text-green-400 font-medium">${pricing.pmAmount.toFixed(2)}</span>
+                      <span className="text-green-400 font-medium">{formatCurrency(pricing.pmAmount)}</span>
                     </div>
                   )}
 
                   {pricing.designAmount !== 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">Project Design ({pricing.designPercent}%):</span>
-                      <span className="text-green-400 font-medium">${pricing.designAmount.toFixed(2)}</span>
+                      <span className="text-green-400 font-medium">{formatCurrency(pricing.designAmount)}</span>
                     </div>
                   )}
 
                   {pricing.systemDesignAmount !== 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">System Design ({pricing.systemDesignPercent}%):</span>
-                      <span className="text-green-400 font-medium">${pricing.systemDesignAmount.toFixed(2)}</span>
+                      <span className="text-green-400 font-medium">{formatCurrency(pricing.systemDesignAmount)}</span>
                     </div>
                   )}
 
                   {pricing.ccFeeAmount !== 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">Credit Card Fee ({pricing.ccFeePercent}%):</span>
-                      <span className="text-green-400 font-medium">${pricing.ccFeeAmount.toFixed(2)}</span>
+                      <span className="text-green-400 font-medium">{formatCurrency(pricing.ccFeeAmount)}</span>
                     </div>
                   )}
 
                   {pricing.miscPartsAmount !== 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">Misc Parts ({pricing.miscPartsPercent}%):</span>
-                      <span className="text-green-400 font-medium">${pricing.miscPartsAmount.toFixed(2)}</span>
+                      <span className="text-green-400 font-medium">{formatCurrency(pricing.miscPartsAmount)}</span>
                     </div>
                   )}
 
@@ -5080,7 +5081,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                   <div className="flex justify-between pt-1 border-t border-gray-600">
                     <span className="text-gray-400">Adjusted Subtotal:</span>
-                    <span className="text-white font-medium">${pricing.adjustedSubtotal.toFixed(2)}</span>
+                    <span className="text-white font-medium">{formatCurrency(pricing.adjustedSubtotal)}</span>
                   </div>
                 </div>
               )}
@@ -5123,12 +5124,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
               <div className="flex justify-between pt-2 border-t border-gray-700">
                 <span className="text-gray-400">Tax ({pricing.taxRate}%):</span>
-                <span className="text-white font-medium">${pricing.taxAmount.toFixed(2)}</span>
+                <span className="text-white font-medium">{formatCurrency(pricing.taxAmount)}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-700">
                 <span className="text-white font-semibold">Total:</span>
                 <div className="text-right">
-                  <div className="text-cyan-400 text-xl font-bold">${pricing.total.toFixed(2)}</div>
+                  <div className="text-cyan-400 text-xl font-bold">{formatCurrency(pricing.total)}</div>
                   {(() => {
                     // Calculate total cost from all line items
                     let lineItemsCost = 0;
@@ -5167,7 +5168,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     <span className="text-gray-400">
                       Deposit {pricing.depositPercent > 0 ? `(${pricing.depositPercent}%)` : ''}:
                     </span>
-                    <span className="text-yellow-400 font-medium">${pricing.depositAmount.toFixed(2)}</span>
+                    <span className="text-yellow-400 font-medium">{formatCurrency(pricing.depositAmount)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Balance Due:</span>

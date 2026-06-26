@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FileText, CheckCircle, XCircle, Clock, Send } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 
 interface RecurringInvoice {
   id: string;
@@ -132,7 +133,7 @@ export default function RecurringInvoiceHistory() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-white">${invoice.amount.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-white">{formatCurrency(invoice.amount)}</p>
                   </div>
                 </div>
 

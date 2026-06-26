@@ -823,7 +823,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     if (formData.our_price < 0) newErrors.price = 'Price must be positive';
 
     if (effectiveMinMargin > 0 && formData.our_price < calculatedMinPrice) {
-      newErrors.price = `Price must be at least $${calculatedMinPrice.toFixed(2)} (${effectiveMinMargin}% margin)`;
+      newErrors.price = `Price must be at least $${calculatedMinPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${effectiveMinMargin}% margin)`;
     }
 
     setErrors(newErrors);
@@ -1854,7 +1854,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 </label>
                 <input
                   type="text"
-                  value={`$${formData.labor_cost.toFixed(2)}`}
+                  value={`$${formData.labor_cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   disabled
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
                 />

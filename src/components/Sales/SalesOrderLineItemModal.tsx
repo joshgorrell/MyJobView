@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Lock, Pencil, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
 
 interface MasterProduct {
   id: string;
@@ -440,7 +441,7 @@ export function SalesOrderLineItemModal({
                         />
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-300">${(lineItem.cost ?? 0).toFixed(2)}</p>
+                      <p className="text-sm text-gray-300">{formatCurrency(lineItem.cost ?? 0)}</p>
                     )}
                   </Field>
                 </div>
@@ -449,7 +450,7 @@ export function SalesOrderLineItemModal({
                 <div className="grid grid-cols-3 gap-3">
                   <LockedField
                     label="Sale Price"
-                    value={`$${lineItem.unit_price.toFixed(2)}`}
+                    value={formatCurrency(lineItem.unit_price)}
                     tooltip="Sold price — locked. Create a Change Order to modify pricing."
                   />
                   <LockedField
@@ -459,7 +460,7 @@ export function SalesOrderLineItemModal({
                   />
                   <LockedField
                     label="Labor Rate"
-                    value={lineItem.labor_rate != null ? `$${lineItem.labor_rate.toFixed(2)}` : '—'}
+                    value={lineItem.labor_rate != null ? formatCurrency(lineItem.labor_rate) : '—'}
                     tooltip="Labor rate is locked after sale."
                   />
                 </div>

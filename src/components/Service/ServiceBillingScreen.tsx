@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, Clock, DollarSign, Package, Plus, Trash2, CreditCard as Edit, Save, FileText, Image as ImageIcon, AlertCircle, CheckCircle, Send } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -526,17 +527,17 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
                     <div>
                       <p className="font-medium text-gray-900">{part.part_name}</p>
                       <p className="text-sm text-gray-600">
-                        Qty: {part.quantity} × ${part.unit_price.toFixed(2)}
+                        Qty: {part.quantity} × {formatCurrency(part.unit_price)}
                       </p>
                     </div>
-                    <p className="font-bold text-gray-900">${part.total_price.toFixed(2)}</p>
+                    <p className="font-bold text-gray-900">{formatCurrency(part.total_price)}</p>
                   </div>
                 ))}
               </div>
             )}
             <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
               <span className="font-semibold text-gray-900">Parts Total:</span>
-              <span className="text-xl font-bold text-green-600">${partsTotal.toFixed(2)}</span>
+              <span className="text-xl font-bold text-green-600">{formatCurrency(partsTotal)}</span>
             </div>
           </div>
 
@@ -664,27 +665,27 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-700">Labor:</span>
-                <span className="font-medium">${laborTotal.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(laborTotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-700">Parts:</span>
-                <span className="font-medium">${partsTotal.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(partsTotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-700">Additional Charges:</span>
-                <span className="font-medium">${chargesTotal.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(chargesTotal)}</span>
               </div>
               <div className="flex justify-between text-sm pt-2 border-t border-green-300">
                 <span className="text-gray-700">Subtotal:</span>
-                <span className="font-medium">${subtotal.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-700">Tax (8%):</span>
-                <span className="font-medium">${tax.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(tax)}</span>
               </div>
               <div className="flex justify-between text-xl font-bold pt-3 border-t-2 border-green-400">
                 <span className="text-gray-900">Total:</span>
-                <span className="text-green-600">${total.toFixed(2)}</span>
+                <span className="text-green-600">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>

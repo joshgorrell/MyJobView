@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit2, Pause, Play, X, Calendar, Shield, Award, List, Search } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Pause, Play, X, Calendar, Shield, Award, List, Search } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 import CreateSubscriptionModal from './CreateSubscriptionModal';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -270,7 +271,7 @@ export default function SubscriptionsList({ planType }: SubscriptionsListProps) 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-gray-400 mb-1">Amount</p>
-                    <p className="text-white font-semibold">${amount.toFixed(2)}</p>
+                    <p className="text-white font-semibold">{formatCurrency(amount)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400 mb-1">Frequency</p>

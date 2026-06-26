@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
 import { X, Save, Package, DollarSign, Wrench, FileText, Link, Image, Upload, ExternalLink, Search } from 'lucide-react';
 import ImageSearchModal from './ImageSearchModal';
 
@@ -772,7 +773,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <div className="text-gray-500">Cost</div>
-                    <div className="font-semibold text-lg">${formData.cost.toFixed(2)}</div>
+                    <div className="font-semibold text-lg">{formatCurrency(formData.cost)}</div>
                   </div>
                   <div>
                     <div className="text-gray-500">Margin</div>
@@ -780,7 +781,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
                   </div>
                   <div>
                     <div className="text-gray-500">Sell Price</div>
-                    <div className="font-semibold text-lg text-green-600">${formData.our_price.toFixed(2)}</div>
+                    <div className="font-semibold text-lg text-green-600">{formatCurrency(formData.our_price)}</div>
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-gray-300">

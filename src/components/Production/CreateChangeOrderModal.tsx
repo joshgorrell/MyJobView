@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { X, Plus, Trash2, Save, Send, Package, AlertCircle, Info, Link2, ChevronDown, ChevronUp, Globe, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { RemoveLineItemDialog } from './RemoveLineItemDialog';
@@ -1318,9 +1319,9 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
               {lineItems.length > 0 && (
                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex justify-between text-sm">
-                  <span className="text-gray-600">Materials: <span className="font-medium text-gray-900">${partsSubtotal.toFixed(2)}</span></span>
-                  <span className="text-gray-600">Labor: <span className="font-medium text-gray-900">${laborSubtotal.toFixed(2)}</span></span>
-                  <span className="text-gray-600">Subtotal: <span className="font-semibold text-gray-900">${(partsSubtotal + laborSubtotal).toFixed(2)}</span></span>
+                  <span className="text-gray-600">Materials: <span className="font-medium text-gray-900">{formatCurrency(partsSubtotal)}</span></span>
+                  <span className="text-gray-600">Labor: <span className="font-medium text-gray-900">{formatCurrency(laborSubtotal)}</span></span>
+                  <span className="text-gray-600">Subtotal: <span className="font-semibold text-gray-900">{formatCurrency(partsSubtotal + laborSubtotal)}</span></span>
                 </div>
               )}
             </div>
@@ -1443,7 +1444,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
                 <span className="font-medium text-gray-900">Subtotal After Modifiers:</span>
-                <span className="text-xl font-bold text-blue-600">${subtotalAfterModifiers.toFixed(2)}</span>
+                <span className="text-xl font-bold text-blue-600">{formatCurrency(subtotalAfterModifiers)}</span>
               </div>
             </div>
           )}
@@ -1659,7 +1660,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
               <div className="p-4 bg-gray-900 text-white rounded-xl space-y-2">
                 <div className="flex justify-between text-sm text-gray-300">
                   <span>Current Contract Total</span>
-                  <span>${originalContractAmount.toFixed(2)}</span>
+                  <span>{formatCurrency(originalContractAmount)}</span>
                 </div>
                 <div className="border-t border-gray-700 pt-2 flex justify-between text-sm">
                   <span>Materials</span>
@@ -1689,7 +1690,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                 </div>
                 <div className="flex justify-between text-xl font-bold border-t border-gray-700 pt-2">
                   <span>New Contract Total</span>
-                  <span>${newContractTotal.toFixed(2)}</span>
+                  <span>{formatCurrency(newContractTotal)}</span>
                 </div>
               </div>
 

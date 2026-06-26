@@ -1,21 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import {
-  Award,
-  CheckCircle2,
-  XCircle,
-  DollarSign,
-  Clock,
-  Users,
-  TrendingUp,
-  AlertCircle,
-  Edit,
-  Eye,
-  Calendar,
-  Target,
-  Unlock,
-  X
-} from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
+import { Award, CheckCircle2, XCircle, DollarSign, Clock, Users, TrendingUp, AlertCircle, CreditCard as Edit, Eye, Calendar, Target, Unlock, X } from 'lucide-react';
 import { UserSelector } from '../Shared/UserSelector';
 
 interface BonusCalculation {
@@ -257,7 +243,7 @@ export function BonusApprovalDashboard() {
           notifications.push({
             type: 'bonus_approved',
             title: 'Performance Bonus Approved',
-            message: `Your Test & Tune performance bonus of $${(updatedAmount * 0.65).toFixed(2)} has been approved!`,
+            message: `Your Test & Tune performance bonus of ${formatCurrency(updatedAmount * 0.65)} has been approved!`,
             related_id: approvalModal.calculationId
           });
         }
@@ -266,7 +252,7 @@ export function BonusApprovalDashboard() {
           notifications.push({
             type: 'bonus_approved',
             title: 'Performance Bonus Approved',
-            message: `Your Test & Tune performance bonus of $${(updatedAmount * 0.35).toFixed(2)} has been approved!`,
+            message: `Your Test & Tune performance bonus of ${formatCurrency(updatedAmount * 0.35)} has been approved!`,
             related_id: approvalModal.calculationId
           });
         }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import {
   Award,
   DollarSign,
@@ -923,10 +924,10 @@ export function MyBonusesTab() {
 
                     <div className="text-right flex-shrink-0">
                       <div className={`text-2xl font-bold ${tb.status === 'denied' ? 'text-red-400 line-through' : 'text-green-600'}`}>
-                        ${finalAmount.toFixed(2)}
+                        {formatCurrency(finalAmount)}
                       </div>
                       {tb.adjusted_amount !== null && tb.adjusted_amount !== tb.bonus_amount && (
-                        <div className="text-xs text-gray-400 line-through">${tb.bonus_amount.toFixed(2)}</div>
+                        <div className="text-xs text-gray-400 line-through">{formatCurrency(tb.bonus_amount)}</div>
                       )}
                     </div>
                   </div>

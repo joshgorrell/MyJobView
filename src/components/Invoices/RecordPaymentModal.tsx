@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, DollarSign, Mail, FileText, Check, CreditCard, Banknote, Building2, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 
 interface RecordPaymentModalProps {
   invoice: {
@@ -129,7 +130,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
 
     try {
       const paymentNotes = convenienceFee > 0
-        ? `${notes ? notes + '\n\n' : ''}${ccFeeLabel}: $${convenienceFee.toFixed(2)}`
+        ? `${notes ? notes + '\n\n' : ''}${ccFeeLabel}: ${formatCurrency(convenienceFee)}`
         : notes || null;
 
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'ach') && paymentProcessor;
@@ -223,17 +224,17 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Invoice Total</span>
-                <span className="font-semibold text-gray-900">${invoice.total.toFixed(2)}</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(invoice.total)}</span>
               </div>
               {invoice.amount_paid > 0 && (
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-gray-600">Previously Paid</span>
-                  <span className="font-semibold text-green-600">${invoice.amount_paid.toFixed(2)}</span>
+                  <span className="font-semibold text-green-600">{formatCurrency(invoice.amount_paid)}</span>
                 </div>
               )}
               <div className="flex justify-between items-center pt-2.5 border-t border-blue-200">
                 <span className="text-sm font-semibold text-gray-900">Amount Due</span>
-                <span className="text-xl font-bold text-red-600">${invoice.amount_due.toFixed(2)}</span>
+                <span className="text-xl font-bold text-red-600">{formatCurrency(invoice.amount_due)}</span>
               </div>
             </div>
 
@@ -263,7 +264,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
                   onClick={() => setAmount(invoice.amount_due.toFixed(2))}
                   className="w-full py-2.5 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 rounded-xl text-sm font-semibold text-white transition-colors touch-manipulation"
                 >
-                  Full Amount — ${invoice.amount_due.toFixed(2)}
+                  Full Amount — {formatCurrency(invoice.amount_due)}
                 </button>
               </div>
             </div>
@@ -319,15 +320,15 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
                 <p className="font-semibold text-amber-900">{ccFeeLabel}</p>
                 <div className="flex justify-between text-amber-800">
                   <span>Payment Amount</span>
-                  <span>${parseFloat(amount).toFixed(2)}</span>
+                  <span>{formatCurrency(parseFloat(amount))}</span>
                 </div>
                 <div className="flex justify-between text-amber-800">
                   <span>Fee ({ccFeeType === 'percentage' ? `${(ccFeePercentage * 100).toFixed(2)}%` : 'Flat'})</span>
-                  <span>${convenienceFee.toFixed(2)}</span>
+                  <span>{formatCurrency(convenienceFee)}</span>
                 </div>
                 <div className="flex justify-between font-bold pt-2 border-t border-amber-300 text-amber-900 text-base">
                   <span>Total to Charge</span>
-                  <span>${totalWithFee.toFixed(2)}</span>
+                  <span>{formatCurrency(totalWithFee)}</span>
                 </div>
               </div>
             )}
@@ -460,7 +461,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
               {loading
                 ? 'Recording...'
                 : convenienceFee > 0
-                  ? `Charge $${totalWithFee.toFixed(2)}`
+                  ? `Charge ${formatCurrency(totalWithFee)}`
                   : 'Record Payment'
               }
             </button>

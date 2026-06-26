@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { Plus, GripVertical, Settings, Grid3x3, Calculator, X, RotateCcw, XCircle, AlertTriangle } from 'lucide-react';
 import ProposalGridRow from './ProposalGridRow';
@@ -526,11 +527,11 @@ export default function ProposalBuilderPro({ proposalId, onSave, changeOrderId, 
         <div className="flex flex-wrap items-center gap-3 sm:gap-5">
           <div>
             <span className="text-gray-400">Cost: </span>
-            <span className="font-semibold">${totalCost.toFixed(2)}</span>
+            <span className="font-semibold">{formatCurrency(totalCost)}</span>
           </div>
           <div>
             <span className="text-gray-400">Price: </span>
-            <span className="font-semibold">${totalPrice.toFixed(2)}</span>
+            <span className="font-semibold">{formatCurrency(totalPrice)}</span>
           </div>
           <div>
             <span className="text-gray-400">Margin: </span>

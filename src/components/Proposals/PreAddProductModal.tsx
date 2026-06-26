@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { Product } from '../../lib/types';
 import { X, Save } from 'lucide-react';
 
@@ -225,7 +226,7 @@ export default function PreAddProductModal({ product, targetRoomCount, onClose, 
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Per Area:</span>
-              <span className="font-semibold text-gray-900">${lineTotal.toFixed(2)}</span>
+              <span className="font-semibold text-gray-900">{formatCurrency(lineTotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Number of Areas:</span>
@@ -233,7 +234,7 @@ export default function PreAddProductModal({ product, targetRoomCount, onClose, 
             </div>
             <div className="border-t border-gray-300 pt-2 flex justify-between">
               <span className="font-semibold text-gray-900">Grand Total:</span>
-              <span className="text-2xl font-bold text-blue-600">${grandTotal.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-blue-600">{formatCurrency(grandTotal)}</span>
             </div>
           </div>
         </div>

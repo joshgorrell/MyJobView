@@ -1,3 +1,8 @@
+export function formatCurrency(amount: number | null | undefined): string {
+  if (amount == null) return '$0.00';
+  return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function formatDistanceToNow(date: string): string {
   const now = new Date();
   const past = new Date(date);

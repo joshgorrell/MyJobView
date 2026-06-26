@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { X, Search, Plus, User, Briefcase, Users, MapPin, AlertTriangle, Bell, Mail, MessageSquare, Link, Calendar, PhoneCall, LayoutGrid, ExternalLink, Package, ChevronDown, ChevronUp, ClipboardList, Phone, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
@@ -2100,7 +2101,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
                             {product.sku && <p className="text-xs text-gray-500">SKU: {product.sku}</p>}
                           </div>
                           {product.unit_price != null && (
-                            <span className="text-sm text-gray-600 flex-shrink-0">${product.unit_price.toFixed(2)}</span>
+                            <span className="text-sm text-gray-600 flex-shrink-0">{formatCurrency(product.unit_price)}</span>
                           )}
                         </button>
                       ))}

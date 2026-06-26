@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Search, Building2, User, DollarSign, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 
 interface CustomerOption {
   id: string;
@@ -209,7 +210,7 @@ export function SelectCustomerModal({ onSelect, onClose }: SelectCustomerModalPr
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-semibold text-gray-900 truncate">{customer.display_name}</span>
                       {customer.total_outstanding > 0 && (
-                        <span className="text-sm font-bold text-red-600 shrink-0">${customer.total_outstanding.toFixed(2)}</span>
+                        <span className="text-sm font-bold text-red-600 shrink-0">{formatCurrency(customer.total_outstanding)}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5">

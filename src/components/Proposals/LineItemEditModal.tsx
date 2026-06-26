@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 import { ProposalLineItem, Product, ProposalRoom } from '../../lib/types';
-import { X, Save, Plus, RefreshCw, Replace, Package, DollarSign, Box, TrendingUp, Wrench, Tag, ImageIcon, Edit, Check, Copy, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { X, Save, Plus, RefreshCw, Replace, Package, DollarSign, Box, TrendingUp, Wrench, Tag, Image as ImageIcon, CreditCard as Edit, Check, Copy, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import ProductSelector from './ProductSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProductDetailModal } from '../Products/ProductDetailModal';
@@ -765,11 +766,11 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Material</p>
-                    <p className="text-lg font-bold text-gray-900">${lineTotal.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(lineTotal)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Labor</p>
-                    <p className="text-lg font-bold text-gray-900">${laborTotal.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(laborTotal)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Profit</p>

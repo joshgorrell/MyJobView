@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, DollarSign, Mail, FileText, Check, CreditCard, Banknote, Building2, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
 
 interface OpenInvoice {
   id: string;
@@ -178,7 +179,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
 
     try {
       const paymentNotes = convenienceFee > 0
-        ? `${notes ? notes + '\n\n' : ''}${ccFeeLabel}: $${convenienceFee.toFixed(2)}`
+        ? `${notes ? notes + '\n\n' : ''}${ccFeeLabel}: ${formatCurrency(convenienceFee)}`
         : notes || null;
 
       const insertedPaymentIds: string[] = [];
@@ -315,7 +316,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Total Outstanding</p>
-                  <p className="text-2xl font-bold text-blue-900">${totalOutstanding.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-blue-900">{formatCurrency(totalOutstanding)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Open Invoices</p>
@@ -347,7 +348,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                   onClick={handleFillAll}
                   className="mt-2.5 w-full py-2.5 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 rounded-xl text-sm font-semibold text-white transition-colors touch-manipulation"
                 >
-                  Pay All Open — ${totalOutstanding.toFixed(2)}
+                  Pay All Open — {formatCurrency(totalOutstanding)}
                 </button>
               </div>
 
@@ -357,15 +358,15 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                   <p className="font-semibold text-amber-900">{ccFeeLabel}</p>
                   <div className="flex justify-between text-amber-800">
                     <span>Payment Amount</span>
-                    <span>${totalEntered.toFixed(2)}</span>
+                    <span>{formatCurrency(totalEntered)}</span>
                   </div>
                   <div className="flex justify-between text-amber-800">
                     <span>Fee ({ccFeeType === 'percentage' ? `${(ccFeePercentage * 100).toFixed(2)}%` : 'Flat'})</span>
-                    <span>${convenienceFee.toFixed(2)}</span>
+                    <span>{formatCurrency(convenienceFee)}</span>
                   </div>
                   <div className="flex justify-between font-bold pt-1.5 border-t border-amber-300 text-amber-900 text-base">
                     <span>Total to Charge</span>
-                    <span>${(totalEntered + convenienceFee).toFixed(2)}</span>
+                    <span>{formatCurrency(totalEntered + convenienceFee)}</span>
                   </div>
                 </div>
               )}
@@ -487,7 +488,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                                 <span className="text-sm font-semibold text-gray-900">#{row.invoice_number}</span>
                                 <span className="ml-2 text-xs text-gray-400">{new Date(row.invoice_date).toLocaleDateString()}</span>
                               </div>
-                              <span className="text-xs font-semibold text-gray-700">${row.amount_due.toFixed(2)} due</span>
+                              <span className="text-xs font-semibold text-gray-700">{formatCurrency(row.amount_due)} due</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="relative flex-1">
@@ -513,11 +514,11 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                             </div>
                             {overAllocated && (
                               <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> Exceeds amount due by ${(alloc - row.amount_due).toFixed(2)}
+                                <AlertCircle className="w-3 h-3" /> Exceeds amount due by {formatCurrency(alloc - row.amount_due)}
                               </p>
                             )}
                             {alloc > 0 && !overAllocated && (
-                              <p className="text-xs text-gray-500">Balance after: <span className={`font-semibold ${newBalance <= 0 ? 'text-green-600' : 'text-gray-700'}`}>${newBalance.toFixed(2)}</span></p>
+                              <p className="text-xs text-gray-500">Balance after: <span className={`font-semibold ${newBalance <= 0 ? 'text-green-600' : 'text-gray-700'}`}>{formatCurrency(newBalance)}</span></p>
                             )}
                           </div>
 
@@ -528,7 +529,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                               <div className="text-xs text-gray-400 mt-0.5">{new Date(row.invoice_date).toLocaleDateString()}{row.due_date ? ` · Due ${new Date(row.due_date).toLocaleDateString()}` : ''}</div>
                             </div>
                             <div className="text-right pr-4">
-                              <span className="text-sm font-semibold text-gray-700">${row.amount_due.toFixed(2)}</span>
+                              <span className="text-sm font-semibold text-gray-700">{formatCurrency(row.amount_due)}</span>
                             </div>
                             <div className="pr-4">
                               <div className="flex items-center gap-1.5">
@@ -555,13 +556,13 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                               </div>
                               {overAllocated && (
                                 <p className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" /> Over by ${(alloc - row.amount_due).toFixed(2)}
+                                  <AlertCircle className="w-3 h-3" /> Over by {formatCurrency(alloc - row.amount_due)}
                                 </p>
                               )}
                             </div>
                             <div className="text-right">
                               <span className={`text-sm font-semibold ${newBalance <= 0 && alloc > 0 ? 'text-green-600' : 'text-gray-700'}`}>
-                                {alloc > 0 ? `$${newBalance.toFixed(2)}` : '—'}
+                                {alloc > 0 ? formatCurrency(newBalance) : '—'}
                               </span>
                               {newBalance <= 0 && alloc > 0 && (
                                 <div className="text-xs text-green-600 font-medium">Paid in full</div>
@@ -639,16 +640,16 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
             <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 grid grid-cols-3 gap-2 text-center">
               <div>
                 <div className="text-xs text-gray-400 font-medium">Entered</div>
-                <div className="text-sm font-bold text-gray-900">${totalEntered.toFixed(2)}</div>
+                <div className="text-sm font-bold text-gray-900">{formatCurrency(totalEntered)}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-400 font-medium">Allocated</div>
-                <div className={`text-sm font-bold ${allocationExceedsTotal ? 'text-red-600' : 'text-gray-900'}`}>${totalAllocated.toFixed(2)}</div>
+                <div className={`text-sm font-bold ${allocationExceedsTotal ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(totalAllocated)}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-400 font-medium">Unallocated</div>
                 <div className={`text-sm font-bold ${remaining < -0.005 ? 'text-red-600' : remaining > 0.005 ? 'text-amber-600' : 'text-green-600'}`}>
-                  ${Math.abs(remaining).toFixed(2)}{remaining < -0.005 ? ' over' : remaining > 0.005 ? ' left' : ''}
+                  {formatCurrency(Math.abs(remaining))}{remaining < -0.005 ? ' over' : remaining > 0.005 ? ' left' : ''}
                 </div>
               </div>
             </div>
@@ -678,7 +679,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                 >
                   {submitting
                     ? 'Saving...'
-                    : `Record $${totalAllocated.toFixed(2)}`
+                    : `Record ${formatCurrency(totalAllocated)}`
                   }
                 </button>
               </div>

@@ -3,7 +3,7 @@ import { ArrowLeft, Mail, Phone, Building2, Tag, Calendar, User, TrendingUp, Cre
 import { supabase } from '../../lib/supabase';
 import { Contact, ContactTag, Profile, CompanyOffice, Task, DiscussionPost } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatPhoneNumber } from '../../lib/utils';
+import { formatPhoneNumber, formatCurrency } from '../../lib/utils';
 import { offlineSupabaseUpdate, offlineSupabaseDelete, offlineSupabaseInsert } from '../../lib/offlineSupport';
 import { lookupTaxRateByZip } from '../../lib/taxCalculations';
 import { ContactHistory } from './ContactHistory';
@@ -2101,7 +2101,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                           <>
                             <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 mb-2">
                               <span className="text-xs font-medium text-amber-800">Total Balance Due</span>
-                              <span className="text-sm font-bold text-amber-900">${totalBalance.toFixed(2)}</span>
+                              <span className="text-sm font-bold text-amber-900">{formatCurrency(totalBalance)}</span>
                             </div>
                             {openInvoices.map(inv => {
                               const balance = inv.total - (inv.amount_paid || 0);
@@ -2135,7 +2135,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                                    <span className="text-sm font-semibold text-gray-900">${balance.toFixed(2)}</span>
+                                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(balance)}</span>
                                     <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
                                   </div>
                                 </button>
