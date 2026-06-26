@@ -405,9 +405,9 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
           {moduleSettings.portal_sales_orders_enabled && (
             <DashboardTile
               icon={<CheckSquare className="w-5 h-5" />}
-              title="Sales Orders"
+              title="Projects"
               count={stats.activeSalesOrders}
-              description="Approved proposals and confirmed projects"
+              description="Your approved proposals & active projects"
               color="teal"
               onClick={() => setCurrentView('sales-orders')}
             />
@@ -466,27 +466,6 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
               color="navy"
               onClick={() => setCurrentView('vip')}
             />
-          )}
-
-          {!hasVipMembership && !trialAccess && (
-            <button
-              onClick={() => { window.location.href = '/portal/vip-membership'; }}
-              className="group bg-gradient-to-br from-[#0f2347] to-[#1a3a6e] rounded-2xl p-5 sm:p-6 text-left shadow-sm hover:shadow-lg transition-all border border-[#1a3a6e] cursor-pointer"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center">
-                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                </div>
-                <ChevronRight className="w-5 h-5 text-blue-300 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-              <div className="text-white font-bold text-base mb-1">Upgrade to VIP</div>
-              <div className="text-blue-200 text-sm leading-relaxed">
-                Priority scheduling, punchlist access, and regular maintenance
-              </div>
-              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded-full">
-                <span className="text-yellow-300 text-xs font-semibold">Learn More</span>
-              </div>
-            </button>
           )}
 
           {moduleSettings.portal_tasks_enabled && (
@@ -555,20 +534,21 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
               </div>
             </div>
           ) : !trialAccess ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Star className="w-5 h-5 text-gray-400" />
+            <div className="relative overflow-hidden bg-gradient-to-br from-[#0f2347] to-[#1a3a6e] rounded-2xl p-6 sm:p-7 shadow-lg border border-[#1a3a6e]">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+              <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                <div className="w-12 h-12 bg-yellow-400/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-base font-semibold text-gray-900 mb-0.5">No VIP Membership</div>
-                  <p className="text-sm text-gray-500">Join our VIP program for priority scheduling, punchlist access, and regular maintenance visits.</p>
+                  <div className="text-white font-bold text-base mb-1">Upgrade to VIP Membership</div>
+                  <p className="text-blue-200 text-sm leading-relaxed">Priority scheduling, unlimited punchlist access, regular maintenance visits, and dedicated support — all for one flat rate.</p>
                 </div>
                 <a
                   href="/portal/vip-membership"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-[#0f2347] hover:bg-[#1a3a6e] text-white rounded-xl transition-colors flex-shrink-0"
+                  className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-white font-bold rounded-xl transition-colors shadow text-sm"
                 >
-                  Join VIP
+                  View Plans
                   <ChevronRight className="w-4 h-4" />
                 </a>
               </div>
