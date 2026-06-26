@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Calendar, Clock, Building2, Mail, Phone, ChevronRight } from 'lucide-react';
+import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Calendar, Clock, Building2, Mail, Phone, ChevronRight, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Contact, ContactTag, Profile, CompanyOffice } from '../../lib/types';
 import { ContactForm } from './ContactForm';
