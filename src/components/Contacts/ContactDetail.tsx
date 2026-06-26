@@ -145,6 +145,8 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [lookingUpTaxRate, setLookingUpTaxRate] = useState(false);
   const [taxJurisdictionName, setTaxJurisdictionName] = useState<string>('');
+  const [openInvoices, setOpenInvoices] = useState<{ id: string; invoice_number: string; status: string; total: number; amount_paid: number; due_date: string | null; invoice_type: string }[]>([]);
+  const [openInvoicesLoading, setOpenInvoicesLoading] = useState(false);
   const editingRef = useRef(false);
 
   useEffect(() => {
@@ -219,6 +221,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
     loadPunchlistAccess();
     loadCompetitorRelationships();
     loadAppointments();
+    loadOpenInvoices();
     if (activeTab === 'photos') {
       loadJobPhotos();
     }
@@ -262,6 +265,18 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
       if (officeData) setContactOffice(officeData);
     }
+  }
+
+  async function loadOpenInvoices() {
+    setOpenInvoicesLoading(true);
+    const { data } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, status, total, amount_paid, due_date, invoice_type')
+      .eq('contact_id', contact.id)
+      .in('status', ['sent', 'partial', 'overdue'])
+      .order('due_date', { ascending: true });
+    setOpenInvoices(data || []);
+    setOpenInvoicesLoading(false);
   }
 
   async function loadOffices() {
@@ -1275,13 +1290,6 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                     <span className="truncate">Invoice</span>
                   </button>
                   <button
-                    onClick={() => setShowApplyPayment(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-green-300 text-green-700 bg-green-50 rounded-md hover:bg-green-100 hover:border-green-400 transition-colors touch-manipulation"
-                  >
-                    <DollarSign className="w-3.5 h-3.5" />
-                    <span className="truncate">Payment</span>
-                  </button>
-                  <button
                     onClick={() => setShowCreateWorkOrder(true)}
                     className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
                   >
@@ -2067,6 +2075,78 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                     </div>
                   </div>
                 )}
+                {/* Open Invoices */}
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">Open Invoices</p>
+                    {openInvoices.length > 0 && (
+                      <button
+                        onClick={() => setShowApplyPayment(true)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 transition-colors"
+                      >
+                        <DollarSign className="w-3 h-3" />
+                        Apply Payment
+                      </button>
+                    )}
+                  </div>
+                  {openInvoicesLoading ? (
+                    <p className="text-xs text-gray-400">Loading...</p>
+                  ) : openInvoices.length === 0 ? (
+                    <p className="text-xs text-gray-500">No outstanding balance</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {(() => {
+                        const totalBalance = openInvoices.reduce((sum, inv) => sum + (inv.total - (inv.amount_paid || 0)), 0);
+                        return (
+                          <>
+                            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 mb-2">
+                              <span className="text-xs font-medium text-amber-800">Total Balance Due</span>
+                              <span className="text-sm font-bold text-amber-900">${totalBalance.toFixed(2)}</span>
+                            </div>
+                            {openInvoices.map(inv => {
+                              const balance = inv.total - (inv.amount_paid || 0);
+                              const isOverdue = inv.status === 'overdue' || (inv.due_date && new Date(inv.due_date) < new Date());
+                              return (
+                                <button
+                                  key={inv.id}
+                                  onClick={() => setViewingInvoiceId(inv.id)}
+                                  className="w-full text-left flex items-center justify-between px-2.5 py-2 bg-white border border-gray-200 rounded hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-medium text-gray-900">{inv.invoice_number}</span>
+                                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                                        inv.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                                        inv.status === 'partial' ? 'bg-amber-100 text-amber-700' :
+                                        'bg-blue-100 text-blue-700'
+                                      }`}>
+                                        {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
+                                      </span>
+                                      {isOverdue && inv.status !== 'overdue' && (
+                                        <span className="inline-flex items-center gap-0.5 text-xs text-red-600">
+                                          <AlertCircle className="w-3 h-3" /> Overdue
+                                        </span>
+                                      )}
+                                    </div>
+                                    {inv.due_date && (
+                                      <p className="text-xs text-gray-500 mt-0.5">
+                                        Due {new Date(inv.due_date).toLocaleDateString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                    <span className="text-sm font-semibold text-gray-900">${balance.toFixed(2)}</span>
+                                    <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
               </>
             )}
             </div>
@@ -3058,7 +3138,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
           contactId={contact.id}
           contactName={(contact as any).contact_name || `${(contact as any).first_name || ''} ${(contact as any).last_name || ''}`.trim() || 'Customer'}
           onClose={() => setShowApplyPayment(false)}
-          onSuccess={() => setShowApplyPayment(false)}
+          onSuccess={() => { setShowApplyPayment(false); loadOpenInvoices(); }}
         />
       )}
 
