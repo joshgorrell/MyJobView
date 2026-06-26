@@ -28,7 +28,7 @@ const METHOD_OPTIONS = [
   { value: 'cash', label: 'Cash', icon: Banknote },
   { value: 'check', label: 'Check', icon: FileText },
   { value: 'credit_card', label: 'Credit Card', icon: CreditCard },
-  { value: 'ach', label: 'ACH / Bank Transfer', icon: Building2 },
+  { value: 'bank_transfer', label: 'ACH / Bank Transfer', icon: Building2 },
 ];
 
 export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSuccess }: ApplyBulkPaymentModalProps) {
@@ -166,7 +166,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   });
 
   const allocationExceedsTotal = totalAllocated > totalEntered + 0.005;
-  const canSubmit = totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting;
+  const canSubmit = totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -182,7 +182,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
         : notes || null;
 
       const insertedPaymentIds: string[] = [];
-      const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'ach') && paymentProcessor;
+      const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && paymentProcessor;
 
       for (const row of rows) {
         const alloc = parseFloat(row.allocation);
@@ -410,7 +410,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
               </div>
 
               {/* Processor info note for CC/ACH */}
-              {(paymentMethod === 'credit_card' || paymentMethod === 'ach') && (
+              {(paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && (
                 <div className={`flex items-start gap-2.5 p-3 rounded-xl text-sm ${
                   paymentProcessor
                     ? 'bg-blue-50 border border-blue-200 text-blue-800'
@@ -440,15 +440,21 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-800 mb-2">
-                    Reference #
-                    <span className="text-gray-400 font-normal ml-1 text-xs">optional</span>
+                    {paymentMethod === 'check' ? (
+                      <>Check # <span className="text-red-500">*</span></>
+                    ) : (
+                      <>Reference # <span className="text-gray-400 font-normal ml-1 text-xs">optional</span></>
+                    )}
                   </label>
                   <input
                     type="text"
                     value={referenceNumber}
                     onChange={e => setReferenceNumber(e.target.value)}
-                    placeholder="Check #, transaction ID"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm touch-manipulation"
+                    required={paymentMethod === 'check'}
+                    placeholder={paymentMethod === 'check' ? 'Enter check number' : 'Transaction ID, etc.'}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm touch-manipulation ${
+                      paymentMethod === 'check' ? 'border-gray-400 font-semibold' : 'border-gray-300'
+                    }`}
                   />
                 </div>
               </div>
