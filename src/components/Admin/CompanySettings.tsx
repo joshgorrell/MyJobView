@@ -1149,9 +1149,9 @@ export function CompanySettings() {
             />
             <div className="flex-1">
               <label htmlFor="portal-sales-orders" className="font-medium text-gray-900 cursor-pointer">
-                Sales Orders
+                Projects
               </label>
-              <p className="text-sm text-gray-600">Allow customers to view their approved proposals (sales orders)</p>
+              <p className="text-sm text-gray-600">Allow customers to view their approved projects</p>
             </div>
           </div>
 

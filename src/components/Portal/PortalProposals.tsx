@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, CheckCircle, Clock, XCircle, ChevronRight, ArrowLeft } from 'lucide-react';
+import { FileText, CheckCircle, Clock, XCircle, ChevronRight, ArrowLeft, Send, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PortalProposalDetail } from './PortalProposalDetail';
 
@@ -15,8 +15,23 @@ interface Proposal {
   renewal_count: number;
 }
 
+interface RenewalModalProps {
+  proposal: Proposal;
+  contactId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
 interface PortalProposalsProps {
   isEmbedded?: boolean;
+}
+
+function isProposalExpired(proposal: Proposal): boolean {
+  if (proposal.status === 'expired') return true;
+  if (proposal.expires_at) {
+    return new Date(proposal.expires_at) < new Date();
+  }
+  return false;
 }
 
 export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {}) {
@@ -25,6 +40,9 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
   const [selectedProposal, setSelectedProposal] = useState<string | null>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
   const [impersonatingName, setImpersonatingName] = useState<string | null>(null);
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [renewalTarget, setRenewalTarget] = useState<Proposal | null>(null);
+  const [renewalSuccess, setRenewalSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     loadProposals();
@@ -90,6 +108,8 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
 
       if (!targetContactId) return;
 
+      setContactId(targetContactId);
+
       await supabase.rpc('update_contact_portal_access', { p_contact_id: targetContactId });
 
       const { data, error } = await supabase
@@ -97,7 +117,7 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
         .select('id, proposal_number, title, status, total, created_at, valid_until, expires_at, renewal_count')
         .eq('contact_id', targetContactId)
         .eq('is_portal_visible', true)
-        .in('status', ['sent', 'viewed'])
+        .in('status', ['sent', 'viewed', 'expired'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -132,6 +152,123 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
     );
   }
 
+  const activeProposals = proposals.filter(p => !isProposalExpired(p));
+  const expiredProposals = proposals.filter(p => isProposalExpired(p));
+
+  const renderProposalCard = (proposal: Proposal) => {
+    const expired = isProposalExpired(proposal);
+
+    const accentColors: Record<string, string> = {
+      draft: 'bg-gray-400',
+      sent: 'bg-blue-500',
+      viewed: 'bg-cyan-500',
+      approved: 'bg-green-500',
+      declined: 'bg-red-500',
+      expired: 'bg-gray-300',
+    };
+    const accent = expired ? 'bg-gray-300' : (accentColors[proposal.status] || 'bg-gray-400');
+
+    if (expired) {
+      return (
+        <div
+          key={proposal.id}
+          className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden opacity-60 relative"
+        >
+          <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
+          <div className="p-6 pl-7">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h3 className="text-lg font-semibold text-gray-500">
+                    {proposal.proposal_number}
+                  </h3>
+                  <StatusBadge status="expired" />
+                </div>
+                <p className="text-gray-400 mb-3">{proposal.title}</p>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
+                  <span>Created: {new Date(proposal.created_at).toLocaleDateString()}</span>
+                  {proposal.expires_at && (
+                    <ExpirationBadge expiresAt={proposal.expires_at} renewalCount={proposal.renewal_count} />
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between sm:justify-end gap-4 flex-shrink-0">
+                <div className="text-left sm:text-right">
+                  <p className="text-sm text-gray-400">Total</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-400">
+                    ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              {renewalSuccess === proposal.id ? (
+                <p className="text-sm text-green-600 font-medium">
+                  Your renewal request has been sent. We'll be in touch soon.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  This proposal has expired.{' '}
+                  <button
+                    onClick={() => setRenewalTarget(proposal)}
+                    className="text-blue-600 hover:text-blue-700 underline font-medium"
+                  >
+                    Click here if you'd like us to renew this proposal for you.
+                  </button>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={proposal.id}
+        className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative"
+      >
+        <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
+        <div className="p-6 pl-7">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {proposal.proposal_number}
+                </h3>
+                <StatusBadge status={proposal.status} />
+              </div>
+              <p className="text-gray-600 mb-3">{proposal.title}</p>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                <span>Created: {new Date(proposal.created_at).toLocaleDateString()}</span>
+                {proposal.expires_at && (
+                  <ExpirationBadge expiresAt={proposal.expires_at} renewalCount={proposal.renewal_count} />
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between sm:justify-end gap-4 flex-shrink-0">
+              <div className="text-left sm:text-right">
+                <p className="text-sm text-gray-500">Total</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                  ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedProposal(proposal.id);
+                  window.history.pushState({}, '', `/portal/proposals/${proposal.id}`);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <ChevronRight className="w-6 h-6 text-gray-600" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const content = (
     <>
       {proposals.length === 0 ? (
@@ -143,63 +280,35 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {proposals.map((proposal) => {
-            const accentColors: Record<string, string> = {
-              draft: 'bg-gray-400',
-              sent: 'bg-blue-500',
-              viewed: 'bg-cyan-500',
-              approved: 'bg-green-500',
-              declined: 'bg-red-500',
-              expired: 'bg-gray-400',
-            };
-            const accent = accentColors[proposal.status] || 'bg-gray-400';
-            return (
-              <div
-                key={proposal.id}
-                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative"
-              >
-                <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
-                <div className="p-6 pl-7">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {proposal.proposal_number}
-                        </h3>
-                        <StatusBadge status={proposal.status} />
-                      </div>
-                      <p className="text-gray-600 mb-3">{proposal.title}</p>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                        <span>Created: {new Date(proposal.created_at).toLocaleDateString()}</span>
-                        {proposal.expires_at && (
-                          <ExpirationBadge expiresAt={proposal.expires_at} renewalCount={proposal.renewal_count} />
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-4 flex-shrink-0">
-                      <div className="text-left sm:text-right">
-                        <p className="text-sm text-gray-500">Total</p>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                          ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSelectedProposal(proposal.id);
-                          window.history.pushState({}, '', `/portal/proposals/${proposal.id}`);
-                        }}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                      >
-                        <ChevronRight className="w-6 h-6 text-gray-600" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="space-y-6">
+          {activeProposals.length > 0 && (
+            <div className="space-y-4">
+              {expiredProposals.length > 0 && (
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Active</h3>
+              )}
+              {activeProposals.map(renderProposalCard)}
+            </div>
+          )}
+
+          {expiredProposals.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Expired</h3>
+              {expiredProposals.map(renderProposalCard)}
+            </div>
+          )}
         </div>
+      )}
+
+      {renewalTarget && contactId && (
+        <RenewalModal
+          proposal={renewalTarget}
+          contactId={contactId}
+          onClose={() => setRenewalTarget(null)}
+          onSuccess={() => {
+            setRenewalSuccess(renewalTarget.id);
+            setRenewalTarget(null);
+          }}
+        />
       )}
     </>
   );
@@ -253,6 +362,129 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
   );
 }
 
+function RenewalModal({ proposal, contactId, onClose, onSuccess }: RenewalModalProps) {
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSend() {
+    if (!message.trim()) {
+      setError('Please enter a message before sending.');
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const authorId = user?.id || contactId;
+
+      const { data: thread, error: threadError } = await supabase
+        .from('message_threads')
+        .insert({
+          contact_id: contactId,
+          context_type: 'proposal',
+          context_id: proposal.id,
+          subject: `Renewal Request: ${proposal.proposal_number}`,
+          visibility: 'internal',
+          last_message_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (threadError) throw threadError;
+
+      const { error: msgError } = await supabase
+        .from('messages')
+        .insert({
+          thread_id: thread.id,
+          author_id: authorId,
+          author_name: 'Customer',
+          author_type: 'customer',
+          body: message.trim(),
+        });
+
+      if (msgError) throw msgError;
+
+      onSuccess();
+    } catch (err) {
+      console.error('Error sending renewal request:', err);
+      setError('Failed to send your request. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Request Proposal Renewal</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{proposal.proposal_number} — {proposal.title}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-600">
+            Let us know if there's anything specific you'd like updated, or just send a quick note — we'll get back to you shortly.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Message to your representative
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="e.g. I'd like to move forward with this — can you refresh the pricing and extend the validity?"
+              rows={4}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600">{error}</p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 pb-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending || !message.trim()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            {sending ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Send Request
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const configs = {
     draft: {
@@ -283,7 +515,7 @@ function StatusBadge({ status }: { status: string }) {
     expired: {
       icon: <XCircle className="w-4 h-4" />,
       label: 'Expired',
-      className: 'bg-gray-100 text-gray-700',
+      className: 'bg-gray-100 text-gray-600',
     },
   };
 
@@ -318,7 +550,7 @@ function ExpirationBadge({ expiresAt, renewalCount }: { expiresAt: string; renew
     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${colorClass} text-xs font-medium`}>
       <Clock className="w-3 h-3" />
       {daysUntilExpiration} day{daysUntilExpiration !== 1 ? 's' : ''} remaining
-      {renewalCount > 0 && ` (Renewed ${renewalCount}×)`}
+      {renewalCount > 0 && ` (Renewed ${renewalCount}x)`}
     </span>
   );
 }

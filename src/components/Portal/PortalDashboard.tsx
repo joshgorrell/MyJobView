@@ -77,14 +77,14 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [portalAccessLevel, setPortalAccessLevel] = useState<string | null>(null);
   const [moduleSettings, setModuleSettings] = useState<PortalModuleSettings>({
-    portal_proposals_enabled: true,
+    portal_proposals_enabled: false,
     portal_projects_enabled: false,
     portal_appointments_enabled: false,
     portal_invoices_enabled: false,
     portal_messages_enabled: false,
     portal_vip_services_enabled: false,
     portal_tasks_enabled: true,
-    portal_sales_orders_enabled: true,
+    portal_sales_orders_enabled: false,
   });
 
   useEffect(() => {
@@ -407,7 +407,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
               icon={<CheckSquare className="w-5 h-5" />}
               title="Projects"
               count={stats.activeSalesOrders}
-              description="Your approved proposals & active projects"
+              description="Your approved Projects"
               color="teal"
               onClick={() => setCurrentView('sales-orders')}
             />
