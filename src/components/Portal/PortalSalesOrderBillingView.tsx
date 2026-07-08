@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, CheckCircle, Clock, AlertCircle, CreditCard, FileText, ExternalLink } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, AlertCircle, CreditCard, FileText, ExternalLink, Phone, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 
@@ -13,6 +13,11 @@ interface BillingInvoice {
   amount_paid: number;
   amount_due: number;
   qbo_invoice_id: string | null;
+}
+
+interface CompanyContact {
+  phone: string | null;
+  email: string | null;
 }
 
 interface PortalSalesOrderBillingViewProps {
@@ -64,6 +69,7 @@ function InvoiceStatusBadge({ status }: { status: string }) {
 export function PortalSalesOrderBillingView({ salesOrderId, contractTotal }: PortalSalesOrderBillingViewProps) {
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [companyContact, setCompanyContact] = useState<CompanyContact>({ phone: null, email: null });
 
   useEffect(() => {
     loadBillingData();
@@ -92,25 +98,38 @@ export function PortalSalesOrderBillingView({ salesOrderId, contractTotal }: Por
 
       if (!contactId) return;
 
-      const { data, error } = await supabase
-        .from('invoices')
-        .select(`
-          id,
-          invoice_number,
-          invoice_date,
-          due_date,
-          status,
-          total,
-          amount_paid,
-          amount_due,
-          qbo_invoice_id
-        `)
-        .eq('sales_order_id', salesOrderId)
-        .eq('contact_id', contactId)
-        .order('invoice_date', { ascending: true });
+      const [invoiceResult, settingsResult] = await Promise.all([
+        supabase
+          .from('invoices')
+          .select(`
+            id,
+            invoice_number,
+            invoice_date,
+            due_date,
+            status,
+            total,
+            amount_paid,
+            amount_due,
+            qbo_invoice_id
+          `)
+          .eq('sales_order_id', salesOrderId)
+          .eq('contact_id', contactId)
+          .order('invoice_date', { ascending: true }),
+        supabase
+          .from('company_settings')
+          .select('phone, email')
+          .maybeSingle(),
+      ]);
 
-      if (error) throw error;
-      setInvoices((data || []) as BillingInvoice[]);
+      if (invoiceResult.error) throw invoiceResult.error;
+      setInvoices((invoiceResult.data || []) as BillingInvoice[]);
+
+      if (settingsResult.data) {
+        setCompanyContact({
+          phone: (settingsResult.data as any).phone || null,
+          email: (settingsResult.data as any).email || null,
+        });
+      }
     } catch (error) {
       console.error('Error loading billing data:', error);
     } finally {
@@ -123,6 +142,8 @@ export function PortalSalesOrderBillingView({ salesOrderId, contractTotal }: Por
   const totalDue = invoices.reduce((sum, inv) => sum + inv.amount_due, 0);
   const progressPct = contractTotal > 0 ? Math.min(100, (totalPaid / contractTotal) * 100) : 0;
   const outstandingInvoices = invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'void' && inv.status !== 'draft');
+  const payableOnline = outstandingInvoices.filter(inv => inv.qbo_invoice_id);
+  const needsContact = outstandingInvoices.filter(inv => !inv.qbo_invoice_id);
 
   if (loading) {
     return (
@@ -134,6 +155,68 @@ export function PortalSalesOrderBillingView({ salesOrderId, contractTotal }: Por
 
   return (
     <div className="space-y-6">
+      {/* Top-level payment CTA */}
+      {outstandingInvoices.length > 0 && (
+        <div className={`rounded-xl border p-4 sm:p-5 ${
+          payableOnline.length > 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className={`text-base font-semibold ${payableOnline.length > 0 ? 'text-blue-900' : 'text-amber-900'}`}>
+                {outstandingInvoices.length === 1
+                  ? '1 invoice outstanding'
+                  : `${outstandingInvoices.length} invoices outstanding`}
+              </p>
+              <p className={`text-sm mt-0.5 ${payableOnline.length > 0 ? 'text-blue-700' : 'text-amber-700'}`}>
+                Total due: <span className="font-semibold">{formatCurrency(totalDue)}</span>
+              </p>
+            </div>
+            {payableOnline.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {payableOnline.map(inv => (
+                  <a
+                    key={inv.id}
+                    href={`https://app.qbo.intuit.com/app/invoice?txnId=${inv.qbo_invoice_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Pay {payableOnline.length === 1 ? 'Now' : inv.invoice_number}
+                    <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                  </a>
+                ))}
+              </div>
+            )}
+            {payableOnline.length === 0 && needsContact.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {companyContact.phone && (
+                  <a
+                    href={`tel:${companyContact.phone}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Call to Pay
+                  </a>
+                )}
+                {companyContact.email && (
+                  <a
+                    href={`mailto:${companyContact.email}?subject=Payment inquiry`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-amber-300 hover:bg-amber-50 text-amber-800 text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email Us
+                  </a>
+                )}
+                {!companyContact.phone && !companyContact.email && (
+                  <p className="text-sm text-amber-700 font-medium">Please contact us to arrange payment.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -197,7 +280,9 @@ export function PortalSalesOrderBillingView({ salesOrderId, contractTotal }: Por
               return (
                 <div
                   key={invoice.id}
-                  className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  className={`bg-white rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+                    isOverdue ? 'border-red-200' : 'border-gray-200'
+                  }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -235,7 +320,19 @@ export function PortalSalesOrderBillingView({ salesOrderId, contractTotal }: Por
                       </a>
                     )}
                     {isDue && !invoice.qbo_invoice_id && (
-                      <span className="text-xs text-gray-400 italic">Contact us to pay</span>
+                      <div className="flex items-center gap-2">
+                        {companyContact.phone ? (
+                          <a
+                            href={`tel:${companyContact.phone}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            Call to Pay
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Contact us to pay</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -244,33 +341,6 @@ export function PortalSalesOrderBillingView({ salesOrderId, contractTotal }: Por
           </div>
         )}
       </div>
-
-      {outstandingInvoices.length > 1 && outstandingInvoices.every(inv => inv.qbo_invoice_id) && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-blue-900">
-              {outstandingInvoices.length} invoices outstanding
-            </p>
-            <p className="text-xs text-blue-700 mt-0.5">
-              Total due: {formatCurrency(totalDue)}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {outstandingInvoices.map(inv => (
-              <a
-                key={inv.id}
-                href={`https://app.qbo.intuit.com/app/invoice?txnId=${inv.qbo_invoice_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
-              >
-                Pay {inv.invoice_number}
-                <ExternalLink className="w-3 h-3 opacity-70" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
