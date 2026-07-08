@@ -129,7 +129,108 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
     );
   }
 
-  // Detail view
+  // Detail view — embedded inside PortalDashboard
+  if (selectedOrder && isEmbedded) {
+    const outstandingCount = outstandingCounts[selectedOrder.id] || 0;
+
+    const tabs: { id: DetailTab; label: string; icon: React.ReactNode; badge?: number }[] = [
+      { id: 'scope', label: 'Scope of Work', icon: <Layers className="w-4 h-4" /> },
+      { id: 'billing', label: 'Billing', icon: <Receipt className="w-4 h-4" />, badge: outstandingCount },
+    ];
+
+    return (
+      <div>
+        {/* Inline order header with back button */}
+        <div className="mb-6">
+          <button
+            onClick={closeDetail}
+            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Projects
+          </button>
+
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h2 className="text-xl font-bold text-gray-900">{selectedOrder.order_number}</h2>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Approved
+                  </span>
+                  {outstandingCount > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                      <Receipt className="w-3 h-3" />
+                      {outstandingCount} invoice{outstandingCount > 1 ? 's' : ''} due
+                    </span>
+                  )}
+                </div>
+                {selectedOrder.proposal && (
+                  <p className="text-gray-600 text-sm">{selectedOrder.proposal.title}</p>
+                )}
+              </div>
+              <div className="flex-shrink-0 text-left sm:text-right">
+                <p className="text-xs text-gray-500 mb-0.5">Contract Total</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(selectedOrder.contract_total)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div className="border-b border-gray-200 mb-6">
+          <div className="flex gap-0 overflow-x-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 -mb-px ${
+                  activeTab === tab.id
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.badge && tab.badge > 0 ? (
+                  <span className="ml-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold">
+                    {tab.badge}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        {activeTab === 'scope' && selectedOrder.proposal_id ? (
+          <PortalProposalDetail
+            proposalId={selectedOrder.proposal_id}
+            onBack={closeDetail}
+            backLabel="Projects"
+            overrideDisplayNumber={selectedOrder.order_number}
+            hideExpiration={true}
+            previewMode={true}
+          />
+        ) : activeTab === 'scope' ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">No scope document is linked to this project.</p>
+          </div>
+        ) : null}
+
+        {activeTab === 'billing' && (
+          <PortalSalesOrderBillingView
+            salesOrderId={selectedOrder.id}
+            contractTotal={selectedOrder.contract_total}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Detail view — standalone (not embedded)
   if (selectedOrder) {
     const outstandingCount = outstandingCounts[selectedOrder.id] || 0;
 
