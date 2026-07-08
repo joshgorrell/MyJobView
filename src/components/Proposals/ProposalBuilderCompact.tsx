@@ -3159,7 +3159,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     };
   }
 
-  const containerClass = isCoMode ? "h-full flex flex-col bg-gray-900 overflow-y-auto" : "min-h-screen flex flex-col bg-gray-900";
+  const containerClass = isCoMode ? "h-full flex flex-col bg-gray-900 overflow-hidden" : "h-screen flex flex-col bg-gray-900 overflow-hidden";
 
   const containerStyle = {};
 
@@ -3892,7 +3892,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       )}
 
       {/* Main Content: Sidebar + Items */}
-      <div className="flex-1 flex relative pb-32 sm:pb-24" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+      <div className="flex-1 flex relative overflow-hidden">
         {/* Floating Edge Arrow (when sidebar collapsed) — desktop only */}
         {sidebarCollapsed && !isMobile && (
           <button
@@ -3906,7 +3906,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
         {/* ── DESKTOP SIDEBAR (md and up) ── */}
         {!sidebarCollapsed && !isMobile && (
-          <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col sticky top-0 self-start max-h-screen overflow-y-auto">
+          <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col overflow-y-auto flex-shrink-0">
             <div className="p-3 sm:p-4 border-b border-gray-700">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-white font-semibold text-sm sm:text-base">Areas</h2>
@@ -4339,7 +4339,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         )}
 
         {/* Line Items Area */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
             {rooms.length === 0 && unassignedItems.filter(i => isCoMode || !i.is_hidden).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <Package className="w-16 h-16 text-gray-600 mb-4" />
@@ -4347,7 +4347,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 <p className="text-gray-500 text-sm mb-4">Click "Add" in the toolbar to add your first item</p>
               </div>
             ) : (
-              <div className="overflow-x-auto flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
                 {/* Collapse/Expand All Button */}
                 <div className="bg-gray-850 border-b border-gray-700 px-3 py-2 flex items-center justify-between">
                   <div className="text-xs text-gray-400">
