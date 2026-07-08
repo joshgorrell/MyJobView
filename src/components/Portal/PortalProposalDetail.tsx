@@ -191,6 +191,8 @@ interface PortalInvoice {
 interface PortalProposalDetailProps {
   proposalId: string;
   onBack: () => void;
+  /** Label for the back button (default: "Proposals") */
+  backLabel?: string;
   /** When true, skip activity tracking and status updates (internal preview use) */
   previewMode?: boolean;
   /** Override the template used for display (internal preview use) */
@@ -201,7 +203,7 @@ interface PortalProposalDetailProps {
   overrideDisplayNumber?: string;
 }
 
-export function PortalProposalDetail({ proposalId, onBack, previewMode = false, templateOverrideId, hideExpiration = false, overrideDisplayNumber }: PortalProposalDetailProps) {
+export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMode = false, templateOverrideId, hideExpiration = false, overrideDisplayNumber }: PortalProposalDetailProps) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [rooms, setRooms] = useState<ProposalRoom[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -619,7 +621,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
           <h2 className="text-xl font-bold text-gray-900 mb-2">Proposal Not Found</h2>
           <p className="text-gray-500 mb-6">This proposal could not be loaded. It may have been removed or you may not have access.</p>
           <button onClick={onBack} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
-            Back to Proposals
+            Back to {backLabel ?? 'Proposals'}
           </button>
         </div>
       </div>
@@ -636,7 +638,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
             <div className="flex items-center h-16 sm:h-20 gap-3">
               <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px]">
                 <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline text-sm font-medium">Proposals</span>
+                <span className="hidden sm:inline text-sm font-medium">{backLabel ?? 'Proposals'}</span>
               </button>
               <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-8 sm:h-10 object-contain" />
             </div>
@@ -663,7 +665,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
               onClick={onBack}
               className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
             >
-              Back to Proposals
+              Back to {backLabel ?? 'Proposals'}
             </button>
           </div>
         </div>
@@ -685,7 +687,7 @@ export function PortalProposalDetail({ proposalId, onBack, previewMode = false, 
                 className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px] flex-shrink-0"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline text-sm font-medium">Proposals</span>
+                <span className="hidden sm:inline text-sm font-medium">{backLabel ?? 'Proposals'}</span>
               </button>
               <img
                 src="/el_logo_color_(2).png"

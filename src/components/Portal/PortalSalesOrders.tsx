@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
-import { FileText, ArrowLeft, CheckCircle, Clock, ChevronRight, DollarSign } from 'lucide-react';
+import { FileText, ArrowLeft, CheckCircle, Clock, ChevronRight, DollarSign, Layers, Receipt } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
+import { PortalProposalDetail } from './PortalProposalDetail';
+import { PortalSalesOrderBillingView } from './PortalSalesOrderBillingView';
 
 interface SalesOrder {
   id: string;
+  proposal_id: string | null;
   order_number: string;
   status: string;
   contract_total: number;
@@ -16,6 +20,8 @@ interface SalesOrder {
   } | null;
 }
 
+type DetailTab = 'scope' | 'billing';
+
 interface PortalSalesOrdersProps {
   isEmbedded?: boolean;
 }
@@ -23,6 +29,8 @@ interface PortalSalesOrdersProps {
 export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps = {}) {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
+  const [activeTab, setActiveTab] = useState<DetailTab>('scope');
 
   useEffect(() => {
     loadSalesOrders();
@@ -55,6 +63,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
         .from('sales_orders')
         .select(`
           id,
+          proposal_id,
           order_number,
           status,
           contract_total,
@@ -78,13 +87,95 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
     }
   }
 
+  function openOrder(order: SalesOrder) {
+    setSelectedOrder(order);
+    setActiveTab('scope');
+  }
+
+  function closeDetail() {
+    setSelectedOrder(null);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading sales orders...</p>
+          <p className="text-gray-600">Loading projects...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Detail view
+  if (selectedOrder) {
+    const tabs: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
+      { id: 'scope', label: 'Scope of Work', icon: <Layers className="w-4 h-4" /> },
+      { id: 'billing', label: 'Billing', icon: <Receipt className="w-4 h-4" /> },
+    ];
+
+    return (
+      <div>
+        {/* Back + tab header */}
+        <div className="mb-6">
+          <button
+            onClick={closeDetail}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Projects
+          </button>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">{selectedOrder.order_number}</h2>
+              {selectedOrder.proposal && (
+                <p className="text-sm text-gray-500 mt-0.5">{selectedOrder.proposal.title}</p>
+              )}
+            </div>
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Approved
+            </span>
+          </div>
+          <div className="flex border-b border-gray-200">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                  activeTab === tab.id
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeTab === 'scope' && selectedOrder.proposal_id ? (
+          <PortalProposalDetail
+            proposalId={selectedOrder.proposal_id}
+            onBack={closeDetail}
+            backLabel="Projects"
+            overrideDisplayNumber={selectedOrder.order_number}
+            hideExpiration={true}
+          />
+        ) : activeTab === 'scope' ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">No scope document is linked to this project.</p>
+          </div>
+        ) : null}
+
+        {activeTab === 'billing' && (
+          <PortalSalesOrderBillingView
+            salesOrderId={selectedOrder.id}
+            contractTotal={selectedOrder.contract_total}
+          />
+        )}
       </div>
     );
   }
@@ -94,7 +185,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
       {orders.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Sales Orders Yet</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Projects Yet</h3>
           <p className="text-gray-600">
             Approved proposals will appear here once your project has been confirmed.
           </p>
@@ -102,9 +193,10 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <div
+            <button
               key={order.id}
-              className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative"
+              onClick={() => openOrder(order)}
+              className="w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md hover:border-blue-200 transition-all relative group"
             >
               <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />
               <div className="p-6 pl-7">
@@ -139,9 +231,10 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
                         Contract Total
                       </p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                        ${order.contract_total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(order.contract_total)}
                       </p>
                     </div>
+                    <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
                   </div>
                 </div>
 
@@ -160,7 +253,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
                   </div>
                 )}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -171,7 +264,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
     return (
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900">My Sales Orders</h2>
+          <h2 className="text-xl font-bold text-gray-900">My Projects</h2>
           <p className="text-sm text-gray-500 mt-0.5">Approved proposals and confirmed projects</p>
         </div>
         {content}
@@ -197,7 +290,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
               className="h-8 sm:h-10 object-contain flex-shrink-0"
             />
             <div className="hidden sm:block border-l border-white/20 pl-4">
-              <p className="text-white font-semibold text-sm leading-tight">My Sales Orders</p>
+              <p className="text-white font-semibold text-sm leading-tight">My Projects</p>
               <p className="text-blue-300 text-xs">Approved proposals and confirmed projects</p>
             </div>
           </div>
