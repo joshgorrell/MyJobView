@@ -162,6 +162,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
             backLabel="Projects"
             overrideDisplayNumber={selectedOrder.order_number}
             hideExpiration={true}
+            previewMode={true}
           />
         ) : activeTab === 'scope' ? (
           <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">

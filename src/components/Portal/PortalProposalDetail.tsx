@@ -676,8 +676,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const canTakeAction = proposal.status === 'sent' || proposal.status === 'viewed';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className={previewMode ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
+      {/* Header — only shown in standalone mode */}
+      {!previewMode && (
       <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20 gap-4">
@@ -722,6 +723,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           </div>
         </div>
       </header>
+      )}
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1024,7 +1026,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Proposal Summary Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="bg-blue-100 p-2.5 rounded-xl">
                   <DollarSign className="w-6 h-6 text-blue-600" />
