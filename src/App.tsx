@@ -38,6 +38,7 @@ const RewardsDashboard = lazy(() => import('./components/Rewards/RewardsDashboar
 const DepartmentManager = lazy(() => import('./components/Admin/DepartmentManager').then(m => ({ default: m.DepartmentManager })));
 const GPSDiagnostics = lazy(() => import('./components/Admin/GPSDiagnostics').then(m => ({ default: m.GPSDiagnostics })));
 const ContactCSVImport = lazy(() => import('./components/Admin/ContactCSVImport').then(m => ({ default: m.ContactCSVImport })));
+const SecurityContractCSVImport = lazy(() => import('./components/Admin/SecurityContractCSVImport').then(m => ({ default: m.SecurityContractCSVImport })));
 const HistoricalSalesImport = lazy(() => import('./components/Admin/HistoricalSalesImport').then(m => ({ default: m.HistoricalSalesImport })));
 const TasksView = lazy(() => import('./components/Tasks/TasksView').then(m => ({ default: m.TasksView })));
 const TaskForm = lazy(() => import('./components/Tasks/TaskForm').then(m => ({ default: m.TaskForm })));
@@ -1066,6 +1067,8 @@ function AppContent() {
           {activeTab === 'gps_diagnostics' && profile.role === 'admin' && <GPSDiagnostics key={activeTab} />}
 
           {activeTab === 'contact_import' && profile.role === 'admin' && <ContactCSVImport key={activeTab} />}
+
+          {activeTab === 'contract_import' && profile.role === 'admin' && <SecurityContractCSVImport key={activeTab} />}
 
           {activeTab === 'historical_sales_import' && profile.role === 'admin' && <HistoricalSalesImport key={activeTab} />}
 
