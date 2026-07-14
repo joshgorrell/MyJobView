@@ -504,3 +504,63 @@ export interface PricingUpdateOptions {
   expires_at?: string;
   is_portal_visible?: boolean;
 }
+
+export type AgreementType = 'monitoring' | 'maintenance' | 'equipment_warranty';
+
+export type SystemType =
+  | 'security'
+  | 'surveillance'
+  | 'access_control'
+  | 'audio_video'
+  | 'automation'
+  | 'networking'
+  | 'lighting_control'
+  | 'other';
+
+export const AGREEMENT_TYPE_LABELS: Record<AgreementType, string> = {
+  monitoring: 'Monitoring Agreement',
+  maintenance: 'Maintenance Agreement',
+  equipment_warranty: 'Equipment Extended Warranty',
+};
+
+export const AGREEMENT_TYPE_COLORS: Record<AgreementType, string> = {
+  monitoring: 'blue',
+  maintenance: 'green',
+  equipment_warranty: 'amber',
+};
+
+export const SYSTEM_TYPE_LABELS: Record<SystemType, string> = {
+  security: 'Security',
+  surveillance: 'Surveillance',
+  access_control: 'Access Control',
+  audio_video: 'Audio / Video',
+  automation: 'Automation',
+  networking: 'Networking',
+  lighting_control: 'Lighting Control',
+  other: 'Other',
+};
+
+export const SERVICE_SCHEDULE_LABELS: Record<string, string> = {
+  quarterly: 'Quarterly',
+  semi_annual: 'Semi-Annual',
+  annual: 'Annual',
+};
+
+export const EQUIPMENT_WARRANTY_MAX_AGE_MONTHS = 15;
+
+export interface CustomerPurchasedEquipment {
+  product_id: string;
+  product_name: string;
+  manufacturer: string | null;
+  model_number: string | null;
+  sku: string | null;
+  category: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  proposal_id: string;
+  sales_order_id: string | null;
+  project_id: string | null;
+  purchase_date: string | null;
+  age_months: number | null;
+}

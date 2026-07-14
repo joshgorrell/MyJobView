@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { ArrowLeft, Send, CheckCircle, XCircle, Eye, Mail, Clock, AlertCircle, User, Shield, Phone, CreditCard, Ligature as FileSignature, MapPin, CreditCard as Edit, Printer, Trash2, Ban } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle, XCircle, Eye, Mail, Clock, AlertCircle, User, Shield, Phone, CreditCard, Ligature as FileSignature, MapPin, CreditCard as Edit, Printer, Trash2, Ban, Wrench, ShieldCheck } from 'lucide-react';
 import ManualContractEntry from './ManualContractEntry';
 import ConfirmModal from '../ui/ConfirmModal';
+import { AGREEMENT_TYPE_LABELS, AGREEMENT_TYPE_COLORS, SYSTEM_TYPE_LABELS, SERVICE_SCHEDULE_LABELS, type AgreementType, type SystemType } from '../../lib/types';
 
 interface SecurityContractDetailProps {
-  contract: any;
+  contract?: any;
+  contractId?: string;
   onClose: () => void;
-  onUpdate: () => void;
+  onUpdate?: () => void;
 }
 
-export default function SecurityContractDetail({ contract, onClose, onUpdate }: SecurityContractDetailProps) {
+export default function SecurityContractDetail({ contract, contractId, onClose, onUpdate }: SecurityContractDetailProps) {
+  const resolvedContractId = contract?.id || contractId;
   const [contractData, setContractData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -30,7 +33,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
 
   useEffect(() => {
     loadContractDetails();
-  }, [contract.id]);
+  }, [resolvedContractId]);
 
   async function loadContractDetails() {
     try {
@@ -48,7 +51,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           emergency_contacts:security_contract_emergency_contacts(*),
           approvals:security_contract_approvals(*)
         `)
-        .eq('id', contract.id)
+        .eq('id', resolvedContractId)
         .single();
 
       if (error) throw error;
@@ -76,7 +79,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           invitation_sent_at: new Date().toISOString(),
           status: 'pending_customer'
         })
-        .eq('id', contract.id);
+        .eq('id', resolvedContractId);
 
       if (error) throw error;
 
@@ -91,7 +94,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contractId: contract.id,
+          contractId: resolvedContractId,
           token,
           customerEmail: contractData.contact.email,
           customerName: contractData.contact.full_name
@@ -108,7 +111,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
       }
 
       alert('Invitation sent successfully!');
-      onUpdate();
+      onUpdate?.();
       onClose();
     } catch (error: any) {
       console.error('Error sending invitation:', error);
@@ -132,12 +135,12 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           approved_at: new Date().toISOString(),
           approved_by_user_id: user.user.id
         })
-        .eq('id', contract.id);
+        .eq('id', resolvedContractId);
 
       if (error) throw error;
 
       alert('Contract approved!');
-      onUpdate();
+      onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error approving contract:', error);
@@ -161,12 +164,12 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           status: 'rejected',
           rejection_reason: rejectionReason
         })
-        .eq('id', contract.id);
+        .eq('id', resolvedContractId);
 
       if (error) throw error;
 
       alert('Contract rejected');
-      onUpdate();
+      onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error rejecting contract:', error);
@@ -184,12 +187,12 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           status: 'active',
           activated_at: new Date().toISOString()
         })
-        .eq('id', contract.id);
+        .eq('id', resolvedContractId);
 
       if (error) throw error;
 
       alert('Contract activated!');
-      onUpdate();
+      onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error activating contract:', error);
@@ -202,12 +205,12 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
       const { error } = await supabase
         .from('security_contracts')
         .delete()
-        .eq('id', contract.id);
+        .eq('id', resolvedContractId);
 
       if (error) throw error;
 
       alert('Contract deleted permanently');
-      onUpdate();
+      onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error deleting contract:', error);
@@ -237,12 +240,12 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           cancellation_reason: cancellationReason,
           cancelled_by_user_id: user?.id ?? null
         })
-        .eq('id', contract.id);
+        .eq('id', resolvedContractId);
 
       if (error) throw error;
 
       alert(immediateCancel ? 'Contract cancelled immediately' : `Contract scheduled to cancel on ${finalBillingDate}`);
-      onUpdate();
+      onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error cancelling contract:', error);
@@ -771,8 +774,33 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-white">Contract {contractData.contract_number}</h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-2xl font-bold text-white">Contract {contractData.contract_number}</h1>
+                  {contractData.agreement_type && (
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      contractData.agreement_type === 'monitoring' ? 'bg-blue-100 text-blue-800' :
+                      contractData.agreement_type === 'maintenance' ? 'bg-green-100 text-green-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {contractData.agreement_type === 'monitoring' && <Shield className="w-3 h-3 inline mr-1" />}
+                      {contractData.agreement_type === 'maintenance' && <Wrench className="w-3 h-3 inline mr-1" />}
+                      {contractData.agreement_type === 'equipment_warranty' && <ShieldCheck className="w-3 h-3 inline mr-1" />}
+                      {AGREEMENT_TYPE_LABELS[contractData.agreement_type as AgreementType] || contractData.agreement_type}
+                    </span>
+                  )}
+                </div>
                 <p className="text-blue-100 mt-1">{contractData.template?.name}</p>
+                {contractData.system_type && contractData.system_type !== 'security' && (
+                  <p className="text-sm text-blue-200 mt-1">System: {SYSTEM_TYPE_LABELS[contractData.system_type as SystemType] || contractData.system_type}</p>
+                )}
+                {contractData.service_schedule && (
+                  <p className="text-sm text-blue-200 mt-1">Service Schedule: {SERVICE_SCHEDULE_LABELS[contractData.service_schedule] || contractData.service_schedule}</p>
+                )}
+                {contractData.warranty_start_date && contractData.warranty_end_date && (
+                  <p className="text-sm text-blue-200 mt-1">
+                    Warranty: {new Date(contractData.warranty_start_date).toLocaleDateString()} - {new Date(contractData.warranty_end_date).toLocaleDateString()}
+                  </p>
+                )}
                 <p className="text-sm text-blue-200 mt-2">Preview as customer sees it</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -1518,7 +1546,7 @@ export default function SecurityContractDetail({ contract, onClose, onUpdate }: 
           onComplete={() => {
             setShowManualEntry(false);
             loadContractDetails();
-            onUpdate();
+            onUpdate?.();
           }}
         />
       )}

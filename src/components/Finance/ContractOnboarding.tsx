@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload } from 'lucide-react';
+import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload, Shield } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
 import SecurityAccountStats from './SecurityAccountStats';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -209,8 +209,11 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Contract Management</h1>
-          <p className="text-gray-300 mt-1">Track completed, active, and cancelled security contracts</p>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Shield className="w-6 h-6 text-blue-400" />
+            Monitoring Contract Onboarding
+          </h1>
+          <p className="text-gray-300 mt-1">Alarm monitoring contract onboarding, approval, and activation</p>
         </div>
         {onNavigateToImport && (
           <button
@@ -333,9 +336,15 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
                             <User className="w-6 h-6 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-base text-gray-900 mb-1">
-                              {contract.contact?.full_name || 'Unknown'}
-                            </h4>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-bold text-base text-gray-900">
+                                {contract.contact?.full_name || 'Unknown'}
+                              </h4>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                <Shield className="w-3 h-3" />
+                                Monitoring
+                              </span>
+                            </div>
                             <p className="text-sm text-gray-600 break-words">
                               {contract.contact?.email || 'No email'}
                             </p>

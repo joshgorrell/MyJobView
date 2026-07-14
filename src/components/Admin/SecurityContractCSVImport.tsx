@@ -80,6 +80,12 @@ const CONTRACT_FIELD_LABELS: Record<string, string> = {
   services: 'Services',
   notes: 'Notes',
   external_id: 'External ID',
+  agreement_type: 'Agreement Type',
+  system_type: 'System Type',
+  service_schedule: 'Service Schedule',
+  billing_frequency: 'Billing Frequency',
+  warranty_start_date: 'Warranty Start Date',
+  warranty_end_date: 'Warranty End Date',
 };
 
 const ALL_CONTRACT_FIELDS = Object.keys(CONTRACT_FIELD_LABELS);
@@ -104,6 +110,12 @@ function detectContractColumnMapping(parsed: ParsedCSV): ContractColumnMap {
     services: ['services', 'service', 'monitoring services', 'account services', 'features', 'plan services', 'included services'],
     notes: ['notes', 'note', 'comments', 'comment', 'description', 'memo', 'remarks', 'details'],
     external_id: ['external id', 'external_id', 'bill.com id', 'billdotcom id', 'vendor id', 'customer id', 'reference id', 'ref id', 'billing id'],
+    agreement_type: ['agreement type', 'agreement_type', 'contract type', 'plan type'],
+    system_type: ['system type', 'system_type', 'system'],
+    service_schedule: ['service schedule', 'service_schedule', 'maintenance schedule', 'inspection schedule'],
+    billing_frequency: ['billing frequency', 'billing_frequency', 'payment frequency'],
+    warranty_start_date: ['warranty start', 'warranty_start_date', 'warranty start date', 'coverage start'],
+    warranty_end_date: ['warranty end', 'warranty_end_date', 'warranty end date', 'coverage end', 'expiration date'],
   };
 
   const usedHeaders = new Set<string>();
@@ -612,6 +624,12 @@ export function SecurityContractCSVImport() {
           import_batch_id: batchId,
           imported_from_external: true,
           created_by_user_id: profile.id,
+          agreement_type: (d.agreement_type as 'monitoring' | 'maintenance' | 'equipment_warranty') || 'monitoring',
+          system_type: (d.system_type as 'security' | 'surveillance' | 'access_control' | 'audio_video' | 'automation' | 'networking' | 'lighting_control' | 'other') || 'security',
+          service_schedule: d.service_schedule || null,
+          billing_frequency_override: d.billing_frequency || 'monthly',
+          warranty_start_date: d.warranty_start_date || null,
+          warranty_end_date: d.warranty_end_date || null,
         };
 
         const { data: contract, error: contractError } = await supabase
