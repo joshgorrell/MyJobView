@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List } from 'lucide-react';
+import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
 import SecurityAccountStats from './SecurityAccountStats';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -31,7 +31,7 @@ interface StatusColumn {
   borderColor: string;
 }
 
-export default function ContractOnboarding() {
+export default function ContractOnboarding({ onNavigateToImport }: { onNavigateToImport?: () => void }) {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -212,6 +212,15 @@ export default function ContractOnboarding() {
           <h1 className="text-2xl font-bold text-white">Contract Management</h1>
           <p className="text-gray-300 mt-1">Track completed, active, and cancelled security contracts</p>
         </div>
+        {onNavigateToImport && (
+          <button
+            onClick={onNavigateToImport}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            <Upload className="w-4 h-4" />
+            Import Contracts
+          </button>
+        )}
       </div>
 
       <div className="flex gap-1 mb-6 bg-white/10 rounded-lg p-1 w-fit">
