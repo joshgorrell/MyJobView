@@ -581,7 +581,6 @@ function AppContent() {
   }
 
   if (currentPath === '/eula') {
-    if (!user || !profile) return <LoginForm />;
     return (
       <Suspense fallback={<LoadingFallback />}>
         <EULA />
@@ -590,7 +589,6 @@ function AppContent() {
   }
 
   if (currentPath === '/privacy-policy') {
-    if (!user || !profile) return <LoginForm />;
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PrivacyPolicy />
