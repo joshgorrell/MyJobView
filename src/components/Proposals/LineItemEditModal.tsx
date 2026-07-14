@@ -437,6 +437,10 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
   }
 
   function handleSubmit(saveToMaster: boolean) {
+    if (!formData.cost || formData.cost <= 0) {
+      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      return;
+    }
     setSaving(true);
 
     const laborTotal = (formData.labor_hours || 0) * formData.quantity * (formData.labor_rate || 0);
@@ -671,12 +675,12 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Cost</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Cost <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                       <input
                         type="text"
-                        value={formData.cost}
+                        value={formData.cost || ''}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === '' || val === '-') {
@@ -692,9 +696,12 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                           const parsed = parseFloat(e.target.value);
                           setFormData({ ...formData, cost: isNaN(parsed) ? 0 : parsed });
                         }}
-                        className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full pl-8 pr-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${!formData.cost || formData.cost <= 0 ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         placeholder="0.00"
                       />
+                      {(!formData.cost || formData.cost <= 0) && (
+                        <p className="text-xs text-red-500 mt-1">Required</p>
+                      )}
                     </div>
                   </div>
 

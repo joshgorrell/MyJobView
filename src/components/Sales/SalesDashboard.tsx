@@ -8,6 +8,8 @@ import { ManagerCheckInCompliance } from './ManagerCheckInCompliance';
 import { MonthlySalesStats } from './MonthlySalesStats';
 import { StaffSalesComparison } from './StaffSalesComparison';
 import { OfficeSalesBreakdown } from './OfficeSalesBreakdown';
+import { fetchSalesKpis, type SalesKpis, type KpiScope, type DateRangeKey } from '../../lib/salesKpis';
+import { Percent, TrendingUp as TrendingUpIcon } from 'lucide-react';
 
 interface DashboardMetrics {
   pipelineValue: number;
@@ -196,10 +198,32 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
   const [activeView, setActiveView] = useState<'dashboard' | 'offices'>('dashboard');
 
+  const [salesKpis, setSalesKpis] = useState<SalesKpis>({ averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 });
+  const [salesKpisLoading, setSalesKpisLoading] = useState(false);
+
   const isAdmin = profile?.role && ['admin', 'manager', 'sales_manager'].includes(profile.role);
 
   // For single-rep view: the rep whose data the dashboard shows
   const viewingRepId = selectedRepIds.length === 1 ? selectedRepIds[0] : null;
+
+  // Fetch Average Sale and Profit Margin KPIs
+  useEffect(() => {
+    async function loadKpis() {
+      setSalesKpisLoading(true);
+      try {
+        const scope: KpiScope = viewingRepId
+          ? { type: 'rep', repId: viewingRepId }
+          : { type: 'company' };
+        const kpis = await fetchSalesKpis(scope, dateRange as DateRangeKey);
+        setSalesKpis(kpis);
+      } catch (err) {
+        console.error('Failed to load sales KPIs:', err);
+      } finally {
+        setSalesKpisLoading(false);
+      }
+    }
+    loadKpis();
+  }, [viewingRepId, dateRange]);
   const isComparingMultiple = selectedRepIds.length >= 2;
 
   useEffect(() => {
@@ -1207,6 +1231,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       ytdVsPriorDir,
       monthVsLastMonthPct,
       quotaProgress,
+      annualQuota: repQuota,
+      repName: salesRepsForSelector.find(r => r.id === viewingRepId)?.display_name || 'Rep',
       rolling3: rolling(3),
       rolling6: rolling(6),
       rolling12: rolling(12),
@@ -1701,6 +1727,49 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                     </div>
                   </div>
                 )}
+
+                {/* Goal Progress Card for viewed rep */}
+                {repPerfMetrics && (
+                  <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl border border-blue-500/30 p-5 flex flex-col gap-3 text-white">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Target className="w-4 h-4 text-blue-300" />
+                      Goal Progress — {repPerfMetrics.repName}
+                    </h3>
+                    <div>
+                      <div className="flex justify-between items-baseline mb-1">
+                        <span className="text-xs text-blue-200">Annual Quota</span>
+                        <span className="text-sm font-bold tabular-nums">{formatCurrency(repPerfMetrics.annualQuota)}</span>
+                      </div>
+                      <div className="flex justify-between items-baseline mb-1">
+                        <span className="text-xs text-blue-200">YTD Sales</span>
+                        <span className="text-sm font-bold tabular-nums">{formatCurrency(repPerfMetrics.ytdTotal)}</span>
+                      </div>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <span className="text-xs text-blue-200">Monthly Target</span>
+                        <span className="text-sm font-bold tabular-nums">{formatCurrency(repPerfMetrics.annualQuota / 12)}</span>
+                      </div>
+                      <div className="w-full bg-blue-900/50 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-green-400 to-green-500 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(repPerfMetrics.quotaProgress ?? 0, 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-baseline mt-2">
+                        <span className="text-xs text-blue-200">Progress</span>
+                        <span className="text-lg font-bold tabular-nums">{repPerfMetrics.quotaProgress ?? 0}%</span>
+                      </div>
+                      {(repPerfMetrics.quotaProgress ?? 0) >= 100 && (
+                        <p className="text-xs text-green-300 mt-1 font-medium">Goal achieved!</p>
+                      )}
+                      {(repPerfMetrics.quotaProgress ?? 0) >= 75 && (repPerfMetrics.quotaProgress ?? 0) < 100 && (
+                        <p className="text-xs text-blue-200 mt-1">Almost there -- keep pushing!</p>
+                      )}
+                      {(repPerfMetrics.quotaProgress ?? 0) < 75 && (
+                        <p className="text-xs text-blue-300/70 mt-1">{Math.max(0, repPerfMetrics.annualQuota - repPerfMetrics.ytdTotal).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })} to go</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -1847,7 +1916,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                               style={{ width: `${progressClamped}%`, backgroundColor: color }}
                             />
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">of {formatCurrency(rep.monthlyTarget)}</div>
+                          <div className="text-xs text-gray-500 mt-1">of {formatCurrency(rep.monthlyTarget)}/mo</div>
                         </div>
                       )}
                       <div>
@@ -1907,6 +1976,41 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           <div className="text-2xl sm:text-3xl font-bold mb-1 tabular-nums">{formatCurrency(metrics.averageDealSize)}</div>
           <div className="text-xs sm:text-sm text-orange-100">Avg Deal Size</div>
           <div className="text-xs text-orange-200 mt-1 opacity-80">{metrics.conversionRate}% lead conversion</div>
+        </div>
+      </div>
+
+      {/* Average Sale & Profit Margin KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg p-4 text-white shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
+              <span className="text-sm font-medium text-emerald-100">Average Sale</span>
+            </div>
+            <TrendingUpIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-60" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-bold mb-1 tabular-nums">
+            {salesKpisLoading ? '...' : formatCurrency(salesKpis.averageSale)}
+          </div>
+          <div className="text-xs text-emerald-100">Avg Sales Order Value — {getDateRangeLabel()}</div>
+          <div className="text-xs text-emerald-200 mt-1 opacity-80">{salesKpis.salesOrderCount} orders</div>
+        </div>
+
+        <div className={`bg-gradient-to-br ${salesKpis.averageMarginPct >= 40 ? 'from-green-500 to-green-600' : salesKpis.averageMarginPct >= 25 ? 'from-amber-500 to-amber-600' : 'from-red-500 to-red-600'} rounded-lg p-4 text-white shadow-md`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Percent className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
+              <span className="text-sm font-medium text-white/90">Avg Profit Margin</span>
+            </div>
+            <TrendingUpIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-60" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-bold mb-1 tabular-nums">
+            {salesKpisLoading ? '...' : `${salesKpis.averageMarginPct.toFixed(1)}%`}
+          </div>
+          <div className="text-xs text-white/80">Avg Margin Across Sales Orders — {getDateRangeLabel()}</div>
+          <div className="text-xs text-white/70 mt-1 opacity-80">
+            {salesKpis.averageMarginPct >= 40 ? 'Above target' : salesKpis.averageMarginPct >= 25 ? 'Near target' : 'Below target'}
+          </div>
         </div>
       </div>
 

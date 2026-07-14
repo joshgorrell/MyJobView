@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Building2, ChevronDown, ChevronRight, AlertTriangle, TrendingUp, FileText, DollarSign, X } from 'lucide-react';
+import { Building2, ChevronDown, ChevronRight, AlertTriangle, TrendingUp, FileText, DollarSign, Percent, X } from 'lucide-react';
+import { fetchSalesKpis } from '../../lib/salesKpis';
 
 interface OfficeSummary {
   officeId: string;
@@ -12,6 +13,8 @@ interface OfficeSummary {
   collectedTotal: number;
   pipelineTotal: number;
   proposalCount: number;
+  averageSale: number;
+  averageMarginPct: number;
   orders: OfficeOrder[];
 }
 
@@ -145,6 +148,8 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
           collectedTotal: 0,
           pipelineTotal: 0,
           proposalCount: 0,
+          averageSale: 0,
+          averageMarginPct: 0,
           orders: [],
         });
       }
@@ -189,6 +194,17 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
       const result = Array.from(officeMap.values())
         .filter(o => o.orderCount > 0 || o.proposalCount > 0)
         .sort((a, b) => b.contractTotal - a.contractTotal);
+
+      // Fetch per-office KPIs (average sale + margin)
+      for (const office of result) {
+        try {
+          const officeKpis = await fetchSalesKpis({ type: 'office', officeId: office.officeId }, dateRange);
+          office.averageSale = officeKpis.averageSale;
+          office.averageMarginPct = officeKpis.averageMarginPct;
+        } catch {
+          // KPI fetch failure is non-fatal
+        }
+      }
 
       setOffices(result);
     } catch (err) {
@@ -291,6 +307,8 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
               <div className="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Office</div>
               <div className="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider font-medium text-right">Orders</div>
               <div className="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider font-medium text-right">Sold</div>
+              <div className="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider font-medium text-right">Avg Sale</div>
+              <div className="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider font-medium text-right">Margin</div>
               <div className="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider font-medium text-right">Invoiced</div>
               <div className="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider font-medium text-right">Pipeline</div>
               <div />
@@ -335,11 +353,17 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
                             <span>Pipeline: {fmt(office.pipelineTotal)}</span>
                             <span>{pct.toFixed(1)}% of total</span>
                           </div>
+                          <div className="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Avg Sale: {office.averageSale > 0 ? fmt(office.averageSale) : '--'}</span>
+                            <span className={office.averageMarginPct >= 40 ? 'text-green-400' : office.averageMarginPct >= 25 ? 'text-amber-400' : ''}>
+                              Margin: {office.averageMarginPct > 0 ? `${office.averageMarginPct.toFixed(1)}%` : '--'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
                       {/* Desktop layout */}
-                      <div className="hidden md:grid grid-cols-[auto_1fr_repeat(4,minmax(0,120px))_40px] gap-0 items-center min-h-[56px]">
+                      <div className="hidden md:grid grid-cols-[auto_1fr_repeat(6,minmax(0,110px))_40px] gap-0 items-center min-h-[56px]">
                         <div className="w-10 flex items-center justify-center">
                           {isExpanded
                             ? <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -366,6 +390,14 @@ export function OfficeSalesBreakdown({ onNavigateToOffice }: OfficeSalesBreakdow
                         </div>
                         <div className="px-4 py-3 text-right">
                           <span className="text-white font-semibold text-sm">{fmt(office.contractTotal)}</span>
+                        </div>
+                        <div className="px-4 py-3 text-right">
+                          <span className="text-emerald-400 text-sm font-medium">{office.averageSale > 0 ? fmt(office.averageSale) : '--'}</span>
+                        </div>
+                        <div className="px-4 py-3 text-right">
+                          <span className={`text-sm font-medium ${office.averageMarginPct >= 40 ? 'text-green-400' : office.averageMarginPct >= 25 ? 'text-amber-400' : office.averageMarginPct > 0 ? 'text-red-400' : 'text-gray-600'}`}>
+                            {office.averageMarginPct > 0 ? `${office.averageMarginPct.toFixed(1)}%` : '--'}
+                          </span>
                         </div>
                         <div className="px-4 py-3 text-right">
                           <span className="text-blue-300 text-sm">{fmt(office.invoicedTotal)}</span>

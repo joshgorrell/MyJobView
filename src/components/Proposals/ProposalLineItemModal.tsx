@@ -282,6 +282,10 @@ export default function ProposalLineItemModal({
 
   async function copyToSelectedAreas() {
     if (selectedAreasForCopy.size === 0) return;
+    if (!form.cost || form.cost <= 0) {
+      alert('Cost is required. Please enter a unit cost greater than $0 before copying.');
+      return;
+    }
     setCopyingToAreas(true);
     try {
       const laborTotalVal = (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
@@ -340,6 +344,10 @@ export default function ProposalLineItemModal({
   }
 
   function handleSubmit(saveToMaster: boolean) {
+    if (!form.cost || form.cost <= 0) {
+      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      return;
+    }
     setSaving(true);
     const laborTotalVal = (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
     let parentItemId: string | null = null;
@@ -555,13 +563,16 @@ export default function ProposalLineItemModal({
                       className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                       placeholder="ea" />
                   </Field>
-                  <Field label="Cost">
+                  <Field label="Cost *">
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                      <input type="number" value={form.cost}
+                      <input type="number" value={form.cost || ''}
                         onChange={e => setForm(f => ({ ...f, cost: parseFloat(e.target.value) || 0 }))}
-                        className="w-full pl-7 pr-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                        min="0" step="0.01" />
+                        className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${!form.cost || form.cost <= 0 ? 'border-red-500' : 'border-gray-600'}`}
+                        min="0" step="0.01" placeholder="0.00" />
+                      {(!form.cost || form.cost <= 0) && (
+                        <p className="text-xs text-red-400 mt-1">Required</p>
+                      )}
                     </div>
                   </Field>
                   <Field label="Sale Price">

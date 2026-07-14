@@ -117,6 +117,7 @@ const StickyNotes = lazy(() => import('./components/Sales/StickyNotes').then(m =
 const DesignQueue = lazy(() => import('./components/Sales/DesignQueue'));
 const DesignBriefModal = lazy(() => import('./components/Sales/DesignBriefModal'));
 const TVDashboard = lazy(() => import('./components/Production/TVDashboard').then(m => ({ default: m.default })));
+const SalesTVDashboard = lazy(() => import('./components/Sales/SalesTVDashboard').then(m => ({ default: m.default })));
 const BugManagement = lazy(() => import('./components/Admin/BugManagement').then(m => ({ default: m.default })));
 const EULA = lazy(() => import('./components/Public/EULA').then(m => ({ default: m.EULA })));
 const PrivacyPolicy = lazy(() => import('./components/Public/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
@@ -610,6 +611,15 @@ function AppContent() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <TVDashboard />
+      </Suspense>
+    );
+  }
+
+  if (currentPath === '/sales-tv-dashboard') {
+    if (!user || !profile) return <LoginForm />;
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <SalesTVDashboard />
       </Suspense>
     );
   }
