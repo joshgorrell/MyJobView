@@ -175,7 +175,7 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
           className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden opacity-60 relative"
         >
           <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
-          <div className="p-6 pl-7">
+          <div className="p-4 sm:p-6 pl-7">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -229,7 +229,7 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
         className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative"
       >
         <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
-        <div className="p-6 pl-7">
+        <div className="p-4 sm:p-6 pl-7">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -272,7 +272,7 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
   const content = (
     <>
       {proposals.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Proposals Yet</h3>
           <p className="text-gray-600">
@@ -317,7 +317,7 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
     return (
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900">My Proposals</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">My Proposals</h2>
           <p className="text-sm text-gray-500 mt-0.5">View and manage your proposals</p>
         </div>
         {content}
@@ -419,7 +419,7 @@ function RenewalModal({ proposal, contactId, onClose, onSuccess }: RenewalModalP
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Request Proposal Renewal</h2>
             <p className="text-sm text-gray-500 mt-0.5">{proposal.proposal_number} — {proposal.title}</p>
@@ -432,7 +432,7 @@ function RenewalModal({ proposal, contactId, onClose, onSuccess }: RenewalModalP
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           <p className="text-sm text-gray-600">
             Let us know if there's anything specific you'd like updated, or just send a quick note — we'll get back to you shortly.
           </p>

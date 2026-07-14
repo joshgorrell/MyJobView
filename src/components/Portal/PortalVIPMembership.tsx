@@ -455,7 +455,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         <div className="flex items-center gap-3 mb-3">
           <Star className="w-8 h-8 text-yellow-400" />
           <div>
-            <h2 className="text-2xl font-bold text-white">VIP Membership</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">VIP Membership</h2>
             <p className="text-gray-300">Premium support and priority service</p>
           </div>
         </div>
@@ -475,7 +475,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 </div>
                 <span className="text-sm font-semibold text-yellow-300 tracking-wide uppercase">VIP Membership</span>
               </div>
-              <h3 className="text-3xl font-bold text-white mb-3 leading-tight">
+              <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3 leading-tight">
                 Priority Service. Total Peace of Mind.
               </h3>
               <p className="text-blue-200 text-base mb-6 max-w-xl leading-relaxed">
@@ -493,7 +493,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
           {/* Benefits grid */}
           <div>
-            <h3 className="text-xl font-bold text-white mb-5">Everything VIP Includes</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-white mb-5">Everything VIP Includes</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {BENEFITS.map((benefit) => {
                 const Icon = benefit.icon;
@@ -513,7 +513,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
           {/* How It Works */}
           <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
-            <h3 className="text-xl font-bold text-gray-900 mb-7 text-center">How It Works</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-7 text-center">How It Works</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-7">
               {HOW_IT_WORKS.map((step) => (
                 <div key={step.step} className="flex flex-col items-center text-center">
@@ -534,11 +534,11 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           {/* Status Badge */}
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-2 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-green-400" />
                 Current Membership
               </h3>
-              <p className="text-2xl font-bold text-white mb-2">
+              <p className="text-xl sm:text-2xl font-bold text-white mb-2">
                 {currentSubscription.plan.plan_name}
               </p>
               {currentSubscription.plan.description && (
@@ -638,7 +638,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 </div>
                 <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
                   <div className="text-sm text-blue-400 mb-1">Days Remaining</div>
-                  <div className="text-3xl font-bold text-blue-300">
+                  <div className="text-2xl sm:text-3xl font-bold text-blue-300">
                     {currentSubscription.trial_end_date && (() => {
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
@@ -710,7 +710,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {currentSubscription.status !== 'trial' && (
               <button
                 onClick={() => setShowPaymentSettings(true)}
@@ -796,7 +796,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           )}
 
           <div id="available-plans">
-            <h3 className="text-xl font-bold text-white mb-4">
+            <h3 className="text-lg sm:text-xl font-bold text-white mb-4">
               {currentSubscription?.status === 'trial' ? 'Keep Your VIP Access' : 'Available Plans'}
             </h3>
             <p className="text-gray-300 mb-6">
@@ -815,7 +815,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
               >
                 <div className="flex items-center gap-2 mb-4">
                   <Package className="w-6 h-6 text-blue-400" />
-                  <h4 className="text-xl font-bold text-white">{plan.plan_name}</h4>
+                  <h4 className="text-lg sm:text-xl font-bold text-white">{plan.plan_name}</h4>
                 </div>
 
                 {plan.description && (
@@ -823,7 +823,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 )}
 
                 <div className="mb-6">
-                  <div className="text-4xl font-bold text-white mb-2">
+                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2">
                     ${plan.amount}
                   </div>
                   <div className="text-gray-400">
@@ -865,7 +865,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           </div>
 
           {/* Business VIP Inquiry Section */}
-          <div className="mt-8 bg-gradient-to-r from-blue-900/40 to-indigo-900/40 backdrop-blur-sm border border-blue-500/30 rounded-lg p-8">
+          <div className="mt-8 bg-gradient-to-r from-blue-900/40 to-indigo-900/40 backdrop-blur-sm border border-blue-500/30 rounded-lg p-6 sm:p-8">
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="flex-shrink-0">
                 <div className="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center">
@@ -873,7 +873,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 </div>
               </div>
               <div className="flex-1 text-center md:text-left">
-                <h3 className="text-2xl font-bold text-white mb-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
                   Business VIP Plans Available
                 </h3>
                 <p className="text-gray-300 mb-3">
@@ -886,7 +886,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
               <div className="flex-shrink-0">
                 <a
                   href={`mailto:${companyEmail}?subject=Business VIP Plan Inquiry&body=Hi,%0D%0A%0D%0AI'm interested in learning more about VIP membership options for my business.%0D%0A%0D%0ABusiness Name:%0D%0ANumber of Locations:%0D%0AContact Name:%0D%0APhone:%0D%0A%0D%0APlease contact me to discuss custom VIP solutions.`}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 whitespace-nowrap"
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 sm:whitespace-nowrap"
                 >
                   <Mail className="w-5 h-5" />
                   Contact About Business Plans
@@ -938,7 +938,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
               {selectedPlan.description && (
                 <p className="text-gray-300 text-sm mb-3">{selectedPlan.description}</p>
               )}
-              <div className="text-3xl font-bold text-white">
+              <div className="text-2xl sm:text-3xl font-bold text-white">
                 ${selectedPlan.amount}
                 <span className="text-sm text-gray-400 font-normal ml-2">
                   {getBillingFrequencyLabel(selectedPlan.billing_frequency)}

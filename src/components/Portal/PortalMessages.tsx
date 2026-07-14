@@ -221,9 +221,9 @@ export default function PortalMessages() {
   if (!hasVipAccess) {
     return (
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-12 text-center">
           <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold text-gray-900 mb-3">VIP Feature</h3>
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">VIP Feature</h3>
           <p className="text-gray-600 mb-6">
             Direct messaging with your project team is available exclusively to VIP members.
           </p>
@@ -243,7 +243,7 @@ export default function PortalMessages() {
       </div>
 
       {threads.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-12 text-center">
           <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
           <p className="text-gray-500">

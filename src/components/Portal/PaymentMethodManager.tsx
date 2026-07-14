@@ -146,7 +146,7 @@ export function PaymentMethodManager({ contactId, onPaymentMethodAdded }: Paymen
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-white">Payment Methods</h3>
         <button
           onClick={() => setShowAddForm(true)}
@@ -179,7 +179,7 @@ export function PaymentMethodManager({ contactId, onPaymentMethodAdded }: Paymen
                 method.is_default ? 'border-blue-500' : 'border-gray-700'
               }`}
             >
-              <div className="flex items-start justify-between">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
                   {method.payment_type === 'card' ? (
                     <CreditCard className="w-5 h-5 text-blue-400 mt-0.5" />

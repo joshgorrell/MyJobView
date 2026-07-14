@@ -699,12 +699,12 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   if (!loading && accessInfo !== null && !accessInfo.has_access) {
     return (
       <div className="max-w-4xl mx-auto">
-        <div className="bg-gradient-to-br from-blue-50 to-slate-50 border-2 border-blue-300 rounded-lg p-8">
+        <div className="bg-gradient-to-br from-blue-50 to-slate-50 border-2 border-blue-300 rounded-lg p-4 sm:p-8">
           <div className="text-center mb-6">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <ClipboardList className="w-8 h-8 text-blue-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Punchlist Portal</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Punchlist Portal</h2>
             <p className="text-gray-600 text-lg">VIP Members Get Priority Service &amp; Support</p>
           </div>
 
@@ -764,7 +764,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
             </a>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between gap-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-gray-600 text-sm">
               Just finished a project? Ask us about our free <strong>90-Day Test &amp; Tune</strong> trial.
             </p>
@@ -938,8 +938,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
       {isCreating && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200">
               <h3 className="text-base font-semibold text-gray-900">Add a Task</h3>
               <button
                 onClick={() => {
@@ -976,7 +976,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               </div>
 
               {newTaskPhotos.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {newTaskPhotos.map((photo, index) => (
                     <div key={index} className="relative group">
                       <img
@@ -1553,7 +1553,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       {tasks.length === 0 && !isCreating && (
         <div className="text-center py-12 bg-white border border-gray-200 rounded-lg shadow-sm">
           <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Tasks Yet</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No Tasks Yet</h3>
           <p className="text-gray-600 mb-4">
             Create your first punchlist task to get started
           </p>
@@ -1569,7 +1569,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
       {showCamera && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <CameraCapture
               onCapture={(file) => handlePhotoCapture(showCamera, file)}
               onClose={() => setShowCamera(null)}
@@ -1580,7 +1580,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
       {showNewTaskCamera && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <CameraCapture
               onCapture={handleNewTaskPhotoCapture}
               onClose={() => setShowNewTaskCamera(false)}
@@ -1597,7 +1597,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <HelpCircle className="w-6 h-6 text-blue-600" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">How the Punchlist Works</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">How the Punchlist Works</h2>
               </div>
               <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-5 h-5 text-gray-600" />
@@ -1827,7 +1827,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               className="h-10 object-contain"
             />
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-white leading-tight">My Punchlist</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-white leading-tight">My Punchlist</h1>
               {displayName && !isAdminImpersonating ? (
                 <p className="text-xs text-blue-200">{timeGreeting}, {displayName}</p>
               ) : (

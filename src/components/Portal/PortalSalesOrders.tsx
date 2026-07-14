@@ -150,11 +150,11 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
             Back to Projects
           </button>
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h2 className="text-xl font-bold text-gray-900">{selectedOrder.order_number}</h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">{selectedOrder.order_number}</h2>
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                     <CheckCircle className="w-3.5 h-3.5" />
                     Approved
@@ -172,7 +172,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
               </div>
               <div className="flex-shrink-0 text-left sm:text-right">
                 <p className="text-xs text-gray-500 mb-0.5">Contract Total</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(selectedOrder.contract_total)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{formatCurrency(selectedOrder.contract_total)}</p>
               </div>
             </div>
           </div>
@@ -214,7 +214,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
             previewMode={true}
           />
         ) : activeTab === 'scope' ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 sm:p-10 text-center">
             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No scope document is linked to this project.</p>
           </div>
@@ -309,7 +309,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
               previewMode={true}
             />
           ) : activeTab === 'scope' ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 sm:p-10 text-center">
               <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No scope document is linked to this project.</p>
             </div>
@@ -329,7 +329,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
   const content = (
     <>
       {orders.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Projects Yet</h3>
           <p className="text-gray-600">
@@ -347,7 +347,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
                 className="w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md hover:border-blue-200 transition-all relative group"
               >
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />
-                <div className="p-6 pl-7">
+                <div className="p-4 sm:p-6 pl-7">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -419,7 +419,7 @@ export function PortalSalesOrders({ isEmbedded = false }: PortalSalesOrdersProps
     return (
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900">My Projects</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">My Projects</h2>
           <p className="text-sm text-gray-500 mt-0.5">Approved proposals and confirmed projects</p>
         </div>
         {content}

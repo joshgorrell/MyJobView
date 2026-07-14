@@ -11,7 +11,7 @@ export function TestAndTuneWelcomeModal({ onClose, daysRemaining, customerName }
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-lg relative">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 sm:p-6 rounded-t-lg relative">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
@@ -24,14 +24,14 @@ export function TestAndTuneWelcomeModal({ onClose, daysRemaining, customerName }
               <Sparkles className="w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold">Welcome to Test & Tune!</h2>
+              <h2 className="text-xl sm:text-2xl font-bold">Welcome to Test & Tune!</h2>
               <p className="text-blue-100 text-sm">Your complimentary 90-day VIP access</p>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-6">
           {/* Thank You Message */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-gray-700">
@@ -157,11 +157,11 @@ export function TestAndTuneWelcomeModal({ onClose, daysRemaining, customerName }
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 p-6 rounded-b-lg flex items-center justify-between gap-4">
+        <div className="bg-gray-50 p-4 sm:p-6 rounded-b-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="text-sm text-gray-600">
             You can access this information anytime from your dashboard
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <a
               href="/portal/vip-membership"
               className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors font-medium"

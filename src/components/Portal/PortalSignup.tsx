@@ -682,7 +682,7 @@ export function PortalSignup() {
                     <button
                       key={plan.id}
                       onClick={() => handlePlanSelect(plan)}
-                      className={`relative rounded-lg p-6 text-left transition-all group ${
+                      className={`relative rounded-lg p-4 sm:p-6 text-left transition-all group ${
                         isSelected
                           ? 'bg-blue-50 border-2 border-blue-500 shadow-md'
                           : 'bg-white border-2 border-gray-200 hover:border-blue-400'
@@ -697,7 +697,7 @@ export function PortalSignup() {
                         </div>
                       )}
 
-                      <div className="flex items-start justify-between mb-3 pr-24">
+                      <div className="flex items-start justify-between mb-3 pr-16 sm:pr-24">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <Package className={`w-5 h-5 ${isSelected ? 'text-blue-600' : 'text-gray-600'}`} />
@@ -712,7 +712,7 @@ export function PortalSignup() {
                           )}
                         </div>
                         <div className="text-right">
-                          <div className={`text-2xl font-bold ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
+                          <div className={`text-xl sm:text-2xl font-bold ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
                             ${plan.amount}
                           </div>
                           <div className={`text-sm ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>

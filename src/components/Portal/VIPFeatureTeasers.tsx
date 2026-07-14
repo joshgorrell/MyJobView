@@ -182,7 +182,7 @@ export function VIPFeatureTeasers({ showAllModules = true }: VIPFeatureTeasersPr
             </div>
 
             {/* Content */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Header */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">

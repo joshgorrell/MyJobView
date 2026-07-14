@@ -126,7 +126,7 @@ export function PortalLimitedDashboard() {
 
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-4">
               <img
                 src="/el_logo_color_(2).png"
@@ -134,7 +134,7 @@ export function PortalLimitedDashboard() {
                 className="h-12 object-contain"
               />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Customer Portal</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Customer Portal</h1>
                 <p className="text-sm text-gray-600">Welcome back, {contactName}</p>
               </div>
             </div>
@@ -153,11 +153,11 @@ export function PortalLimitedDashboard() {
         {/* Your Proposals Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Your Proposals</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Your Proposals</h2>
           </div>
 
           {proposals.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-12 text-center">
               <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No Active Proposals</h3>
               <p className="text-gray-600 mb-6">
@@ -178,9 +178,9 @@ export function PortalLimitedDashboard() {
                   onClick={() => handleProposalClick(proposal.id)}
                   className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all text-left group"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-start justify-between flex-wrap gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <FileText className="w-6 h-6 text-blue-600" />
                         <span className="text-lg font-bold text-gray-900">
                           {proposal.proposal_number}
@@ -196,7 +196,7 @@ export function PortalLimitedDashboard() {
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">
                         {proposal.title || 'Untitled Proposal'}
                       </h3>
-                      <div className="flex items-center gap-6 text-sm text-gray-600">
+                      <div className="flex items-center gap-3 sm:gap-6 text-sm text-gray-600 flex-wrap">
                         <span className="font-semibold text-lg text-green-700">
                           ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
@@ -219,13 +219,13 @@ export function PortalLimitedDashboard() {
         </div>
 
         {/* Upgrade to VIP Section */}
-        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 rounded-2xl shadow-xl p-8 text-white mb-8">
-          <div className="flex items-start gap-6">
+        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 rounded-2xl shadow-xl p-6 sm:p-8 text-white mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
             <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0">
               <Star className="w-8 h-8 text-yellow-300" />
             </div>
             <div className="flex-1">
-              <h2 className="text-3xl font-bold mb-3">Unlock Full Portal Access</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-3">Unlock Full Portal Access</h2>
               <p className="text-blue-100 text-lg mb-6 leading-relaxed">
                 Subscribe to our VIP Membership to access your full customer portal including project tracking,
                 invoices, appointments, service history, and your personal punchlist system.
@@ -267,7 +267,7 @@ export function PortalLimitedDashboard() {
         {/* VIP Feature Teasers */}
         <div className="mb-8">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Unlock These Premium Features</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Unlock These Premium Features</h2>
             <p className="text-gray-600">
               See what you're missing with VIP Membership. Get full access to manage your projects, invoices, and more!
             </p>

@@ -180,7 +180,7 @@ export function PortalLogin() {
 
       <div className="relative w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          <div className="bg-gradient-to-r from-[#0f2347] to-[#1a3a6e] px-8 pt-10 pb-8 text-center">
+          <div className="bg-gradient-to-r from-[#0f2347] to-[#1a3a6e] px-6 sm:px-8 pt-10 pb-6 sm:pb-8 text-center">
             <img
               src="/el_logo_color_(2).png"
               alt="Electronic Life"
@@ -192,7 +192,7 @@ export function PortalLogin() {
             </p>
           </div>
 
-          <div className="px-8 py-8">
+          <div className="px-6 sm:px-8 py-6 sm:py-8">
             <p className="text-gray-600 text-sm sm:text-base text-center mb-6 leading-relaxed">
               Enter your email address and we'll send you a secure, password-free login link.
             </p>

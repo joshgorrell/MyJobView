@@ -45,7 +45,7 @@ export function VIPMembershipFAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
       <h3 className="text-xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h3>
       <div className="space-y-3">
         {faqs.map((faq, index) => (

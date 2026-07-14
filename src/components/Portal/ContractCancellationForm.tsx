@@ -166,7 +166,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 flex items-center justify-center">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-10 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-[#0f2347] animate-spin mx-auto mb-3" />
           <p className="text-gray-500 text-sm">Loading your contracts...</p>
@@ -178,11 +178,11 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
   if (step === 'select' && contracts.length > 1) {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-100">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">Select Contract to Cancel</h2>
           <p className="text-sm text-gray-500 mt-0.5">Choose which monitoring contract you'd like to cancel.</p>
         </div>
-        <div className="p-6 space-y-3">
+        <div className="p-4 sm:p-6 space-y-3">
           {contracts.map((c) => (
             <button
               key={c.id}
@@ -275,7 +275,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
         {/* Contract Details */}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
           <h3 className="font-semibold text-gray-900 text-sm mb-3">Contract Details</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { label: 'Contract #', value: contract.contract_number },
               { label: 'Monthly Rate', value: formatCurrency(contract.monthly_rate) },
@@ -292,7 +292,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
 
         {/* Fee Banner */}
         {calculatedData.is_early_termination ? (
-          <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-5">
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 sm:p-5">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
                 <AlertTriangle className="w-5 h-5 text-orange-600" />
@@ -302,7 +302,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
                 <p className="text-sm text-orange-800 mb-3 leading-relaxed">
                   Your contract has more than 90 days remaining. Cancelling early requires payment of the remaining contract value.
                 </p>
-                <div className="bg-white rounded-xl p-4 border border-orange-200 flex items-center justify-between">
+                <div className="bg-white rounded-xl p-4 border border-orange-200 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-xs text-orange-700 font-medium">Total Buyout Amount</p>
                     <p className="text-xs text-gray-500 mt-0.5">

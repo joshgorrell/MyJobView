@@ -535,7 +535,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
             </div>
           ) : !trialAccess ? (
             <div className="relative overflow-hidden bg-gradient-to-br from-[#0f2347] to-[#1a3a6e] rounded-2xl p-6 sm:p-7 shadow-lg border border-[#1a3a6e]">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+              <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none hidden sm:block" />
               <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-5">
                 <div className="w-12 h-12 bg-yellow-400/20 rounded-xl flex items-center justify-center flex-shrink-0">
                   <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />

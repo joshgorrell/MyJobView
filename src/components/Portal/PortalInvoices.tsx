@@ -494,9 +494,9 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             )}
 
             {outstandingInvoices.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
                 <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">You're all caught up!</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">You're all caught up!</h3>
                 <p className="text-gray-500">No outstanding invoices at this time.</p>
               </div>
             ) : (
@@ -538,13 +538,13 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                 {outstandingInvoices.map((invoice) => (
                   <div
                     key={invoice.id}
-                    className={`bg-white rounded-lg shadow-sm border-2 p-6 hover:shadow-md transition-all ${
+                    className={`bg-white rounded-lg shadow-sm border-2 p-4 sm:p-6 hover:shadow-md transition-all ${
                       selectedInvoiceIds.includes(invoice.id)
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200'
                     }`}
                   >
-                    <div className="flex items-start justify-between mb-4">
+                    <div className="flex flex-wrap items-start justify-between mb-4 gap-2">
                       <div className="flex-1 flex items-start gap-3 min-w-0">
                         <input
                           type="checkbox"
@@ -627,7 +627,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
               </div>
             )}
 
-            <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6">
               <h3 className="text-base font-semibold text-blue-900 mb-2 flex items-center gap-2">
                 <AlertCircle className="w-5 h-5" />
                 Payment Information
@@ -646,9 +646,9 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
         {viewMode === 'history' && (
           <>
             {paidInvoices.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
                 <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Payment History</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No Payment History</h3>
                 <p className="text-gray-500">Paid invoices will appear here once you complete a payment.</p>
               </div>
             ) : (
@@ -659,7 +659,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                 {paidInvoices.map((invoice) => (
                   <div
                     key={invoice.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-shadow"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -713,9 +713,9 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
         {viewMode === 'subscriptions' && (
           <>
             {recurringSubscriptions.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
                 <RefreshCw className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Subscriptions</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No Active Subscriptions</h3>
                 <p className="text-gray-500">You don't have any active recurring subscriptions at this time.</p>
               </div>
             ) : (
@@ -729,12 +729,12 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                   const daysUntilEnd = endDate ? Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
                   return (
-                    <div key={subscription.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                      <div className="flex items-start justify-between mb-4">
+                    <div key={subscription.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+                      <div className="flex flex-wrap items-start justify-between mb-4 gap-2">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
                             <RefreshCw className="w-5 h-5 text-teal-600" />
-                            <h3 className="text-lg font-semibold text-gray-900">
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                               {subscription.recurring_plans?.plan_name || 'Recurring Subscription'}
                             </h3>
                             <SubscriptionStatusBadge status={subscription.status} />
@@ -787,7 +787,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <p className="text-xs text-gray-500 mb-1">Recurring Amount (Auto-Pay)</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">
                           ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {subscription.recurring_plans?.billing_frequency}
                         </p>
                       </div>
@@ -840,9 +840,9 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
         <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto">
             <div className="p-5 sm:p-6">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex flex-wrap items-start justify-between mb-4 gap-2">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Cancel Subscription</h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">Cancel Subscription</h2>
                   <p className="text-gray-500">{selectedSubscription.recurring_plans?.plan_name}</p>
                 </div>
                 <button onClick={() => setCancelModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -1023,7 +1023,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       {paymentUnavailableInvoice && (
         <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-sm p-5 sm:p-6">
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex flex-wrap items-start justify-between mb-4 gap-2">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
                   <AlertCircle className="w-5 h-5 text-amber-600" />
@@ -1072,7 +1072,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     return (
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900">My Invoices</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">My Invoices</h2>
           <p className="text-sm text-gray-500 mt-0.5">View and pay your invoices and subscriptions</p>
         </div>
         {mainContent}

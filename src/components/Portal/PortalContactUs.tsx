@@ -36,30 +36,30 @@ export function PortalContactUs() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
           <div className="text-center max-w-xl mx-auto">
             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Mail className="w-10 h-10 text-blue-600" />
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
               Need Help?
             </h2>
 
-            <p className="text-gray-600 mb-8">
+            <p className="text-gray-600 mb-6 sm:mb-8">
               Our support team is here to assist you. Send us an email and we'll get back to you as soon as possible.
             </p>
 
             <a
               href="mailto:support@electroniclife.com"
-              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg font-semibold text-lg shadow-md hover:shadow-lg transition-all"
+              className="inline-flex items-center justify-center gap-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg font-semibold text-base sm:text-lg shadow-md hover:shadow-lg transition-all w-full sm:w-auto"
             >
               <Mail className="w-6 h-6" />
               support@electroniclife.com
             </a>
 
-            <div className="mt-8 pt-8 border-t border-gray-200">
-              <div className="bg-blue-50 rounded-lg p-6 mb-6">
+            <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-gray-200">
+              <div className="bg-blue-50 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
                 <h3 className="font-semibold text-gray-900 mb-3">Service Request Options</h3>
                 <div className="text-left space-y-3 text-sm text-gray-700">
                   <p>

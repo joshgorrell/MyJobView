@@ -645,7 +645,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           </div>
         </header>
         <div className="max-w-xl mx-auto px-4 py-20 text-center">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-10">
             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
               <XCircle className="w-8 h-8 text-red-500" />
             </div>
@@ -653,7 +653,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               <Clock className="w-3 h-3" />
               Expired
             </span>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">This Proposal Has Expired</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">This Proposal Has Expired</h2>
             <p className="text-gray-500 mb-2">
               Proposal <span className="font-semibold text-gray-700">{proposal.proposal_number}</span> expired on{' '}
               <span className="font-semibold text-gray-700">{new Date(proposal.expires_at!).toLocaleDateString()}</span>.
@@ -725,13 +725,13 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       </header>
       )}
 
-      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Revision Notice */}
             {proposal.revision_notes && proposal.renewal_count > 0 && (
-              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-xl p-6 shadow-md">
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-xl p-4 sm:p-6 shadow-md">
                 <div className="flex items-start gap-4">
                   <div className="bg-blue-500/10 p-2.5 rounded-lg">
                     <AlertCircle className="w-6 h-6 text-blue-600" />
@@ -788,12 +788,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   }}
                 >
                   {/* Room Header */}
-                  <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4">
+                  <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center gap-3">
                       <div className="bg-blue-500/20 p-2 rounded-lg">
                         <Package className="w-5 h-5 text-blue-400" />
                       </div>
-                      <h3 className="text-xl font-bold text-white">{room.name}</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-white">{room.name}</h3>
                     </div>
                   </div>
 
@@ -816,7 +816,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   })()}
 
                   {room.description && room.show_scope && template?.show_area_descriptions && (
-                    <div className="px-6 pt-5 pb-3">
+                    <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3">
                       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                         <div className="flex items-start gap-2 mb-2">
                           <FileText className="w-4 h-4 text-blue-600 mt-0.5" />
@@ -830,7 +830,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   )}
 
                   {/* Items Table */}
-                  <div className="px-6 pb-6">
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
@@ -924,11 +924,11 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <div className="bg-amber-500/20 p-2 rounded-lg">
                           <Package className="w-5 h-5 text-amber-300" />
                         </div>
-                        <h3 className="text-xl font-bold text-white">Unassigned Items</h3>
+                        <h3 className="text-lg sm:text-xl font-bold text-white">Unassigned Items</h3>
                       </div>
                     </div>
                   )}
-                  <div className="px-6 pb-6">
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
@@ -1009,7 +1009,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Additional Notes */}
             {proposal.notes && (
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl p-6 shadow-md">
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl p-4 sm:p-6 shadow-md">
                 <div className="flex items-start gap-3">
                   <div className="bg-blue-500/10 p-2 rounded-lg">
                     <FileText className="w-5 h-5 text-blue-600" />
@@ -1026,7 +1026,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Proposal Summary Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="bg-blue-100 p-2.5 rounded-xl">
                   <DollarSign className="w-6 h-6 text-blue-600" />
@@ -1039,7 +1039,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
                   <div className="text-center">
                     <div className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Total Investment</div>
-                    <div className="text-4xl font-bold text-blue-600">
+                    <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-blue-600">
                       ${(proposal.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
@@ -1125,7 +1125,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Request Changes / Comments Section */}
             {comment && comment !== '' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   Request Changes / Questions
@@ -1148,7 +1148,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Decline Section */}
             {declineReason && (
-              <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
                   <XCircle className="w-4 h-4" />
                   Decline This Proposal
@@ -1202,7 +1202,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             )}
 
             {proposal.deposit_amount_due > 0 && (
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-6 shadow-md">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-md">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
                   Deposit Required
@@ -1215,7 +1215,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Related Invoices Panel */}
             {relatedInvoices.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="bg-blue-100 p-2 rounded-xl">
                     <FileText className="w-5 h-5 text-blue-600" />

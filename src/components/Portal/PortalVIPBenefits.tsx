@@ -201,7 +201,7 @@ export function PortalVIPBenefits() {
         {/* Benefits grid */}
         <div>
           <div className="text-center mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Everything VIP Includes</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Everything VIP Includes</h3>
             <p className="text-gray-500 max-w-xl mx-auto">
               One membership covers all of these — no add-ons, no surprises.
             </p>
@@ -227,8 +227,8 @@ export function PortalVIPBenefits() {
         </div>
 
         {/* How it works */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-          <h3 className="text-2xl font-bold text-gray-900 mb-8 text-center">How It Works</h3>
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm">
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-8 text-center">How It Works</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {HOW_IT_WORKS.map((step, index) => (
               <div key={step.step} className="flex flex-col items-center text-center">
@@ -248,7 +248,7 @@ export function PortalVIPBenefits() {
         {/* Pricing plans */}
         <div>
           <div className="text-center mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Plan</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Choose Your Plan</h3>
             <p className="text-gray-500 max-w-lg mx-auto">
               All plans include every benefit listed above. Pick the billing frequency that works best for you.
             </p>
@@ -284,7 +284,7 @@ export function PortalVIPBenefits() {
                   )}
 
                   <div className="mb-6">
-                    <div className="text-4xl font-bold text-gray-900">
+                    <div className="text-3xl sm:text-4xl font-bold text-gray-900">
                       ${plan.amount}
                     </div>
                     <div className="text-gray-500 text-sm mt-1">{getBillingLabel(plan.billing_frequency)}</div>
@@ -333,13 +333,13 @@ export function PortalVIPBenefits() {
         </div>
 
         {/* Trial callout */}
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-8 shadow-sm">
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
             <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
               <Clock className="w-7 h-7 text-amber-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-900 mb-1">Not Ready to Commit? Try It Free.</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">Not Ready to Commit? Try It Free.</h3>
               <p className="text-gray-600 leading-relaxed">
                 If you recently completed a project with us, you may be eligible for a complimentary
                 <strong> 90-Day Test & Tune</strong> trial — full VIP access at no charge so you can experience
@@ -357,9 +357,9 @@ export function PortalVIPBenefits() {
         </div>
 
         {/* Final CTA strip */}
-        <div className="bg-[#0f2347] rounded-2xl p-8 text-center text-white shadow-xl">
+        <div className="bg-[#0f2347] rounded-2xl p-6 sm:p-8 text-center text-white shadow-xl">
           <Star className="w-10 h-10 text-yellow-400 fill-yellow-400 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold mb-2">Ready to Become a VIP Member?</h3>
+          <h3 className="text-xl sm:text-2xl font-bold mb-2">Ready to Become a VIP Member?</h3>
           <p className="text-blue-200 mb-6 max-w-md mx-auto">
             Join today and start enjoying priority service, unlimited punchlist access, and expert support.
           </p>

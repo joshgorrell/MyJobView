@@ -74,8 +74,8 @@ export function TrialStatusBanner({
 
   if (compact) {
     return (
-      <div className={`${colors.bg} border-2 ${colors.border} rounded-lg p-4`}>
-        <div className="flex items-center justify-between">
+      <div className={`${colors.bg} border-2 ${colors.border} rounded-lg p-3 sm:p-4`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             {isExpiringSoon ? (
               <AlertTriangle className={`w-5 h-5 ${colors.icon}`} />
@@ -105,7 +105,7 @@ export function TrialStatusBanner({
   }
 
   return (
-    <div className={`${colors.bg} border-2 ${colors.border} rounded-lg p-6`}>
+    <div className={`${colors.bg} border-2 ${colors.border} rounded-lg p-4 sm:p-6`}>
       <div className="flex items-start gap-4">
         <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${colors.iconBg}`}>
           {isExpiringSoon ? (
