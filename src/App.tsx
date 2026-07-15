@@ -961,7 +961,6 @@ function AppContent() {
             />
           )}
           {activeTab === 'sales_performance' && checkModuleAccess('sales_performance') && <SalesPerformance key={activeTab} />}
-          {activeTab === 'sales_tv_dashboard' && checkModuleAccess('sales_tv_dashboard') && <SalesTVDashboard key={activeTab} />}
           {activeTab === 'sales_activity' && checkModuleAccess('sales_activity') && <SalesActivity key={activeTab} />}
           {activeTab === 'pipeline_board' && checkModuleAccess('pipeline_board') && <PipelineBoard key={activeTab} />}
           {activeTab === 'prospects' && checkModuleAccess('prospects') && <ProspectsPage key={activeTab} />}

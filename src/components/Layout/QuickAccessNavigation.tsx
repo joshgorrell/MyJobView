@@ -54,9 +54,11 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
             <button
               key={module.id}
               onClick={() => {
-                // TV Dashboard should open in a new window for full-screen display
+                // TV Dashboards should open in a new window for full-screen display
                 if (module.module_key === 'tv_dashboard') {
                   window.open('/tv-dashboard', '_blank', 'fullscreen=yes,width=1920,height=1080');
+                } else if (module.module_key === 'sales_tv_dashboard') {
+                  window.open('/sales-tv-dashboard', '_blank', 'fullscreen=yes,width=1920,height=1080');
                 } else {
                   onModuleChange(module.module_key);
                 }
