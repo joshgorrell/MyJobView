@@ -305,7 +305,8 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
     activePipelineResult,
     proposalsThisMonthResult,
     allTimeProposalsResult,
-    yearlyPerfResult,
+    approvedProposalsThisMonthResult,
+    ytdSalesOrdersResult,
     importedHistResult,
   ] = await Promise.all([
     safe(fetchSalesKpis({ type: 'company' }, 'this_month')),
@@ -355,10 +356,18 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
       .eq('organization_id', orgId)
       .in('status', ['approved', 'approved_pending_action', 'declined', 'cancelled', 'expired'])),
     safe(supabase
-      .from('yearly_sales_performance')
-      .select('year, total_revenue')
+      .from('proposals')
+      .select('id, total')
       .eq('organization_id', orgId)
-      .order('year', { ascending: true })),
+      .in('status', ['approved', 'approved_pending_action'])
+      .gte('created_at', monthStart)
+      .lte('created_at', monthEnd)),
+    safe(supabase
+      .from('sales_orders')
+      .select('contract_total, created_at')
+      .not('status', 'in', '("cancelled","voided")')
+      .gte('created_at', yearStartIso)
+      .lte('created_at', nowIso)),
     safe(supabase
       .from('sales_history_monthly')
       .select('stat_year, invoice_total')
@@ -369,18 +378,45 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
 
   const companyKpis = companyKpisResult.data as SalesKpis || { averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 };
 
-  // Monthly revenue: prioritize sales_monthly_stats (includes manual uploads), fall back to sales_orders
+  // Monthly revenue: 3-tier fallback matching SalesDashboard
+  // 1) sales_monthly_stats (includes manual uploads)  2) sales_orders  3) approved proposals
   const monthlyStatsRows = monthlyStatsResult.data || [];
   const monthlyStatsTotal = monthlyStatsRows.reduce(
     (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
   );
-  const monthlyRevenue = monthlyStatsTotal > 0 ? monthlyStatsTotal : companyKpis.averageSale * companyKpis.salesOrderCount;
+  const salesOrdersRevenue = companyKpis.averageSale * companyKpis.salesOrderCount;
+  const approvedProposalsThisMonth = approvedProposalsThisMonthResult.data || [];
+  const approvedProposalRevenue = approvedProposalsThisMonth.reduce(
+    (sum: number, p: any) => sum + parseFloat(String(p.total || 0)), 0
+  );
+  const monthlyRevenue = monthlyStatsTotal > 0
+    ? monthlyStatsTotal
+    : salesOrdersRevenue > 0
+      ? salesOrdersRevenue
+      : approvedProposalRevenue;
 
-  // YTD from sales_monthly_stats
+  // YTD: start with sales_monthly_stats, then supplement with sales_orders for months not covered
   const ytdStatsRows = ytdStatsResult.data || [];
-  const ytdTotal = ytdStatsRows.reduce(
+  const ytdFromStats = ytdStatsRows.reduce(
     (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
   );
+  // Determine which months already have stats coverage
+  const statsMonthsCovered = new Set<number>();
+  ytdStatsRows.forEach((r: any) => statsMonthsCovered.add(r.month));
+  // Add sales_orders revenue for months without stats
+  const ytdSalesOrders = ytdSalesOrdersResult.data || [];
+  const salesOrdersByMonth = new Map<number, number>();
+  ytdSalesOrders.forEach((o: any) => {
+    const m = new Date(o.created_at).getMonth() + 1;
+    if (m <= curMonth) {
+      salesOrdersByMonth.set(m, (salesOrdersByMonth.get(m) || 0) + parseFloat(String(o.contract_total || 0)));
+    }
+  });
+  let ytdSupplement = 0;
+  salesOrdersByMonth.forEach((total, m) => {
+    if (!statsMonthsCovered.has(m)) ytdSupplement += total;
+  });
+  const ytdTotal = ytdFromStats + ytdSupplement;
 
   // Previous year same period
   const prevYearSamePeriodRows = prevYearSamePeriodStatsResult.data || [];
@@ -425,15 +461,19 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
   const closedUniverse = approvedCount + declinedCount + cancelledCount + expiredCount;
   const winRate = closedUniverse > 0 ? Math.round((approvedCount / closedUniverse) * 100) : 0;
 
-  // Conversion rate (approved / proposals out)
-  const conversionRate = proposalsOut > 0
-    ? Math.round((approvedCount / (approvedCount + proposalsOut)) * 100)
+  // Conversion rate: approved proposals created this month / total proposals created this month
+  const approvedThisMonth = proposalsThisMonth.filter((p: any) =>
+    ['approved', 'approved_pending_action'].includes(p.status)
+  ).length;
+  const conversionRate = proposalsCreated > 0
+    ? Math.round((approvedThisMonth / proposalsCreated) * 100)
     : 0;
 
-  // Average deal size
-  const averageDealSize = companyKpis.salesOrderCount > 0
-    ? monthlyRevenue / companyKpis.salesOrderCount
-    : 0;
+  // Average deal size: fall back to approved proposals count when no sales orders
+  const dealCount = companyKpis.salesOrderCount > 0
+    ? companyKpis.salesOrderCount
+    : approvedProposalsThisMonth.length;
+  const averageDealSize = dealCount > 0 ? monthlyRevenue / dealCount : 0;
 
   // 24-month trend from all sales_monthly_stats
   const allStats = allStatsResult.data || [];
@@ -450,12 +490,12 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
     });
   }
 
-  // Yearly breakdown: merge yearly_sales_performance + imported historical
-  const yearlyPerf = yearlyPerfResult.data || [];
+  // Yearly breakdown: derive from sales_monthly_stats (authoritative, includes manual uploads),
+  // then supplement with imported historical for years not covered
   const byYear = new Map<number, number>();
-  yearlyPerf.forEach((r: any) => {
+  allStats.forEach((r: any) => {
     const prev = byYear.get(r.year) || 0;
-    byYear.set(r.year, prev + parseFloat(String(r.total_revenue || 0)));
+    byYear.set(r.year, prev + parseFloat(String(r.total_sales || 0)));
   });
   // Merge imported historical for years not in live data
   const importedHist = importedHistResult.data || [];
