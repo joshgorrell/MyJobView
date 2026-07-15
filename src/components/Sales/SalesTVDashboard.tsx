@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { fetchSalesKpis, fetchAllRepGoalProgress, type SalesKpis, type RepGoalProgress } from '../../lib/salesKpis';
+import { fetchTvDashboardData, fetchAllRepGoalProgress, type TvDashboardData, type RepGoalProgress } from '../../lib/salesKpis';
 import {
-  Wifi, WifiOff, Clock, TrendingUp, DollarSign, Percent,
-  Target, Award, Building2, Zap
+  Wifi, WifiOff, Clock, TrendingUp, TrendingDown, DollarSign, Percent,
+  Target, Award, Building2, Zap, FileText, BarChart3, ShoppingCart, Minus
 } from 'lucide-react';
 
 interface OfficeKpi {
@@ -14,8 +14,28 @@ interface OfficeKpi {
   orderCount: number;
 }
 
+const EMPTY_DATA: TvDashboardData = {
+  averageSale: 0,
+  averageMarginPct: 0,
+  salesOrderCount: 0,
+  monthlyRevenue: 0,
+  pipelineValue: 0,
+  proposalsOut: 0,
+  proposalsCreated: 0,
+  winRate: 0,
+  conversionRate: 0,
+  averageDealSize: 0,
+  ytdTotal: 0,
+  prevYearSamePeriod: 0,
+  prevYearFull: 0,
+  yoyPct: null,
+  yoyDir: 'flat',
+  monthlyTrend: [],
+  yearlyBreakdown: [],
+};
+
 export default function SalesTVDashboard() {
-  const [kpis, setKpis] = useState<SalesKpis>({ averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 });
+  const [data, setData] = useState<TvDashboardData>(EMPTY_DATA);
   const [repProgress, setRepProgress] = useState<RepGoalProgress[]>([]);
   const [officeKpis, setOfficeKpis] = useState<OfficeKpi[]>([]);
   const [orgName, setOrgName] = useState('');
@@ -37,17 +57,17 @@ export default function SalesTVDashboard() {
     }
   }, []);
 
-  const loadKpis = useCallback(async () => {
+  const loadAllData = useCallback(async () => {
     try {
       const { data: orgData } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
       if (!orgData) return;
 
-      const [companyKpis, reps] = await Promise.all([
-        fetchSalesKpis({ type: 'company' }, 'this_month'),
+      const [tvData, reps] = await Promise.all([
+        fetchTvDashboardData(orgData.id),
         fetchAllRepGoalProgress(orgData.id),
       ]);
 
-      setKpis(companyKpis);
+      setData(tvData);
       setRepProgress(reps);
       setIsConnected(true);
       setLastUpdate(new Date());
@@ -59,6 +79,9 @@ export default function SalesTVDashboard() {
 
   const loadOfficeKpis = useCallback(async () => {
     try {
+      const { data: orgData } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
+      if (!orgData) return;
+
       const { data: offices } = await supabase
         .from('company_offices')
         .select('id, name')
@@ -66,6 +89,7 @@ export default function SalesTVDashboard() {
 
       if (!offices || offices.length === 0) return;
 
+      const { fetchSalesKpis } = await import('../../lib/salesKpis');
       const results: OfficeKpi[] = [];
       for (const office of offices) {
         const kpis = await fetchSalesKpis({ type: 'office', officeId: office.id }, 'this_month');
@@ -87,20 +111,26 @@ export default function SalesTVDashboard() {
 
   useEffect(() => {
     loadOrg();
-    loadKpis();
+    loadAllData();
     loadOfficeKpis();
     const interval = setInterval(() => {
-      loadKpis();
+      loadAllData();
       loadOfficeKpis();
     }, 30000);
     return () => clearInterval(interval);
-  }, [loadOrg, loadKpis, loadOfficeKpis]);
+  }, [loadOrg, loadAllData, loadOfficeKpis]);
 
   function formatCurrency(v: number) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD',
       minimumFractionDigits: 0, maximumFractionDigits: 0,
     }).format(v);
+  }
+
+  function formatCompact(v: number) {
+    if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+    if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+    return formatCurrency(v);
   }
 
   function formatTime(d: Date) {
@@ -111,8 +141,13 @@ export default function SalesTVDashboard() {
     return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
-  const marginColor = kpis.averageMarginPct >= 40 ? 'text-green-400' : kpis.averageMarginPct >= 25 ? 'text-amber-400' : 'text-red-400';
-  const marginBg = kpis.averageMarginPct >= 40 ? 'from-green-500/20 to-green-600/10 border-green-500/30' : kpis.averageMarginPct >= 25 ? 'from-amber-500/20 to-amber-600/10 border-amber-500/30' : 'from-red-500/20 to-red-600/10 border-red-500/30';
+  const marginColor = data.averageMarginPct >= 40 ? 'text-green-400' : data.averageMarginPct >= 25 ? 'text-amber-400' : 'text-red-400';
+  const marginBg = data.averageMarginPct >= 40 ? 'from-green-500/20 to-green-600/10 border-green-500/30' : data.averageMarginPct >= 25 ? 'from-amber-500/20 to-amber-600/10 border-amber-500/30' : 'from-red-500/20 to-red-600/10 border-red-500/30';
+
+  const yoyColor = data.yoyDir === 'up' ? 'text-green-400' : data.yoyDir === 'down' ? 'text-red-400' : 'text-gray-400';
+  const yoyBg = data.yoyDir === 'up' ? 'from-green-500/20 to-green-600/10 border-green-500/30' : data.yoyDir === 'down' ? 'from-red-500/20 to-red-600/10 border-red-500/30' : 'from-gray-500/20 to-gray-600/10 border-gray-500/30';
+
+  const trendMax = Math.max(...data.monthlyTrend.map(m => m.total), 1);
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-[#0a0e1a] via-[#0d1224] to-[#0a0e1a] text-white overflow-hidden">
@@ -174,7 +209,7 @@ export default function SalesTVDashboard() {
           )}
           <div>
             <h1 className="text-xl font-bold tracking-tight">{orgName || 'Sales Dashboard'}</h1>
-            <p className="text-xs text-gray-400">Sales KPIs & Goal Progress</p>
+            <p className="text-xs text-gray-400">Sales Performance KPIs & Goal Progress</p>
           </div>
         </div>
 
@@ -205,52 +240,211 @@ export default function SalesTVDashboard() {
       {/* Main Content */}
       <div className="h-[calc(100vh-72px)] overflow-y-auto scrollbar-hide p-6 space-y-6">
 
-        {/* Hero KPI Tiles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Average Sale */}
-          <div className={`glass-effect rounded-2xl p-8 card-animate gradient-animate`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center border border-emerald-500/30">
-                  <DollarSign className="w-8 h-8 text-emerald-400" />
+        {/* Top KPI Row — 4 tiles */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Monthly Revenue */}
+          <div className="glass-effect rounded-2xl p-6 card-animate gradient-animate">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center border border-emerald-500/30">
+                  <DollarSign className="w-7 h-7 text-emerald-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-200">Average Sale</h2>
-                  <p className="text-xs text-gray-500">This Month</p>
+                  <h2 className="text-base font-semibold text-gray-200">Monthly Revenue</h2>
+                  <p className="text-xs text-gray-500">{new Date().toLocaleDateString('en-US', { month: 'long' })}</p>
                 </div>
               </div>
-              <TrendingUp className="w-6 h-6 text-emerald-400/60" />
             </div>
-            <div className="text-5xl font-bold tabular-nums count-animate" key={kpis.averageSale}>
-              {formatCurrency(kpis.averageSale)}
+            <div className="text-4xl font-bold tabular-nums count-animate" key={data.monthlyRevenue}>
+              {formatCurrency(data.monthlyRevenue)}
             </div>
             <div className="text-sm text-gray-500 mt-2">
-              {kpis.salesOrderCount} sales orders this month
+              {data.salesOrderCount} sales orders
             </div>
           </div>
 
-          {/* Average Profit Margin */}
-          <div className={`glass-effect rounded-2xl p-8 card-animate bg-gradient-to-br ${marginBg}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center border border-blue-500/30">
-                  <Percent className="w-8 h-8 text-blue-400" />
+          {/* Pipeline Value */}
+          <div className="glass-effect rounded-2xl p-6 card-animate">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center border border-blue-500/30">
+                  <ShoppingCart className="w-7 h-7 text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-200">Avg Profit Margin</h2>
-                  <p className="text-xs text-gray-500">This Month</p>
+                  <h2 className="text-base font-semibold text-gray-200">Pipeline Value</h2>
+                  <p className="text-xs text-gray-500">Active proposals</p>
                 </div>
               </div>
-              <Target className="w-6 h-6 text-blue-400/60" />
             </div>
-            <div className={`text-5xl font-bold tabular-nums count-animate ${marginColor}`} key={kpis.averageMarginPct}>
-              {kpis.averageMarginPct.toFixed(1)}%
+            <div className="text-4xl font-bold tabular-nums count-animate text-blue-400" key={data.pipelineValue}>
+              {formatCurrency(data.pipelineValue)}
             </div>
             <div className="text-sm text-gray-500 mt-2">
-              {kpis.averageMarginPct >= 40 ? 'Above target -- excellent' : kpis.averageMarginPct >= 25 ? 'Near target -- room to improve' : 'Below target -- needs attention'}
+              {data.proposalsOut} out with customers
+            </div>
+          </div>
+
+          {/* YTD Total with YoY */}
+          <div className={`glass-effect rounded-2xl p-6 card-animate bg-gradient-to-br ${yoyBg}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/30 to-indigo-600/20 flex items-center justify-center border border-indigo-500/30">
+                  <BarChart3 className="w-7 h-7 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-gray-200">YTD Sales</h2>
+                  <p className="text-xs text-gray-500">{new Date().getFullYear()} Year-to-Date</p>
+                </div>
+              </div>
+            </div>
+            <div className="text-4xl font-bold tabular-nums count-animate" key={data.ytdTotal}>
+              {formatCurrency(data.ytdTotal)}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              {data.yoyPct !== null ? (
+                <div className={`flex items-center gap-1 text-sm font-medium ${yoyColor}`}>
+                  {data.yoyDir === 'up' ? <TrendingUp className="w-4 h-4" /> : data.yoyDir === 'down' ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+                  {data.yoyPct > 0 ? '+' : ''}{data.yoyPct}% vs {new Date().getFullYear() - 1}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No prior year data</div>
+              )}
+            </div>
+          </div>
+
+          {/* Win Rate */}
+          <div className="glass-effect rounded-2xl p-6 card-animate">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/30 to-amber-600/20 flex items-center justify-center border border-amber-500/30">
+                  <Target className="w-7 h-7 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-gray-200">Win Rate</h2>
+                  <p className="text-xs text-gray-500">All-time proposals</p>
+                </div>
+              </div>
+            </div>
+            <div className="text-4xl font-bold tabular-nums count-animate text-amber-400" key={data.winRate}>
+              {data.winRate}%
+            </div>
+            <div className="text-sm text-gray-500 mt-2">
+              Avg deal: {formatCurrency(data.averageDealSize)}
             </div>
           </div>
         </div>
+
+        {/* Second KPI Row — Average Sale, Margin, Proposals Created, Conversion */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Average Sale */}
+          <div className="glass-effect rounded-2xl p-5 card-animate">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm font-medium text-gray-300">Average Sale</span>
+            </div>
+            <div className="text-2xl font-bold tabular-nums text-emerald-400">{formatCurrency(data.averageSale)}</div>
+            <div className="text-xs text-gray-500 mt-1">This month</div>
+          </div>
+
+          {/* Average Profit Margin */}
+          <div className={`glass-effect rounded-2xl p-5 card-animate bg-gradient-to-br ${marginBg}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Percent className="w-5 h-5 text-blue-400" />
+              <span className="text-sm font-medium text-gray-300">Avg Profit Margin</span>
+            </div>
+            <div className={`text-2xl font-bold tabular-nums ${marginColor}`}>{data.averageMarginPct.toFixed(1)}%</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {data.averageMarginPct >= 40 ? 'Above target' : data.averageMarginPct >= 25 ? 'Near target' : 'Below target'}
+            </div>
+          </div>
+
+          {/* Proposals Created */}
+          <div className="glass-effect rounded-2xl p-5 card-animate">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="w-5 h-5 text-teal-400" />
+              <span className="text-sm font-medium text-gray-300">Proposals Created</span>
+            </div>
+            <div className="text-2xl font-bold tabular-nums text-teal-400">{data.proposalsCreated}</div>
+            <div className="text-xs text-gray-500 mt-1">This month</div>
+          </div>
+
+          {/* Conversion Rate */}
+          <div className="glass-effect rounded-2xl p-5 card-animate">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-5 h-5 text-orange-400" />
+              <span className="text-sm font-medium text-gray-300">Conversion Rate</span>
+            </div>
+            <div className="text-2xl font-bold tabular-nums text-orange-400">{data.conversionRate}%</div>
+            <div className="text-xs text-gray-500 mt-1">Approved vs active</div>
+          </div>
+        </div>
+
+        {/* 24-Month Trend Bar Chart */}
+        {data.monthlyTrend.length > 0 && (
+          <div className="glass-effect rounded-2xl p-6 card-animate">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-5 h-5 text-blue-400" />
+              <h2 className="text-lg font-semibold text-gray-200">24-Month Sales Trend</h2>
+              <span className="text-xs text-gray-500 ml-2">Includes manual uploads</span>
+            </div>
+            <div className="flex items-end gap-0.5 h-32">
+              {data.monthlyTrend.map((bar, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative" title={`${bar.label}: ${formatCurrency(bar.total)}`}>
+                  <div
+                    className={`w-full rounded-sm transition-all duration-300 ${
+                      bar.isCurrentMonth
+                        ? 'bg-blue-500'
+                        : bar.total > 0
+                        ? 'bg-emerald-500/60 hover:bg-emerald-400'
+                        : 'bg-gray-700/40'
+                    }`}
+                    style={{ height: `${Math.max((bar.total / trendMax) * 100, bar.total > 0 ? 3 : 0)}%` }}
+                  />
+                  <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
+                    <div className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white whitespace-nowrap shadow-lg">
+                      <div className="font-semibold">{bar.label}</div>
+                      <div>{formatCurrency(bar.total)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500/60 inline-block" /> Sales</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" /> Current month</span>
+            </div>
+          </div>
+        )}
+
+        {/* Year-over-Year Breakdown */}
+        {data.yearlyBreakdown.length > 0 && (
+          <div className="glass-effect rounded-2xl p-6 card-animate">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-indigo-400" />
+              <h2 className="text-lg font-semibold text-gray-200">Year-over-Year Performance</h2>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+              {data.yearlyBreakdown.map(card => (
+                <div key={card.year} className="rounded-xl bg-white/5 p-4 border border-white/5">
+                  <div className="text-xs text-gray-400 mb-1">{card.year}</div>
+                  <div className="text-lg font-bold text-white tabular-nums">{formatCompact(card.total)}</div>
+                  {card.yoy !== null ? (
+                    <div className={`inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded mt-1.5 ${
+                      card.dir === 'up' ? 'bg-green-500/20 text-green-400' :
+                      card.dir === 'down' ? 'bg-red-500/20 text-red-400' :
+                      'bg-gray-700 text-gray-400'
+                    }`}>
+                      {card.dir === 'up' ? <TrendingUp className="w-3 h-3" /> : card.dir === 'down' ? <TrendingDown className="w-3 h-3" /> : null}
+                      {card.yoy > 0 ? '+' : ''}{card.yoy}%
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-600 mt-1.5">Baseline</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Rep Goal Progress Leaderboard */}
         <div className="glass-effect rounded-2xl p-6 card-animate">
@@ -259,7 +453,7 @@ export default function SalesTVDashboard() {
               <Award className="w-5 h-5 text-amber-400" />
               <h2 className="text-lg font-semibold text-gray-200">Sales Goal Progress</h2>
             </div>
-            <span className="text-xs text-gray-500">YTD vs Annual Quota</span>
+            <span className="text-xs text-gray-500">YTD vs Annual Quota (includes manual uploads)</span>
           </div>
 
           {repProgress.length === 0 ? (

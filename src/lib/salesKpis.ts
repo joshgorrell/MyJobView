@@ -168,12 +168,34 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
 
   const results: RepGoalProgress[] = [];
 
+  // Batch-fetch all sales_monthly_stats for this org (YTD + current month)
+  const { data: allMonthlyStats } = await supabase
+    .from('sales_monthly_stats')
+    .select('user_id, year, month, total_sales')
+    .eq('organization_id', orgId)
+    .order('year', { ascending: true })
+    .order('month', { ascending: true });
+
   for (const rep of reps) {
     const annualQuota = parseFloat(String(rep.current_annual_quota || 0));
     const legacyMonthly = parseFloat(String(rep.monthly_sales_target || 0)) * 12;
     const effectiveQuota = annualQuota > 0 ? annualQuota : legacyMonthly;
 
-    // Fetch YTD sales orders for this rep
+    // YTD sales from sales_monthly_stats (includes manual uploads)
+    const repYtdStats = (allMonthlyStats || []).filter(
+      (r: any) => r.user_id === rep.id && r.year === now.getFullYear() && r.month <= (now.getMonth() + 1)
+    );
+    const ytdStatsTotal = repYtdStats.reduce(
+      (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
+    );
+
+    // This month from sales_monthly_stats
+    const repMonthStat = (allMonthlyStats || []).find(
+      (r: any) => r.user_id === rep.id && r.year === now.getFullYear() && r.month === (now.getMonth() + 1)
+    );
+    const monthStatsTotal = repMonthStat ? parseFloat(String(repMonthStat.total_sales || 0)) : 0;
+
+    // Fetch YTD sales orders for this rep (live data)
     const { data: ytdOrders } = await supabase
       .from('sales_orders')
       .select('contract_total')
@@ -182,12 +204,12 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
       .gte('created_at', yearStartIso)
       .lte('created_at', nowIso);
 
-    const ytdSales = (ytdOrders || []).reduce(
+    const ytdOrderTotal = (ytdOrders || []).reduce(
       (sum, o) => sum + parseFloat(String(o.contract_total || 0)),
       0
     );
 
-    // Fetch this month's sales
+    // Fetch this month's sales orders
     const { data: monthOrders } = await supabase
       .from('sales_orders')
       .select('contract_total')
@@ -196,10 +218,14 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
       .gte('created_at', monthStartIso)
       .lte('created_at', nowIso);
 
-    const thisMonthSales = (monthOrders || []).reduce(
+    const monthOrderTotal = (monthOrders || []).reduce(
       (sum, o) => sum + parseFloat(String(o.contract_total || 0)),
       0
     );
+
+    // Prioritize sales_monthly_stats (includes manual uploads), fall back to sales_orders
+    const ytdSales = ytdStatsTotal > 0 ? ytdStatsTotal : ytdOrderTotal;
+    const thisMonthSales = monthStatsTotal > 0 ? monthStatsTotal : monthOrderTotal;
 
     const quotaProgress = effectiveQuota > 0 ? Math.round((ytdSales / effectiveQuota) * 100) : 0;
     const monthlyQuota = effectiveQuota > 0 ? effectiveQuota / 12 : 0;
@@ -226,4 +252,253 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
 
 export async function fetchCompanyKpis(orgId: string): Promise<SalesKpis> {
   return fetchSalesKpis({ type: 'company' }, 'this_month');
+}
+
+// ── TV Dashboard aggregated data ─────────────────────────────────────────────
+
+export interface TvDashboardData {
+  averageSale: number;
+  averageMarginPct: number;
+  salesOrderCount: number;
+  monthlyRevenue: number;
+  pipelineValue: number;
+  proposalsOut: number;
+  proposalsCreated: number;
+  winRate: number;
+  conversionRate: number;
+  averageDealSize: number;
+  ytdTotal: number;
+  prevYearSamePeriod: number;
+  prevYearFull: number;
+  yoyPct: number | null;
+  yoyDir: 'up' | 'down' | 'flat';
+  monthlyTrend: Array<{ label: string; total: number; isCurrentMonth: boolean }>;
+  yearlyBreakdown: Array<{ year: number; total: number; yoy: number | null; dir: 'up' | 'down' | 'neutral' }>;
+}
+
+function monthLabel(month: number): string {
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return names[month - 1] || '';
+}
+
+export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardData> {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+  const prevYear = curYear - 1;
+
+  const monthStart = new Date(curYear, now.getMonth(), 1).toISOString();
+  const monthEnd = new Date(curYear, now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+  const yearStartIso = new Date(curYear, 0, 1).toISOString();
+  const nowIso = now.toISOString();
+
+  const safe = <T>(q: PromiseLike<{ data: T | null; error: any | null }>) =>
+    Promise.resolve(q).catch(() => ({ data: null, error: null }));
+
+  const [
+    companyKpisResult,
+    monthlyStatsResult,
+    ytdStatsResult,
+    prevYearSamePeriodStatsResult,
+    prevYearFullStatsResult,
+    allStatsResult,
+    activePipelineResult,
+    proposalsThisMonthResult,
+    allTimeProposalsResult,
+    yearlyPerfResult,
+    importedHistResult,
+  ] = await Promise.all([
+    safe(fetchSalesKpis({ type: 'company' }, 'this_month')),
+    safe(supabase
+      .from('sales_monthly_stats')
+      .select('year, month, total_sales')
+      .eq('organization_id', orgId)
+      .eq('year', curYear)
+      .eq('month', curMonth)),
+    safe(supabase
+      .from('sales_monthly_stats')
+      .select('total_sales')
+      .eq('organization_id', orgId)
+      .eq('year', curYear)
+      .lte('month', curMonth)),
+    safe(supabase
+      .from('sales_monthly_stats')
+      .select('total_sales')
+      .eq('organization_id', orgId)
+      .eq('year', prevYear)
+      .lte('month', curMonth)),
+    safe(supabase
+      .from('sales_monthly_stats')
+      .select('total_sales')
+      .eq('organization_id', orgId)
+      .eq('year', prevYear)),
+    safe(supabase
+      .from('sales_monthly_stats')
+      .select('year, month, total_sales')
+      .eq('organization_id', orgId)
+      .order('year', { ascending: true })
+      .order('month', { ascending: true })),
+    safe(supabase
+      .from('proposals')
+      .select('id, status, total')
+      .eq('organization_id', orgId)
+      .in('status', ['designing', 'ready_to_submit', 'sent', 'portal'])),
+    safe(supabase
+      .from('proposals')
+      .select('id, status, total')
+      .eq('organization_id', orgId)
+      .gte('created_at', monthStart)
+      .lte('created_at', monthEnd)),
+    safe(supabase
+      .from('proposals')
+      .select('id, status')
+      .eq('organization_id', orgId)
+      .in('status', ['approved', 'approved_pending_action', 'declined', 'cancelled', 'expired'])),
+    safe(supabase
+      .from('yearly_sales_performance')
+      .select('year, total_revenue')
+      .eq('organization_id', orgId)
+      .order('year', { ascending: true })),
+    safe(supabase
+      .from('sales_history_monthly')
+      .select('stat_year, invoice_total')
+      .eq('organization_id', orgId)
+      .eq('source_type', 'historical_import')
+      .order('stat_year', { ascending: true })),
+  ]);
+
+  const companyKpis = companyKpisResult.data as SalesKpis || { averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 };
+
+  // Monthly revenue: prioritize sales_monthly_stats (includes manual uploads), fall back to sales_orders
+  const monthlyStatsRows = monthlyStatsResult.data || [];
+  const monthlyStatsTotal = monthlyStatsRows.reduce(
+    (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
+  );
+  const monthlyRevenue = monthlyStatsTotal > 0 ? monthlyStatsTotal : companyKpis.averageSale * companyKpis.salesOrderCount;
+
+  // YTD from sales_monthly_stats
+  const ytdStatsRows = ytdStatsResult.data || [];
+  const ytdTotal = ytdStatsRows.reduce(
+    (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
+  );
+
+  // Previous year same period
+  const prevYearSamePeriodRows = prevYearSamePeriodStatsResult.data || [];
+  const prevYearSamePeriod = prevYearSamePeriodRows.reduce(
+    (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
+  );
+
+  // Previous year full
+  const prevYearFullRows = prevYearFullStatsResult.data || [];
+  const prevYearFull = prevYearFullRows.reduce(
+    (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
+  );
+
+  // YoY
+  const yoyPct = prevYearSamePeriod > 0
+    ? Math.round(((ytdTotal - prevYearSamePeriod) / prevYearSamePeriod) * 100)
+    : null;
+  const yoyDir: 'up' | 'down' | 'flat' =
+    yoyPct === null ? 'flat' : yoyPct > 0 ? 'up' : yoyPct < 0 ? 'down' : 'flat';
+
+  // Pipeline
+  const activePipeline = activePipelineResult.data || [];
+  const pipelineValue = activePipeline.reduce(
+    (sum: number, p: any) => sum + parseFloat(String(p.total || 0)), 0
+  );
+  const proposalsOut = activePipeline.filter((p: any) =>
+    ['sent', 'portal'].includes(p.status)
+  ).length;
+
+  // Proposals this month
+  const proposalsThisMonth = proposalsThisMonthResult.data || [];
+  const proposalsCreated = proposalsThisMonth.length;
+
+  // Win rate from all-time proposals
+  const allTimeProposals = allTimeProposalsResult.data || [];
+  const approvedCount = allTimeProposals.filter((p: any) =>
+    ['approved', 'approved_pending_action'].includes(p.status)
+  ).length;
+  const declinedCount = allTimeProposals.filter((p: any) => p.status === 'declined').length;
+  const cancelledCount = allTimeProposals.filter((p: any) => p.status === 'cancelled').length;
+  const expiredCount = allTimeProposals.filter((p: any) => p.status === 'expired').length;
+  const closedUniverse = approvedCount + declinedCount + cancelledCount + expiredCount;
+  const winRate = closedUniverse > 0 ? Math.round((approvedCount / closedUniverse) * 100) : 0;
+
+  // Conversion rate (approved / proposals out)
+  const conversionRate = proposalsOut > 0
+    ? Math.round((approvedCount / (approvedCount + proposalsOut)) * 100)
+    : 0;
+
+  // Average deal size
+  const averageDealSize = companyKpis.salesOrderCount > 0
+    ? monthlyRevenue / companyKpis.salesOrderCount
+    : 0;
+
+  // 24-month trend from all sales_monthly_stats
+  const allStats = allStatsResult.data || [];
+  const monthlyTrend: Array<{ label: string; total: number; isCurrentMonth: boolean }> = [];
+  for (let i = 23; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const yr = d.getFullYear();
+    const mo = d.getMonth() + 1;
+    const row = allStats.find((r: any) => r.year === yr && r.month === mo);
+    monthlyTrend.push({
+      label: `${monthLabel(mo)} ${yr}`,
+      total: row ? parseFloat(String(row.total_sales || 0)) : 0,
+      isCurrentMonth: i === 0,
+    });
+  }
+
+  // Yearly breakdown: merge yearly_sales_performance + imported historical
+  const yearlyPerf = yearlyPerfResult.data || [];
+  const byYear = new Map<number, number>();
+  yearlyPerf.forEach((r: any) => {
+    const prev = byYear.get(r.year) || 0;
+    byYear.set(r.year, prev + parseFloat(String(r.total_revenue || 0)));
+  });
+  // Merge imported historical for years not in live data
+  const importedHist = importedHistResult.data || [];
+  const importedByYear = new Map<number, number>();
+  importedHist.forEach((r: any) => {
+    const yr = r.stat_year;
+    const prev = importedByYear.get(yr) || 0;
+    importedByYear.set(yr, prev + parseFloat(String(r.invoice_total || 0)));
+  });
+  importedByYear.forEach((total, year) => {
+    if (!byYear.has(year)) byYear.set(year, total);
+  });
+
+  const sortedYears = Array.from(byYear.entries()).sort((a, b) => a[0] - b[0]);
+  const yearlyBreakdown = sortedYears.map(([year, total], idx) => {
+    if (idx === 0) return { year, total, yoy: null as number | null, dir: 'neutral' as const };
+    const prev = sortedYears[idx - 1][1];
+    const pct = prev > 0 ? Math.round(((total - prev) / prev) * 100 * 10) / 10 : null;
+    return {
+      year,
+      total,
+      yoy: pct,
+      dir: pct === null ? 'neutral' as const : pct > 0 ? 'up' as const : 'down' as const,
+    };
+  });
+
+  return {
+    averageSale: companyKpis.averageSale,
+    averageMarginPct: companyKpis.averageMarginPct,
+    salesOrderCount: companyKpis.salesOrderCount,
+    monthlyRevenue,
+    pipelineValue,
+    proposalsOut,
+    proposalsCreated,
+    winRate,
+    conversionRate,
+    averageDealSize,
+    ytdTotal,
+    prevYearSamePeriod,
+    prevYearFull,
+    yoyPct,
+    yoyDir,
+    monthlyTrend,
+    yearlyBreakdown,
+  };
 }
