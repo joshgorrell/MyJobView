@@ -150,7 +150,7 @@ export default function SalesTVDashboard() {
   const trendMax = Math.max(...data.monthlyTrend.map(m => m.total), 1);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-[#0a0e1a] via-[#0d1224] to-[#0a0e1a] text-white overflow-hidden">
+    <div className="min-h-[calc(100vh-72px)] bg-gradient-to-br from-[#0a0e1a] via-[#0d1224] to-[#0a0e1a] text-white overflow-hidden">
       <style>{`
         @keyframes slideIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -238,7 +238,7 @@ export default function SalesTVDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="h-[calc(100vh-72px)] overflow-y-auto scrollbar-hide p-6 space-y-6">
+      <div className="overflow-y-auto scrollbar-hide p-6 space-y-6">
 
         {/* Top KPI Row — 4 tiles */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
