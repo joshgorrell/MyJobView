@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Briefcase, Calendar, DollarSign, MessageSquare, LogOut, Shield, XCircle, ClipboardList, Star, ArrowLeft, ChevronRight, CheckSquare } from 'lucide-react';
+import { FileText, Briefcase, Calendar, DollarSign, MessageSquare, LogOut, Shield, XCircle, ClipboardList, Star, ArrowLeft, ChevronRight, CheckSquare, Receipt, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ContractCancellationForm } from './ContractCancellationForm';
 import { TrialStatusBanner } from './TrialStatusBanner';
@@ -76,6 +76,12 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const [hasActiveContract, setHasActiveContract] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [portalAccessLevel, setPortalAccessLevel] = useState<string | null>(null);
+  const [billingPreference, setBillingPreference] = useState<'monthly' | 'annual'>('monthly');
+  const [billingConfig, setBillingConfig] = useState<any>(null);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
+  const [showBillingChangeConfirm, setShowBillingChangeConfirm] = useState(false);
+  const [pendingBillingPref, setPendingBillingPref] = useState<'monthly' | 'annual' | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
   const [moduleSettings, setModuleSettings] = useState<PortalModuleSettings>({
     portal_proposals_enabled: false,
     portal_projects_enabled: false,
@@ -244,6 +250,31 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
       } else {
         setVipSubscription(null);
       }
+
+      // Load billing preference and config
+      const { data: billingSettings } = await supabase
+        .from('company_settings')
+        .select('annual_billing_enabled, default_billing_preference, annual_discount_type, annual_discount_percentage, annual_discount_flat_amount, customer_can_change_billing_preference')
+        .maybeSingle();
+      if (billingSettings) setBillingConfig(billingSettings);
+
+      const { data: prefData } = await supabase
+        .from('customer_billing_preferences')
+        .select('billing_preference')
+        .eq('contact_id', contactId)
+        .maybeSingle();
+      setBillingPreference(prefData?.billing_preference || billingSettings?.default_billing_preference || 'monthly');
+
+      // Load all active recurring subscriptions for this contact
+      const { data: subs } = await supabase
+        .from('recurring_subscriptions')
+        .select(`
+          id, next_billing_date, status, custom_amount,
+          plan:recurring_plans(plan_name, billing_frequency, amount)
+        `)
+        .eq('contact_id', contactId)
+        .eq('status', 'active');
+      setActiveSubscriptions(subs || []);
 
       const [proposalsRes, projectsRes, appointmentsRes, invoicesRes, messagesRes, vipWorkOrdersRes, punchlistRes, salesOrdersRes] = await Promise.all([
         supabase.from('proposals').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['sent', 'viewed']),
@@ -572,6 +603,112 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
                 >
                   Request Cancellation
                   <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Billing Preference Card */}
+        {activeSubscriptions.length > 0 && (
+          <div className="mt-5 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Receipt className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-semibold text-gray-900 mb-1">Billing Preference</h3>
+                <p className="text-gray-500 text-sm mb-4">
+                  Your billing preference applies to all eligible recurring services on your account.
+                </p>
+
+                <div className="flex items-center gap-3 mb-4">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                    billingPreference === 'annual'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${billingPreference === 'annual' ? 'bg-green-500' : 'bg-blue-500'}`} />
+                    {billingPreference === 'annual' ? 'Annual Billing' : 'Monthly Billing'}
+                  </span>
+                </div>
+
+                {/* Active subscriptions breakdown */}
+                <div className="space-y-2 mb-4">
+                  {activeSubscriptions.map((sub: any) => (
+                    <div key={sub.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
+                      <span className="text-gray-700">{sub.plan?.plan_name || 'Recurring Service'}</span>
+                      <span className="text-gray-900 font-medium">
+                        {formatCurrency(sub.custom_amount || sub.plan?.amount || 0)}
+                        {billingPreference === 'annual' ? '/yr' : '/mo'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Change preference button */}
+                {billingConfig?.annual_billing_enabled && billingConfig?.customer_can_change_billing_preference && (
+                  <button
+                    onClick={() => {
+                      setPendingBillingPref(billingPreference === 'monthly' ? 'annual' : 'monthly');
+                      setShowBillingChangeConfirm(true);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Switch to {billingPreference === 'monthly' ? 'Annual' : 'Monthly'} Billing
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Billing Change Confirmation Modal */}
+        {showBillingChangeConfirm && pendingBillingPref && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Change Billing Preference?</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                You are about to switch from{' '}
+                <strong>{billingPreference === 'monthly' ? 'Monthly' : 'Annual'}</strong> to{' '}
+                <strong>{pendingBillingPref === 'monthly' ? 'Monthly' : 'Annual'}</strong> billing.
+              </p>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  This change will take effect on your next billing cycle. Your agreement terms, renewal dates,
+                  and coverage will not be affected.
+                </p>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => { setShowBillingChangeConfirm(false); setPendingBillingPref(null); }}
+                  className="px-4 py-2 text-gray-600 font-medium rounded-xl hover:bg-gray-100 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setBillingLoading(true);
+                    const { data: { user } } = await supabase.auth.getUser();
+                    const { error } = await supabase.rpc('update_customer_billing_preference', {
+                      p_contact_id: contactId,
+                      p_new_preference: pendingBillingPref,
+                      p_reason: 'Changed by customer via portal',
+                      p_changed_by: user?.id || null,
+                      p_changed_by_name: user?.email || null
+                    });
+                    setBillingLoading(false);
+                    if (!error) {
+                      setBillingPreference(pendingBillingPref);
+                      setShowBillingChangeConfirm(false);
+                      setPendingBillingPref(null);
+                    }
+                  }}
+                  disabled={billingLoading}
+                  className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 text-sm"
+                >
+                  {billingLoading ? 'Saving...' : 'Confirm Change'}
                 </button>
               </div>
             </div>

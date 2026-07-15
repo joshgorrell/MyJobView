@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import {
@@ -68,6 +68,19 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
     }
   }
 
+  useEffect(() => {
+    supabase
+      .from('company_settings')
+      .select('annual_billing_enabled, default_billing_preference, annual_discount_type, annual_discount_percentage, annual_discount_flat_amount')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setBillingConfig(data);
+          setBillingPreference(data.default_billing_preference || 'monthly');
+        }
+      });
+  }, []);
+
   function isStepComplete(): boolean {
     switch (currentStep) {
       case 1:
@@ -128,7 +141,8 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           : formData.paymentMethod === 'credit_card'
             ? 'Please complete all card fields: Card Number, Expiration Date, and CVV.'
             : 'Please complete all bank fields: Routing Number, Account Number, and Account Type.',
-        5: 'Please provide your signature.'
+        5: 'Please select a billing preference.',
+        6: 'Please provide your signature.'
       };
       alert(messages[currentStep] || 'Please complete all required fields.');
       return;
@@ -160,6 +174,17 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         canAuthorize: ec.canAuthorize || false,
         priority_order: index + 1
       }));
+
+      // Save billing preference
+      if (contract.contact_id) {
+        await supabase.rpc('update_customer_billing_preference', {
+          p_contact_id: contract.contact_id,
+          p_new_preference: billingPreference,
+          p_reason: 'Selected during onboarding',
+          p_changed_by: null,
+          p_changed_by_name: formData.personalInfo.full_name || null
+        });
+      }
 
       const { data, error } = await supabase.rpc('submit_security_onboarding', {
         p_token: token,
@@ -726,8 +751,160 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           </div>
         )}
 
-        {/* Step 5: Sign Agreement */}
+        {/* Step 5: Billing Preference */}
         {currentStep === 5 && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Your Services</h2>
+              <p className="text-gray-500 text-sm mt-1">Review your selected services and choose how you'd like to pay.</p>
+            </div>
+
+            {/* Services Summary */}
+            <div className="space-y-3">
+              {/* Security Monitoring */}
+              <div className="border border-gray-200 rounded-2xl p-4 bg-white">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">Security Monitoring</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {contract.term_months || 36} Month Agreement
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {formatCurrency(parseFloat(contract.monthly_price) || 0)}/month
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly Total */}
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">Monthly Services Total</span>
+                <span className="text-lg font-bold text-gray-900">
+                  {formatCurrency(parseFloat(contract.monthly_price) || 0)}/month
+                </span>
+              </div>
+            </div>
+
+            {/* Billing Preference Selection */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 mb-3">Choose Your Billing Preference</h3>
+              <div className="space-y-3">
+                {/* Monthly Option */}
+                <button
+                  onClick={() => setBillingPreference('monthly')}
+                  className={`w-full text-left border-2 rounded-2xl p-4 transition-all ${
+                    billingPreference === 'monthly'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 mt-0.5 flex-shrink-0 flex items-center justify-center ${
+                      billingPreference === 'monthly' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                    }`}>
+                      {billingPreference === 'monthly' && <div className="w-2 h-2 bg-white rounded-full" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-gray-900">Monthly Billing</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(parseFloat(contract.monthly_price) || 0)}/month
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency(parseFloat(contract.monthly_price) || 0)} each month.</p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Annual Option */}
+                {billingConfig?.annual_billing_enabled && (
+                  <button
+                    onClick={() => setBillingPreference('annual')}
+                    className={`w-full text-left border-2 rounded-2xl p-4 transition-all ${
+                      billingPreference === 'annual'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 mt-0.5 flex-shrink-0 flex items-center justify-center ${
+                        billingPreference === 'annual' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                      }`}>
+                        {billingPreference === 'annual' && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-900">Annual Billing</span>
+                          {(() => {
+                            const monthlyTotal = parseFloat(contract.monthly_price) || 0;
+                            const annualSubtotal = monthlyTotal * 12;
+                            const discount = calculateAnnualDiscount(
+                              annualSubtotal,
+                              billingConfig.annual_discount_type,
+                              billingConfig.annual_discount_percentage,
+                              billingConfig.annual_discount_flat_amount
+                            );
+                            const amountDue = annualSubtotal - discount;
+                            return (
+                              <span className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(amountDue)}/year
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Pay one year in advance and receive a discount.</p>
+                        {billingPreference === 'annual' && (() => {
+                          const monthlyTotal = parseFloat(contract.monthly_price) || 0;
+                          const annualSubtotal = monthlyTotal * 12;
+                          const discount = calculateAnnualDiscount(
+                            annualSubtotal,
+                            billingConfig.annual_discount_type,
+                            billingConfig.annual_discount_percentage,
+                            billingConfig.annual_discount_flat_amount
+                          );
+                          const amountDue = annualSubtotal - discount;
+                          return (
+                            <div className="mt-3 bg-white border border-gray-200 rounded-xl p-3 space-y-1.5">
+                              <div className="flex justify-between text-xs text-gray-600">
+                                <span>Annual Subtotal</span>
+                                <span>{formatCurrency(annualSubtotal)}</span>
+                              </div>
+                              {discount > 0 && (
+                                <div className="flex justify-between text-xs text-green-600">
+                                  <span>Annual Discount
+                                    {billingConfig.annual_discount_type === 'percentage'
+                                      ? ` (${billingConfig.annual_discount_percentage}%)`
+                                      : ''}
+                                  </span>
+                                  <span>-{formatCurrency(discount)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-sm font-bold text-gray-900 pt-1.5 border-t border-gray-100">
+                                <span>Amount Due Today</span>
+                                <span>{formatCurrency(amountDue)}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+              <p className="text-sm text-blue-800 leading-relaxed">
+                Your billing preference applies to all eligible recurring services on your account. You can change this preference later from your customer portal.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 6: Sign Agreement */}
+        {currentStep === 6 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Sign Agreement</h2>
@@ -813,7 +990,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={saving || !formData.signature || !formData.paymentMethod || formData.emergencyContacts.length < 2}
+            disabled={saving || !formData.signature || !formData.paymentMethod || formData.emergencyContacts.length < 2 || !billingPreference}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm min-h-[44px] shadow-sm"
           >
             {saving ? (
