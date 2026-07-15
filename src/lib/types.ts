@@ -564,3 +564,53 @@ export interface CustomerPurchasedEquipment {
   purchase_date: string | null;
   age_months: number | null;
 }
+
+export type BillingPreference = 'monthly' | 'annual';
+
+export const BILLING_PREFERENCE_LABELS: Record<BillingPreference, string> = {
+  monthly: 'Monthly Billing',
+  annual: 'Annual Billing',
+};
+
+export type AnnualDiscountType = 'percentage' | 'flat' | 'none';
+
+export type BillingProrationRule = 'full_period' | 'prorate_partial' | 'next_cycle';
+
+export interface CustomerBillingPreference {
+  id: string;
+  contact_id: string;
+  billing_preference: BillingPreference;
+  effective_date: string;
+  override_flag: boolean;
+  override_reason: string | null;
+  last_updated_by: string | null;
+  last_updated_at: string;
+}
+
+export interface BillingConfigSettings {
+  annual_billing_enabled: boolean;
+  default_billing_preference: BillingPreference;
+  annual_discount_type: AnnualDiscountType;
+  annual_discount_percentage: number;
+  annual_discount_flat_amount: number;
+  customer_can_change_billing_preference: boolean;
+  staff_can_override_billing_preference: boolean;
+  billing_proration_rule: BillingProrationRule;
+  billing_change_effective_date: 'immediate' | 'next_cycle';
+  default_auto_renew: boolean;
+  grace_period_days: number;
+}
+
+export function calculateAnnualDiscount(
+  annualSubtotal: number,
+  discountType: AnnualDiscountType,
+  discountPercentage: number,
+  discountFlatAmount: number
+): number {
+  if (discountType === 'percentage') {
+    return Math.round(annualSubtotal * (discountPercentage / 100) * 100) / 100;
+  } else if (discountType === 'flat') {
+    return Math.min(discountFlatAmount, annualSubtotal);
+  }
+  return 0;
+}

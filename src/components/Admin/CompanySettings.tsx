@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Building2, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image } from 'lucide-react';
+import { Building2, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { CompanySettings as CompanySettingsType, CompanyOffice } from '../../lib/types';
@@ -61,6 +61,19 @@ export function CompanySettings() {
   // Auto Review Follow-up Settings
   const [autoReviewFollowupEnabled, setAutoReviewFollowupEnabled] = useState(false);
   const [autoReviewFollowupDays, setAutoReviewFollowupDays] = useState(14);
+
+  // Billing Preference Settings
+  const [annualBillingEnabled, setAnnualBillingEnabled] = useState(false);
+  const [defaultBillingPreference, setDefaultBillingPreference] = useState<'monthly' | 'annual'>('monthly');
+  const [annualDiscountType, setAnnualDiscountType] = useState<'percentage' | 'flat' | 'none'>('none');
+  const [annualDiscountPercentage, setAnnualDiscountPercentage] = useState(5);
+  const [annualDiscountFlatAmount, setAnnualDiscountFlatAmount] = useState(50);
+  const [customerCanChangePref, setCustomerCanChangePref] = useState(true);
+  const [staffCanOverridePref, setStaffCanOverridePref] = useState(true);
+  const [billingProrationRule, setBillingProrationRule] = useState<'full_period' | 'prorate_partial' | 'next_cycle'>('next_cycle');
+  const [billingChangeEffective, setBillingChangeEffective] = useState<'immediate' | 'next_cycle'>('next_cycle');
+  const [defaultAutoRenew, setDefaultAutoRenew] = useState(true);
+  const [gracePeriodDays, setGracePeriodDays] = useState(0);
 
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
@@ -125,6 +138,17 @@ export function CompanySettings() {
         // Auto review follow-up settings
         setAutoReviewFollowupEnabled(data.auto_review_followup_enabled ?? false);
         setAutoReviewFollowupDays(data.auto_review_followup_days ?? 14);
+        setAnnualBillingEnabled(data.annual_billing_enabled ?? false);
+        setDefaultBillingPreference(data.default_billing_preference ?? 'monthly');
+        setAnnualDiscountType(data.annual_discount_type ?? 'none');
+        setAnnualDiscountPercentage(data.annual_discount_percentage ? Number(data.annual_discount_percentage) : 5);
+        setAnnualDiscountFlatAmount(data.annual_discount_flat_amount ? Number(data.annual_discount_flat_amount) : 50);
+        setCustomerCanChangePref(data.customer_can_change_billing_preference ?? true);
+        setStaffCanOverridePref(data.staff_can_override_billing_preference ?? true);
+        setBillingProrationRule(data.billing_proration_rule ?? 'next_cycle');
+        setBillingChangeEffective(data.billing_change_effective_date ?? 'next_cycle');
+        setDefaultAutoRenew(data.default_auto_renew ?? true);
+        setGracePeriodDays(data.grace_period_days ?? 0);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -356,6 +380,17 @@ export function CompanySettings() {
             cc_convenience_fee_percentage: ccFeePercentage / 100,
             cc_convenience_fee_flat_amount: ccFeeFlatAmount,
             cc_convenience_fee_label: ccFeeLabel,
+            annual_billing_enabled: annualBillingEnabled,
+            default_billing_preference: defaultBillingPreference,
+            annual_discount_type: annualDiscountType,
+            annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
+            annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
+            customer_can_change_billing_preference: customerCanChangePref,
+            staff_can_override_billing_preference: staffCanOverridePref,
+            billing_proration_rule: billingProrationRule,
+            billing_change_effective_date: billingChangeEffective,
+            default_auto_renew: defaultAutoRenew,
+            grace_period_days: gracePeriodDays,
             portal_proposals_enabled: portalProposalsEnabled,
             portal_projects_enabled: portalProjectsEnabled,
             portal_appointments_enabled: portalAppointmentsEnabled,
@@ -399,6 +434,17 @@ export function CompanySettings() {
             cc_convenience_fee_percentage: ccFeePercentage / 100,
             cc_convenience_fee_flat_amount: ccFeeFlatAmount,
             cc_convenience_fee_label: ccFeeLabel,
+            annual_billing_enabled: annualBillingEnabled,
+            default_billing_preference: defaultBillingPreference,
+            annual_discount_type: annualDiscountType,
+            annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
+            annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
+            customer_can_change_billing_preference: customerCanChangePref,
+            staff_can_override_billing_preference: staffCanOverridePref,
+            billing_proration_rule: billingProrationRule,
+            billing_change_effective_date: billingChangeEffective,
+            default_auto_renew: defaultAutoRenew,
+            grace_period_days: gracePeriodDays,
             portal_proposals_enabled: portalProposalsEnabled,
             portal_projects_enabled: portalProjectsEnabled,
             portal_appointments_enabled: portalAppointmentsEnabled,
@@ -1086,6 +1132,174 @@ export function CompanySettings() {
             placeholder="e.g. Payment is due within 30 days. Late payments are subject to a 1.5% monthly finance charge..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           />
+        </div>
+
+        {/* Recurring Billing Configuration */}
+        <div className="border-t border-gray-200 pt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-blue-600" />
+            Recurring Billing Configuration
+          </h3>
+          <div className="space-y-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={annualBillingEnabled}
+                onChange={(e) => setAnnualBillingEnabled(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-900">Enable Annual Billing</span>
+                <p className="text-xs text-gray-500">Allow customers to choose annual prepay billing with a discount.</p>
+              </div>
+            </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Default Billing Preference</label>
+                <select
+                  value={defaultBillingPreference}
+                  onChange={(e) => setDefaultBillingPreference(e.target.value as 'monthly' | 'annual')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="annual" disabled={!annualBillingEnabled}>Annual (requires annual billing enabled)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Annual Discount Type</label>
+                <select
+                  value={annualDiscountType}
+                  onChange={(e) => setAnnualDiscountType(e.target.value as 'percentage' | 'flat' | 'none')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  disabled={!annualBillingEnabled}
+                >
+                  <option value="none">No Discount</option>
+                  <option value="percentage">Percentage Off</option>
+                  <option value="flat">Flat Dollar Amount Off</option>
+                </select>
+              </div>
+            </div>
+
+            {annualDiscountType === 'percentage' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Annual Discount Percentage (%)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="100"
+                  value={annualDiscountPercentage}
+                  onChange={(e) => setAnnualDiscountPercentage(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  disabled={!annualBillingEnabled}
+                />
+              </div>
+            )}
+            {annualDiscountType === 'flat' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Annual Discount Amount ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={annualDiscountFlatAmount}
+                  onChange={(e) => setAnnualDiscountFlatAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  disabled={!annualBillingEnabled}
+                />
+              </div>
+            )}
+
+            {annualBillingEnabled && annualDiscountType !== 'none' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-900">
+                  <strong>Preview:</strong> A customer paying $76.85/month annually would pay{' '}
+                  {annualDiscountType === 'percentage'
+                    ? `${formatCurrency(76.85 * 12 * (1 - annualDiscountPercentage / 100))} (saved ${formatCurrency(76.85 * 12 * (annualDiscountPercentage / 100))})`
+                    : `${formatCurrency(76.85 * 12 - annualDiscountFlatAmount)} (saved ${formatCurrency(annualDiscountFlatAmount)})`
+                  } per year.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={customerCanChangePref}
+                  onChange={(e) => setCustomerCanChangePref(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Customers Can Change Preference</span>
+                  <p className="text-xs text-gray-500">Allow portal users to switch between monthly and annual.</p>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={staffCanOverridePref}
+                  onChange={(e) => setStaffCanOverridePref(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Staff Can Override Preference</span>
+                  <p className="text-xs text-gray-500">Allow staff to override billing preference per-agreement.</p>
+                </div>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Billing Proration Rule</label>
+                <select
+                  value={billingProrationRule}
+                  onChange={(e) => setBillingProrationRule(e.target.value as 'full_period' | 'prorate_partial' | 'next_cycle')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="next_cycle">Next Cycle (no proration)</option>
+                  <option value="full_period">Full Period Charge</option>
+                  <option value="prorate_partial">Prorate Partial Period</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Change Effective Date</label>
+                <select
+                  value={billingChangeEffective}
+                  onChange={(e) => setBillingChangeEffective(e.target.value as 'immediate' | 'next_cycle')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="next_cycle">Next Billing Cycle</option>
+                  <option value="immediate">Immediate</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Grace Period (days)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="60"
+                  value={gracePeriodDays}
+                  onChange={(e) => setGracePeriodDays(parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={defaultAutoRenew}
+                onChange={(e) => setDefaultAutoRenew(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-900">Default Auto-Renew</span>
+                <p className="text-xs text-gray-500">New agreements auto-renew by default unless cancelled.</p>
+              </div>
+            </label>
+          </div>
         </div>
 
         <button

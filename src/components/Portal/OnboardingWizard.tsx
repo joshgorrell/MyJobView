@@ -4,9 +4,10 @@ import { formatCurrency } from '../../lib/utils';
 import {
   ArrowRight, ArrowLeft, Check, User, Shield, Phone, CreditCard,
   Ligature as FileSignature, HelpCircle, Mail, Plus, Trash2, Lock,
-  Building2, Loader2, AlertCircle
+  Building2, Loader2, AlertCircle, Receipt
 } from 'lucide-react';
 import { SignaturePad } from '../Production/SignaturePad';
+import { calculateAnnualDiscount, type BillingPreference } from '../../lib/types';
 
 interface OnboardingWizardProps {
   contract: any;
@@ -22,6 +23,8 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   const [saving, setSaving] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [billingPreference, setBillingPreference] = useState<BillingPreference>('monthly');
+  const [billingConfig, setBillingConfig] = useState<any>(null);
   const [formData, setFormData] = useState({
     personalInfo: {
       full_name: contract.contact?.full_name || '',
@@ -45,7 +48,8 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
     { id: 2, name: 'Property', icon: Shield },
     { id: 3, name: 'Contacts', icon: Phone },
     { id: 4, name: 'Payment', icon: CreditCard },
-    { id: 5, name: 'Sign', icon: FileSignature }
+    { id: 5, name: 'Billing', icon: Receipt },
+    { id: 6, name: 'Sign', icon: FileSignature }
   ];
 
   async function saveProgress() {
@@ -103,6 +107,8 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         }
         return false;
       case 5:
+        return !!billingPreference;
+      case 6:
         return !!formData.signature;
       default:
         return false;
