@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ArrowLeft, Send, CheckCircle, XCircle, Eye, Mail, Clock, AlertCircle, User, Shield, Phone, CreditCard, Ligature as FileSignature, MapPin, CreditCard as Edit, Printer, Trash2, Ban, Wrench, ShieldCheck } from 'lucide-react';
 import ManualContractEntry from './ManualContractEntry';
+import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 import ConfirmModal from '../ui/ConfirmModal';
 import { AGREEMENT_TYPE_LABELS, AGREEMENT_TYPE_COLORS, SYSTEM_TYPE_LABELS, SERVICE_SCHEDULE_LABELS, type AgreementType, type SystemType } from '../../lib/types';
 
@@ -1130,6 +1131,9 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                 <div><strong>Template:</strong> {contractData.template?.name}</div>
                 <div><strong>Status:</strong> <span className="uppercase font-semibold">{contractData.status?.replace('_', ' ')}</span></div>
                 <div><strong>Monthly Fee:</strong> ${parseFloat(contractData.monthly_price || 0).toFixed(2)}/month</div>
+                {contractData.contact_id && (
+                  <div><strong>Billing Preference:</strong> <BillingPrefBadge contactId={contractData.contact_id} /></div>
+                )}
                 {contractData.customer_signature_date && (
                   <div><strong>Signed Date:</strong> {new Date(contractData.customer_signature_date).toLocaleDateString()}</div>
                 )}

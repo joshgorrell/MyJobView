@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Shield, Plus, Clock, FileText, Send, Calendar, User, RotateCcw, Search, Trash2, AlertCircle, Eye, CreditCard as Edit2, ArrowRight, UserCheck, CheckCircle, XCircle, Loader2, Mail, X } from 'lucide-react';
+import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 import CreateSecurityContractModal from './CreateSecurityContractModal';
 import SecurityContractDetail from './SecurityContractDetail';
 import EditSecurityContractModal from './EditSecurityContractModal';
@@ -205,6 +206,12 @@ function SendAgreementDialog({
                     </div>
                   )}
                 </div>
+                {state.contract.contact_id && (
+                  <div className="border-t border-gray-200 pt-2.5 mt-2.5">
+                    <p className="text-gray-400 mb-0.5 text-xs">Billing Preference</p>
+                    <BillingPrefBadge contactId={state.contract.contact_id} />
+                  </div>
+                )}
               </div>
 
               <p className="text-sm text-gray-600 mb-5 leading-relaxed">

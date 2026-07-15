@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 import { supabase } from '../../lib/supabase';
 import { Search, Plus, ShieldCheck, DollarSign, Calendar, X, AlertCircle, CheckCircle, Loader2, ChevronRight, Package } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
@@ -151,6 +152,7 @@ export default function EquipmentWarrantyAgreements() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Items</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Warranty Period</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Billing</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Pref</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Price</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3"></th>
@@ -173,6 +175,9 @@ export default function EquipmentWarrantyAgreements() {
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 capitalize">{a.billing_frequency_override || '—'}</td>
+                      <td className="px-4 py-3">
+                        {a.contact_id && <BillingPrefBadge contactId={a.contact_id} />}
+                      </td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
                         ${a.monthly_price ? a.monthly_price.toFixed(2) : (a.subscription?.custom_amount || 0).toFixed(2)}
                         <span className="text-gray-400 text-xs ml-1">/{a.billing_frequency_override === 'yearly' ? 'yr' : 'mo'}</span>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { DollarSign, Users, TrendingUp, AlertCircle, Calendar, Shield, Award } from 'lucide-react';
+import { DollarSign, Users, TrendingUp, AlertCircle, Calendar, Shield, Award, Receipt } from 'lucide-react';
 
 interface DashboardStats {
   totalActiveSubscriptions: number;
@@ -10,6 +10,11 @@ interface DashboardStats {
   overdueInvoices: number;
   avgSubscriptionValue: number;
   newThisMonth: number;
+  annualSubscriptions: number;
+  monthlySubscriptions: number;
+  annualRevenue: number;
+  monthlyRevenue: number;
+  combinedInvoices: number;
 }
 
 interface TypeStats {
@@ -26,6 +31,11 @@ export default function RecurringDashboard() {
     overdueInvoices: 0,
     avgSubscriptionValue: 0,
     newThisMonth: 0,
+    annualSubscriptions: 0,
+    monthlySubscriptions: 0,
+    annualRevenue: 0,
+    monthlyRevenue: 0,
+    combinedInvoices: 0,
   });
   const [securityStats, setSecurityStats] = useState<TypeStats>({
     activeSubscriptions: 0,
@@ -122,6 +132,20 @@ export default function RecurringDashboard() {
         .gte('next_billing_date', today)
         .lte('next_billing_date', thirtyDaysFromNow.toISOString().split('T')[0]);
 
+      // Load billing preference breakdown
+      const { data: prefs } = await supabase
+        .from('customer_billing_preferences')
+        .select('billing_preference');
+      const annualCount = prefs?.filter((p: any) => p.billing_preference === 'annual').length || 0;
+      const monthlyCount = prefs?.filter((p: any) => p.billing_preference === 'monthly').length || 0;
+
+      // Count combined invoices (invoices with multiple line items from recurring billing)
+      const { count: combinedCount } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('invoice_type', 'recurring')
+        .gte('created_at', thirtyDaysAgo.toISOString());
+
       setStats({
         totalActiveSubscriptions: totalActive,
         monthlyRecurringRevenue: mrr,
@@ -129,6 +153,11 @@ export default function RecurringDashboard() {
         overdueInvoices: 0,
         avgSubscriptionValue: avgValue,
         newThisMonth: newSubs?.length || 0,
+        annualSubscriptions: annualCount,
+        monthlySubscriptions: monthlyCount,
+        annualRevenue: annualCount * (mrr / Math.max(totalActive, 1)) * 12,
+        monthlyRevenue: monthlyCount * (mrr / Math.max(totalActive, 1)),
+        combinedInvoices: combinedCount || 0,
       });
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
@@ -180,6 +209,13 @@ export default function RecurringDashboard() {
       icon: Calendar,
       color: 'text-yellow-400',
       bgColor: 'bg-yellow-500/10',
+    },
+    {
+      title: 'Combined Invoices (30d)',
+      value: stats.combinedInvoices.toString(),
+      icon: Receipt,
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/10',
     },
   ];
 
@@ -254,6 +290,27 @@ export default function RecurringDashboard() {
               <span className="text-gray-300">Avg Plan Value</span>
               <span className="text-xl font-semibold text-purple-300">{formatCurrency(vipStats.avgSubscriptionValue)}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Billing Preference Breakdown */}
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-white mb-4">Billing Preference Breakdown</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-blue-300 text-sm font-medium">Monthly Billing</span>
+              <span className="text-2xl font-bold text-white">{stats.monthlySubscriptions}</span>
+            </div>
+            <p className="text-gray-400 text-xs">Est. Monthly Revenue: {formatCurrency(stats.monthlyRevenue)}</p>
+          </div>
+          <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-green-300 text-sm font-medium">Annual Billing</span>
+              <span className="text-2xl font-bold text-white">{stats.annualSubscriptions}</span>
+            </div>
+            <p className="text-gray-400 text-xs">Est. Annual Revenue: {formatCurrency(stats.annualRevenue)}</p>
           </div>
         </div>
       </div>
