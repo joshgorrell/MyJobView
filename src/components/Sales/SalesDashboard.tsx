@@ -1634,7 +1634,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   <BarChart3 className="w-4 h-4 text-blue-400" />
                   Last 24 Months
                 </h3>
-                {repBarData.length > 0 && (() => {
+                {repBarData.length > 0 && repBarData.some(b => b.total > 0) ? (() => {
                   const maxVal = Math.max(...repBarData.map(b => b.total), 1);
                   return (
                     <div className="flex items-end gap-0.5 sm:gap-1 h-36">
@@ -1661,7 +1661,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                       ))}
                     </div>
                   );
-                })()}
+                })() : (
+                  <div className="h-36 flex items-center justify-center text-center">
+                    <div>
+                      <BarChart3 className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">No sales recorded in the last 24 months</p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500/70 inline-block" /> Above avg</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-gray-600 inline-block" /> Below avg</span>
