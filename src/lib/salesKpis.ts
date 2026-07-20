@@ -188,6 +188,9 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     const ytdStatsTotal = repYtdStats.reduce(
       (sum: number, r: any) => sum + parseFloat(String(r.total_sales || 0)), 0
     );
+    // Track which months already have stats coverage to avoid double-counting sales orders
+    const statsMonthsCovered = new Set<number>();
+    repYtdStats.forEach((r: any) => statsMonthsCovered.add(r.month));
 
     // This month from sales_monthly_stats
     const repMonthStat = (allMonthlyStats || []).find(
@@ -195,19 +198,28 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     );
     const monthStatsTotal = repMonthStat ? parseFloat(String(repMonthStat.total_sales || 0)) : 0;
 
-    // Fetch YTD sales orders for this rep (live data)
+    // Fetch YTD sales orders for this rep (live data) — with created_at for per-month grouping
     const { data: ytdOrders } = await supabase
       .from('sales_orders')
-      .select('contract_total')
+      .select('contract_total, created_at')
       .not('status', 'in', '("cancelled","voided")')
       .or(`sales_rep_id.eq.${rep.id},created_by.eq.${rep.id}`)
       .gte('created_at', yearStartIso)
       .lte('created_at', nowIso);
 
-    const ytdOrderTotal = (ytdOrders || []).reduce(
-      (sum, o) => sum + parseFloat(String(o.contract_total || 0)),
-      0
-    );
+    // Supplement YTD with sales orders for months not covered by stats
+    let ytdSupplement = 0;
+    const salesOrdersByMonth = new Map<number, number>();
+    (ytdOrders || []).forEach((o: any) => {
+      const m = new Date(o.created_at).getMonth() + 1;
+      if (m <= now.getMonth() + 1) {
+        salesOrdersByMonth.set(m, (salesOrdersByMonth.get(m) || 0) + parseFloat(String(o.contract_total || 0)));
+      }
+    });
+    salesOrdersByMonth.forEach((total, m) => {
+      if (!statsMonthsCovered.has(m)) ytdSupplement += total;
+    });
+    const ytdSales = ytdStatsTotal + ytdSupplement;
 
     // Fetch this month's sales orders
     const { data: monthOrders } = await supabase
@@ -223,9 +235,20 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
       0
     );
 
-    // Prioritize sales_monthly_stats (includes manual uploads), fall back to sales_orders
-    const ytdSales = ytdStatsTotal > 0 ? ytdStatsTotal : ytdOrderTotal;
-    const thisMonthSales = monthStatsTotal > 0 ? monthStatsTotal : monthOrderTotal;
+    // 3-tier fallback: sales_monthly_stats → sales_orders → approved proposals
+    let thisMonthSales = monthStatsTotal > 0 ? monthStatsTotal : monthOrderTotal;
+    if (thisMonthSales === 0) {
+      const { data: monthApprovedProposals } = await supabase
+        .from('proposals')
+        .select('total')
+        .eq('created_by', rep.id)
+        .in('status', ['approved', 'approved_pending_action'])
+        .gte('created_at', monthStartIso)
+        .lte('created_at', nowIso);
+      thisMonthSales = (monthApprovedProposals || []).reduce(
+        (sum, p) => sum + parseFloat(String(p.total || 0)), 0
+      );
+    }
 
     const quotaProgress = effectiveQuota > 0 ? Math.round((ytdSales / effectiveQuota) * 100) : 0;
     const monthlyQuota = effectiveQuota > 0 ? effectiveQuota / 12 : 0;
@@ -295,6 +318,10 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
   const safe = <T>(q: PromiseLike<{ data: T | null; error: any | null }>) =>
     Promise.resolve(q).catch(() => ({ data: null, error: null }));
 
+  const companyKpisPromise = fetchSalesKpis({ type: 'company' }, 'this_month')
+    .then((data): { data: SalesKpis | null; error: any | null } => ({ data, error: null }))
+    .catch((): { data: SalesKpis | null; error: any | null } => ({ data: null, error: null }));
+
   const [
     companyKpisResult,
     monthlyStatsResult,
@@ -309,7 +336,7 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
     ytdSalesOrdersResult,
     importedHistResult,
   ] = await Promise.all([
-    safe(fetchSalesKpis({ type: 'company' }, 'this_month')),
+    companyKpisPromise,
     safe(supabase
       .from('sales_monthly_stats')
       .select('year, month, total_sales')
@@ -376,7 +403,7 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
       .order('stat_year', { ascending: true })),
   ]);
 
-  const companyKpis = companyKpisResult.data as SalesKpis || { averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 };
+  const companyKpis: SalesKpis = companyKpisResult.data || { averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 };
 
   // Monthly revenue: 3-tier fallback matching SalesDashboard
   // 1) sales_monthly_stats (includes manual uploads)  2) sales_orders  3) approved proposals
