@@ -1706,17 +1706,22 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const draggedItemData = items[draggedIndex];
       const targetItemData = items[targetIndex];
 
-      // Determine if we should unnest
       const draggedIsNested = draggedItemData.parent_item_id !== null;
       const targetIsNested = targetItemData.parent_item_id !== null;
 
       let shouldUnnest = false;
+      let shouldNest = false;
 
       if (draggedIsNested && !targetIsNested) {
-        // Dragging nested item to top-level item - unnest it
         shouldUnnest = true;
+      } else if (!draggedIsNested && !targetIsNested) {
+        const hasChildren = room.line_items.some(li => li.parent_item_id === draggedItem);
+        if (hasChildren) {
+          alert('Cannot nest items that already have nested accessories');
+          return;
+        }
+        shouldNest = true;
       } else if (draggedIsNested && targetIsNested && draggedItemData.parent_item_id !== targetItemData.parent_item_id) {
-        // Cannot reorder items with different parents
         return;
       }
 
@@ -1728,7 +1733,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const updates = items.map((item, index) => ({
         id: item.id,
         sort_order: index,
-        ...(item.id === draggedItem && shouldUnnest ? { parent_item_id: null } : {})
+        ...(item.id === draggedItem && shouldUnnest ? { parent_item_id: null } : {}),
+        ...(item.id === draggedItem && shouldNest ? { parent_item_id: targetItemId } : {})
       }));
 
       // Update all items
@@ -1736,6 +1742,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         const updateData: any = { sort_order: update.sort_order };
         if (update.id === draggedItem && shouldUnnest) {
           updateData.parent_item_id = null;
+        }
+        if (update.id === draggedItem && shouldNest) {
+          updateData.parent_item_id = targetItemId;
         }
 
         const { error } = await supabase
