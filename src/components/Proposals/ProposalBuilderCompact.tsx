@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent } from 'lucide-react';
 import {
   recordCOAction,
   recordCOModifierChange,
@@ -3360,14 +3360,34 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             {selectedItems.size > 0 && (
               <>
                 <div className="h-6 w-px bg-gray-700 mx-1" />
-                <button
-                  onClick={handleBulkNestItems}
-                  className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-xs font-medium"
-                  title="Toggle nest/unnest"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>{selectedItems.size}</span>
-                </button>
+                {(() => {
+                  const selectedItemsData = rooms.flatMap(room =>
+                    room.line_items.filter(item => selectedItems.has(item.id))
+                  );
+                  const allNested = selectedItemsData.length > 0 && selectedItemsData.every(item => item.parent_item_id);
+                  if (allNested) {
+                    return (
+                      <button
+                        onClick={handleBulkNestItems}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-600 text-white hover:bg-amber-700 rounded-lg transition-colors text-xs font-medium"
+                        title="Unnest selected items"
+                      >
+                        <Outdent className="w-3.5 h-3.5" />
+                        <span>Unnest {selectedItems.size}</span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      onClick={handleBulkNestItems}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-xs font-medium"
+                      title="Nest selected items under the item above"
+                    >
+                      <Indent className="w-3.5 h-3.5" />
+                      <span>Nest {selectedItems.size}</span>
+                    </button>
+                  );
+                })()}
                 <button
                   onClick={() => setShowCopyToModal(true)}
                   className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-xs font-medium"
@@ -4385,7 +4405,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           />
                         </div>
                       </th>
-                      <th className="py-2 px-2 w-10"></th>
                       {visibleColumns.has('manufacturer') && <th className="text-left py-2 px-3 whitespace-nowrap">Manufacturer</th>}
                       {visibleColumns.has('sku') && <th className="text-left py-2 px-3 whitespace-nowrap">SKU</th>}
                       {visibleColumns.has('description') && <th className="text-left py-2 px-3">Description</th>}
@@ -4606,20 +4625,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   />
                                 </div>
                               </td>
-                              <td className="py-1 px-2 w-10">
-                                {item.products?.image_url ? (
-                                  <img
-                                    src={item.products.image_url}
-                                    alt={item.description || ''}
-                                    className="w-8 h-8 object-cover rounded border border-gray-600"
-                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                  />
-                                ) : item.product_id ? (
-                                  <div className="w-8 h-8 rounded border border-amber-700 bg-amber-900/30 flex items-center justify-center" title="No product image">
-                                    <span className="text-amber-500 text-[10px] font-bold">!</span>
-                                  </div>
-                                ) : null}
-                              </td>
+
                               {visibleColumns.has('manufacturer') && (
                                 <td className="py-2 px-3 text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]" title={item.products?.manufacturers?.name || '-'}>
                                   {item.products?.manufacturers?.name || '-'}
@@ -4859,7 +4865,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   })() : (() => {
                                     const materialTotal = parseFloat(item.unit_price || 0) * item.quantity;
                                     const laborTotal = parseFloat(item.labor_total || 0);
-                                    return formatCurrency(materialTotal + laborTotal);
+                                    let displayTotal = materialTotal + laborTotal;
+                                    if (hasChildren) {
+                                      const nestedChildren = room.line_items.filter(nested => nested.parent_item_id === item.id);
+                                      const nestedMaterial = nestedChildren.reduce((sum, n) => sum + (parseFloat(n.unit_price || 0) * n.quantity), 0);
+                                      const nestedLabor = nestedChildren.reduce((sum, n) => sum + parseFloat(n.labor_total || 0), 0);
+                                      displayTotal += nestedMaterial + nestedLabor;
+                                    }
+                                    return formatCurrency(displayTotal);
                                   })()}
                                 </td>
                               )}
