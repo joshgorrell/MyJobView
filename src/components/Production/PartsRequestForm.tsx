@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Search, Trash2, Package, User, Briefcase, Truck } from 'lucide-react';
+import { X, Plus, Search, Trash2, Package, User, Briefcase, Truck, ShoppingCart, Wrench, ClipboardList } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -7,6 +7,7 @@ interface Product {
   id: string;
   name: string;
   sku: string;
+  model_number?: string;
   vendor: string;
   current_stock: number;
   unit_price: number;
@@ -36,11 +37,16 @@ interface PartsRequestFormProps {
   onSuccess: () => void;
 }
 
+type SourceType = 'sales_order' | 'work_order' | 'service_request' | 'general';
+
 export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) {
   const { user, profile } = useAuth();
-  const [requestType, setRequestType] = useState<'job' | 'stock' | 'van'>('job');
+  const [sourceType, setSourceType] = useState<SourceType>('general');
   const [workOrderId, setWorkOrderId] = useState('');
   const [projectId, setProjectId] = useState('');
+  const [salesOrderId, setSalesOrderId] = useState('');
+  const [serviceRequestId, setServiceRequestId] = useState('');
+  const [officeId, setOfficeId] = useState('');
   const [assignedTo, setAssignedTo] = useState(user?.id || '');
   const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
   const [notes, setNotes] = useState('');
@@ -50,6 +56,11 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
   const [users, setUsers] = useState<any[]>([]);
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [salesOrders, setSalesOrders] = useState<any[]>([]);
+  const [serviceRequests, setServiceRequests] = useState<any[]>([]);
+  const [offices, setOffices] = useState<any[]>([]);
+  const [salesOrderLineItems, setSalesOrderLineItems] = useState<any[]>([]);
+  const [selectedLineItems, setSelectedLineItems] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [notificationRecipients, setNotificationRecipients] = useState<any[]>([]);
 
@@ -57,8 +68,28 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
     loadUsers();
     loadWorkOrders();
     loadProjects();
+    loadSalesOrders();
+    loadServiceRequests();
+    loadOffices();
     loadNotificationRecipients();
   }, []);
+
+  useEffect(() => {
+    if (searchTerm.length >= 2) {
+      searchProducts();
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (salesOrderId) {
+      loadSalesOrderLineItems(salesOrderId);
+    } else {
+      setSalesOrderLineItems([]);
+      setSelectedLineItems(new Set());
+    }
+  }, [salesOrderId]);
 
   const loadNotificationRecipients = async () => {
     const { data } = await supabase
@@ -71,14 +102,6 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
       .eq('is_active', true);
     if (data) setNotificationRecipients(data);
   };
-
-  useEffect(() => {
-    if (searchTerm.length >= 2) {
-      searchProducts();
-    } else {
-      setSearchResults([]);
-    }
-  }, [searchTerm]);
 
   const loadUsers = async () => {
     const { data } = await supabase
@@ -108,6 +131,62 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
     if (data) setProjects(data);
   };
 
+  const loadSalesOrders = async () => {
+    const { data } = await supabase
+      .from('sales_orders')
+      .select(`
+        id, order_number, status,
+        contact:contacts(first_name, last_name, company_name)
+      `)
+      .in('status', ['pending', 'approved', 'active'])
+      .order('order_number', { ascending: false })
+      .limit(50);
+    if (data) setSalesOrders(data);
+  };
+
+  const loadServiceRequests = async () => {
+    const { data } = await supabase
+      .from('service_requests')
+      .select('id, customer_name, customer_phone, job_description, job_location_address')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (data) setServiceRequests(data);
+  };
+
+  const loadOffices = async () => {
+    const { data } = await supabase
+      .from('company_offices')
+      .select('id, office_name')
+      .order('display_order');
+    if (data) setOffices(data);
+  };
+
+  const loadSalesOrderLineItems = async (soId: string) => {
+    const { data: so } = await supabase
+      .from('sales_orders')
+      .select('proposal_id')
+      .eq('id', soId)
+      .maybeSingle();
+
+    if (!so?.proposal_id) {
+      setSalesOrderLineItems([]);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('proposal_line_items')
+      .select(`
+        id, product_id, description, quantity, unit_price, line_total,
+        product:products(name, sku, vendor, default_vendor_id, vendor_id,
+          default_vendor:vendors!products_default_vendor_id_fkey(vendor_name),
+          vendors:vendors!products_vendor_id_fkey(vendor_name))
+      `)
+      .eq('proposal_id', so.proposal_id)
+      .order('sort_order');
+
+    if (data) setSalesOrderLineItems(data);
+  };
+
   const searchProducts = async () => {
     const { data } = await supabase
       .from('products')
@@ -122,7 +201,6 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
   };
 
   const addItemFromProduct = (product: Product) => {
-    // Get vendor name from relationships or fallback to text field
     const vendorName = product.default_vendor?.vendor_name ||
                        product.vendors?.vendor_name ||
                        product.vendor ||
@@ -134,11 +212,33 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
       model_number: product.sku || product.model_number || '',
       vendor: vendorName,
       quantity: 1,
-      assigned_to: requestType === 'van' ? assignedTo : undefined,
       unit_price: product.unit_price
     }]);
     setSearchTerm('');
     setSearchResults([]);
+  };
+
+  const addItemsFromSalesOrder = () => {
+    const newItems: RequestItem[] = [];
+    salesOrderLineItems.forEach((li) => {
+      if (selectedLineItems.has(li.id)) {
+        const product = li.product as any;
+        const vendorName = product?.default_vendor?.vendor_name ||
+                           product?.vendors?.vendor_name ||
+                           product?.vendor ||
+                           '';
+        newItems.push({
+          product_id: li.product_id || undefined,
+          product_name: li.description || product?.name || '',
+          model_number: product?.sku || product?.model_number || '',
+          vendor: vendorName,
+          quantity: parseInt(String(li.quantity)) || 1,
+          unit_price: parseFloat(String(li.unit_price)) || 0
+        });
+      }
+    });
+    setItems([...items, ...newItems]);
+    setSelectedLineItems(new Set());
   };
 
   const addCustomItem = () => {
@@ -146,8 +246,7 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
       product_name: '',
       model_number: '',
       vendor: '',
-      quantity: 1,
-      assigned_to: requestType === 'van' ? assignedTo : undefined
+      quantity: 1
     }]);
   };
 
@@ -161,6 +260,24 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const toggleLineItem = (id: string) => {
+    const newSelected = new Set(selectedLineItems);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedLineItems(newSelected);
+  };
+
+  const selectAllLineItems = () => {
+    if (selectedLineItems.size === salesOrderLineItems.length) {
+      setSelectedLineItems(new Set());
+    } else {
+      setSelectedLineItems(new Set(salesOrderLineItems.map((li: any) => li.id)));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) {
@@ -168,26 +285,40 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
       return;
     }
 
-    // Validate that job requests have either a project or work order
-    if (requestType === 'job' && !workOrderId && !projectId) {
-      alert('For Job requests, you must select either a Project or Work Order');
+    if (sourceType === 'work_order' && !workOrderId && !projectId) {
+      alert('For Work Order requests, you must select either a Project or Work Order');
+      return;
+    }
+
+    if (sourceType === 'sales_order' && !salesOrderId) {
+      alert('Please select a Sales Order');
+      return;
+    }
+
+    if (sourceType === 'service_request' && !serviceRequestId) {
+      alert('Please select a Service Request');
       return;
     }
 
     setSubmitting(true);
     try {
+      const insertData: any = {
+        requested_by: user?.id,
+        request_type: sourceType === 'general' ? 'stock' : sourceType === 'sales_order' ? 'job' : sourceType === 'work_order' ? 'job' : 'job',
+        work_order_id: sourceType === 'work_order' ? (workOrderId || null) : null,
+        project_id: sourceType === 'work_order' ? (projectId || null) : null,
+        sales_order_id: sourceType === 'sales_order' ? salesOrderId : null,
+        service_request_id: sourceType === 'service_request' ? serviceRequestId : null,
+        office_id: officeId || null,
+        assigned_to: sourceType === 'general' ? (assignedTo || null) : null,
+        priority,
+        status: 'pending',
+        notes
+      };
+
       const { data: request, error: requestError } = await supabase
         .from('product_requests')
-        .insert({
-          requested_by: user?.id,
-          request_type: requestType,
-          work_order_id: workOrderId || null,
-          project_id: projectId || null,
-          assigned_to: requestType === 'van' ? assignedTo : null,
-          priority,
-          status: 'pending',
-          notes
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -211,7 +342,6 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
 
       if (itemsError) throw itemsError;
 
-      // Create tasks/notifications for configured recipients
       const recipientUserIds: string[] = [];
 
       for (const recipient of notificationRecipients) {
@@ -223,15 +353,17 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
             .select('id')
             .eq('role', recipient.notification_role);
           if (roleUsers) {
-            recipientUserIds.push(...roleUsers.map(u => u.id));
+            recipientUserIds.push(...roleUsers.map((u: any) => u.id));
           }
         }
       }
 
-      // Create task for first recipient and notifications for all
       if (recipientUserIds.length > 0) {
+        const sourceLabel = sourceType === 'sales_order' ? 'Sales Order' :
+                            sourceType === 'work_order' ? 'Work Order' :
+                            sourceType === 'service_request' ? 'Service Request' : 'General';
         const taskData = {
-          title: `Product Request #${request.id.slice(0, 8)} - ${requestType}`,
+          title: `Product Request #${request.id.slice(0, 8)} - ${sourceLabel}`,
           description: `${items.length} item(s) requested by ${profile?.first_name} ${profile?.last_name}\n\n${notes}`,
           assigned_to: recipientUserIds[0],
           priority: priority === 'urgent' ? 'high' : 'medium',
@@ -244,12 +376,11 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
 
         await supabase.from('tasks').insert(taskData);
 
-        // Create notifications for all recipients
         const notifications = recipientUserIds.map(userId => ({
           user_id: userId,
           type: 'product_request',
           title: `New Product Request`,
-          message: `${profile?.first_name} ${profile?.last_name} submitted a ${requestType} request with ${items.length} item(s)`,
+          message: `${profile?.first_name} ${profile?.last_name} submitted a ${sourceLabel} request with ${items.length} item(s)`,
           related_id: request.id
         }));
 
@@ -266,6 +397,13 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
     }
   };
 
+  const sourceOptions = [
+    { value: 'sales_order' as SourceType, label: 'Sales Order', icon: ShoppingCart, desc: 'Order items from a sales order' },
+    { value: 'work_order' as SourceType, label: 'Work Order', icon: Wrench, desc: 'Order items for a job' },
+    { value: 'service_request' as SourceType, label: 'Service Request', icon: ClipboardList, desc: 'Order items for a service call' },
+    { value: 'general' as SourceType, label: 'General / Stock', icon: Package, desc: 'Order stock or van inventory' },
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-4 sm:my-8 max-h-[96vh] overflow-y-auto">
@@ -273,7 +411,7 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
           <div className="sticky top-0 bg-white flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 z-10">
             <div className="flex-1 min-w-0 pr-2">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">New Product Request</h2>
-              <p className="text-xs sm:text-sm text-gray-600 mt-1">Request products for jobs, stock, or technician vans</p>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">Request products from sales orders, work orders, service requests, or general stock</p>
             </div>
             <button
               type="button"
@@ -285,111 +423,230 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
           </div>
 
           <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Request Type *
-                </label>
-                <select
-                  value={requestType}
-                  onChange={(e) => setRequestType(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                  required
-                >
-                  <option value="job">For Job</option>
-                  <option value="stock">For Stock</option>
-                  <option value="van">For Van</option>
-                </select>
+            {/* Source Type Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Request Source *</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {sourceOptions.map((opt) => {
+                  const Icon = opt.icon;
+                  const active = sourceType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setSourceType(opt.value);
+                        setItems([]);
+                        setSelectedLineItems(new Set());
+                      }}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all text-center ${
+                        active
+                          ? 'border-blue-600 bg-blue-50 text-blue-900'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
+                      <span className="text-xs sm:text-sm font-medium">{opt.label}</span>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              {requestType === 'job' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Project
-                    </label>
-                    <select
-                      value={projectId}
-                      onChange={(e) => setProjectId(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base ${
-                        !projectId && !workOrderId ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    >
-                      <option value="">Select Project</option>
-                      {projects.map((proj) => (
-                        <option key={proj.id} value={proj.id}>
-                          {proj.project_number} - {proj.project_name}
-                        </option>
-                      ))}
-                    </select>
-                    {!projectId && !workOrderId && (
-                      <p className="text-xs text-red-600 mt-1">Required: Select Project or WO</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Work Order
-                    </label>
-                    <select
-                      value={workOrderId}
-                      onChange={(e) => setWorkOrderId(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base ${
-                        !projectId && !workOrderId ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    >
-                      <option value="">Select Work Order</option>
-                      {workOrders.map((wo) => (
-                        <option key={wo.id} value={wo.id}>
-                          {wo.wo_number} - {wo.project?.project_name}
-                        </option>
-                      ))}
-                    </select>
-                    {!projectId && !workOrderId && (
-                      <p className="text-xs text-red-600 mt-1">Required: Select Project or WO</p>
-                    )}
-                  </div>
-                </>
-              )}
+            {/* Office Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Office</label>
+              <select
+                value={officeId}
+                onChange={(e) => setOfficeId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+              >
+                <option value="">No specific office</option>
+                {offices.map((office) => (
+                  <option key={office.id} value={office.id}>{office.office_name}</option>
+                ))}
+              </select>
+            </div>
 
-              {requestType === 'van' && (
+            {/* Sales Order Selection + Line Items */}
+            {sourceType === 'sales_order' && (
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assign To *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sales Order *</label>
                   <select
-                    value={assignedTo}
-                    onChange={(e) => setAssignedTo(e.target.value)}
+                    value={salesOrderId}
+                    onChange={(e) => setSalesOrderId(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
                     required
                   >
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.first_name} {u.last_name}
+                    <option value="">Select Sales Order...</option>
+                    {salesOrders.map((so) => (
+                      <option key={so.id} value={so.id}>
+                        {so.order_number} - {so.contact?.first_name} {so.contact?.last_name} {so.contact?.company_name ? `(${so.contact.company_name})` : ''}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
 
+                {salesOrderLineItems.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        Line Items ({salesOrderLineItems.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={selectAllLineItems}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        {selectedLineItems.size === salesOrderLineItems.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+                    <div className="divide-y divide-gray-200 max-h-64 overflow-y-auto">
+                      {salesOrderLineItems.map((li: any) => {
+                        const product = li.product as any;
+                        const vendorName = product?.default_vendor?.vendor_name ||
+                                           product?.vendors?.vendor_name ||
+                                           product?.vendor || 'N/A';
+                        const isSelected = selectedLineItems.has(li.id);
+                        return (
+                          <label
+                            key={li.id}
+                            className="flex items-start gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleLineItem(li.id)}
+                              className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900">{li.description || product?.name || 'N/A'}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {product?.sku || 'N/A'} - {vendorName} - Qty: {li.quantity} - {li.unit_price ? `$${li.unit_price}` : 'N/A'}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {selectedLineItems.size > 0 && (
+                      <div className="px-4 py-2 bg-blue-50 border-t border-gray-200">
+                        <button
+                          type="button"
+                          onClick={addItemsFromSalesOrder}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          + Add {selectedLineItems.size} selected item(s) to request
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Work Order Selection */}
+            {sourceType === 'work_order' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
+                  <select
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base ${
+                      !projectId && !workOrderId ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Select Project</option>
+                    {projects.map((proj) => (
+                      <option key={proj.id} value={proj.id}>
+                        {proj.project_number} - {proj.project_name}
+                      </option>
+                    ))}
+                  </select>
+                  {!projectId && !workOrderId && (
+                    <p className="text-xs text-red-600 mt-1">Required: Select Project or WO</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Work Order</label>
+                  <select
+                    value={workOrderId}
+                    onChange={(e) => setWorkOrderId(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base ${
+                      !projectId && !workOrderId ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Select Work Order</option>
+                    {workOrders.map((wo) => (
+                      <option key={wo.id} value={wo.id}>
+                        {wo.wo_number} - {wo.project?.project_name}
+                      </option>
+                    ))}
+                  </select>
+                  {!projectId && !workOrderId && (
+                    <p className="text-xs text-red-600 mt-1">Required: Select Project or WO</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Service Request Selection */}
+            {sourceType === 'service_request' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priority
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Service Request *</label>
                 <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as any)}
+                  value={serviceRequestId}
+                  onChange={(e) => setServiceRequestId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                  required
                 >
-                  <option value="normal">Normal</option>
-                  <option value="urgent">Urgent</option>
+                  <option value="">Select Service Request...</option>
+                  {serviceRequests.map((sr) => (
+                    <option key={sr.id} value={sr.id}>
+                      {sr.customer_name} - {sr.job_description?.slice(0, 40) || 'No description'}
+                    </option>
+                  ))}
                 </select>
               </div>
+            )}
+
+            {/* General / Stock: Assign To */}
+            {sourceType === 'general' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
+                <select
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                >
+                  <option value="">No assignment</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name} {u.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Priority */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+              >
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+              </select>
             </div>
 
+            {/* Product Search (always available) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Products
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Products</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -418,7 +675,7 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                       >
                         <div className="font-medium text-gray-900 text-sm sm:text-base break-words">{product.name}</div>
                         <div className="text-xs sm:text-sm text-gray-600 break-words">
-                          {modelNumber} • {vendorName} • Stock: {product.current_stock || 0}
+                          {modelNumber} - {vendorName} - Stock: {product.current_stock || 0}
                         </div>
                       </button>
                     );
@@ -427,6 +684,7 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
               )}
             </div>
 
+            {/* Items List */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-medium text-gray-700">
@@ -445,7 +703,9 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                 <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                   <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-600 text-sm">No items added yet</p>
-                  <p className="text-gray-500 text-xs mt-1">Search for products or add custom items</p>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {sourceType === 'sales_order' ? 'Select line items from the sales order above, or search for products' : 'Search for products or add custom items'}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -476,9 +736,8 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                             type="text"
                             value={item.model_number}
                             onChange={(e) => updateItem(index, 'model_number', e.target.value)}
-                            placeholder="Model # *"
+                            placeholder="Model #"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                            required
                           />
                         </div>
                         <div className="col-span-2 sm:col-span-1">
@@ -486,9 +745,8 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                             type="text"
                             value={item.vendor}
                             onChange={(e) => updateItem(index, 'vendor', e.target.value)}
-                            placeholder="Vendor *"
+                            placeholder="Vendor"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                            required
                           />
                         </div>
                         <div className="col-span-2 sm:col-span-1">
@@ -496,7 +754,7 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                             type="number"
                             min="1"
                             value={item.quantity}
-                            onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value))}
+                            onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
                             placeholder="Qty *"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                             required
@@ -509,10 +767,9 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
               )}
             </div>
 
+            {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
