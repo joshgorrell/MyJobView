@@ -3248,11 +3248,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     <div className={containerClass} style={containerStyle}>
       {/* Header */}
       <div className="sticky top-0 bg-gray-800 border-b border-gray-700 flex-shrink-0 z-30">
-        {/* Row 1: Title and Information */}
-        <div className="px-3 sm:px-4 py-2.5 border-b border-gray-700/50">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            {/* Left: Back button + Title + Customer */}
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* Compact Header — single row */}
+        <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
+          {/* Left: Back + Title + Customer */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <button
                 type="button"
                 onClick={(e) => {
@@ -3268,7 +3267,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg font-semibold text-white truncate">
+                  <h1 className="text-base font-semibold text-white truncate">
                     {proposal?.title || proposal?.proposal_number || 'Proposal Builder'}
                   </h1>
                   {proposal?.status && getStatusBadge(proposal.status)}
@@ -3280,10 +3279,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   <span className="text-gray-500">#{proposal?.proposal_number}</span>
                 </div>
               </div>
-            </div>
+          </div>
 
-            {/* Right: Status Badges */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Right: Badges + All Actions */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
               {/* Live on Portal Badge */}
               {proposal?.is_portal_visible && proposal?.is_active_revision && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
@@ -3338,22 +3337,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   </span>
                 );
               })()}
-            </div>
-          </div>
-        </div>
 
-        {/* CO Mode Summary Bar */}
-        {isCoMode && (
-          <div className="bg-amber-950/40 border-b border-amber-700/40 px-4 py-2 flex items-center gap-2 text-xs flex-shrink-0">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-            <span className="text-amber-300 font-semibold">Change Order Mode</span>
-          </div>
-        )}
-
-        {/* Row 2: Action Buttons */}
-        <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
-          {/* Left: Bulk Actions + Filter */}
-          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Sidebar Toggle (mobile/collapsed) */}
             {sidebarCollapsed && (
               <button
@@ -3417,10 +3401,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </>
             )}
 
-          </div>
-
-          {/* Right: Primary Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Send/Portal Button */}
             {proposal?.status !== 'approved' && (
               <>
@@ -3852,6 +3832,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             </div>
           </div>
         </div>
+
+        {/* CO Mode Summary Bar */}
+        {isCoMode && (
+          <div className="bg-amber-950/40 border-b border-amber-700/40 px-4 py-2 flex items-center gap-2 text-xs flex-shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <span className="text-amber-300 font-semibold">Change Order Mode</span>
+          </div>
+        )}
       </div>
 
       {/* Locked Banner — shown when proposal is locked (live on portal) */}
