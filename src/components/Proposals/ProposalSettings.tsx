@@ -490,12 +490,12 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
           .order('sort_order'),
         supabase
           .from('proposals')
-          .select('*, contacts:contacts!proposals_contact_id_fkey(*), bill_to_contact:contacts!proposals_bill_to_contact_id_fkey(id, full_name, company_name, email, phone, street_address, city, state, zip)')
+          .select('*, contacts:contacts!proposals_contact_id_fkey(*), bill_to_contact:contacts!proposals_bill_to_contact_id_fkey(id, full_name, company_name, email, phone, street_address, city, state, zip_code)')
           .eq('id', proposalId)
           .maybeSingle(),
         supabase
           .from('contacts')
-          .select('id, full_name, company_name, email, phone, street_address, city, state, zip')
+          .select('id, full_name, company_name, email, phone, street_address, city, state, zip_code')
           .eq('organization_id', profile.organization_id)
           .order('full_name'),
         supabase
@@ -673,7 +673,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
 
     try {
       const contactId = proposal.contact_id;
-      const zipCode = proposal.jobsite_zip || proposal.contacts?.zip;
+      const zipCode = proposal.jobsite_zip || proposal.contacts?.zip_code;
 
       if (!contactId) {
         console.log('No contact ID, skipping tax rate update');
@@ -1640,10 +1640,10 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
                     )}
                   </p>
                 </div>
-                {proposal.contacts?.zip || proposal.jobsite_zip ? (
+                {proposal.contacts?.zip_code || proposal.jobsite_zip ? (
                   <div className="text-right">
                     <p className="text-xs text-green-700 font-medium">ZIP Code</p>
-                    <p className="text-sm text-green-900">{proposal.jobsite_zip || proposal.contacts?.zip}</p>
+                    <p className="text-sm text-green-900">{proposal.jobsite_zip || proposal.contacts?.zip_code}</p>
                   </div>
                 ) : (
                   <div className="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded">
@@ -2146,9 +2146,9 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
                             <span className="text-gray-600">Billing Address:</span>
                             <div className="text-gray-900 ml-2">
                               {proposal.contacts.street_address && <div>{proposal.contacts.street_address}</div>}
-                              {(proposal.contacts.city || proposal.contacts.state || proposal.contacts.zip) && (
+                              {(proposal.contacts.city || proposal.contacts.state || proposal.contacts.zip_code) && (
                                 <div>
-                                  {proposal.contacts.city}{proposal.contacts.city && proposal.contacts.state ? ', ' : ''}{proposal.contacts.state} {proposal.contacts.zip}
+                                  {proposal.contacts.city}{proposal.contacts.city && proposal.contacts.state ? ', ' : ''}{proposal.contacts.state} {proposal.contacts.zip_code}
                                 </div>
                               )}
                             </div>
