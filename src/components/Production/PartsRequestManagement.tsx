@@ -124,14 +124,14 @@ export function PartsRequestManagement() {
 
   const createPurchaseOrder = async (request: ProductRequest) => {
     try {
-      const totalCost = request.items.reduce((sum, item) =>
+      const totalCost = (request.items || []).reduce((sum, item) =>
         sum + (item.estimated_cost || 0), 0
       );
 
       const { data: po, error: poError } = await supabase
         .from('purchase_orders')
         .insert({
-          vendor: request.items[0]?.vendor || 'Multiple Vendors',
+          vendor: request.items?.[0]?.vendor || 'Multiple Vendors',
           total: totalCost,
           status: 'draft',
           requested_by: request.requested_by,
@@ -142,7 +142,7 @@ export function PartsRequestManagement() {
 
       if (poError) throw poError;
 
-      const poItems = request.items.map(item => ({
+      const poItems = (request.items || []).map(item => ({
         po_id: po.id,
         product_id: null,
         product_name: item.product_name,
@@ -182,13 +182,16 @@ export function PartsRequestManagement() {
   const filteredRequests = requests.filter(req => {
     const matchesStatus = filterStatus === 'all' || req.status === filterStatus;
     const matchesType = filterType === 'all' || req.request_type === filterType;
+    const requester = req.requester;
+    const requesterFirst = requester?.first_name?.toLowerCase() || '';
+    const requesterLast = requester?.last_name?.toLowerCase() || '';
     const matchesSearch =
-      req.requester.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.requester.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      requesterFirst.includes(searchTerm.toLowerCase()) ||
+      requesterLast.includes(searchTerm.toLowerCase()) ||
       req.work_order?.wo_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.items.some(item =>
-        item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.model_number.toLowerCase().includes(searchTerm.toLowerCase())
+      (req.items || []).some(item =>
+        (item.product_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.model_number || '').toLowerCase().includes(searchTerm.toLowerCase())
       );
 
     return matchesStatus && matchesType && matchesSearch;
@@ -217,7 +220,7 @@ export function PartsRequestManagement() {
     const activeRequests = requests.filter(r => ['pending', 'approved'].includes(r.status));
 
     activeRequests.forEach(request => {
-      request.items.forEach(item => {
+      (request.items || []).forEach(item => {
         const vendor = item.vendor || 'Unknown Vendor';
         if (!grouped[vendor]) {
           grouped[vendor] = [];
@@ -231,7 +234,7 @@ export function PartsRequestManagement() {
           vendor: item.vendor,
           quantityRequested: item.quantity_requested,
           estimatedCost: item.estimated_cost,
-          requester: `${request.requester.first_name} ${request.requester.last_name}`,
+          requester: `${request.requester?.first_name || ''} ${request.requester?.last_name || ''}`.trim(),
           createdAt: request.created_at,
           priority: request.priority
         });
@@ -608,9 +611,9 @@ export function PartsRequestManagement() {
                       </div>
                       <div className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
                         {request.request_type === 'job' && request.work_order && (
-                          <span>WO: {request.work_order.wo_number} • </span>
+                          <span>WO: {request.work_order?.wo_number} • </span>
                         )}
-                        <span className="capitalize">{request.request_type}</span> • {request.items.length} item(s)
+                        <span className="capitalize">{request.request_type}</span> • {(request.items || []).length} item(s)
                       </div>
                     </div>
                   </div>
@@ -627,18 +630,18 @@ export function PartsRequestManagement() {
                 <div className="flex items-center gap-4 text-xs sm:text-sm text-gray-600">
                   <div className="flex items-center gap-1">
                     <User className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="truncate">{request.requester.first_name} {request.requester.last_name}</span>
+                    <span className="truncate">{request.requester?.first_name || 'Unknown'} {request.requester?.last_name || ''}</span>
                   </div>
                 </div>
 
-                {request.items.slice(0, 2).map((item) => (
+                {(request.items || []).slice(0, 2).map((item) => (
                   <div key={item.id} className="mt-2 text-xs sm:text-sm text-gray-600 bg-gray-50 rounded px-3 py-2 break-words">
                     {item.product_name} ({item.model_number}) × {item.quantity_requested}
                   </div>
                 ))}
-                {request.items.length > 2 && (
+                {(request.items || []).length > 2 && (
                   <div className="mt-2 text-xs sm:text-sm text-gray-500">
-                    + {request.items.length - 2} more item(s)
+                    + {(request.items || []).length - 2} more item(s)
                   </div>
                 )}
 
@@ -735,7 +738,7 @@ export function PartsRequestManagement() {
                 <div>
                   <span className="text-gray-500">Requested By:</span>
                   <span className="ml-2 font-medium">
-                    {selectedRequest.requester.first_name} {selectedRequest.requester.last_name}
+                    {selectedRequest.requester?.first_name || 'Unknown'} {selectedRequest.requester?.last_name || ''}
                   </span>
                 </div>
                 <div>
@@ -754,9 +757,9 @@ export function PartsRequestManagement() {
               )}
 
               <div>
-                <div className="text-sm font-medium text-gray-700 mb-3">Items ({selectedRequest.items.length})</div>
+                <div className="text-sm font-medium text-gray-700 mb-3">Items ({(selectedRequest.items || []).length})</div>
                 <div className="space-y-2">
-                  {selectedRequest.items.map((item) => (
+                  {(selectedRequest.items || []).map((item) => (
                     <div key={item.id} className="border border-gray-200 rounded-lg p-3">
                       <div className="font-medium text-gray-900">{item.product_name}</div>
                       <div className="text-sm text-gray-600 mt-1">
