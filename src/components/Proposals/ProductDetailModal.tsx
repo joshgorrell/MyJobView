@@ -389,46 +389,58 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
             onChange={handlePanelChange}
           />
 
-          {/* Accessories Section */}
-          <div className="mt-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Package className="w-4 h-4 text-cyan-600" />
-                <span className="text-sm font-semibold text-gray-700">Accessories</span>
+          {/* Customer Supplied Banner */}
+          {panelData.isCustomerSupplied && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <Package className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <p className="text-xs text-amber-700 font-medium">
+                Customer Supplied — material cost is set to $0 and excluded from totals. Labor and accessories are still billed.
+              </p>
+            </div>
+          )}
+
+          {/* Accessories Section — collapsed when empty */}
+          <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">Accessories &amp; Add-ons</h3>
                 {accessories.length > 0 && (
-                  <span className="text-xs text-gray-500">({accessories.length})</span>
+                  <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-xs font-medium">
+                    {accessories.length}
+                  </span>
                 )}
               </div>
               <button
                 onClick={() => setShowAddAccessory(true)}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-xs text-white font-medium transition-colors"
               >
-                <Plus className="w-3 h-3" /> Add Accessory
+                <Plus className="w-3.5 h-3.5" />Add Accessory
               </button>
             </div>
 
-            {accessories.length > 0 ? (
-              <div className="space-y-1.5">
-                {accessories.map((acc) => (
-                  <div key={acc.id} className="flex items-center justify-between bg-white border border-gray-200 rounded p-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{acc.description}</p>
-                      <p className="text-xs text-gray-500">
-                        {acc.quantity} {acc.unit} × {formatCurrency(acc.unit_price)} = {formatCurrency(acc.line_total)}
-                      </p>
+            {accessories.length > 0 && (
+              <div className="p-4">
+                <div className="space-y-1.5">
+                  {accessories.map((acc) => (
+                    <div key={acc.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                      <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-900 truncate">{acc.description}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {acc.quantity} {acc.unit} × {formatCurrency(acc.unit_price)} = {formatCurrency(acc.line_total)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeAccessory(acc.id)}
+                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors shrink-0"
+                        title="Remove accessory"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => removeAccessory(acc.id)}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors shrink-0"
-                      title="Remove accessory"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            ) : (
-              <p className="text-xs text-gray-400 py-2 text-center">No accessories added yet</p>
             )}
           </div>
 
