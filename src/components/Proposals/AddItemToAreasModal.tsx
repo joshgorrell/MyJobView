@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { Product, ProposalRoom } from '../../lib/types';
-import { Search, Package, X, Plus, RefreshCw, Save, ChevronDown, ChevronUp, ExternalLink, CreditCard as Edit } from 'lucide-react';
+import { Search, Package, X, Plus, RefreshCw, Save, ChevronDown, ChevronUp, ExternalLink, ArrowLeft } from 'lucide-react';
 import SinglePageProductForm from '../Products/SinglePageProductForm';
 import ProductSelector from './ProductSelector';
 import { useAuth } from '../../contexts/AuthContext';
-import { ProductDetailModal } from '../Products/ProductDetailModal';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface AddItemToAreasModalProps {
@@ -88,7 +87,6 @@ export default function AddItemToAreasModal({
   const [masterProduct, setMasterProduct] = useState<any>(null);
   const [loadingMaster, setLoadingMaster] = useState(false);
   const [showMasterDetails, setShowMasterDetails] = useState(false);
-  const [showProductDetailView, setShowProductDetailView] = useState(false);
 
   const [pendingAccessories, setPendingAccessories] = useState<PendingAccessory[]>([]);
   const [showAccessorySelector, setShowAccessorySelector] = useState(false);
@@ -622,7 +620,7 @@ export default function AddItemToAreasModal({
             <div className="space-y-6">
               {/* Main Content - Two Column Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Left Column - Product Info */}
+                {/* Left Column - Product Info (inline details, no buttons) */}
                 <div className="lg:col-span-3">
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                     {(selectedProduct as any).image_url || masterProduct?.image_url ? (
@@ -642,12 +640,23 @@ export default function AddItemToAreasModal({
 
                     <div className="space-y-2">
                       <div className="font-medium text-gray-900 text-sm">{selectedProduct.name}</div>
+
                       {(selectedProduct.sku || masterProduct?.sku) && (
                         <div className="text-xs">
                           <span className="text-gray-500">SKU:</span>{' '}
                           <span className="text-gray-900 font-medium">{selectedProduct.sku || masterProduct?.sku}</span>
                         </div>
                       )}
+
+                      {(selectedProduct as any).manufacturer_model_number || masterProduct?.manufacturer_model_number ? (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Model:</span>{' '}
+                          <span className="text-gray-900 font-medium">
+                            {(selectedProduct as any).manufacturer_model_number || masterProduct?.manufacturer_model_number}
+                          </span>
+                        </div>
+                      ) : null}
+
                       {masterProduct?.category?.name && (
                         <div className="text-xs">
                           <span className="text-gray-500">Category:</span>{' '}
@@ -657,25 +666,51 @@ export default function AddItemToAreasModal({
                           </span>
                         </div>
                       )}
-                      {canEditProducts && selectedProduct.id && !selectedProduct.id.toString().startsWith('null') && (
-                        <button
-                          onClick={() => setShowProductDetailView(true)}
-                          className="w-full mt-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                          View Details
-                        </button>
+
+                      {masterProduct?.manufacturer?.name && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Manufacturer:</span>{' '}
+                          <span className="text-gray-900 font-medium">{masterProduct.manufacturer.name}</span>
+                        </div>
                       )}
+
+                      {masterProduct?.vendor?.vendor_name && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Vendor:</span>{' '}
+                          <span className="text-gray-900 font-medium">{masterProduct.vendor.vendor_name}</span>
+                        </div>
+                      )}
+
+                      {masterProduct?.sales_description && (
+                        <div className="text-xs pt-1 border-t border-gray-200">
+                          <span className="text-gray-500 block mb-1">Sales Description:</span>
+                          <span className="text-gray-700">{masterProduct.sales_description}</span>
+                        </div>
+                      )}
+
+                      {masterProduct?.product_link && (
+                        <a
+                          href={masterProduct.product_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs pt-1"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          View Product Page
+                        </a>
+                      )}
+
+                      {/* Subtle back-to-search link */}
                       <button
                         onClick={() => {
                           setSelectedProduct(null);
                           setMasterProduct(null);
                           setPendingAccessories([]);
                         }}
-                        className="w-full mt-2 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
+                        className="w-full mt-3 pt-2 border-t border-gray-200 text-gray-500 hover:text-gray-700 text-xs flex items-center justify-center gap-1.5 transition-colors"
                       >
-                        <X className="h-3.5 w-3.5" />
-                        Change Product
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        Back to search
                       </button>
                     </div>
                   </div>
@@ -1037,7 +1072,7 @@ export default function AddItemToAreasModal({
                 </div>
               </div>
 
-              {/* Accessories & Add-ons Section */}
+              {/* Accessories Section */}
               <div className="border border-gray-200 rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -1118,11 +1153,6 @@ export default function AddItemToAreasModal({
                         </div>
                       ))}
                     </div>
-
-                    <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Accessories Total:</span>
-                      <span className="text-base font-bold text-gray-900">{formatCurrency(accessoriesTotal)}</span>
-                    </div>
                   </>
                 )}
 
@@ -1184,27 +1214,6 @@ export default function AddItemToAreasModal({
                           <p className="text-base font-bold text-gray-900">{masterProduct.default_labor_hours || 0} hrs</p>
                         </div>
                       </div>
-
-                      {(masterProduct.sales_description || masterProduct.product_link) && (
-                        <div className="space-y-2">
-                          {masterProduct.sales_description && (
-                            <div className="text-sm text-gray-700">
-                              <span className="font-medium">Description:</span> {masterProduct.sales_description}
-                            </div>
-                          )}
-                          {masterProduct.product_link && (
-                            <a
-                              href={masterProduct.product_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              View Product Page
-                            </a>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -1387,20 +1396,6 @@ export default function AddItemToAreasModal({
         <ProductSelector
           onSelect={addPendingAccessory}
           onClose={() => setShowAccessorySelector(false)}
-        />
-      )}
-
-      {showProductDetailView && selectedProduct?.id && !selectedProduct.id.toString().startsWith('null') && (
-        <ProductDetailModal
-          productId={selectedProduct.id}
-          onClose={() => {
-            setShowProductDetailView(false);
-            loadMasterProduct(selectedProduct.id);
-          }}
-          onEdit={() => {
-            setShowProductDetailView(false);
-            window.open(`/admin/products?edit=${selectedProduct.id}`, '_blank');
-          }}
         />
       )}
 
