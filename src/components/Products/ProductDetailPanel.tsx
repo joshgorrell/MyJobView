@@ -37,6 +37,7 @@ export interface ProductDetailPanelData {
   isTaxable: boolean;
   isHidden: boolean;
   isCustomerSupplied: boolean;
+  isLaborItem: boolean;
 }
 
 export interface LaborPhaseOption {
@@ -182,6 +183,25 @@ export default function ProductDetailPanel({
                 <span className="text-xs text-gray-700 capitalize">{data.inventoryType}</span>
               </div>
             )}
+            {isEdit ? (
+              <div className="pt-1">
+                <label className="block text-xs text-gray-500 mb-0.5">Description</label>
+                <textarea
+                  value={data.description || ''}
+                  onChange={(e) => onChange?.('description', e.target.value)}
+                  rows={2}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white resize-none"
+                  placeholder="Product description..."
+                />
+              </div>
+            ) : (
+              data.description && (
+                <div className="pt-1">
+                  <span className="text-xs text-gray-500">Description</span>
+                  <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{data.description}</p>
+                </div>
+              )
+            )}
           </div>
 
           {(data.manufacturerUrl || data.supplierUrl || data.productSheetUrl || data.installVideoUrl) && (
@@ -277,24 +297,6 @@ export default function ProductDetailPanel({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs text-blue-700 mb-0.5">Unit Price</label>
-              {isEdit ? (
-                <div className="relative">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                  <input
-                    type="number"
-                    value={data.isCustomerSupplied ? 0 : data.unitPrice}
-                    step="0.01"
-                    disabled={data.isCustomerSupplied}
-                    onChange={(e) => onChange?.('unitPrice', parseFloat(e.target.value) || 0)}
-                    className="w-full pl-5 pr-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                  />
-                </div>
-              ) : (
-                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.unitPrice)}</span>
-              )}
-            </div>
-            <div>
               <label className="block text-xs text-blue-700 mb-0.5">Cost</label>
               {isEdit ? (
                 <div className="relative">
@@ -311,6 +313,24 @@ export default function ProductDetailPanel({
                 </div>
               ) : (
                 <span className="text-sm font-bold text-blue-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.cost)}</span>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs text-blue-700 mb-0.5">Unit Price</label>
+              {isEdit ? (
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                  <input
+                    type="number"
+                    value={data.isCustomerSupplied ? 0 : data.unitPrice}
+                    step="0.01"
+                    disabled={data.isCustomerSupplied}
+                    onChange={(e) => onChange?.('unitPrice', parseFloat(e.target.value) || 0)}
+                    className="w-full pl-5 pr-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
+              ) : (
+                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.unitPrice)}</span>
               )}
             </div>
           </div>
@@ -387,63 +407,34 @@ export default function ProductDetailPanel({
           )}
         </div>
 
-        {/* Description + Task Notes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-0.5">Description</label>
-            {isEdit ? (
+        {/* Task Notes (full width) */}
+        <div>
+          {isEdit ? (
+            <>
+              <label className="block text-xs text-gray-500 mb-0.5">Task Notes</label>
               <textarea
-                value={data.description || ''}
-                onChange={(e) => onChange?.('description', e.target.value)}
+                value={data.taskNotes || ''}
+                onChange={(e) => onChange?.('taskNotes', e.target.value)}
                 rows={2}
                 className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white resize-none"
-                placeholder="Product description..."
+                placeholder="Install notes for technicians..."
               />
-            ) : (
-              <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">
-                {data.description || <span className="text-gray-400">No description</span>}
-              </p>
-            )}
-          </div>
-          <div>
-            {isEdit ? (
+            </>
+          ) : (
+            data.taskNotes ? (
               <>
-                <div className="flex items-center justify-between mb-0.5">
-                  <label className="text-xs text-gray-500">Task Notes</label>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={data.showTaskNotes}
-                      onChange={(e) => onChange?.('showTaskNotes', e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 w-3 h-3"
-                    />
-                    <span className="text-xs text-gray-500">Show on proposal</span>
-                  </label>
-                </div>
-                <textarea
-                  value={data.taskNotes || ''}
-                  onChange={(e) => onChange?.('taskNotes', e.target.value)}
-                  rows={2}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white resize-none"
-                  placeholder="Install notes for technicians..."
-                />
+                <label className="block text-xs text-gray-500 mb-0.5">Task Notes</label>
+                <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{data.taskNotes}</p>
               </>
             ) : (
-              data.taskNotes ? (
+              data.specifications ? (
                 <>
-                  <label className="block text-xs text-gray-500 mb-0.5">Task Notes</label>
-                  <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{data.taskNotes}</p>
+                  <label className="block text-xs text-gray-500 mb-0.5">Specifications</label>
+                  <p className="text-xs text-gray-700 line-clamp-3">{data.specifications}</p>
                 </>
-              ) : (
-                data.specifications ? (
-                  <>
-                    <label className="block text-xs text-gray-500 mb-0.5">Specifications</label>
-                    <p className="text-xs text-gray-700 line-clamp-3">{data.specifications}</p>
-                  </>
-                ) : null
-              )
-            )}
-          </div>
+              ) : null
+            )
+          )}
         </div>
       </div>
 
@@ -532,6 +523,24 @@ export default function ProductDetailPanel({
                   <Gift className="w-3 h-3 text-amber-500" />
                   Customer Supplied
                 </span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={data.isLaborItem}
+                  onChange={(e) => onChange?.('isLaborItem', e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 w-3.5 h-3.5"
+                />
+                <span className="text-xs text-gray-600">Labor Item</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={data.showTaskNotes}
+                  onChange={(e) => onChange?.('showTaskNotes', e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 w-3.5 h-3.5"
+                />
+                <span className="text-xs text-gray-600">Show task notes on proposal</span>
               </label>
             </div>
           </div>

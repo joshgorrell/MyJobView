@@ -88,6 +88,8 @@ export function ProductDetailModal({ productId, onClose, onEdit }: ProductDetail
         showTaskNotes: false,
         isTaxable: p.taxable ?? false,
         isHidden: false,
+        isCustomerSupplied: false,
+        isLaborItem: false,
       });
     } catch (error) {
       console.error('Error loading product:', error);

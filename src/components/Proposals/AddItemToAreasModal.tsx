@@ -84,6 +84,7 @@ export default function AddItemToAreasModal({
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set(activeAreaId ? [activeAreaId] : []));
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
+  const [roomLineItems, setRoomLineItems] = useState<Record<string, { product_id: string | null }[]>>({});
   const [showNewProductForm, setShowNewProductForm] = useState(false);
   const [pendingAccessories, setPendingAccessories] = useState<PendingAccessory[]>([]);
   const [showAccessorySelector, setShowAccessorySelector] = useState(false);
@@ -105,6 +106,7 @@ export default function AddItemToAreasModal({
     is_taxable: true,
     is_hidden: false,
     is_customer_supplied: false,
+    is_labor_item: false,
     display_mode: 'itemized' as 'itemized' | 'bundle' | 'collapsed',
   });
 
@@ -121,14 +123,24 @@ export default function AddItemToAreasModal({
   }, [selectedProduct]);
 
   async function loadAll() {
-    const [prodsRes, phasesRes, classesRes] = await Promise.all([
+    const [prodsRes, phasesRes, classesRes, itemsRes] = await Promise.all([
       supabase.from('products').select('*').order('sku'),
       supabase.from('labor_phases').select('id, name, default_price').eq('is_active', true).order('sort_order'),
       supabase.from('proposal_classes').select('id, name, color').eq('is_active', true).order('name'),
+      supabase.from('proposal_line_items').select('room_id, product_id').eq('proposal_id', proposalId).is('parent_item_id', null),
     ]);
     if (prodsRes.data) setProducts(prodsRes.data);
     if (phasesRes.data) setLaborPhases(phasesRes.data);
     if (classesRes.data) setClasses(classesRes.data);
+    if (itemsRes.data) {
+      const byRoom: Record<string, { product_id: string | null }[]> = {};
+      for (const it of itemsRes.data as any[]) {
+        const key = it.room_id || '_no_room';
+        if (!byRoom[key]) byRoom[key] = [];
+        byRoom[key].push({ product_id: it.product_id });
+      }
+      setRoomLineItems(byRoom);
+    }
     setLoading(false);
   }
 
@@ -184,6 +196,7 @@ export default function AddItemToAreasModal({
       is_taxable: product.is_taxable !== undefined ? product.is_taxable : true,
       is_hidden: false,
       is_customer_supplied: false,
+      is_labor_item: (product as any).item_type === 'labor',
       display_mode: 'itemized',
     });
     setPendingAccessories([]);
@@ -288,6 +301,9 @@ export default function AddItemToAreasModal({
       showTaskNotes: 'show_task_notes',
       isTaxable: 'is_taxable',
       isHidden: 'is_hidden',
+      isCustomerSupplied: 'is_customer_supplied',
+      isLaborItem: 'is_labor_item',
+      description: 'description',
     };
     const formKey = fieldMap[field];
     if (formKey) {
@@ -333,7 +349,7 @@ export default function AddItemToAreasModal({
           labor_hours: effLaborHrs || null,
           labor_rate: effLaborRate || null,
           labor_total: laborTotalVal || null,
-          item_type: form.item_type || null,
+          item_type: form.is_labor_item ? 'labor' : (form.item_type || 'material'),
           task_notes: form.task_notes || null,
           show_task_notes: form.show_task_notes,
           is_taxable: form.is_taxable,
@@ -419,6 +435,7 @@ export default function AddItemToAreasModal({
     isTaxable: form.is_taxable,
     isHidden: form.is_hidden,
     isCustomerSupplied: form.is_customer_supplied,
+    isLaborItem: form.is_labor_item,
   } : null;
 
   const modal = (
@@ -523,22 +540,6 @@ export default function AddItemToAreasModal({
                   onChange={handlePanelChange}
                 />
               )}
-
-              {/* Customer Supplied toggle */}
-              <div className="flex items-center gap-4 pt-1">
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={form.is_customer_supplied}
-                    onChange={e => setForm(f => ({ ...f, is_customer_supplied: e.target.checked }))}
-                    className="rounded border-gray-300 text-amber-500 focus:ring-amber-500/30 w-3.5 h-3.5" />
-                  <span className="text-xs text-amber-600 font-medium">Customer Supplied</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={form.item_type === 'labor'}
-                    onChange={e => setForm(f => ({ ...f, item_type: e.target.checked ? 'labor' : 'material' }))}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30 w-3.5 h-3.5" />
-                  <span className="text-xs text-gray-600">Labor Item</span>
-                </label>
-              </div>
 
               {/* Customer Supplied Banner */}
               {form.is_customer_supplied && (
@@ -647,6 +648,9 @@ export default function AddItemToAreasModal({
                     {localRooms.map(room => {
                       const isSelected = selectedRooms.has(room.id);
                       const isActive = room.id === activeAreaId;
+                      const existingItems = roomLineItems[room.id];
+                      const isDuplicate = existingItems && selectedProduct && !String(selectedProduct.id).startsWith('null') &&
+                        existingItems.some(it => it.product_id === selectedProduct.id);
                       return (
                         <label key={room.id}
                           className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
@@ -654,6 +658,9 @@ export default function AddItemToAreasModal({
                             onChange={() => toggleRoom(room.id)}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
                           <span className="text-xs text-gray-700 flex-1">{room.name}</span>
+                          {isDuplicate && (
+                            <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Already in area</span>
+                          )}
                           {isActive && (
                             <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
                           )}

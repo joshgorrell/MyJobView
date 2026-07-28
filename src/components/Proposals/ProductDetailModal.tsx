@@ -116,6 +116,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
           isTaxable: item.is_taxable ?? false,
           isHidden: item.is_hidden ?? false,
           isCustomerSupplied: item.is_customer_supplied ?? false,
+          isLaborItem: item.item_type === 'labor',
         });
       }
 
@@ -284,6 +285,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
         is_taxable: panelData.isTaxable,
         is_hidden: panelData.isHidden,
         is_customer_supplied: panelData.isCustomerSupplied,
+        item_type: panelData.isLaborItem ? 'labor' : 'material',
         line_total: lineTotal,
       };
 

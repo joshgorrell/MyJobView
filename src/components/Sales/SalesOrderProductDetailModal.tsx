@@ -100,6 +100,8 @@ export function SalesOrderProductDetailModal({ lineItem, onClose }: SalesOrderPr
         showTaskNotes: false,
         isTaxable: false,
         isHidden: false,
+        isCustomerSupplied: false,
+        isLaborItem: false,
       });
     } catch (err) {
       console.error('Error loading product:', err);
