@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { Product, ProposalRoom } from '../../lib/types';
-import { Search, Package, X, Plus } from 'lucide-react';
+import { Search, Package, X, Plus, RefreshCw, Save, ChevronDown, ChevronUp, ExternalLink, CreditCard as Edit } from 'lucide-react';
 import SinglePageProductForm from '../Products/SinglePageProductForm';
+import ProductSelector from './ProductSelector';
+import { useAuth } from '../../contexts/AuthContext';
+import { ProductDetailModal } from '../Products/ProductDetailModal';
+import ConfirmModal from '../ui/ConfirmModal';
 
 interface AddItemToAreasModalProps {
   proposalId: string;
@@ -27,6 +31,15 @@ interface LaborPhase {
   default_price: number | null;
 }
 
+interface PendingAccessory {
+  tempId: string;
+  product: Product;
+  quantity: number;
+  unit_price: number;
+  cost: number;
+  description: string;
+}
+
 export default function AddItemToAreasModal({
   proposalId,
   rooms: initialRooms,
@@ -35,12 +48,14 @@ export default function AddItemToAreasModal({
   onItemsAdded,
   onRoomsUpdate
 }: AddItemToAreasModalProps) {
+  const { profile } = useAuth();
+  const canEditProducts = profile?.can_edit_products ?? false;
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // Form data matching LineItemEditModal
   const [formData, setFormData] = useState({
     description: '',
     quantity: 1,
@@ -70,11 +85,29 @@ export default function AddItemToAreasModal({
   const [localRooms, setLocalRooms] = useState<ProposalRoom[]>(initialRooms);
   const [showNewProductForm, setShowNewProductForm] = useState(false);
 
+  const [masterProduct, setMasterProduct] = useState<any>(null);
+  const [loadingMaster, setLoadingMaster] = useState(false);
+  const [showMasterDetails, setShowMasterDetails] = useState(false);
+  const [showProductDetailView, setShowProductDetailView] = useState(false);
+
+  const [pendingAccessories, setPendingAccessories] = useState<PendingAccessory[]>([]);
+  const [showAccessorySelector, setShowAccessorySelector] = useState(false);
+  const [displayMode, setDisplayMode] = useState<'itemized' | 'bundle' | 'collapsed'>('itemized');
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
   useEffect(() => {
     loadProducts();
     loadLaborPhases();
     loadClasses();
   }, []);
+
+  useEffect(() => {
+    if (selectedProduct?.id && !selectedProduct.id.toString().startsWith('null')) {
+      loadMasterProduct(selectedProduct.id);
+    } else {
+      setMasterProduct(null);
+    }
+  }, [selectedProduct]);
 
   async function loadClasses() {
     try {
@@ -122,6 +155,48 @@ export default function AddItemToAreasModal({
     }
   }
 
+  async function loadMasterProduct(productId: string) {
+    setLoadingMaster(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id,
+          sku,
+          name,
+          description,
+          unit,
+          unit_price,
+          cost,
+          our_price,
+          default_labor_hours,
+          class_id,
+          item_type,
+          labor_phase_id,
+          is_taxable,
+          manufacturer_model_number,
+          sales_description,
+          product_link,
+          image_url,
+          manufacturer:manufacturers(name),
+          vendor:vendors(vendor_name),
+          category:product_categories(name),
+          subcategory:product_subcategories(name),
+          labor_phase:labor_phases(name, default_price)
+        `)
+        .eq('id', productId)
+        .single();
+
+      if (error) throw error;
+      setMasterProduct(data);
+    } catch (error) {
+      console.error('Error loading master product:', error);
+      setMasterProduct(null);
+    } finally {
+      setLoadingMaster(false);
+    }
+  }
+
   const filteredProducts = products.filter(product => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -156,6 +231,8 @@ export default function AddItemToAreasModal({
       is_hidden: false,
       is_customer_supplied: false,
     });
+    setPendingAccessories([]);
+    setDisplayMode('itemized');
   }
 
   async function handleProductCreated(productData: any) {
@@ -274,6 +351,79 @@ export default function AddItemToAreasModal({
     }
   }
 
+  function updateFromMaster() {
+    if (!masterProduct) return;
+
+    setFormData({
+      ...formData,
+      description: masterProduct.name || formData.description,
+      unit: masterProduct.unit || formData.unit,
+      unit_price: masterProduct.unit_price || formData.unit_price,
+      cost: masterProduct.cost || formData.cost,
+      class_id: masterProduct.class_id || formData.class_id,
+      labor_hours: masterProduct.default_labor_hours || formData.labor_hours,
+      labor_phase_id: masterProduct.labor_phase_id || formData.labor_phase_id,
+      is_taxable: masterProduct.is_taxable !== undefined ? masterProduct.is_taxable : formData.is_taxable,
+    });
+
+    if (masterProduct.labor_phase_id) {
+      const phase = laborPhases.find(p => p.id === masterProduct.labor_phase_id);
+      if (phase?.default_price) {
+        setFormData(prev => ({ ...prev, labor_rate: phase.default_price! }));
+      }
+    }
+  }
+
+  function addPendingAccessory(product: Product) {
+    const newAccessory: PendingAccessory = {
+      tempId: `pending-${Date.now()}-${Math.random()}`,
+      product,
+      quantity: 1,
+      unit_price: product.unit_price || product.our_price || 0,
+      cost: product.cost || 0,
+      description: product.description || product.name,
+    };
+    setPendingAccessories([...pendingAccessories, newAccessory]);
+    setShowAccessorySelector(false);
+  }
+
+  function removePendingAccessory(tempId: string) {
+    setConfirmModal({
+      title: 'Remove Accessory',
+      message: 'Remove this accessory from the item?',
+      onConfirm: () => {
+        setPendingAccessories(pendingAccessories.filter(a => a.tempId !== tempId));
+        setConfirmModal(null);
+      }
+    });
+  }
+
+  async function handleSaveToMaster() {
+    if (!selectedProduct?.id || !canEditProducts) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name: formData.description,
+          unit: formData.unit,
+          unit_price: formData.unit_price,
+          cost: formData.cost,
+          class_id: formData.class_id || null,
+          default_labor_hours: formData.labor_hours || null,
+          labor_phase_id: formData.labor_phase_id || null,
+          is_taxable: formData.is_taxable,
+        })
+        .eq('id', selectedProduct.id);
+
+      if (error) throw error;
+      alert('Product master catalog updated successfully.');
+    } catch (error: any) {
+      console.error('Error saving to master:', error);
+      alert('Failed to save to master: ' + error.message);
+    }
+  }
+
   async function handleSave() {
     if (!selectedProduct) {
       alert('Please select a product');
@@ -297,11 +447,10 @@ export default function AddItemToAreasModal({
       const laborTotal = effectiveLaborHours * formData.quantity * effectiveLaborRate;
       const effectiveLineTotal = formData.is_customer_supplied ? 0 : formData.quantity * formData.unit_price;
 
-      const lineItems: any[] = [];
-      let sortIndex = 0;
+      const roomIds = selectedRooms.size === 0 ? [null] : Array.from(selectedRooms);
 
-      const buildItem = (roomId: string | null) => {
-        const lineItem: any = {
+      for (const roomId of roomIds) {
+        const mainItem: any = {
           proposal_id: proposalId,
           room_id: roomId,
           description: formData.description,
@@ -321,35 +470,47 @@ export default function AddItemToAreasModal({
           is_hidden: formData.is_hidden,
           is_customer_supplied: formData.is_customer_supplied,
           is_custom: false,
-          sort_order: 9999 + sortIndex++
+          display_mode: pendingAccessories.length > 0 ? displayMode : null,
+          sort_order: 9999
         };
 
         if (isOneOff) {
-          lineItem.product_id = null;
-          lineItem.item_name = selectedProduct.name || (selectedProduct as any).manufacturer_model_number;
+          mainItem.product_id = null;
+          mainItem.item_name = selectedProduct.name || (selectedProduct as any).manufacturer_model_number;
         } else {
-          lineItem.product_id = selectedProduct.id;
+          mainItem.product_id = selectedProduct.id;
         }
 
-        return lineItem;
-      };
+        const { data: insertedMain, error: mainError } = await supabase
+          .from('proposal_line_items')
+          .insert(mainItem)
+          .select()
+          .single();
 
-      if (selectedRooms.size === 0) {
-        lineItems.push(buildItem(null));
-      } else {
-        Array.from(selectedRooms).forEach(roomId => {
-          lineItems.push(buildItem(roomId));
-        });
-      }
+        if (mainError) throw mainError;
 
-      const { data, error } = await supabase
-        .from('proposal_line_items')
-        .insert(lineItems)
-        .select();
+        if (pendingAccessories.length > 0 && insertedMain) {
+          const accessoryItems = pendingAccessories.map((acc, idx) => ({
+            proposal_id: proposalId,
+            room_id: roomId,
+            product_id: acc.product.id,
+            parent_item_id: insertedMain.id,
+            description: acc.description,
+            quantity: acc.quantity,
+            unit: acc.product.unit || 'each',
+            unit_price: acc.unit_price,
+            cost: acc.cost,
+            line_total: acc.quantity * acc.unit_price,
+            sort_order: 10000 + idx,
+            is_custom: false,
+          }));
 
-      if (error) {
-        console.error('Database error:', error);
-        throw error;
+          const { error: accError } = await supabase
+            .from('proposal_line_items')
+            .insert(accessoryItems);
+
+          if (accError) throw accError;
+        }
       }
 
       onItemsAdded();
@@ -361,13 +522,14 @@ export default function AddItemToAreasModal({
     }
   }
 
-  // Calculations matching LineItemEditModal
   const lineTotal = formData.is_customer_supplied ? 0 : formData.quantity * formData.unit_price;
   const laborTotal = formData.is_customer_supplied ? 0 : (formData.labor_hours || 0) * formData.quantity * (formData.labor_rate || 0);
   const totalRevenue = lineTotal + laborTotal;
   const totalCost = formData.is_customer_supplied ? 0 : (formData.cost * formData.quantity);
   const profit = totalRevenue - totalCost;
   const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+
+  const accessoriesTotal = pendingAccessories.reduce((sum, a) => sum + a.quantity * a.unit_price, 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
@@ -463,9 +625,9 @@ export default function AddItemToAreasModal({
                 {/* Left Column - Product Info */}
                 <div className="lg:col-span-3">
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                    {(selectedProduct as any).image_url ? (
+                    {(selectedProduct as any).image_url || masterProduct?.image_url ? (
                       <img
-                        src={(selectedProduct as any).image_url}
+                        src={(selectedProduct as any).image_url || masterProduct?.image_url}
                         alt={selectedProduct.name}
                         className="w-full h-48 object-contain rounded-lg mb-3"
                         onError={(e) => {
@@ -480,14 +642,36 @@ export default function AddItemToAreasModal({
 
                     <div className="space-y-2">
                       <div className="font-medium text-gray-900 text-sm">{selectedProduct.name}</div>
-                      {selectedProduct.sku && (
+                      {(selectedProduct.sku || masterProduct?.sku) && (
                         <div className="text-xs">
                           <span className="text-gray-500">SKU:</span>{' '}
-                          <span className="text-gray-900 font-medium">{selectedProduct.sku}</span>
+                          <span className="text-gray-900 font-medium">{selectedProduct.sku || masterProduct?.sku}</span>
                         </div>
                       )}
+                      {masterProduct?.category?.name && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Category:</span>{' '}
+                          <span className="text-gray-900 font-medium">
+                            {masterProduct.category.name}
+                            {masterProduct.subcategory?.name && ` > ${masterProduct.subcategory.name}`}
+                          </span>
+                        </div>
+                      )}
+                      {canEditProducts && selectedProduct.id && !selectedProduct.id.toString().startsWith('null') && (
+                        <button
+                          onClick={() => setShowProductDetailView(true)}
+                          className="w-full mt-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                          View Details
+                        </button>
+                      )}
                       <button
-                        onClick={() => setSelectedProduct(null)}
+                        onClick={() => {
+                          setSelectedProduct(null);
+                          setMasterProduct(null);
+                          setPendingAccessories([]);
+                        }}
                         className="w-full mt-2 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -853,6 +1037,215 @@ export default function AddItemToAreasModal({
                 </div>
               </div>
 
+              {/* Accessories & Add-ons Section */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Accessories & Add-ons</h3>
+                    <p className="text-sm text-gray-500 mt-1">Items that are part of this product package</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAccessorySelector(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <Plus size={16} />
+                    Add Accessory
+                  </button>
+                </div>
+
+                {pendingAccessories.length > 0 && (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Display Mode</label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setDisplayMode('itemized')}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            displayMode === 'itemized'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          Itemized
+                        </button>
+                        <button
+                          onClick={() => setDisplayMode('bundle')}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            displayMode === 'bundle'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          Bundle
+                        </button>
+                        <button
+                          onClick={() => setDisplayMode('collapsed')}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            displayMode === 'collapsed'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          Collapsed
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {displayMode === 'itemized' && 'Show all items as separate line items'}
+                        {displayMode === 'bundle' && 'Show only parent item with total including accessories'}
+                        {displayMode === 'collapsed' && 'Show parent with text summary of accessories'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      {pendingAccessories.map((accessory) => (
+                        <div
+                          key={accessory.tempId}
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">{accessory.description}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {accessory.quantity} {accessory.product.unit || 'ea'} x ${accessory.unit_price.toFixed(2)} = ${(accessory.quantity * accessory.unit_price).toFixed(2)}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => removePendingAccessory(accessory.tempId)}
+                            className="text-red-600 hover:text-red-700 p-2 hover:bg-red-50 rounded transition-colors"
+                            title="Remove accessory"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Accessories Total:</span>
+                      <span className="text-base font-bold text-gray-900">{formatCurrency(accessoriesTotal)}</span>
+                    </div>
+                  </>
+                )}
+
+                {pendingAccessories.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm">No accessories added yet</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Master Catalog Details - Collapsible */}
+              {masterProduct && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setShowMasterDetails(!showMasterDetails)}
+                    className="w-full bg-gray-50 px-5 py-3 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="font-medium text-gray-900 flex items-center gap-2">
+                      <Package className="w-4 h-4 text-gray-600" />
+                      Master Catalog Details
+                    </span>
+                    {showMasterDetails ? (
+                      <ChevronUp className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-500" />
+                    )}
+                  </button>
+
+                  {showMasterDetails && (
+                    <div className="p-5 bg-white space-y-4">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Master Price</p>
+                          <p className="text-base font-bold text-gray-900">
+                            ${Number(masterProduct.our_price || masterProduct.unit_price || 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Master Cost</p>
+                          <p className="text-base font-bold text-gray-900">
+                            ${Number(masterProduct.cost || 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Master Margin</p>
+                          <p className="text-base font-bold text-gray-900">
+                            {(() => {
+                              const cost = Number(masterProduct.cost || 0);
+                              const price = Number(masterProduct.our_price || masterProduct.unit_price || 0);
+                              const profit = price - cost;
+                              const margin = price > 0 ? (profit / price) * 100 : 0;
+                              return margin.toFixed(1);
+                            })()}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Default Hours</p>
+                          <p className="text-base font-bold text-gray-900">{masterProduct.default_labor_hours || 0} hrs</p>
+                        </div>
+                      </div>
+
+                      {(masterProduct.sales_description || masterProduct.product_link) && (
+                        <div className="space-y-2">
+                          {masterProduct.sales_description && (
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">Description:</span> {masterProduct.sales_description}
+                            </div>
+                          )}
+                          {masterProduct.product_link && (
+                            <a
+                              href={masterProduct.product_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              View Product Page
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Master Product Actions */}
+              {selectedProduct?.id && !selectedProduct.id.toString().startsWith('null') && (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-start gap-2 mb-3">
+                    <Package className="w-4 h-4 text-gray-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Linked to Master Catalog</p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        This item is synced with the master catalog.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={updateFromMaster}
+                      disabled={loadingMaster || !masterProduct}
+                      className="px-4 py-2 bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <RefreshCw size={16} className={loadingMaster ? 'animate-spin' : ''} />
+                      Update from Master
+                    </button>
+                    {canEditProducts && (
+                      <button
+                        type="button"
+                        onClick={handleSaveToMaster}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Save size={16} />
+                        Save to Master
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Area Selection */}
               <div className="border border-gray-200 rounded-lg p-5">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -933,49 +1326,51 @@ export default function AddItemToAreasModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-5 sm:px-8 py-4 flex items-center justify-between shrink-0">
-          <div>
-            {selectedProduct && (
-              <div className="text-sm">
-                <span className="text-gray-500">Line Total: </span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(formData.is_customer_supplied ? 0 : lineTotal + laborTotal)}
-                </span>
-              </div>
-            )}
-          </div>
+        <div className="border-t border-gray-200 px-5 sm:px-8 py-4 sm:py-5 bg-gray-50 rounded-b-none sm:rounded-b-2xl shrink-0">
+          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div>
+              {selectedProduct && (
+                <div className="text-sm">
+                  <span className="text-gray-500">Line Total: </span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatCurrency(formData.is_customer_supplied ? 0 : lineTotal + laborTotal + accessoriesTotal)}
+                  </span>
+                </div>
+              )}
+            </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-
-            {selectedProduct && (
+            <div className="flex items-center gap-3">
               <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-colors"
+                onClick={onClose}
+                className="px-5 py-2.5 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg font-medium transition-colors"
               >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Adding...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4" />
-                    <span>
-                      {selectedRooms.size === 0
-                        ? 'Add (Unassigned)'
-                        : `Add to ${selectedRooms.size} Area${selectedRooms.size !== 1 ? 's' : ''}`}
-                    </span>
-                  </>
-                )}
+                Cancel
               </button>
-            )}
+
+              {selectedProduct && (
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Adding...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>
+                        {selectedRooms.size === 0
+                          ? 'Add (Unassigned)'
+                          : `Add to ${selectedRooms.size} Area${selectedRooms.size !== 1 ? 's' : ''}`}
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -987,6 +1382,36 @@ export default function AddItemToAreasModal({
           onClose={() => setShowNewProductForm(false)}
         />
       )}
+
+      {showAccessorySelector && (
+        <ProductSelector
+          onSelect={addPendingAccessory}
+          onClose={() => setShowAccessorySelector(false)}
+        />
+      )}
+
+      {showProductDetailView && selectedProduct?.id && !selectedProduct.id.toString().startsWith('null') && (
+        <ProductDetailModal
+          productId={selectedProduct.id}
+          onClose={() => {
+            setShowProductDetailView(false);
+            loadMasterProduct(selectedProduct.id);
+          }}
+          onEdit={() => {
+            setShowProductDetailView(false);
+            window.open(`/admin/products?edit=${selectedProduct.id}`, '_blank');
+          }}
+        />
+      )}
+
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        title={confirmModal?.title || ''}
+        message={confirmModal?.message || ''}
+        variant="danger"
+        onConfirm={() => confirmModal?.onConfirm()}
+        onCancel={() => setConfirmModal(null)}
+      />
     </div>
   );
 }
