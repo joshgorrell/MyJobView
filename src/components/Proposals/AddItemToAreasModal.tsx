@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, RefreshCw, Plus, Copy, ChevronDown, ChevronUp, ArrowLeft, Search } from 'lucide-react';
+import { X, Package, Plus, Check, Loader2, Copy, ArrowLeft, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
 import { Product, ProposalRoom } from '../../lib/types';
 import SinglePageProductForm from '../Products/SinglePageProductForm';
 import ProductSelector from './ProductSelector';
+import ProductDetailPanel, { type ProductDetailPanelData } from '../Products/ProductDetailPanel';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface AddItemToAreasModalProps {
@@ -74,10 +75,6 @@ export default function AddItemToAreasModal({
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
   const [showNewProductForm, setShowNewProductForm] = useState(false);
-  const [showMasterDetails, setShowMasterDetails] = useState(false);
-  const [showNewClassForm, setShowNewClassForm] = useState(false);
-  const [newClassName, setNewClassName] = useState('');
-  const [newClassColor, setNewClassColor] = useState('#3B82F6');
   const [pendingAccessories, setPendingAccessories] = useState<PendingAccessory[]>([]);
   const [showAccessorySelector, setShowAccessorySelector] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -242,44 +239,6 @@ export default function AddItemToAreasModal({
     }
   }
 
-  async function createNewClass() {
-    if (!newClassName.trim()) return;
-    const { data, error } = await supabase
-      .from('proposal_classes')
-      .insert({ name: newClassName.trim(), color: newClassColor, sort_order: classes.length, is_active: true })
-      .select('id, name, color')
-      .single();
-    if (!error && data) {
-      setClasses(prev => [...prev, data]);
-      setForm(f => ({ ...f, class_id: data.id }));
-      setShowNewClassForm(false);
-      setNewClassName('');
-      setNewClassColor('#3B82F6');
-    }
-  }
-
-  function updateFromMaster() {
-    if (!masterProduct) return;
-    setForm(f => ({
-      ...f,
-      description: masterProduct.name || f.description,
-      unit: masterProduct.unit || f.unit,
-      unit_price: masterProduct.unit_price || f.unit_price,
-      cost: masterProduct.cost ?? f.cost,
-      class_id: (masterProduct as any).class_id ?? f.class_id,
-      labor_hours: masterProduct.default_labor_hours ?? f.labor_hours,
-      item_type: (masterProduct as any).item_type || f.item_type,
-      labor_phase_id: masterProduct.labor_phase_id ?? f.labor_phase_id,
-      is_taxable: masterProduct.is_taxable !== undefined ? masterProduct.is_taxable : f.is_taxable,
-    }));
-    if (masterProduct.labor_phase_id) {
-      const phase = laborPhases.find(p => p.id === masterProduct.labor_phase_id);
-      if (phase?.default_price) {
-        setForm(f => ({ ...f, labor_rate: phase.default_price! }));
-      }
-    }
-  }
-
   function addPendingAccessory(product: Product) {
     const acc: PendingAccessory = {
       tempId: `pending-${Date.now()}-${Math.random()}`,
@@ -304,25 +263,31 @@ export default function AddItemToAreasModal({
     });
   }
 
-  async function handleSaveToMaster() {
-    if (!selectedProduct?.id || !canEditProducts) return;
-    const { error } = await supabase
-      .from('products')
-      .update({
-        name: form.description,
-        unit: form.unit,
-        unit_price: form.unit_price,
-        cost: form.cost,
-        class_id: form.class_id || null,
-        default_labor_hours: form.labor_hours || null,
-        labor_phase_id: form.labor_phase_id || null,
-        is_taxable: form.is_taxable,
-      })
-      .eq('id', selectedProduct.id);
-    if (error) {
-      alert('Failed to save to master: ' + error.message);
-    } else {
-      alert('Product master catalog updated successfully.');
+  function handlePanelChange(field: keyof ProductDetailPanelData, value: any) {
+    const fieldMap: Record<string, string> = {
+      productName: 'description',
+      quantity: 'quantity',
+      unit: 'unit',
+      unitPrice: 'unit_price',
+      cost: 'cost',
+      laborHours: 'labor_hours',
+      laborRate: 'labor_rate',
+      laborPhaseId: 'labor_phase_id',
+      classId: 'class_id',
+      taskNotes: 'task_notes',
+      showTaskNotes: 'show_task_notes',
+      isTaxable: 'is_taxable',
+      isHidden: 'is_hidden',
+    };
+    const formKey = fieldMap[field];
+    if (formKey) {
+      setForm(f => ({ ...f, [formKey]: value }));
+    }
+    if (field === 'laborPhaseId' && value) {
+      const ph = laborPhases.find(p => p.id === value);
+      if (ph?.default_price) {
+        setForm(f => ({ ...f, labor_rate: ph.default_price! }));
+      }
     }
   }
 
@@ -408,594 +373,327 @@ export default function AddItemToAreasModal({
   const lineTotal = form.is_customer_supplied ? 0 : form.quantity * form.unit_price;
   const laborTotalCalc = form.is_customer_supplied ? 0 : (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
   const totalRevenue = lineTotal + laborTotalCalc;
-  const totalCost = form.is_customer_supplied ? 0 : form.cost * form.quantity;
-  const profit = totalRevenue - totalCost;
-  const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
   const accessoriesTotal = pendingAccessories.reduce((s, a) => s + a.quantity * a.unit_price, 0);
-  const currentImageUrl = (selectedProduct as any)?.image_url || masterProduct?.image_url || null;
+
+  // Build panelData for ProductDetailPanel
+  const panelData: ProductDetailPanelData | null = selectedProduct ? {
+    productId: selectedProduct.id ?? null,
+    productName: form.description,
+    sku: selectedProduct.sku || masterProduct?.sku || null,
+    upc: (selectedProduct as any).upc || (masterProduct as any).upc || null,
+    category: masterProduct?.category?.name || (selectedProduct as any).category || null,
+    subcategory: masterProduct?.subcategory?.name || null,
+    inventoryType: (masterProduct as any).inventory_type || (selectedProduct as any).inventory_type || null,
+    itemColor: (masterProduct as any).item_color || (selectedProduct as any).item_color || null,
+    itemSize: (masterProduct as any).item_size || (selectedProduct as any).item_size || null,
+    manufacturerName: masterProduct?.manufacturer?.name || null,
+    imageUrl: (selectedProduct as any).image_url || masterProduct?.image_url || null,
+    manufacturerUrl: (masterProduct as any).manufacturer_url || null,
+    supplierUrl: (masterProduct as any).supplier_url || null,
+    productSheetUrl: (masterProduct as any).product_sheet_url || null,
+    installVideoUrl: (masterProduct as any).install_video_url || null,
+    description: masterProduct?.description || selectedProduct.description || null,
+    specifications: (masterProduct as any).specifications || null,
+    unitPrice: form.unit_price,
+    cost: form.cost,
+    msrp: (masterProduct as any).msrp ? Number((masterProduct as any).msrp) : null,
+    quantity: form.quantity,
+    unit: form.unit,
+    laborHours: form.labor_hours,
+    laborRate: form.labor_rate,
+    laborPhaseId: form.labor_phase_id || null,
+    laborPhaseName: masterProduct?.labor_phase?.name || null,
+    classId: form.class_id || null,
+    taskNotes: form.task_notes,
+    showTaskNotes: form.show_task_notes,
+    isTaxable: form.is_taxable,
+    isHidden: form.is_hidden,
+  } : null;
 
   const modal = (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ maxHeight: '92vh' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/60 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4 text-gray-400" />
+        <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between shrink-0">
+          <div className="min-w-0 flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+              <Package className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-white leading-tight">Add Item to Proposal</h2>
+              <h2 className="text-base font-bold text-gray-900 leading-tight">Add Item to Proposal</h2>
               <p className="text-xs text-gray-500 mt-0.5">
                 {selectedProduct ? 'Configure item details and pricing' : 'Search for a product or create a new one'}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
-            {/* Step 1: Product Selection */}
-            {!selectedProduct ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Search Products</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Search by name, SKU, or description..."
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
-                      autoFocus
-                    />
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {/* Step 1: Product Selection */}
+          {!selectedProduct ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Search Products</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search by name, SKU, or description..."
+                    className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowNewProductForm(true)}
+                className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />Create New Product
+              </button>
+
+              <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto bg-white">
+                {loading ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">Loading products...</div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">
+                    {searchQuery ? 'No products match your search' : 'No products available'}
                   </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {filteredProducts.map(product => (
+                      <button
+                        key={product.id}
+                        onClick={() => handleProductSelect(product)}
+                        className="w-full p-3 text-left hover:bg-blue-50 transition-colors flex items-start gap-3"
+                      >
+                        <Package className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 text-sm">{product.name}</div>
+                          {product.sku && <div className="text-xs text-gray-500 mt-0.5 font-mono">SKU: {product.sku}</div>}
+                          {product.description && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</div>}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-gray-900 font-medium text-sm">
+                            ${(product.unit_price || (product as any).our_price || 0).toFixed(2)}
+                          </div>
+                          <div className="text-xs text-gray-400">per {product.unit || 'ea'}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Back to search */}
+              <button
+                onClick={() => { setSelectedProduct(null); setMasterProduct(null); setPendingAccessories([]); }}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />Back to Search
+              </button>
+
+              {/* Product Detail Panel — same component as Edit Item Details */}
+              {panelData && (
+                <ProductDetailPanel
+                  mode="edit"
+                  data={panelData}
+                  laborPhases={laborPhases}
+                  classes={classes}
+                  onChange={handlePanelChange}
+                />
+              )}
+
+              {/* Customer Supplied toggle */}
+              <div className="flex items-center gap-4 pt-1">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={form.is_customer_supplied}
+                    onChange={e => setForm(f => ({ ...f, is_customer_supplied: e.target.checked }))}
+                    className="rounded border-gray-300 text-amber-500 focus:ring-amber-500/30 w-3.5 h-3.5" />
+                  <span className="text-xs text-amber-600 font-medium">Customer Supplied</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={form.item_type === 'labor'}
+                    onChange={e => setForm(f => ({ ...f, item_type: e.target.checked ? 'labor' : 'material' }))}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30 w-3.5 h-3.5" />
+                  <span className="text-xs text-gray-600">Labor Item</span>
+                </label>
+              </div>
+
+              {/* Customer Supplied Banner */}
+              {form.is_customer_supplied && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <Package className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <p className="text-xs text-amber-700 font-medium">
+                    Customer Supplied — pricing is set to $0 and excluded from all totals.
+                  </p>
+                </div>
+              )}
+
+              {/* Accessories Section */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Accessories &amp; Add-ons</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Items nested under this product</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAccessorySelector(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-xs text-white font-medium transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />Add Accessory
+                  </button>
                 </div>
 
-                <button
-                  onClick={() => setShowNewProductForm(true)}
-                  className="w-full px-4 py-3 bg-blue-700 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-colors"
-                >
-                  <Plus className="w-5 h-5" />Create New Product
-                </button>
-
-                <div className="border border-gray-700/50 rounded-xl max-h-96 overflow-y-auto">
-                  {loading ? (
-                    <div className="p-8 text-center text-gray-500 text-sm">Loading products...</div>
-                  ) : filteredProducts.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500 text-sm">
-                      {searchQuery ? 'No products match your search' : 'No products available'}
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-gray-800">
-                      {filteredProducts.map(product => (
-                        <button
-                          key={product.id}
-                          onClick={() => handleProductSelect(product)}
-                          className="w-full p-4 text-left hover:bg-gray-800 transition-colors flex items-start gap-3"
-                        >
-                          <Package className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-white text-sm">{product.name}</div>
-                            {product.sku && <div className="text-xs text-gray-500 mt-0.5 font-mono">SKU: {product.sku}</div>}
-                            {product.description && <div className="text-xs text-gray-400 mt-1 line-clamp-2">{product.description}</div>}
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-white font-medium text-sm">
-                              ${(product.unit_price || (product as any).our_price || 0).toFixed(2)}
+                <div className="p-4">
+                  {pendingAccessories.length > 0 ? (
+                    <>
+                      <div className="flex gap-1.5 mb-3">
+                        {(['itemized', 'bundle', 'collapsed'] as const).map(mode => (
+                          <button key={mode}
+                            onClick={() => setForm(f => ({ ...f, display_mode: mode }))}
+                            className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+                              form.display_mode === mode
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-500 hover:text-gray-700 hover:bg-gray-200 border border-gray-200'
+                            }`}>
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mb-3">
+                        {form.display_mode === 'itemized' && 'Show all items as separate line items'}
+                        {form.display_mode === 'bundle' && 'Show only parent item with total including accessories'}
+                        {form.display_mode === 'collapsed' && 'Show parent with text summary of accessories'}
+                      </p>
+                      <div className="space-y-1.5">
+                        {pendingAccessories.map(acc => (
+                          <div key={acc.tempId} className="flex items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                            <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-900 truncate">{acc.description}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {acc.quantity} {acc.product.unit || 'ea'} × {formatCurrency(acc.unit_price)} = {formatCurrency(acc.quantity * acc.unit_price)}
+                              </p>
                             </div>
-                            <div className="text-xs text-gray-500">per {product.unit || 'ea'}</div>
+                            <button onClick={() => removePendingAccessory(acc.tempId)}
+                              className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors shrink-0">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                        </button>
-                      ))}
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-6 text-gray-400">
+                      <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-xs">No accessories added yet</p>
                     </div>
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Two-column main layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
 
-                  {/* Left — Image + Catalog Info */}
-                  <div className="space-y-4">
-                    {/* Product Image */}
-                    <div className="relative group rounded-xl overflow-hidden border border-gray-700 bg-gray-800 aspect-square flex items-center justify-center">
-                      {currentImageUrl ? (
-                        <img
-                          src={currentImageUrl}
-                          alt={form.description}
-                          className="w-full h-full object-contain p-2"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 text-gray-600">
-                          <ImageIcon className="w-10 h-10" />
-                          <span className="text-xs">No image</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Catalog meta */}
-                    <div className="bg-gray-800/60 rounded-xl border border-gray-700/50 p-3.5 space-y-2">
-                      <div className="font-medium text-white text-sm">{selectedProduct.name}</div>
-                      {(selectedProduct.sku || masterProduct?.sku) && (
-                        <div className="flex justify-between gap-2">
-                          <span className="text-xs text-gray-500 shrink-0">SKU</span>
-                          <span className="text-xs text-gray-300 font-mono text-right">{selectedProduct.sku || masterProduct?.sku}</span>
-                        </div>
-                      )}
-                      {masterProduct?.manufacturer?.name && (
-                        <div className="flex justify-between gap-2">
-                          <span className="text-xs text-gray-500 shrink-0">Mfr</span>
-                          <span className="text-xs text-gray-300 text-right">{masterProduct.manufacturer.name}</span>
-                        </div>
-                      )}
-                      {(masterProduct?.manufacturer_model_number || (selectedProduct as any)?.manufacturer_model_number) && (
-                        <div className="flex justify-between gap-2">
-                          <span className="text-xs text-gray-500 shrink-0">Model</span>
-                          <span className="text-xs text-gray-300 font-mono text-right">{masterProduct?.manufacturer_model_number || (selectedProduct as any)?.manufacturer_model_number}</span>
-                        </div>
-                      )}
-                      {masterProduct?.category?.name && (
-                        <div className="flex justify-between gap-2">
-                          <span className="text-xs text-gray-500 shrink-0">Cat</span>
-                          <span className="text-xs text-gray-300 text-right flex items-center gap-1">
-                            {masterProduct.category.name}
-                            {masterProduct.subcategory?.name && (
-                              <><ChevronRight className="w-3 h-3 text-gray-600" />{masterProduct.subcategory.name}</>
-                            )}
-                          </span>
-                        </div>
-                      )}
-                      {masterProduct?.vendor?.vendor_name && (
-                        <div className="flex justify-between gap-2">
-                          <span className="text-xs text-gray-500 shrink-0">Vendor</span>
-                          <span className="text-xs text-gray-300 text-right">{masterProduct.vendor.vendor_name}</span>
-                        </div>
-                      )}
-                      {masterProduct?.sales_description && (
-                        <div className="pt-2 border-t border-gray-700/40">
-                          <span className="text-xs text-gray-500 block mb-1">Sales Description</span>
-                          <span className="text-xs text-gray-400">{masterProduct.sales_description}</span>
-                        </div>
-                      )}
-                      {masterProduct?.product_link && (
-                        <a href={masterProduct.product_link} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1">
-                          <ExternalLink className="w-3 h-3" />Product Link
-                        </a>
-                      )}
-                      {!masterProduct && (
-                        <p className="text-xs text-gray-600 italic">Custom item</p>
-                      )}
-                    </div>
-
-                    {/* Back to search */}
-                    <button
-                      onClick={() => { setSelectedProduct(null); setMasterProduct(null); setPendingAccessories([]); }}
-                      className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-xs text-gray-400 font-medium flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5" />Back to Search
+              {/* Area Selection */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Copy className="w-4 h-4 text-gray-400" />Add to Areas
+                  </h3>
+                  {selectedRooms.size > 0 && (
+                    <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+                      {selectedRooms.size} selected
+                    </span>
+                  )}
+                </div>
+                <div className="px-4 pb-4 space-y-3">
+                  {/* Create new area */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newAreaName}
+                      onChange={e => setNewAreaName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) handleCreateArea(); }}
+                      placeholder="Create new area..."
+                      className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-lg text-white transition-colors">
+                      {creatingArea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     </button>
                   </div>
 
-                  {/* Right — Form Fields */}
-                  <div className="lg:col-span-3 space-y-4">
-                    {/* Description */}
-                    <Field label="Description">
-                      <input
-                        type="text"
-                        value={form.description}
-                        onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
-                        placeholder="Product description"
-                      />
-                    </Field>
-
-                    {/* Customer Supplied Banner */}
-                    {form.is_customer_supplied && (
-                      <div className="flex items-center gap-2 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
-                        <Package className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                        <p className="text-sm text-amber-300 font-medium">
-                          This item is marked Customer Supplied — pricing is set to $0 and excluded from all totals.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Qty + Unit + Cost + Price */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <Field label="Quantity">
-                        <input type="number" value={form.quantity}
-                          onChange={e => setForm(f => ({ ...f, quantity: parseFloat(e.target.value) || 0 }))}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                          min="0" step="0.01" />
-                      </Field>
-                      <Field label="Unit">
-                        <input type="text" value={form.unit}
-                          onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                          placeholder="ea" />
-                      </Field>
-                      <Field label={form.is_customer_supplied ? "Cost" : "Cost *"}>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                          <input type="number" value={form.is_customer_supplied ? 0 : (form.cost || '')}
-                            disabled={form.is_customer_supplied}
-                            onChange={e => setForm(f => ({ ...f, cost: parseFloat(e.target.value) || 0 }))}
-                            className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : (!form.cost || form.cost <= 0 ? 'border-red-500' : 'border-gray-600')}`}
-                            min="0" step="0.01" placeholder="0.00" />
-                          {!form.is_customer_supplied && (!form.cost || form.cost <= 0) && (
-                            <p className="text-xs text-red-400 mt-1">Required</p>
+                  {/* Area list */}
+                  <div className="space-y-1 max-h-36 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-2">
+                    {localRooms.map(room => {
+                      const isSelected = selectedRooms.has(room.id);
+                      const isActive = room.id === activeAreaId;
+                      return (
+                        <label key={room.id}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
+                          <input type="checkbox" checked={isSelected}
+                            onChange={() => toggleRoom(room.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
+                          <span className="text-xs text-gray-700 flex-1">{room.name}</span>
+                          {isActive && (
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
                           )}
-                        </div>
-                      </Field>
-                      <Field label="Sale Price">
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                          <input type="number" value={form.is_customer_supplied ? 0 : form.unit_price}
-                            disabled={form.is_customer_supplied}
-                            onChange={e => setForm(f => ({ ...f, unit_price: parseFloat(e.target.value) || 0 }))}
-                            className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : 'border-blue-500/50 focus:ring-1 focus:ring-blue-500/30'}`}
-                            min="0" step="0.01" />
-                        </div>
-                      </Field>
-                    </div>
-
-                    {/* Labor row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <Field label="Labor Hours">
-                        <input type="number" value={form.is_customer_supplied ? 0 : form.labor_hours}
-                          disabled={form.is_customer_supplied}
-                          onChange={e => setForm(f => ({ ...f, labor_hours: parseFloat(e.target.value) || 0 }))}
-                          className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : 'border-gray-600'}`}
-                          min="0" step="0.25" />
-                      </Field>
-                      <Field label="Labor Rate">
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                          <input type="number" value={form.is_customer_supplied ? 0 : form.labor_rate}
-                            disabled={form.is_customer_supplied}
-                            onChange={e => setForm(f => ({ ...f, labor_rate: parseFloat(e.target.value) || 0 }))}
-                            className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : 'border-gray-600'}`}
-                            min="0" step="0.01" />
-                        </div>
-                      </Field>
-                      <Field label="Labor Phase">
-                        <select value={form.labor_phase_id}
-                          onChange={e => {
-                            const pid = e.target.value || '';
-                            setForm(f => ({ ...f, labor_phase_id: pid }));
-                            if (pid) {
-                              const ph = laborPhases.find(p => p.id === pid);
-                              if (ph?.default_price) setForm(f => ({ ...f, labor_phase_id: pid, labor_rate: ph.default_price! }));
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
-                          <option value="">No Phase</option>
-                          {laborPhases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                      </Field>
-                    </div>
-
-                    {/* Financial Summary Bar */}
-                    <div className="grid grid-cols-4 gap-0 bg-gray-800/80 border border-gray-700/50 rounded-xl overflow-hidden">
-                      <FinStat label="Material" value={formatCurrency(lineTotal)} />
-                      <FinStat label="Labor" value={formatCurrency(laborTotalCalc)} />
-                      <FinStat label="Profit" value={formatCurrency(profit)} positive={profit >= 0} />
-                      <FinStat label="Margin" value={`${margin.toFixed(1)}%`} positive={margin >= 0} />
-                    </div>
-
-                    {/* Item Type + Class row */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Item Type">
-                        <select value={form.item_type}
-                          onChange={e => setForm(f => ({ ...f, item_type: e.target.value as 'material' | 'labor' | 'other' }))}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
-                          <option value="material">Material</option>
-                          <option value="labor">Labor</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </Field>
-                      <Field label="Class">
-                        {!showNewClassForm ? (
-                          <div className="flex gap-2">
-                            <select value={form.class_id}
-                              onChange={e => setForm(f => ({ ...f, class_id: e.target.value }))}
-                              className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
-                              <option value="">No Class</option>
-                              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                            <button onClick={() => setShowNewClassForm(true)}
-                              className="px-2 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-gray-300 transition-colors" title="Create new class">
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-2 p-2.5 bg-gray-800/80 border border-gray-600 rounded-lg">
-                            <input type="text" value={newClassName} onChange={e => setNewClassName(e.target.value)}
-                              placeholder="Class name"
-                              className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-white text-xs focus:outline-none focus:border-blue-500" autoFocus />
-                            <div className="flex items-center gap-2">
-                              <input type="color" value={newClassColor} onChange={e => setNewClassColor(e.target.value)}
-                                className="w-10 h-7 border border-gray-600 rounded cursor-pointer bg-transparent" />
-                              <button onClick={createNewClass} disabled={!newClassName.trim()}
-                                className="flex-1 px-2 py-1.5 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 text-white rounded text-xs transition-colors">Create</button>
-                              <button onClick={() => { setShowNewClassForm(false); setNewClassName(''); }}
-                                className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-xs transition-colors">Cancel</button>
-                            </div>
-                          </div>
-                        )}
-                      </Field>
-                    </div>
-
-                    {/* Task Notes */}
-                    <Field label="Install Notes for Technicians">
-                      <textarea value={form.task_notes}
-                        onChange={e => setForm(f => ({ ...f, task_notes: e.target.value }))}
-                        rows={2}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm resize-none focus:outline-none focus:border-blue-500"
-                        placeholder="Special installation instructions..." />
-                    </Field>
-
-                    {/* Checkboxes row */}
-                    <div className="flex flex-wrap gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" checked={form.show_task_notes}
-                          onChange={e => setForm(f => ({ ...f, show_task_notes: e.target.checked }))}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500/30" />
-                        <span className="text-xs text-gray-400">Show notes on proposal</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" checked={form.is_hidden}
-                          onChange={e => setForm(f => ({ ...f, is_hidden: e.target.checked }))}
-                          className="rounded border-gray-600 bg-gray-700 text-amber-500 focus:ring-amber-500/30" />
-                        <span className="text-xs text-gray-400">Hide from customer</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer select-none opacity-60" title="Taxable is controlled by sales tax rules">
-                        <input type="checkbox" checked={form.is_taxable} disabled
-                          className="rounded border-gray-600 bg-gray-700 text-gray-500 cursor-not-allowed" />
-                        <span className="text-xs text-gray-500">Taxable (auto)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" checked={form.is_customer_supplied}
-                          onChange={e => setForm(f => ({ ...f, is_customer_supplied: e.target.checked }))}
-                          className="rounded border-gray-600 bg-gray-700 text-amber-500 focus:ring-amber-500/30" />
-                        <span className="text-xs text-amber-400 font-medium">Customer Supplied</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Accessories Section */}
-                <div className="border border-gray-700/50 rounded-xl overflow-hidden mb-4">
-                  <div className="flex items-center justify-between px-4 py-3 bg-gray-800/60">
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">Accessories &amp; Add-ons</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">Items nested under this product</p>
-                    </div>
-                    <button
-                      onClick={() => setShowAccessorySelector(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 rounded-lg text-xs text-white font-medium transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />Add Accessory
-                    </button>
-                  </div>
-
-                  <div className="p-4">
-                    {pendingAccessories.length > 0 ? (
-                      <>
-                        <div className="flex gap-1.5 mb-3">
-                          {(['itemized', 'bundle', 'collapsed'] as const).map(mode => (
-                            <button key={mode}
-                              onClick={() => setForm(f => ({ ...f, display_mode: mode }))}
-                              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-                                form.display_mode === mode
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700'
-                              }`}>
-                              {mode}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-xs text-gray-600 mb-3">
-                          {form.display_mode === 'itemized' && 'Show all items as separate line items'}
-                          {form.display_mode === 'bundle' && 'Show only parent item with total including accessories'}
-                          {form.display_mode === 'collapsed' && 'Show parent with text summary of accessories'}
-                        </p>
-                        <div className="space-y-1.5">
-                          {pendingAccessories.map(acc => (
-                            <div key={acc.tempId} className="flex items-center gap-3 px-3 py-2.5 bg-gray-800/60 border border-gray-700/40 rounded-lg">
-                              <Package className="w-3.5 h-3.5 text-gray-600 shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-white truncate">{acc.description}</p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  {acc.quantity} {acc.product.unit || 'ea'} × {formatCurrency(acc.unit_price)} = {formatCurrency(acc.quantity * acc.unit_price)}
-                                </p>
-                              </div>
-                              <button onClick={() => removePendingAccessory(acc.tempId)}
-                                className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors shrink-0">
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-center py-6 text-gray-600">
-                        <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                        <p className="text-xs">No accessories added yet</p>
+                        </label>
+                      );
+                    })}
+                    {localRooms.length === 0 && (
+                      <div className="text-center py-3 text-gray-400 text-xs">
+                        No areas yet. Create one above, or leave unselected to add without an area.
                       </div>
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+        </div>
 
-                {/* Master Catalog Details (collapsible) */}
-                {masterProduct && (
-                  <div className="border border-gray-700/50 rounded-xl overflow-hidden mb-4">
-                    <button
-                      onClick={() => setShowMasterDetails(!showMasterDetails)}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/60 hover:bg-gray-800 transition-colors"
-                    >
-                      <span className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-gray-500" />Master Catalog Details
-                      </span>
-                      {showMasterDetails ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-                    </button>
-                    {showMasterDetails && (
-                      <div className="px-4 py-4 space-y-3">
-                        <div className="grid grid-cols-4 gap-3">
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Master Price</p>
-                            <p className="text-sm font-bold text-white">{formatCurrency(Number((masterProduct as any).our_price || masterProduct.unit_price || 0))}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Master Cost</p>
-                            <p className="text-sm font-bold text-white">{formatCurrency(Number(masterProduct.cost || 0))}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Master Margin</p>
-                            <p className="text-sm font-bold text-white">
-                              {(() => {
-                                const c = Number(masterProduct.cost || 0);
-                                const p = Number((masterProduct as any).our_price || masterProduct.unit_price || 0);
-                                return p > 0 ? (((p - c) / p) * 100).toFixed(1) : '0.0';
-                              })()}%
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Default Hrs</p>
-                            <p className="text-sm font-bold text-white">{masterProduct.default_labor_hours || 0} hrs</p>
-                          </div>
-                        </div>
-                        {(masterProduct as any).sales_description && (
-                          <p className="text-xs text-gray-400">{(masterProduct as any).sales_description}</p>
-                        )}
-                        {masterProduct.product_link && (
-                          <a href={masterProduct.product_link} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                            <ExternalLink className="w-3 h-3" />View Product Page
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Master Product Actions */}
-                {selectedProduct?.id && !String(selectedProduct.id).startsWith('null') && (
-                  <div className="border border-gray-700/50 rounded-xl p-4 bg-gray-800/30 mb-4">
-                    <div className="flex items-start gap-2 mb-3">
-                      <Package className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-xs font-medium text-gray-300">Linked to Master Catalog</p>
-                        <p className="text-xs text-gray-500 mt-0.5">This item is synced with the master catalog.</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={updateFromMaster} disabled={!masterProduct}
-                        className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 border border-gray-600 rounded-lg text-xs text-gray-300 transition-colors">
-                        <RefreshCw className="w-3.5 h-3.5" />Update from Master
-                      </button>
-                      {canEditProducts && (
-                        <button onClick={handleSaveToMaster}
-                          className="flex items-center justify-center gap-2 px-3 py-2 bg-green-700 hover:bg-green-600 rounded-lg text-xs text-white font-medium transition-colors">
-                          <Save className="w-3.5 h-3.5" />Save to Master
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Area Selection */}
-                <div className="border border-gray-700/50 rounded-xl overflow-hidden mb-4 bg-gray-800/30">
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                      <Copy className="w-4 h-4 text-gray-500" />Add to Areas
-                    </h3>
-                    {selectedRooms.size > 0 && (
-                      <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-medium">
-                        {selectedRooms.size} selected
-                      </span>
-                    )}
-                  </div>
-                  <div className="px-4 pb-4 space-y-3">
-                    {/* Create new area */}
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newAreaName}
-                        onChange={e => setNewAreaName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) handleCreateArea(); }}
-                        placeholder="Create new area..."
-                        className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                      />
-                      <button onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea}
-                        className="px-3 py-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 rounded-lg text-white transition-colors">
-                        {creatingArea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {/* Area list */}
-                    <div className="space-y-1 max-h-36 overflow-y-auto bg-gray-800/60 border border-gray-700/40 rounded-lg p-2">
-                      {localRooms.map(room => {
-                        const isSelected = selectedRooms.has(room.id);
-                        const isActive = room.id === activeAreaId;
-                        return (
-                          <label key={room.id}
-                            className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-900/30' : 'hover:bg-gray-700/40'}`}>
-                            <input type="checkbox" checked={isSelected}
-                              onChange={() => toggleRoom(room.id)}
-                              className="rounded border-gray-600 bg-gray-700 text-blue-500" />
-                            <span className="text-xs text-gray-300 flex-1">{room.name}</span>
-                            {isActive && (
-                              <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
-                            )}
-                          </label>
-                        );
-                      })}
-                      {localRooms.length === 0 && (
-                        <div className="text-center py-3 text-gray-600 text-xs">
-                          No areas yet. Create one above, or leave unselected to add without an area.
-                        </div>
-                      )}
-                    </div>
-                  </div>
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-4">
+            {selectedProduct && (
+              <div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide">Line Total</div>
+                <div className="text-xl font-bold text-gray-900">
+                  {formatCurrency(form.is_customer_supplied ? 0 : totalRevenue + accessoriesTotal)}
                 </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-700/60 space-y-2.5 shrink-0">
-          <div className="flex items-center gap-2">
-            <button onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+            >
               Cancel
             </button>
             {selectedProduct && (
-              <div className="text-sm flex-1 text-right">
-                <span className="text-gray-500">Line Total: </span>
-                <span className="text-lg font-bold text-white">
-                  {formatCurrency(form.is_customer_supplied ? 0 : lineTotal + laborTotalCalc + accessoriesTotal)}
-                </span>
-              </div>
-            )}
-            {selectedProduct && (
-              <button onClick={handleSave} disabled={saving || saved}
-                className={`flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+              <button
+                onClick={handleSave}
+                disabled={saving || saved}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
                   saved ? 'bg-green-600 text-white'
-                    : saving ? 'bg-blue-700 text-white cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-500 text-white'
-                }`}>
-                {saved ? <><Check className="w-4 h-4" />Added</> : saving ? <><Loader2 className="w-4 h-4 animate-spin" />Adding...</> : <>
-                  <Plus className="w-4 h-4" />
-                  {selectedRooms.size === 0 ? 'Add (Unassigned)' : `Add to ${selectedRooms.size} Area${selectedRooms.size !== 1 ? 's' : ''}`}
+                    : saving ? 'bg-blue-400 text-white cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {saved ? <><Check className="w-3.5 h-3.5" />Added</> : saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Adding...</> : <>
+                  <Plus className="w-3.5 h-3.5" />
+                  {selectedRooms.size === 0 ? 'Add Item' : `Add to ${selectedRooms.size} Area${selectedRooms.size !== 1 ? 's' : ''}`}
                 </>}
               </button>
             )}
@@ -1024,25 +722,4 @@ export default function AddItemToAreasModal({
   );
 
   return createPortal(modal, document.body);
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function FinStat({ label, value, positive }: { label: string; value: string; positive?: boolean }) {
-  const isColored = positive !== undefined;
-  return (
-    <div className="px-4 py-3 border-r border-gray-700/40 last:border-r-0">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className={`text-sm font-bold tabular-nums ${isColored ? (positive ? 'text-green-400' : 'text-red-400') : 'text-white'}`}>
-        {value}
-      </p>
-    </div>
-  );
 }
