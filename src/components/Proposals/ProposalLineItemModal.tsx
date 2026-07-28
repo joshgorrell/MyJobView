@@ -91,6 +91,7 @@ export default function ProposalLineItemModal({
     labor_phase_id: item.labor_phase_id ?? '',
     is_taxable: item.is_taxable !== undefined ? item.is_taxable : true,
     is_hidden: item.is_hidden ?? false,
+    is_customer_supplied: item.is_customer_supplied ?? false,
     display_mode: (item.display_mode ?? 'itemized') as 'itemized' | 'bundle' | 'collapsed',
     image_url: '',
   });
@@ -282,7 +283,7 @@ export default function ProposalLineItemModal({
 
   async function copyToSelectedAreas() {
     if (selectedAreasForCopy.size === 0) return;
-    if (!form.cost || form.cost <= 0) {
+    if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
       alert('Cost is required. Please enter a unit cost greater than $0 before copying.');
       return;
     }
@@ -344,12 +345,16 @@ export default function ProposalLineItemModal({
   }
 
   function handleSubmit(saveToMaster: boolean) {
-    if (!form.cost || form.cost <= 0) {
+    if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
       alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
       return;
     }
     setSaving(true);
-    const laborTotalVal = (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
+    const effectiveUnitPrice = form.is_customer_supplied ? 0 : form.unit_price;
+    const effectiveCost = form.is_customer_supplied ? 0 : form.cost;
+    const effectiveLaborHours = form.is_customer_supplied ? 0 : form.labor_hours;
+    const effectiveLaborRate = form.is_customer_supplied ? 0 : form.labor_rate;
+    const laborTotalVal = effectiveLaborHours * form.quantity * effectiveLaborRate;
     let parentItemId: string | null = null;
     if (isNested && itemAbove) {
       parentItemId = itemAbove.parent_item_id || itemAbove.id;
@@ -358,11 +363,11 @@ export default function ProposalLineItemModal({
       description: form.description,
       quantity: form.quantity,
       unit: form.unit,
-      unit_price: form.unit_price,
-      cost: form.cost,
+      unit_price: effectiveUnitPrice,
+      cost: effectiveCost,
       class_id: form.class_id || null,
-      labor_hours: form.labor_hours || null,
-      labor_rate: form.labor_rate || null,
+      labor_hours: effectiveLaborHours || null,
+      labor_rate: effectiveLaborRate || null,
       labor_total: laborTotalVal || null,
       item_type: form.item_type || null,
       task_notes: form.task_notes || null,
@@ -370,7 +375,8 @@ export default function ProposalLineItemModal({
       labor_phase_id: form.labor_phase_id || null,
       is_taxable: form.is_taxable,
       is_hidden: form.is_hidden,
-      line_total: form.quantity * form.unit_price,
+      is_customer_supplied: form.is_customer_supplied,
+      line_total: form.is_customer_supplied ? 0 : form.quantity * form.unit_price,
       display_mode: form.display_mode,
       parent_item_id: parentItemId,
     };
@@ -411,10 +417,10 @@ export default function ProposalLineItemModal({
   }
 
   // Live financials
-  const lineTotal = form.quantity * form.unit_price;
-  const laborTotalCalc = (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
+  const lineTotal = form.is_customer_supplied ? 0 : form.quantity * form.unit_price;
+  const laborTotalCalc = form.is_customer_supplied ? 0 : (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
   const totalRevenue = lineTotal + laborTotalCalc;
-  const totalCost = form.cost * form.quantity;
+  const totalCost = form.is_customer_supplied ? 0 : form.cost * form.quantity;
   const profit = totalRevenue - totalCost;
   const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
 
@@ -549,6 +555,16 @@ export default function ProposalLineItemModal({
                   />
                 </Field>
 
+                {/* Customer Supplied Banner */}
+                {form.is_customer_supplied && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
+                    <Package className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                    <p className="text-sm text-amber-300 font-medium">
+                      This item is marked Customer Supplied — pricing is set to $0 and excluded from all totals.
+                    </p>
+                  </div>
+                )}
+
                 {/* Qty + Unit + Cost + Price */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Field label="Quantity">
@@ -563,14 +579,15 @@ export default function ProposalLineItemModal({
                       className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                       placeholder="ea" />
                   </Field>
-                  <Field label="Cost *">
+                  <Field label={form.is_customer_supplied ? "Cost" : "Cost *"}>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                      <input type="number" value={form.cost || ''}
+                      <input type="number" value={form.is_customer_supplied ? 0 : (form.cost || '')}
+                        disabled={form.is_customer_supplied}
                         onChange={e => setForm(f => ({ ...f, cost: parseFloat(e.target.value) || 0 }))}
-                        className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${!form.cost || form.cost <= 0 ? 'border-red-500' : 'border-gray-600'}`}
+                        className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : (!form.cost || form.cost <= 0 ? 'border-red-500' : 'border-gray-600')}`}
                         min="0" step="0.01" placeholder="0.00" />
-                      {(!form.cost || form.cost <= 0) && (
+                      {!form.is_customer_supplied && (!form.cost || form.cost <= 0) && (
                         <p className="text-xs text-red-400 mt-1">Required</p>
                       )}
                     </div>
@@ -578,9 +595,10 @@ export default function ProposalLineItemModal({
                   <Field label="Sale Price">
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                      <input type="number" value={form.unit_price}
+                      <input type="number" value={form.is_customer_supplied ? 0 : form.unit_price}
+                        disabled={form.is_customer_supplied}
                         onChange={e => setForm(f => ({ ...f, unit_price: parseFloat(e.target.value) || 0 }))}
-                        className="w-full pl-7 pr-3 py-2 bg-gray-800 border border-blue-500/50 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
+                        className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : 'border-blue-500/50 focus:ring-1 focus:ring-blue-500/30'}`}
                         min="0" step="0.01" />
                     </div>
                   </Field>
@@ -589,17 +607,19 @@ export default function ProposalLineItemModal({
                 {/* Labor row */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <Field label="Labor Hours">
-                    <input type="number" value={form.labor_hours}
+                    <input type="number" value={form.is_customer_supplied ? 0 : form.labor_hours}
+                      disabled={form.is_customer_supplied}
                       onChange={e => setForm(f => ({ ...f, labor_hours: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                      className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : 'border-gray-600'}`}
                       min="0" step="0.25" />
                   </Field>
                   <Field label="Labor Rate">
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                      <input type="number" value={form.labor_rate}
+                      <input type="number" value={form.is_customer_supplied ? 0 : form.labor_rate}
+                        disabled={form.is_customer_supplied}
                         onChange={e => setForm(f => ({ ...f, labor_rate: parseFloat(e.target.value) || 0 }))}
-                        className="w-full pl-7 pr-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        className={`w-full pl-7 pr-3 py-2 bg-gray-800 border rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 ${form.is_customer_supplied ? 'border-gray-700 bg-gray-900 text-gray-600 cursor-not-allowed' : 'border-gray-600'}`}
                         min="0" step="0.01" />
                     </div>
                   </Field>
@@ -691,6 +711,12 @@ export default function ProposalLineItemModal({
                     <input type="checkbox" checked={form.is_taxable} disabled
                       className="rounded border-gray-600 bg-gray-700 text-gray-500 cursor-not-allowed" />
                     <span className="text-xs text-gray-500">Taxable (auto)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" checked={form.is_customer_supplied}
+                      onChange={e => setForm(f => ({ ...f, is_customer_supplied: e.target.checked }))}
+                      className="rounded border-gray-600 bg-gray-700 text-amber-500 focus:ring-amber-500/30" />
+                    <span className="text-xs text-amber-400 font-medium">Customer Supplied</span>
                   </label>
                 </div>
 

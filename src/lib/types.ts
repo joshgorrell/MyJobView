@@ -438,6 +438,7 @@ export interface ProposalLineItem {
   class_id?: string | null;
   is_taxable?: boolean;
   task_completed?: boolean;
+  is_customer_supplied?: boolean;
 }
 
 export interface ProposalWithDetails extends Proposal {

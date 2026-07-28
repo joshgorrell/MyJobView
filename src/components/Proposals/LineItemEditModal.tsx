@@ -48,6 +48,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
     labor_phase_id: item.labor_phase_id || '',
     is_taxable: item.is_taxable !== undefined ? item.is_taxable : true,
     is_hidden: item.is_hidden || false,
+    is_customer_supplied: item.is_customer_supplied || false,
   });
   const [classes, setClasses] = useState<ProposalClass[]>([]);
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
@@ -437,7 +438,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
   }
 
   function handleSubmit(saveToMaster: boolean) {
-    if (!formData.cost || formData.cost <= 0) {
+    if (!formData.is_customer_supplied && (!formData.cost || formData.cost <= 0)) {
       alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
       return;
     }
@@ -456,23 +457,30 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       console.log('🔓 Modal unnesting: Clearing parent_item_id');
     }
 
+    const effectiveUnitPrice = formData.is_customer_supplied ? 0 : formData.unit_price;
+    const effectiveCost = formData.is_customer_supplied ? 0 : formData.cost;
+    const effectiveLaborHours = formData.is_customer_supplied ? 0 : formData.labor_hours;
+    const effectiveLaborRate = formData.is_customer_supplied ? 0 : formData.labor_rate;
+    const effectiveLaborTotal = formData.is_customer_supplied ? 0 : laborTotal;
+
     const updates = {
       description: formData.description,
       quantity: formData.quantity,
       unit: formData.unit,
-      unit_price: formData.unit_price,
-      cost: formData.cost,
+      unit_price: effectiveUnitPrice,
+      cost: effectiveCost,
       class_id: formData.class_id || null,
-      labor_hours: formData.labor_hours || null,
-      labor_rate: formData.labor_rate || null,
-      labor_total: laborTotal || null,
+      labor_hours: effectiveLaborHours || null,
+      labor_rate: effectiveLaborRate || null,
+      labor_total: effectiveLaborTotal || null,
       item_type: formData.item_type || null,
       task_notes: formData.task_notes || null,
       show_task_notes: formData.show_task_notes,
       labor_phase_id: formData.labor_phase_id || null,
       is_taxable: formData.is_taxable,
       is_hidden: formData.is_hidden,
-      line_total: formData.quantity * formData.unit_price,
+      is_customer_supplied: formData.is_customer_supplied,
+      line_total: formData.is_customer_supplied ? 0 : formData.quantity * formData.unit_price,
       display_mode: displayMode,
       parent_item_id: parentItemId
     };
@@ -556,10 +564,10 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
     }
   }
 
-  const lineTotal = formData.quantity * formData.unit_price;
-  const laborTotal = (formData.labor_hours || 0) * formData.quantity * (formData.labor_rate || 0);
+  const lineTotal = formData.is_customer_supplied ? 0 : formData.quantity * formData.unit_price;
+  const laborTotal = formData.is_customer_supplied ? 0 : (formData.labor_hours || 0) * formData.quantity * (formData.labor_rate || 0);
   const totalRevenue = lineTotal + laborTotal;
-  const totalCost = (formData.cost * formData.quantity);
+  const totalCost = formData.is_customer_supplied ? 0 : (formData.cost * formData.quantity);
   const profit = totalRevenue - totalCost;
   const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
 
@@ -727,9 +735,10 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Labor Hours</label>
                     <input
                       type="number"
-                      value={formData.labor_hours}
+                      value={formData.is_customer_supplied ? 0 : formData.labor_hours}
+                      disabled={formData.is_customer_supplied}
                       onChange={(e) => setFormData({ ...formData, labor_hours: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formData.is_customer_supplied ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-gray-300'}`}
                       min="0"
                       step="0.25"
                       placeholder="0.00"
@@ -742,9 +751,10 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                       <input
                         type="number"
-                        value={formData.labor_rate}
+                        value={formData.is_customer_supplied ? 0 : formData.labor_rate}
+                        disabled={formData.is_customer_supplied}
                         onChange={(e) => setFormData({ ...formData, labor_rate: parseFloat(e.target.value) || 0 })}
-                        className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full pl-8 pr-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formData.is_customer_supplied ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-gray-300'}`}
                         min="0"
                         step="0.01"
                         placeholder="0.00"
@@ -872,6 +882,26 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
 
                 {/* Checkboxes */}
                 <div className="space-y-3">
+                  {/* Customer Supplied Toggle */}
+                  <div className="border-2 rounded-lg p-3 border-amber-300 bg-amber-50">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_customer_supplied}
+                        onChange={(e) => setFormData({ ...formData, is_customer_supplied: e.target.checked })}
+                        className="w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500 mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-semibold text-amber-800">
+                          Customer Supplied Item
+                        </span>
+                        <div className="text-xs text-amber-700 mt-1">
+                          The customer is providing this item. Price, cost, and labor are set to $0 and excluded from all proposal totals, tax, and deposit calculations. The item still appears in the scope of work.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
                   {/* Nested Checkbox - Always Visible with Clear Status */}
                   <div className={`border-2 rounded-lg p-3 ${
                     canNest ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'

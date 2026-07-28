@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ProposalLineItem, Product } from '../../lib/types';
-import { GripVertical, Trash2, Eye, EyeOff, Info } from 'lucide-react';
+import { GripVertical, Trash2, Eye, EyeOff, Info, Package } from 'lucide-react';
 import ProductDetailEditModal from './ProductDetailEditModal';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -121,7 +121,7 @@ export default function ProposalGridRow({
     <tr
       className={`group border-b hover:bg-gray-800/50 transition-colors ${rowBg} ${
         isSelected ? 'bg-blue-900/20' : ''
-      } ${(localItem as any).is_hidden ? 'opacity-50' : ''}`}
+      } ${(localItem as any).is_hidden ? 'opacity-50' : ''} ${(localItem as any).is_customer_supplied ? 'bg-amber-950/10' : ''}`}
       onClick={() => onSelect(item.id)}
     >
       <td className="py-2 px-3 sticky left-0 z-10 bg-gray-900 group-hover:bg-gray-800/50">
@@ -153,6 +153,12 @@ export default function ProposalGridRow({
           )}
           {coStatus === 'modified' && (
             <span className="text-xs text-amber-400 font-normal whitespace-nowrap">Edited</span>
+          )}
+          {(localItem as any).is_customer_supplied && (
+            <span className="inline-flex items-center gap-1 text-xs text-amber-400 font-medium whitespace-nowrap bg-amber-900/20 px-1.5 py-0.5 rounded" title="Customer Supplied — no charge">
+              <Package className="w-3 h-3" />
+              Cust. Supplied
+            </span>
           )}
         </div>
       </td>
@@ -243,59 +249,79 @@ export default function ProposalGridRow({
 
       {columnPrefs.cost && (
         <td className="py-2 px-3">
+          {(localItem as any).is_customer_supplied ? (
+            <span className="text-amber-400 text-right block text-sm">—</span>
+          ) : (
+            <input
+              type="number"
+              value={localItem.cost || 0}
+              onChange={(e) => handleFieldChange('cost', parseFloat(e.target.value) || 0)}
+              onBlur={() => handleBlur('cost')}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1"
+              min="0"
+              step="0.01"
+            />
+          )}
+        </td>
+      )}
+
+      <td className="py-2 px-3">
+        {(localItem as any).is_customer_supplied ? (
+          <span className="text-amber-400 text-right block text-sm">—</span>
+        ) : (
           <input
             type="number"
-            value={localItem.cost || 0}
-            onChange={(e) => handleFieldChange('cost', parseFloat(e.target.value) || 0)}
-            onBlur={() => handleBlur('cost')}
+            value={localItem.unit_price}
+            onChange={(e) => handleFieldChange('unit_price', parseFloat(e.target.value) || 0)}
+            onBlur={() => handleBlur('unit_price')}
             onClick={(e) => e.stopPropagation()}
             className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1"
             min="0"
             step="0.01"
           />
-        </td>
-      )}
-
-      <td className="py-2 px-3">
-        <input
-          type="number"
-          value={localItem.unit_price}
-          onChange={(e) => handleFieldChange('unit_price', parseFloat(e.target.value) || 0)}
-          onBlur={() => handleBlur('unit_price')}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1"
-          min="0"
-          step="0.01"
-        />
+        )}
       </td>
 
       {columnPrefs.margin && (
         <td className="py-2 px-3">
-          <div className={`text-right ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            ${margin.toFixed(2)}
-          </div>
+          {(localItem as any).is_customer_supplied ? (
+            <span className="text-amber-400 text-right block text-sm">—</span>
+          ) : (
+            <div className={`text-right ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              ${margin.toFixed(2)}
+            </div>
+          )}
         </td>
       )}
 
       {columnPrefs.marginPercent && (
         <td className="py-2 px-3">
-          <input
-            type="number"
-            value={marginPercent.toFixed(1)}
-            onChange={(e) => handleMarginPercentChange(parseFloat(e.target.value) || 0)}
-            onClick={(e) => e.stopPropagation()}
-            className={`w-full bg-transparent border-none text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 ${
-              marginPercent >= 0 ? 'text-green-400' : 'text-red-400'
-            }`}
-            min="0"
-            max="99"
-            step="0.1"
-          />
+          {(localItem as any).is_customer_supplied ? (
+            <span className="text-amber-400 text-right block text-sm">—</span>
+          ) : (
+            <input
+              type="number"
+              value={marginPercent.toFixed(1)}
+              onChange={(e) => handleMarginPercentChange(parseFloat(e.target.value) || 0)}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full bg-transparent border-none text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 ${
+                marginPercent >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}
+              min="0"
+              max="99"
+              step="0.1"
+            />
+          )}
         </td>
       )}
 
       <td className="py-2 px-3 text-right font-semibold">
-        ${localItem.line_total.toFixed(2)}
+        {(localItem as any).is_customer_supplied ? (
+          <span className="text-amber-400">—</span>
+        ) : (
+          <span>${localItem.line_total.toFixed(2)}</span>
+        )}
       </td>
 
       {columnPrefs.hide && (

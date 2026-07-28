@@ -1573,7 +1573,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               is_hidden: item.is_hidden,
               labor_phase_id: item.labor_phase_id,
               class_id: item.class_id,
-              is_taxable: item.is_taxable
+              is_taxable: item.is_taxable,
+              is_customer_supplied: item.is_customer_supplied
             });
         }
       }
