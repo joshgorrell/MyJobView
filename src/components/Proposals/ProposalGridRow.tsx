@@ -318,7 +318,7 @@ export default function ProposalGridRow({
 
       <td className="py-2 px-3 text-right font-semibold">
         {(localItem as any).is_customer_supplied ? (
-          <span className="text-amber-400">—</span>
+          <span className="text-amber-400">${(parseFloat(localItem.labor_total || 0)).toFixed(2)}</span>
         ) : (
           <span>${localItem.line_total.toFixed(2)}</span>
         )}

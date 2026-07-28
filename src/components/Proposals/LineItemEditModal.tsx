@@ -459,9 +459,9 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
 
     const effectiveUnitPrice = formData.is_customer_supplied ? 0 : formData.unit_price;
     const effectiveCost = formData.is_customer_supplied ? 0 : formData.cost;
-    const effectiveLaborHours = formData.is_customer_supplied ? 0 : formData.labor_hours;
-    const effectiveLaborRate = formData.is_customer_supplied ? 0 : formData.labor_rate;
-    const effectiveLaborTotal = formData.is_customer_supplied ? 0 : laborTotal;
+    const effectiveLaborHours = formData.labor_hours;
+    const effectiveLaborRate = formData.labor_rate;
+    const effectiveLaborTotal = laborTotal;
 
     const updates = {
       description: formData.description,
@@ -565,7 +565,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
   }
 
   const lineTotal = formData.is_customer_supplied ? 0 : formData.quantity * formData.unit_price;
-  const laborTotal = formData.is_customer_supplied ? 0 : (formData.labor_hours || 0) * formData.quantity * (formData.labor_rate || 0);
+  const laborTotal = (formData.labor_hours || 0) * formData.quantity * (formData.labor_rate || 0);
   const totalRevenue = lineTotal + laborTotal;
   const totalCost = formData.is_customer_supplied ? 0 : (formData.cost * formData.quantity);
   const profit = totalRevenue - totalCost;
@@ -671,7 +671,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                         Customer Supplied Item
                       </span>
                       <div className="text-xs text-amber-700 mt-1">
-                        The customer is providing this item. Price, cost, and labor are set to $0 and excluded from all proposal totals, tax, and deposit calculations. The item still appears in the scope of work.
+                        The customer is providing this item. Material price and cost are set to $0 and excluded from totals. Labor and accessories are still billed normally. The item still appears in the scope of work.
                       </div>
                     </div>
                   </label>

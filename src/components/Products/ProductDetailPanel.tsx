@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import {
   Package, DollarSign, Wrench, Upload, Pencil, ExternalLink,
-  FileText, Video, Building2, Tag, Hash, Ruler, Palette
+  FileText, Video, Building2, Tag, Hash, Ruler, Palette, Gift
 } from 'lucide-react';
 
 export interface ProductDetailPanelData {
@@ -36,6 +36,7 @@ export interface ProductDetailPanelData {
   showTaskNotes: boolean;
   isTaxable: boolean;
   isHidden: boolean;
+  isCustomerSupplied: boolean;
 }
 
 export interface LaborPhaseOption {
@@ -87,10 +88,10 @@ export default function ProductDetailPanel({
 }: ProductDetailPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const materialTotal = data.unitPrice * data.quantity;
+  const materialTotal = data.isCustomerSupplied ? 0 : data.unitPrice * data.quantity;
   const laborTotal = (data.laborHours || 0) * data.quantity * (data.laborRate || 0);
   const totalRevenue = materialTotal + laborTotal;
-  const totalCost = data.cost * data.quantity;
+  const totalCost = data.isCustomerSupplied ? 0 : data.cost * data.quantity;
   const profit = totalRevenue - totalCost;
   const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
 
@@ -269,9 +270,10 @@ export default function ProductDetailPanel({
         )}
 
         {/* Material Pricing */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+        <div className={`border rounded-lg p-2 ${data.isCustomerSupplied ? 'bg-gray-100 border-gray-300 opacity-60' : 'bg-blue-50 border-blue-200'}`}>
           <div className="flex items-center gap-1 text-xs font-semibold text-blue-800 mb-1.5">
             <DollarSign className="w-3 h-3" /> Material
+            {data.isCustomerSupplied && <span className="text-amber-600 font-normal">(Customer Supplied)</span>}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -281,14 +283,15 @@ export default function ProductDetailPanel({
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                   <input
                     type="number"
-                    value={data.unitPrice}
+                    value={data.isCustomerSupplied ? 0 : data.unitPrice}
                     step="0.01"
+                    disabled={data.isCustomerSupplied}
                     onChange={(e) => onChange?.('unitPrice', parseFloat(e.target.value) || 0)}
-                    className="w-full pl-5 pr-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white"
+                    className="w-full pl-5 pr-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
               ) : (
-                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.unitPrice)}</span>
+                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.unitPrice)}</span>
               )}
             </div>
             <div>
@@ -298,15 +301,16 @@ export default function ProductDetailPanel({
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                   <input
                     type="number"
-                    value={data.cost || ''}
+                    value={data.isCustomerSupplied ? 0 : (data.cost || '')}
                     step="0.01"
                     placeholder="0.00"
+                    disabled={data.isCustomerSupplied}
                     onChange={(e) => onChange?.('cost', parseFloat(e.target.value) || 0)}
-                    className="w-full pl-5 pr-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white"
+                    className="w-full pl-5 pr-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
               ) : (
-                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.cost)}</span>
+                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.cost)}</span>
               )}
             </div>
           </div>
@@ -516,6 +520,18 @@ export default function ProductDetailPanel({
                   className="rounded border-gray-300 text-blue-600 w-3.5 h-3.5 cursor-not-allowed"
                 />
                 <span className="text-xs text-gray-600">Taxable</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={data.isCustomerSupplied}
+                  onChange={(e) => onChange?.('isCustomerSupplied', e.target.checked)}
+                  className="rounded border-gray-300 text-amber-600 w-3.5 h-3.5"
+                />
+                <span className="text-xs text-gray-600 flex items-center gap-1">
+                  <Gift className="w-3 h-3 text-amber-500" />
+                  Customer Supplied
+                </span>
               </label>
             </div>
           </div>

@@ -312,8 +312,8 @@ export default function AddItemToAreasModal({
       const isOneOff = !selectedProduct.id || String(selectedProduct.id).startsWith('null');
       const effPrice = form.is_customer_supplied ? 0 : form.unit_price;
       const effCost = form.is_customer_supplied ? 0 : form.cost;
-      const effLaborHrs = form.is_customer_supplied ? 0 : form.labor_hours;
-      const effLaborRate = form.is_customer_supplied ? 0 : form.labor_rate;
+      const effLaborHrs = form.labor_hours;
+      const effLaborRate = form.labor_rate;
       const laborTotalVal = effLaborHrs * form.quantity * effLaborRate;
       const effLineTotal = form.is_customer_supplied ? 0 : form.quantity * form.unit_price;
       const roomIds = selectedRooms.size === 0 ? [null] : Array.from(selectedRooms);
@@ -381,7 +381,7 @@ export default function AddItemToAreasModal({
 
   // Live financials
   const lineTotal = form.is_customer_supplied ? 0 : form.quantity * form.unit_price;
-  const laborTotalCalc = form.is_customer_supplied ? 0 : (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
+  const laborTotalCalc = (form.labor_hours || 0) * form.quantity * (form.labor_rate || 0);
   const totalRevenue = lineTotal + laborTotalCalc;
   const accessoriesTotal = pendingAccessories.reduce((s, a) => s + a.quantity * a.unit_price, 0);
 
@@ -544,7 +544,7 @@ export default function AddItemToAreasModal({
                 <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <Package className="w-4 h-4 text-amber-500 flex-shrink-0" />
                   <p className="text-xs text-amber-700 font-medium">
-                    Customer Supplied — pricing is set to $0 and excluded from all totals.
+                    Customer Supplied — material cost is set to $0 and excluded from totals. Labor and accessories are still billed.
                   </p>
                 </div>
               )}
@@ -678,7 +678,7 @@ export default function AddItemToAreasModal({
               <div>
                 <div className="text-xs text-gray-500 uppercase tracking-wide">Line Total</div>
                 <div className="text-xl font-bold text-gray-900">
-                  {formatCurrency(form.is_customer_supplied ? 0 : totalRevenue + accessoriesTotal)}
+                  {formatCurrency((form.is_customer_supplied ? laborTotalCalc : totalRevenue) + accessoriesTotal)}
                 </div>
               </div>
             )}

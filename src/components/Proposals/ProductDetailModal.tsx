@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Plus, Trash2, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ProductDetailPanel, { type ProductDetailPanelData, type LaborPhaseOption, type ClassOption } from '../Products/ProductDetailPanel';
+import type { ProposalLineItem } from '../../lib/types';
 
 interface ProductDetailModalProps {
   lineItemId: string;
@@ -22,6 +23,11 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
   const [imagePasted, setImagePasted] = useState(false);
 
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
+  const [accessories, setAccessories] = useState<ProposalLineItem[]>([]);
+  const [showAddAccessory, setShowAddAccessory] = useState(false);
+  const [accessorySearch, setAccessorySearch] = useState('');
+  const [accessoryProducts, setAccessoryProducts] = useState<any[]>([]);
+  const [addingAccessory, setAddingAccessory] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -109,11 +115,22 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
           showTaskNotes: item.show_task_notes ?? false,
           isTaxable: item.is_taxable ?? false,
           isHidden: item.is_hidden ?? false,
+          isCustomerSupplied: item.is_customer_supplied ?? false,
         });
       }
 
       setLaborPhases(phasesRes.data || []);
       setClasses(classesRes.data || []);
+
+      // Load existing accessories (nested child items)
+      if (itemRes.data) {
+        const { data: childItems } = await supabase
+          .from('proposal_line_items')
+          .select('*, labor_phases(name)')
+          .eq('parent_item_id', lineItemId)
+          .order('sort_order');
+        setAccessories((childItems || []) as unknown as ProposalLineItem[]);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -161,6 +178,76 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
     }
   }
 
+  async function searchAccessoryProducts(query: string) {
+    if (!query.trim()) { setAccessoryProducts([]); return; }
+    const { data } = await supabase
+      .from('products')
+      .select('id, sku, name, description, unit_price, cost, image_url, thumbnail_url, manufacturers(name)')
+      .or(`sku.ilike.%${query}%,name.ilike.%${query}%,description.ilike.%${query}%`)
+      .limit(10);
+    setAccessoryProducts(data || []);
+  }
+
+  async function addAccessory(productId: string) {
+    if (!lineItem) return;
+    try {
+      setAddingAccessory(true);
+      const { data: product } = await supabase
+        .from('products')
+        .select('*, manufacturers(name)')
+        .eq('id', productId)
+        .maybeSingle();
+      if (!product) return;
+
+      const maxSort = accessories.length > 0 ? Math.max(...accessories.map(a => a.sort_order || 0)) : 0;
+      const { data, error } = await supabase
+        .from('proposal_line_items')
+        .insert({
+          proposal_id: lineItem.proposal_id,
+          room_id: lineItem.room_id,
+          product_id: product.id,
+          description: product.name || product.description,
+          sku: product.sku,
+          quantity: 1,
+          unit: product.unit || 'ea',
+          unit_price: product.unit_price || 0,
+          cost: product.cost || 0,
+          labor_hours: product.default_labor_hours || 0,
+          labor_rate: 0,
+          labor_total: 0,
+          labor_phase_id: product.labor_phase_id || null,
+          parent_item_id: lineItemId,
+          sort_order: maxSort + 1,
+          is_customer_supplied: false,
+          is_hidden: false,
+        })
+        .select('*, labor_phases(name)')
+        .single();
+      if (error) throw error;
+      setAccessories(prev => [...prev, data as unknown as ProposalLineItem]);
+      setShowAddAccessory(false);
+      setAccessorySearch('');
+      setAccessoryProducts([]);
+    } catch (error) {
+      console.error('Error adding accessory:', error);
+      alert('Failed to add accessory');
+    } finally {
+      setAddingAccessory(false);
+    }
+  }
+
+  async function removeAccessory(accessoryId: string) {
+    if (!confirm('Remove this accessory from the line item?')) return;
+    try {
+      const { error } = await supabase.from('proposal_line_items').delete().eq('id', accessoryId);
+      if (error) throw error;
+      setAccessories(prev => prev.filter(a => a.id !== accessoryId));
+    } catch (error) {
+      console.error('Error removing accessory:', error);
+      alert('Failed to remove accessory');
+    }
+  }
+
   async function handleSave() {
     if (!panelData) return;
     try {
@@ -178,14 +265,15 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       }
 
       const laborTotal = (panelData.laborHours || 0) * panelData.quantity * (panelData.laborRate || 0);
-      const lineTotal = panelData.quantity * panelData.unitPrice;
+      const lineTotal = panelData.isCustomerSupplied ? 0 : panelData.quantity * panelData.unitPrice;
+      const effectiveCost = panelData.isCustomerSupplied ? 0 : panelData.cost;
 
       const updateData = {
         description: panelData.productName,
         quantity: panelData.quantity,
         unit: panelData.unit,
-        unit_price: panelData.unitPrice,
-        cost: panelData.cost,
+        unit_price: panelData.isCustomerSupplied ? 0 : panelData.unitPrice,
+        cost: effectiveCost,
         labor_hours: panelData.laborHours || null,
         labor_rate: panelData.laborRate || null,
         labor_total: laborTotal || null,
@@ -195,6 +283,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
         show_task_notes: panelData.showTaskNotes,
         is_taxable: panelData.isTaxable,
         is_hidden: panelData.isHidden,
+        is_customer_supplied: panelData.isCustomerSupplied,
         line_total: lineTotal,
       };
 
@@ -264,7 +353,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
 
   if (!panelData) return null;
 
-  const materialTotal = panelData.unitPrice * panelData.quantity;
+  const materialTotal = panelData.isCustomerSupplied ? 0 : panelData.unitPrice * panelData.quantity;
   const laborTotal = (panelData.laborHours || 0) * panelData.quantity * (panelData.laborRate || 0);
   const totalRevenue = materialTotal + laborTotal;
 
@@ -297,6 +386,93 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
             onImageSelect={handleImageSelect}
             onChange={handlePanelChange}
           />
+
+          {/* Accessories Section */}
+          <div className="mt-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-cyan-600" />
+                <span className="text-sm font-semibold text-gray-700">Accessories</span>
+                {accessories.length > 0 && (
+                  <span className="text-xs text-gray-500">({accessories.length})</span>
+                )}
+              </div>
+              <button
+                onClick={() => setShowAddAccessory(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Add Accessory
+              </button>
+            </div>
+
+            {accessories.length > 0 ? (
+              <div className="space-y-1.5">
+                {accessories.map((acc) => (
+                  <div key={acc.id} className="flex items-center justify-between bg-white border border-gray-200 rounded p-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{acc.description}</p>
+                      <p className="text-xs text-gray-500">
+                        {acc.quantity} {acc.unit} × {formatCurrency(acc.unit_price)} = {formatCurrency(acc.line_total)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeAccessory(acc.id)}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors shrink-0"
+                      title="Remove accessory"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 py-2 text-center">No accessories added yet</p>
+            )}
+          </div>
+
+          {/* Add Accessory Search */}
+          {showAddAccessory && (
+            <div className="mt-2 border border-blue-200 rounded-lg p-3 bg-blue-50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-gray-700">Search Product to Add as Accessory</span>
+                <button onClick={() => { setShowAddAccessory(false); setAccessorySearch(''); setAccessoryProducts([]); }} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <input
+                type="text"
+                value={accessorySearch}
+                onChange={(e) => { setAccessorySearch(e.target.value); searchAccessoryProducts(e.target.value); }}
+                placeholder="Search by SKU, name, or description..."
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 mb-2"
+                autoFocus
+              />
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {accessoryProducts.map((p) => (
+                  <div
+                    key={p.id}
+                    onClick={() => addAccessory(p.id)}
+                    className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {p.sku && <span className="text-xs font-mono text-cyan-600">{p.sku}</span>}
+                        {p.manufacturers?.name && <span className="text-xs text-gray-400">| {p.manufacturers.name}</span>}
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 truncate">{p.name || p.description}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <p className="text-sm font-medium text-green-600">{formatCurrency(p.unit_price || 0)}</p>
+                    </div>
+                  </div>
+                ))}
+                {accessorySearch && accessoryProducts.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-2">No products found</p>
+                )}
+              </div>
+              {addingAccessory && <p className="text-xs text-blue-600 mt-1">Adding...</p>}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
