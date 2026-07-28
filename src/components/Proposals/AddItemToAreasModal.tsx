@@ -418,6 +418,7 @@ export default function AddItemToAreasModal({
     showTaskNotes: form.show_task_notes,
     isTaxable: form.is_taxable,
     isHidden: form.is_hidden,
+    isCustomerSupplied: form.is_customer_supplied,
   } : null;
 
   const modal = (
