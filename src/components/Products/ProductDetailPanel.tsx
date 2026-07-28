@@ -183,25 +183,6 @@ export default function ProductDetailPanel({
                 <span className="text-xs text-gray-700 capitalize">{data.inventoryType}</span>
               </div>
             )}
-            {isEdit ? (
-              <div className="pt-1">
-                <label className="block text-xs text-gray-500 mb-0.5">Description</label>
-                <textarea
-                  value={data.description || ''}
-                  onChange={(e) => onChange?.('description', e.target.value)}
-                  rows={2}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white resize-none"
-                  placeholder="Product description..."
-                />
-              </div>
-            ) : (
-              data.description && (
-                <div className="pt-1">
-                  <span className="text-xs text-gray-500">Description</span>
-                  <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{data.description}</p>
-                </div>
-              )
-            )}
           </div>
 
           {(data.manufacturerUrl || data.supplierUrl || data.productSheetUrl || data.installVideoUrl) && (
@@ -260,6 +241,9 @@ export default function ProductDetailPanel({
             />
           ) : (
             <h3 className="text-sm font-bold text-gray-900 leading-tight mt-0.5">{data.productName}</h3>
+          )}
+          {data.description && data.description !== data.productName && (
+            <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 mt-1">{data.description}</p>
           )}
         </div>
 
