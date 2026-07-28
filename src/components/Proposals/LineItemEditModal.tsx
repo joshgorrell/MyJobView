@@ -657,6 +657,26 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                   />
                 </div>
 
+                {/* Customer Supplied Toggle */}
+                <div className="border-2 rounded-lg p-3 border-amber-300 bg-amber-50">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_customer_supplied}
+                      onChange={(e) => setFormData({ ...formData, is_customer_supplied: e.target.checked })}
+                      className="w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500 mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-semibold text-amber-800">
+                        Customer Supplied Item
+                      </span>
+                      <div className="text-xs text-amber-700 mt-1">
+                        The customer is providing this item. Price, cost, and labor are set to $0 and excluded from all proposal totals, tax, and deposit calculations. The item still appears in the scope of work.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
                 {/* Pricing Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
@@ -882,26 +902,6 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
 
                 {/* Checkboxes */}
                 <div className="space-y-3">
-                  {/* Customer Supplied Toggle */}
-                  <div className="border-2 rounded-lg p-3 border-amber-300 bg-amber-50">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.is_customer_supplied}
-                        onChange={(e) => setFormData({ ...formData, is_customer_supplied: e.target.checked })}
-                        className="w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500 mt-0.5"
-                      />
-                      <div className="flex-1">
-                        <span className="text-sm font-semibold text-amber-800">
-                          Customer Supplied Item
-                        </span>
-                        <div className="text-xs text-amber-700 mt-1">
-                          The customer is providing this item. Price, cost, and labor are set to $0 and excluded from all proposal totals, tax, and deposit calculations. The item still appears in the scope of work.
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-
                   {/* Nested Checkbox - Always Visible with Clear Status */}
                   <div className={`border-2 rounded-lg p-3 ${
                     canNest ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'

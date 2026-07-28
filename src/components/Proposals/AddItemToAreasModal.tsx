@@ -467,14 +467,14 @@ export default function AddItemToAreasModal({
                       <img
                         src={(selectedProduct as any).image_url}
                         alt={selectedProduct.name}
-                        className="w-full h-48 object-contain rounded-lg mb-3"
+                        className="w-full h-32 object-contain rounded-lg mb-3"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
                       />
                     ) : (
-                      <div className="w-full h-48 bg-white rounded-lg flex items-center justify-center mb-3">
-                        <Package className="h-16 w-16 text-gray-300" />
+                      <div className="w-full h-32 bg-white rounded-lg flex items-center justify-center mb-3">
+                        <Package className="h-12 w-12 text-gray-300" />
                       </div>
                     )}
 
@@ -514,6 +514,26 @@ export default function AddItemToAreasModal({
                       />
                     </div>
 
+                    {/* Customer Supplied Toggle */}
+                    <div className="border-2 rounded-lg p-3 border-amber-300 bg-amber-50">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_customer_supplied}
+                          onChange={(e) => setFormData({ ...formData, is_customer_supplied: e.target.checked })}
+                          className="w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500 mt-0.5"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm font-semibold text-amber-800">
+                            Customer Supplied Item
+                          </span>
+                          <div className="text-xs text-amber-700 mt-1">
+                            The customer is providing this item. Price, cost, and labor are set to $0 and excluded from all proposal totals, tax, and deposit calculations. The item still appears in the scope of work.
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
                     {/* Pricing Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div>
@@ -540,15 +560,12 @@ export default function AddItemToAreasModal({
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                          Cost {!formData.is_customer_supplied && <span className="text-red-500">*</span>}
-                        </label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Cost <span className="text-red-500">*</span></label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                           <input
                             type="text"
-                            value={formData.is_customer_supplied ? 0 : (formData.cost || '')}
-                            disabled={formData.is_customer_supplied}
+                            value={formData.cost || ''}
                             onChange={(e) => {
                               const val = e.target.value;
                               if (val === '' || val === '-') {
@@ -564,16 +581,10 @@ export default function AddItemToAreasModal({
                               const parsed = parseFloat(e.target.value);
                               setFormData({ ...formData, cost: isNaN(parsed) ? 0 : parsed });
                             }}
-                            className={`w-full pl-8 pr-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                              formData.is_customer_supplied
-                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : !formData.cost || formData.cost <= 0
-                                ? 'border-red-400 bg-red-50'
-                                : 'border-gray-300'
-                            }`}
+                            className={`w-full pl-8 pr-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${!formData.cost || formData.cost <= 0 ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                             placeholder="0.00"
                           />
-                          {!formData.is_customer_supplied && (!formData.cost || formData.cost <= 0) && (
+                          {(!formData.cost || formData.cost <= 0) && (
                             <p className="text-xs text-red-500 mt-1">Required</p>
                           )}
                         </div>
@@ -585,14 +596,9 @@ export default function AddItemToAreasModal({
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                           <input
                             type="number"
-                            value={formData.is_customer_supplied ? 0 : formData.unit_price}
-                            disabled={formData.is_customer_supplied}
+                            value={formData.unit_price}
                             onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
-                            className={`w-full pl-8 pr-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                              formData.is_customer_supplied
-                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'border-gray-300'
-                            }`}
+                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             min="0"
                             step="0.01"
                           />
@@ -606,14 +612,9 @@ export default function AddItemToAreasModal({
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Labor Hours</label>
                         <input
                           type="number"
-                          value={formData.is_customer_supplied ? 0 : formData.labor_hours}
-                          disabled={formData.is_customer_supplied}
+                          value={formData.labor_hours}
                           onChange={(e) => setFormData({ ...formData, labor_hours: parseFloat(e.target.value) || 0 })}
-                          className={`w-full px-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            formData.is_customer_supplied
-                              ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'border-gray-300'
-                          }`}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           min="0"
                           step="0.25"
                           placeholder="0.00"
@@ -626,14 +627,9 @@ export default function AddItemToAreasModal({
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                           <input
                             type="number"
-                            value={formData.is_customer_supplied ? 0 : formData.labor_rate}
-                            disabled={formData.is_customer_supplied}
+                            value={formData.labor_rate}
                             onChange={(e) => setFormData({ ...formData, labor_rate: parseFloat(e.target.value) || 0 })}
-                            className={`w-full pl-8 pr-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                              formData.is_customer_supplied
-                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'border-gray-300'
-                            }`}
+                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             min="0"
                             step="0.01"
                             placeholder="0.00"
@@ -655,12 +651,7 @@ export default function AddItemToAreasModal({
                               }
                             }
                           }}
-                          disabled={formData.is_customer_supplied}
-                          className={`w-full px-3 py-2 border rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            formData.is_customer_supplied
-                              ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'border-gray-300'
-                          }`}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="">No Phase</option>
                           {laborPhases.map(phase => (
@@ -775,26 +766,6 @@ export default function AddItemToAreasModal({
 
                     {/* Checkboxes */}
                     <div className="space-y-3">
-                      {/* Customer Supplied Toggle */}
-                      <div className="border-2 rounded-lg p-3 border-amber-300 bg-amber-50">
-                        <label className="flex items-start gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.is_customer_supplied}
-                            onChange={(e) => setFormData({ ...formData, is_customer_supplied: e.target.checked })}
-                            className="w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500 mt-0.5"
-                          />
-                          <div className="flex-1">
-                            <span className="text-sm font-semibold text-amber-800">
-                              Customer Supplied Item
-                            </span>
-                            <div className="text-xs text-amber-700 mt-1">
-                              The customer is providing this item. Price, cost, and labor are set to $0 and excluded from all proposal totals, tax, and deposit calculations. The item still appears in the scope of work.
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
