@@ -467,14 +467,14 @@ export default function AddItemToAreasModal({
                       <img
                         src={(selectedProduct as any).image_url}
                         alt={selectedProduct.name}
-                        className="w-full h-32 object-contain rounded-lg mb-3"
+                        className="w-full h-48 object-contain rounded-lg mb-3"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
                       />
                     ) : (
-                      <div className="w-full h-32 bg-white rounded-lg flex items-center justify-center mb-3">
-                        <Package className="h-12 w-12 text-gray-300" />
+                      <div className="w-full h-48 bg-white rounded-lg flex items-center justify-center mb-3">
+                        <Package className="h-16 w-16 text-gray-300" />
                       </div>
                     )}
 
@@ -539,12 +539,25 @@ export default function AddItemToAreasModal({
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Quantity</label>
                         <input
-                          type="number"
-                          value={formData.quantity}
-                          onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
+                          type="text"
+                          value={formData.quantity || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || val === '-') {
+                              setFormData({ ...formData, quantity: 0 });
+                            } else {
+                              const parsed = parseFloat(val);
+                              if (!isNaN(parsed)) {
+                                setFormData({ ...formData, quantity: parsed });
+                              }
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const parsed = parseFloat(e.target.value);
+                            setFormData({ ...formData, quantity: isNaN(parsed) ? 0 : parsed });
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          min="0"
-                          step="0.01"
+                          placeholder="0"
                         />
                       </div>
 
@@ -595,12 +608,25 @@ export default function AddItemToAreasModal({
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                           <input
-                            type="number"
-                            value={formData.unit_price}
-                            onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
+                            type="text"
+                            value={formData.unit_price || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || val === '-') {
+                                setFormData({ ...formData, unit_price: 0 });
+                              } else {
+                                const parsed = parseFloat(val);
+                                if (!isNaN(parsed)) {
+                                  setFormData({ ...formData, unit_price: parsed });
+                                }
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const parsed = parseFloat(e.target.value);
+                              setFormData({ ...formData, unit_price: isNaN(parsed) ? 0 : parsed });
+                            }}
                             className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            min="0"
-                            step="0.01"
+                            placeholder="0.00"
                           />
                         </div>
                       </div>
@@ -611,12 +637,24 @@ export default function AddItemToAreasModal({
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Labor Hours</label>
                         <input
-                          type="number"
-                          value={formData.labor_hours}
-                          onChange={(e) => setFormData({ ...formData, labor_hours: parseFloat(e.target.value) || 0 })}
+                          type="text"
+                          value={formData.labor_hours || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || val === '-') {
+                              setFormData({ ...formData, labor_hours: 0 });
+                            } else {
+                              const parsed = parseFloat(val);
+                              if (!isNaN(parsed)) {
+                                setFormData({ ...formData, labor_hours: parsed });
+                              }
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const parsed = parseFloat(e.target.value);
+                            setFormData({ ...formData, labor_hours: isNaN(parsed) ? 0 : parsed });
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          min="0"
-                          step="0.25"
                           placeholder="0.00"
                         />
                       </div>
@@ -626,12 +664,24 @@ export default function AddItemToAreasModal({
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                           <input
-                            type="number"
-                            value={formData.labor_rate}
-                            onChange={(e) => setFormData({ ...formData, labor_rate: parseFloat(e.target.value) || 0 })}
+                            type="text"
+                            value={formData.labor_rate || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || val === '-') {
+                                setFormData({ ...formData, labor_rate: 0 });
+                              } else {
+                                const parsed = parseFloat(val);
+                                if (!isNaN(parsed)) {
+                                  setFormData({ ...formData, labor_rate: parsed });
+                                }
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const parsed = parseFloat(e.target.value);
+                              setFormData({ ...formData, labor_rate: isNaN(parsed) ? 0 : parsed });
+                            }}
                             className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            min="0"
-                            step="0.01"
                             placeholder="0.00"
                           />
                         </div>

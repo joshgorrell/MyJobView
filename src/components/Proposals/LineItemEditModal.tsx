@@ -682,12 +682,25 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Quantity</label>
                     <input
-                      type="number"
-                      value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
+                      type="text"
+                      value={formData.quantity || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || val === '-') {
+                          setFormData({ ...formData, quantity: 0 });
+                        } else {
+                          const parsed = parseFloat(val);
+                          if (!isNaN(parsed)) {
+                            setFormData({ ...formData, quantity: parsed });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const parsed = parseFloat(e.target.value);
+                        setFormData({ ...formData, quantity: isNaN(parsed) ? 0 : parsed });
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                      step="0.01"
+                      placeholder="0"
                     />
                   </div>
 
@@ -738,12 +751,25 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                       <input
-                        type="number"
-                        value={formData.unit_price}
-                        onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
+                        type="text"
+                        value={formData.unit_price || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || val === '-') {
+                            setFormData({ ...formData, unit_price: 0 });
+                          } else {
+                            const parsed = parseFloat(val);
+                            if (!isNaN(parsed)) {
+                              setFormData({ ...formData, unit_price: parsed });
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const parsed = parseFloat(e.target.value);
+                          setFormData({ ...formData, unit_price: isNaN(parsed) ? 0 : parsed });
+                        }}
                         className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        min="0"
-                        step="0.01"
+                        placeholder="0.00"
                       />
                     </div>
                   </div>
@@ -754,13 +780,24 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Labor Hours</label>
                     <input
-                      type="number"
-                      value={formData.is_customer_supplied ? 0 : formData.labor_hours}
-                      disabled={formData.is_customer_supplied}
-                      onChange={(e) => setFormData({ ...formData, labor_hours: parseFloat(e.target.value) || 0 })}
-                      className={`w-full px-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formData.is_customer_supplied ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-gray-300'}`}
-                      min="0"
-                      step="0.25"
+                      type="text"
+                      value={formData.labor_hours || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || val === '-') {
+                          setFormData({ ...formData, labor_hours: 0 });
+                        } else {
+                          const parsed = parseFloat(val);
+                          if (!isNaN(parsed)) {
+                            setFormData({ ...formData, labor_hours: parsed });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const parsed = parseFloat(e.target.value);
+                        setFormData({ ...formData, labor_hours: isNaN(parsed) ? 0 : parsed });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="0.00"
                     />
                   </div>
@@ -770,13 +807,24 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                       <input
-                        type="number"
-                        value={formData.is_customer_supplied ? 0 : formData.labor_rate}
-                        disabled={formData.is_customer_supplied}
-                        onChange={(e) => setFormData({ ...formData, labor_rate: parseFloat(e.target.value) || 0 })}
-                        className={`w-full pl-8 pr-3 py-2 border rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formData.is_customer_supplied ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-gray-300'}`}
-                        min="0"
-                        step="0.01"
+                        type="text"
+                        value={formData.labor_rate || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || val === '-') {
+                            setFormData({ ...formData, labor_rate: 0 });
+                          } else {
+                            const parsed = parseFloat(val);
+                            if (!isNaN(parsed)) {
+                              setFormData({ ...formData, labor_rate: parsed });
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const parsed = parseFloat(e.target.value);
+                          setFormData({ ...formData, labor_rate: isNaN(parsed) ? 0 : parsed });
+                        }}
+                        className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         placeholder="0.00"
                       />
                     </div>
