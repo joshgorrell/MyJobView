@@ -288,7 +288,6 @@ export default function AddItemToAreasModal({
 
   function handlePanelChange(field: keyof ProductDetailPanelData, value: any) {
     const fieldMap: Record<string, string> = {
-      productName: 'description',
       quantity: 'quantity',
       unit: 'unit',
       unitPrice: 'unit_price',
@@ -404,7 +403,7 @@ export default function AddItemToAreasModal({
   // Build panelData for ProductDetailPanel
   const panelData: ProductDetailPanelData | null = selectedProduct ? {
     productId: selectedProduct.id ?? null,
-    productName: form.description,
+    productName: selectedProduct.name || '',
     sku: selectedProduct.sku || masterProduct?.sku || null,
     upc: (selectedProduct as any).upc ?? masterProduct?.upc ?? null,
     category: masterProduct?.category?.name || (selectedProduct as any).category || null,
@@ -418,7 +417,7 @@ export default function AddItemToAreasModal({
     supplierUrl: masterProduct?.supplier_url ?? null,
     productSheetUrl: masterProduct?.product_sheet_url ?? null,
     installVideoUrl: masterProduct?.install_video_url ?? null,
-    description: masterProduct?.description || selectedProduct.description || null,
+    description: form.description || null,
     specifications: masterProduct?.specifications ?? null,
     unitPrice: form.unit_price,
     cost: form.cost,

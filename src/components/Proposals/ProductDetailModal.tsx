@@ -85,7 +85,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
 
         setPanelData({
           productId: item.product_id || null,
-          productName: item.description || '',
+          productName: product?.name || item.description || '',
           sku: product?.sku || null,
           upc: product?.upc || null,
           category: product?.category || null,
@@ -99,7 +99,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
           supplierUrl: product?.supplier_url || null,
           productSheetUrl: product?.product_sheet_url || null,
           installVideoUrl: product?.install_video_url || null,
-          description: product?.description || null,
+          description: item.description || null,
           specifications: product?.specifications || null,
           unitPrice: Number(item.unit_price || 0),
           cost: Number(item.cost || 0),
@@ -270,7 +270,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       const effectiveCost = panelData.isCustomerSupplied ? 0 : panelData.cost;
 
       const updateData = {
-        description: panelData.productName,
+        description: panelData.description,
         quantity: panelData.quantity,
         unit: panelData.unit,
         unit_price: panelData.isCustomerSupplied ? 0 : panelData.unitPrice,
@@ -316,7 +316,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
             .from('products')
             .update({
               name: panelData.productName,
-              description: panelData.productName,
+              description: panelData.description,
               unit_price: panelData.unitPrice,
               cost: panelData.cost,
               default_labor_hours: panelData.laborHours || null,
