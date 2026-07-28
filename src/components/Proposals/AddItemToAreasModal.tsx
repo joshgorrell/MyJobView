@@ -26,6 +26,16 @@ interface MasterProductFull extends Product {
   subcategory?: { name: string } | null;
   labor_phase?: { name: string; default_price: number | null } | null;
   sales_description?: string | null;
+  upc?: string | null;
+  inventory_type?: string | null;
+  item_color?: string | null;
+  item_size?: string | null;
+  manufacturer_url?: string | null;
+  supplier_url?: string | null;
+  product_sheet_url?: string | null;
+  install_video_url?: string | null;
+  specifications?: string | null;
+  msrp?: number | null;
 }
 
 interface ProposalClass {
@@ -380,23 +390,23 @@ export default function AddItemToAreasModal({
     productId: selectedProduct.id ?? null,
     productName: form.description,
     sku: selectedProduct.sku || masterProduct?.sku || null,
-    upc: (selectedProduct as any).upc || (masterProduct as any).upc || null,
+    upc: (selectedProduct as any).upc ?? masterProduct?.upc ?? null,
     category: masterProduct?.category?.name || (selectedProduct as any).category || null,
     subcategory: masterProduct?.subcategory?.name || null,
-    inventoryType: (masterProduct as any).inventory_type || (selectedProduct as any).inventory_type || null,
-    itemColor: (masterProduct as any).item_color || (selectedProduct as any).item_color || null,
-    itemSize: (masterProduct as any).item_size || (selectedProduct as any).item_size || null,
+    inventoryType: masterProduct?.inventory_type ?? (selectedProduct as any).inventory_type ?? null,
+    itemColor: masterProduct?.item_color ?? (selectedProduct as any).item_color ?? null,
+    itemSize: masterProduct?.item_size ?? (selectedProduct as any).item_size ?? null,
     manufacturerName: masterProduct?.manufacturer?.name || null,
     imageUrl: (selectedProduct as any).image_url || masterProduct?.image_url || null,
-    manufacturerUrl: (masterProduct as any).manufacturer_url || null,
-    supplierUrl: (masterProduct as any).supplier_url || null,
-    productSheetUrl: (masterProduct as any).product_sheet_url || null,
-    installVideoUrl: (masterProduct as any).install_video_url || null,
+    manufacturerUrl: masterProduct?.manufacturer_url ?? null,
+    supplierUrl: masterProduct?.supplier_url ?? null,
+    productSheetUrl: masterProduct?.product_sheet_url ?? null,
+    installVideoUrl: masterProduct?.install_video_url ?? null,
     description: masterProduct?.description || selectedProduct.description || null,
-    specifications: (masterProduct as any).specifications || null,
+    specifications: masterProduct?.specifications ?? null,
     unitPrice: form.unit_price,
     cost: form.cost,
-    msrp: (masterProduct as any).msrp ? Number((masterProduct as any).msrp) : null,
+    msrp: masterProduct?.msrp ? Number(masterProduct.msrp) : null,
     quantity: form.quantity,
     unit: form.unit,
     laborHours: form.labor_hours,
