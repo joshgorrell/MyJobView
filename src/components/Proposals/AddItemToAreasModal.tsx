@@ -181,7 +181,7 @@ export default function AddItemToAreasModal({
       : null;
 
     setForm({
-      description: product.description || product.name,
+      description: product.description || '',
       quantity: 1,
       unit: product.unit || 'ea',
       unit_price: basePrice,
@@ -269,7 +269,7 @@ export default function AddItemToAreasModal({
       quantity: 1,
       unit_price: product.unit_price || (product as any).our_price || 0,
       cost: product.cost || 0,
-      description: product.description || product.name,
+      description: product.description || '',
     };
     setPendingAccessories(prev => [...prev, acc]);
     setShowAccessorySelector(false);

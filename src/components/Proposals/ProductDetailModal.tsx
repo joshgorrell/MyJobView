@@ -99,7 +99,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
           supplierUrl: product?.supplier_url || null,
           productSheetUrl: product?.product_sheet_url || null,
           installVideoUrl: product?.install_video_url || null,
-          description: item.description || null,
+          description: (item.description && item.description !== product?.name) ? item.description : null,
           specifications: product?.specifications || null,
           unitPrice: Number(item.unit_price || 0),
           cost: Number(item.cost || 0),
