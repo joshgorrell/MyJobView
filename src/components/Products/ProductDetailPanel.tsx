@@ -250,17 +250,7 @@ export default function ProductDetailPanel({
               </div>
             )}
           </div>
-          {isEdit ? (
-            <input
-              type="text"
-              value={data.productName}
-              onChange={(e) => onChange?.('productName', e.target.value)}
-              className="w-full px-2 py-1.5 text-sm font-semibold border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white mt-1"
-              placeholder="Item description"
-            />
-          ) : (
-            <h3 className="text-sm font-bold text-gray-900 leading-tight mt-0.5">{data.productName}</h3>
-          )}
+          <h3 className="text-sm font-bold text-gray-900 leading-tight mt-0.5">{data.productName}</h3>
 
         </div>
 
