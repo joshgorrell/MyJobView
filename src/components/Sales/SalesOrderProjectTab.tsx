@@ -4,6 +4,7 @@ import { Wrench, Clock, CheckCircle, User, AlertTriangle, ChevronDown, ChevronUp
 import type { SalesOrderFull } from './SalesOrderDetail';
 import { CreateProjectWorkOrderModal } from '../Production/CreateProjectWorkOrderModal';
 import { AddProjectTimeModal } from '../Projects/AddProjectTimeModal';
+import { WorkOrderDetail } from '../Production/WorkOrderDetail';
 
 interface WorkOrder {
   id: string;
@@ -124,6 +125,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [totalClockedHours, setTotalClockedHours] = useState(0);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
 
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
   const [assigningPhaseId, setAssigningPhaseId] = useState<string | null>(null);
@@ -1141,7 +1143,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         ) : (
           <div className="space-y-2">
             {visibleWOs.map(wo => (
-              <WorkOrderCard key={wo.id} wo={wo} soldHours={soldLaborHours} />
+              <WorkOrderCard key={wo.id} wo={wo} soldHours={soldLaborHours} onClick={() => setSelectedWorkOrderId(wo.id)} />
             ))}
             {workOrders.length > 5 && (
               <button
@@ -1852,11 +1854,21 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
           }}
         />
       )}
+
+      {selectedWorkOrderId && (
+        <WorkOrderDetail
+          workOrderId={selectedWorkOrderId}
+          onClose={() => {
+            setSelectedWorkOrderId(null);
+            loadProjectData();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function WorkOrderCard({ wo, soldHours }: { wo: WorkOrder; soldHours: number }) {
+function WorkOrderCard({ wo, soldHours, onClick }: { wo: WorkOrder; soldHours: number; onClick?: () => void }) {
   const statusStyles: Record<string, string> = {
     completed: 'bg-green-500/20 text-green-400 border border-green-500/30',
     in_progress: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
@@ -1879,7 +1891,10 @@ function WorkOrderCard({ wo, soldHours }: { wo: WorkOrder; soldHours: number }) 
   const overEst = actualH > estH && estH > 0;
 
   return (
-    <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4 hover:border-gray-600 transition-colors">
+    <div
+      onClick={onClick}
+      className={`bg-gray-900/50 rounded-xl border border-gray-700/50 p-4 transition-colors ${onClick ? 'cursor-pointer hover:border-blue-500/50 hover:bg-gray-800/40' : 'hover:border-gray-600'}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
