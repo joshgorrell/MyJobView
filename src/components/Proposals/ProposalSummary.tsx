@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ResubmitProposalModal from './ResubmitProposalModal';
 import { ProposalQA } from './ProposalQA';
+import { QaDot } from '../Shared/QaDot';
 import { ProposalSubmissionModal } from './ProposalSubmissionModal';
 import { ReactivateProposalModal } from './ReactivateProposalModal';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -53,6 +54,9 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
   const [showResubmitModal, setShowResubmitModal] = useState(false);
   const [showQA, setShowQA] = useState(false);
   const [unreadQaCount, setUnreadQaCount] = useState(0);
+  const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
+  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
+  const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const [showPortalDropdown, setShowPortalDropdown] = useState(false);
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [activityData, setActivityData] = useState<any>(null);
@@ -105,14 +109,26 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
         .eq('context_type', 'proposal')
         .maybeSingle();
       if (!thread) return;
-      const { count } = await supabase
+      const { data: msgs } = await supabase
         .from('messages')
-        .select('id', { count: 'exact', head: true })
+        .select('context_room_id, context_line_item_id, is_read, author_type, is_internal')
         .eq('thread_id', thread.id)
-        .eq('author_type', 'customer')
-        .eq('is_internal', false)
-        .eq('is_read', false);
-      setUnreadQaCount(count || 0);
+        .eq('is_internal', false);
+      if (!msgs) return;
+      const hasMsg: Record<string, boolean> = {};
+      const unread: Record<string, number> = {};
+      let totalUnread = 0;
+      for (const m of msgs) {
+        const key = m.context_line_item_id || m.context_room_id || 'general';
+        hasMsg[key] = true;
+        if (!m.is_read && m.author_type === 'customer') {
+          unread[key] = (unread[key] || 0) + 1;
+          totalUnread++;
+        }
+      }
+      setMessagesByContext(hasMsg);
+      setUnreadByContext(unread);
+      setUnreadQaCount(totalUnread);
     } catch {}
   }
 
@@ -1025,20 +1041,33 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
                   Open Portal Preview
                 </button>
                 <button
-                  onClick={() => {
-                    setShowQA(true);
-                    setShowPortalDropdown(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 relative"
-                >
-                  <MessageSquare size={16} />
-                  Customer Q&A
-                  {unreadQaCount > 0 && (
-                    <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
-                      {unreadQaCount}
-                    </span>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setQaContext({ roomId: null, lineItemId: null, label: null });
+                      setShowQA(true);
+                      setShowPortalDropdown(false);
+                    }}
+                    className="flex-1 px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 relative"
+                  >
+                    <MessageSquare size={16} />
+                    Customer Q&A
+                    {unreadQaCount > 0 && (
+                      <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                        {unreadQaCount}
+                      </span>
+                    )}
+                  </button>
+                  <QaDot
+                    hasMessages={messagesByContext['general'] || unreadQaCount > 0}
+                    unreadCount={unreadByContext['general'] || 0}
+                    onClick={() => {
+                      setQaContext({ roomId: null, lineItemId: null, label: null });
+                      setShowQA(true);
+                      setShowPortalDropdown(false);
+                    }}
+                  />
+                </div>
                 <div className="border-t border-gray-200 my-1"></div>
                 <button
                   onClick={handleEmailProposal}
@@ -1108,7 +1137,10 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
         <ProposalQA
           proposalId={proposal.id}
           isPortal={false}
-          onClose={() => setShowQA(false)}
+          onClose={() => { setShowQA(false); setQaContext({ roomId: null, lineItemId: null, label: null }); }}
+          contextRoomId={qaContext.roomId}
+          contextLineItemId={qaContext.lineItemId}
+          contextLabel={qaContext.label}
         />
       )}
 

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, HelpCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
+import { QaDot } from '../Shared/QaDot';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
 
 interface ProposalRecording {
@@ -228,6 +229,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
   const [paymentUnavailableInvoice, setPaymentUnavailableInvoice] = useState<PortalInvoice | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
+  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
   const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -251,18 +253,21 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       if (!thread) return;
       const { data: msgs } = await supabase
         .from('messages')
-        .select('context_room_id, context_line_item_id')
+        .select('context_room_id, context_line_item_id, is_read, author_type, is_internal')
         .eq('thread_id', thread.id)
-        .eq('author_type', 'customer')
-        .eq('is_internal', false)
-        .eq('is_read', false);
+        .eq('is_internal', false);
       if (!msgs) return;
-      const counts: Record<string, number> = {};
+      const hasMsg: Record<string, boolean> = {};
+      const unread: Record<string, number> = {};
       for (const m of msgs) {
         const key = m.context_line_item_id || m.context_room_id || 'general';
-        counts[key] = (counts[key] || 0) + 1;
+        hasMsg[key] = true;
+        if (!m.is_read && m.author_type === 'customer') {
+          unread[key] = (unread[key] || 0) + 1;
+        }
       }
-      setUnreadByContext(counts);
+      setMessagesByContext(hasMsg);
+      setUnreadByContext(unread);
     } catch {}
   }
 
@@ -931,18 +936,11 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <Package className="w-5 h-5 text-blue-400" />
                       </div>
                       <h3 className="text-lg sm:text-xl font-bold text-white flex-1">{room.name}</h3>
-                      <button
+                      <QaDot
+                        hasMessages={messagesByContext[room.id] || false}
+                        unreadCount={unreadByContext[room.id] || 0}
                         onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-blue-200 hover:text-white text-xs font-medium rounded-lg transition-colors relative"
-                      >
-                        <HelpCircle className="w-3.5 h-3.5" />
-                        Ask about this room
-                        {unreadByContext[room.id] > 0 && (
-                          <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
-                            {unreadByContext[room.id]}
-                          </span>
-                        )}
-                      </button>
+                      />
                     </div>
                   </div>
 
@@ -974,18 +972,13 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <p className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed ml-6">
                           {room.description}
                         </p>
-                        <button
-                          onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
-                          className="mt-3 ml-6 flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          Comment on this scope
-                          {unreadByContext[room.id] > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
-                              {unreadByContext[room.id]}
-                            </span>
-                          )}
-                        </button>
+                        <div className="mt-3 ml-6">
+                          <QaDot
+                            hasMessages={messagesByContext[room.id] || false}
+                            unreadCount={unreadByContext[room.id] || 0}
+                            onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1029,18 +1022,11 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               <td className="py-4">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
-                                  <button
+                                  <QaDot
+                                    hasMessages={messagesByContext[item.id] || false}
+                                    unreadCount={unreadByContext[item.id] || 0}
                                     onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
-                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0 relative"
-                                    title="Ask about this item"
-                                  >
-                                    <HelpCircle className="w-3.5 h-3.5" />
-                                    {unreadByContext[item.id] > 0 && (
-                                      <span className="absolute -top-1.5 -right-1.5 px-1 py-0 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] text-center leading-tight">
-                                        {unreadByContext[item.id]}
-                                      </span>
-                                    )}
-                                  </button>
+                                  />
                                 </div>
                               </td>
                               {template?.show_quantity && (
@@ -1141,18 +1127,11 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               <td className="py-4">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
-                                  <button
+                                  <QaDot
+                                    hasMessages={messagesByContext[item.id] || false}
+                                    unreadCount={unreadByContext[item.id] || 0}
                                     onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
-                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0 relative"
-                                    title="Ask about this item"
-                                  >
-                                    <HelpCircle className="w-3.5 h-3.5" />
-                                    {unreadByContext[item.id] > 0 && (
-                                      <span className="absolute -top-1.5 -right-1.5 px-1 py-0 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] text-center leading-tight">
-                                        {unreadByContext[item.id]}
-                                      </span>
-                                    )}
-                                  </button>
+                                  />
                                 </div>
                               </td>
                               {template?.show_quantity && (
