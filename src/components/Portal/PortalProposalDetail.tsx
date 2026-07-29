@@ -114,6 +114,10 @@ interface Proposal {
   tax_amount: number;
   deposit_amount_due: number;
   deposit_percent: number;
+  require_deposit: boolean | null;
+  deposit_paid: boolean | null;
+  deposit_request_sent: boolean | null;
+  deposit_invoice_id: string | null;
   created_at: string;
   valid_until: string | null;
   expires_at: string | null;
@@ -180,6 +184,7 @@ interface PortalInvoice {
   amount_paid: number;
   amount_due: number;
   qbo_invoice_id: string | null;
+  invoice_type: string | null;
   billing_name: string | null;
   billing_address_line1: string | null;
   billing_address_line2: string | null;
@@ -461,21 +466,49 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           .select('id')
           .eq('proposal_id', proposalId);
 
+        const allInvoices: PortalInvoice[] = [];
+
+        // Fetch deposit invoices linked directly to this proposal
+        const { data: depositInvoices } = await supabase
+          .from('invoices')
+          .select(`
+            id, invoice_number, invoice_title, invoice_date, due_date, status,
+            subtotal, tax, total, amount_paid, amount_due, qbo_invoice_id, invoice_type,
+            billing_name, billing_address_line1, billing_address_line2,
+            billing_city, billing_state, billing_zip
+          `)
+          .eq('proposal_id', proposalId)
+          .eq('invoice_type', 'deposit')
+          .not('status', 'eq', 'void')
+          .order('invoice_date');
+
+        if (depositInvoices) allInvoices.push(...depositInvoices);
+
+        // Fetch invoices linked to sales orders for this proposal
         if (salesOrders && salesOrders.length > 0) {
           const soIds = salesOrders.map((so: { id: string }) => so.id);
           const { data: invoicesData } = await supabase
             .from('invoices')
             .select(`
               id, invoice_number, invoice_title, invoice_date, due_date, status,
-              subtotal, tax, total, amount_paid, amount_due, qbo_invoice_id,
+              subtotal, tax, total, amount_paid, amount_due, qbo_invoice_id, invoice_type,
               billing_name, billing_address_line1, billing_address_line2,
               billing_city, billing_state, billing_zip
             `)
             .in('sales_order_id', soIds)
             .not('status', 'eq', 'void')
             .order('invoice_date');
-          setRelatedInvoices(invoicesData || []);
+          if (invoicesData) allInvoices.push(...invoicesData);
         }
+
+        // Deduplicate by invoice ID
+        const seen = new Set<string>();
+        const deduped = allInvoices.filter(inv => {
+          if (seen.has(inv.id)) return false;
+          seen.add(inv.id);
+          return true;
+        });
+        setRelatedInvoices(deduped);
       }
     } catch (error) {
       console.error('Error loading proposal details:', error);
@@ -1227,17 +1260,62 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               </div>
             )}
 
-            {proposal.deposit_amount_due > 0 && (
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-md">
-                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Deposit Required
-                </h3>
-                <p className="text-sm text-gray-700">
-                  A deposit of <span className="font-bold">${(proposal.deposit_amount_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> ({proposal.deposit_percent}%) is required upon approval.
-                </p>
-              </div>
-            )}
+            {proposal.deposit_amount_due > 0 && (() => {
+              const depositInvoice = relatedInvoices.find(inv => inv.id === proposal.deposit_invoice_id) ||
+                relatedInvoices.find(inv => inv.invoice_type === 'deposit' as any) ||
+                relatedInvoices.find(inv => inv.invoice_number?.toLowerCase().includes('deposit'));
+              const isDepositPaid = proposal.deposit_paid || depositInvoice?.status === 'paid';
+              const isDepositInvoiceReady = depositInvoice && depositInvoice.status === 'sent' && depositInvoice.qbo_invoice_id;
+              const isAwaitingInvoice = !depositInvoice && (proposal.status === 'approved' || proposal.status === 'approved_pending_action') && !isDepositPaid;
+
+              return (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-md">
+                  <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Deposit
+                  </h3>
+
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm text-gray-600">Amount</span>
+                    <span className="text-lg font-bold text-gray-900">
+                      ${(proposal.deposit_amount_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {isDepositPaid ? (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <p className="text-sm font-medium text-green-800">Deposit Paid</p>
+                    </div>
+                  ) : isDepositInvoiceReady ? (
+                    <>
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                        <p className="text-sm font-medium text-amber-800">Deposit Invoice Ready</p>
+                      </div>
+                      <button
+                        onClick={() => depositInvoice && handleInvoicePayment(depositInvoice)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Pay Deposit Now
+                      </button>
+                    </>
+                  ) : isAwaitingInvoice ? (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                      <Clock className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-blue-800">
+                        Your sales representative will send you a deposit invoice shortly. You can pay it from the Invoices tab once it arrives.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-700">
+                      A deposit of <span className="font-bold">${(proposal.deposit_amount_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> ({proposal.deposit_percent}%) is required upon approval.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Related Invoices Panel */}
             {relatedInvoices.length > 0 && (

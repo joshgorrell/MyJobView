@@ -29,8 +29,8 @@ export function ProposalApprovalModal({
   const [poFile, setPoFile] = useState<File | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [depositInvoiceId, setDepositInvoiceId] = useState<string | null>(null);
-  const [qboInvoiceId, setQboInvoiceId] = useState<string | null>(null);
-  const [paymentWindowOpened, setPaymentWindowOpened] = useState(false);
+  const [depositInvoiceStatus, setDepositInvoiceStatus] = useState<string | null>(null);
+  const [depositInvoiceQboId, setDepositInvoiceQboId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export function ProposalApprovalModal({
       // Try to find the deposit invoice for this proposal
       const { data: invoice } = await supabase
         .from('invoices')
-        .select('id, qbo_invoice_id')
+        .select('id, qbo_invoice_id, status')
         .eq('proposal_id', proposalId)
         .eq('invoice_type', 'deposit')
         .order('created_at', { ascending: false })
@@ -81,7 +81,8 @@ export function ProposalApprovalModal({
 
       if (invoice) {
         setDepositInvoiceId(invoice.id);
-        setQboInvoiceId(invoice.qbo_invoice_id);
+        setDepositInvoiceQboId(invoice.qbo_invoice_id);
+        setDepositInvoiceStatus(invoice.status);
       }
     } catch (error) {
       console.error('Error loading proposal settings:', error);
@@ -129,11 +130,6 @@ export function ProposalApprovalModal({
       updated_at: new Date().toISOString()
     };
 
-    if (method === 'payment') {
-      updateData.deposit_paid = true;
-      updateData.deposit_payment_date = new Date().toISOString();
-    }
-
     if (method === 'purchase_order') {
       if (poNumber?.trim()) {
         updateData.purchase_order_number = poNumber.trim();
@@ -151,21 +147,21 @@ export function ProposalApprovalModal({
     if (error) throw error;
   }
 
-  async function handlePayDeposit() {
+  async function handlePaymentApproval() {
     setSubmitting(true);
     try {
-      // Open QuickBooks payment window if we have a QBO invoice ID
-      if (qboInvoiceId) {
-        const paymentUrl = `https://app.qbo.intuit.com/app/paynow?invoiceId=${qboInvoiceId}`;
-        window.open(paymentUrl, '_blank');
-        setPaymentWindowOpened(true);
-      }
-
       await approveProposal('payment');
 
-      const msg = requireDeposit
-        ? 'Your proposal has been approved and a deposit payment window has been opened. Complete the payment in the new window. Your sales representative will confirm once the deposit is received and your order will be ready for scheduling.'
-        : 'Your proposal has been approved! A sales order has been created and is ready for scheduling. Your sales representative has been notified.';
+      let msg: string;
+      if (!requireDeposit) {
+        msg = 'Your proposal has been approved! A sales order has been created and is ready for scheduling. Your sales representative has been notified.';
+      } else if (depositInvoiceId && depositInvoiceStatus === 'sent' && depositInvoiceQboId) {
+        msg = 'Your proposal has been approved! Click the button below to pay your deposit now. Once your deposit is confirmed, your order will be ready for scheduling.';
+      } else if (depositInvoiceId && depositInvoiceStatus === 'paid') {
+        msg = 'Your proposal has been approved and your deposit has been received. Your order is ready for scheduling!';
+      } else {
+        msg = 'Your approval has been received! Your sales representative will send you a deposit invoice shortly. You can pay it from the Invoices tab in your portal. Once your deposit is confirmed, your order will be ready for scheduling.';
+      }
 
       setSuccessMessage(msg);
       setStep('success');
@@ -367,26 +363,22 @@ export function ProposalApprovalModal({
                       ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  {qboInvoiceId ? (
+                  {depositInvoiceId && depositInvoiceStatus === 'sent' && depositInvoiceQboId ? (
                     <p className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
-                      Deposit invoice ready for online payment
+                      Deposit invoice is ready — you can pay immediately after approving
+                    </p>
+                  ) : depositInvoiceId && depositInvoiceStatus === 'paid' ? (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Deposit already paid
                     </p>
                   ) : (
                     <p className="text-xs text-amber-600 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
-                      Your sales rep will send payment instructions shortly
+                      Your sales rep will send a deposit invoice after you approve
                     </p>
                   )}
-                </div>
-              )}
-
-              {paymentWindowOpened && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-green-700">
-                    A payment window has been opened. Complete the payment there, then return here. If you don't see it, check your popup blocker.
-                  </p>
                 </div>
               )}
 
@@ -399,7 +391,7 @@ export function ProposalApprovalModal({
                   Back
                 </button>
                 <button
-                  onClick={handlePayDeposit}
+                  onClick={handlePaymentApproval}
                   disabled={submitting}
                   className="flex-1 px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
                 >
@@ -410,8 +402,8 @@ export function ProposalApprovalModal({
                     </>
                   ) : (
                     <>
-                      <CreditCard className="w-4 h-4" />
-                      {requireDeposit ? 'Pay Deposit & Approve' : 'Approve Proposal'}
+                      <CheckCircle className="w-4 h-4" />
+                      {requireDeposit ? 'Approve Proposal' : 'Approve Proposal'}
                     </>
                   )}
                 </button>
@@ -507,9 +499,28 @@ export function ProposalApprovalModal({
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Proposal Approved!</h3>
               <p className="text-sm text-gray-600 max-w-sm mx-auto">{successMessage}</p>
+
+              {requireDeposit && depositInvoiceId && depositInvoiceStatus === 'sent' && depositInvoiceQboId && (
+                <button
+                  onClick={async () => {
+                    const { data: settings } = await supabase
+                      .from('company_settings')
+                      .select('qbo_realm_id')
+                      .maybeSingle();
+                    if (settings?.qbo_realm_id) {
+                      window.open(`https://app.qbo.intuit.com/app/paynow?invoiceId=${depositInvoiceQboId}`, '_blank');
+                    }
+                  }}
+                  className="mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2 mx-auto"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  Pay Deposit Now
+                </button>
+              )}
+
               <button
                 onClick={onSuccess}
-                className="mt-6 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="mt-4 px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
                 Done
               </button>
