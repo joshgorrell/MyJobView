@@ -665,6 +665,78 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     }
   }
 
+  async function handleSubmitChangeRequest() {
+    if (!proposal || !comment.trim() || comment === 'open') return;
+
+    setSubmitting(true);
+    try {
+      // Find or create the proposal message thread
+      let { data: existingThread } = await supabase
+        .from('message_threads')
+        .select('id')
+        .eq('proposal_id', proposalId)
+        .eq('context_type', 'proposal')
+        .maybeSingle();
+
+      let threadId = existingThread?.id;
+
+      if (!threadId) {
+        const { data: proposalData } = await supabase
+          .from('proposals')
+          .select('proposal_number, created_by, contact_id')
+          .eq('id', proposalId)
+          .single();
+
+        if (proposalData) {
+          const { data: newThread, error: createError } = await supabase
+            .from('message_threads')
+            .insert({
+              subject: `Q&A: Proposal ${proposalData.proposal_number}`,
+              context_type: 'proposal',
+              context_id: proposalId,
+              proposal_id: proposalId,
+              contact_id: proposalData.contact_id,
+              assigned_sales_rep_id: proposalData.created_by,
+              visibility: 'public',
+              created_by: proposalData.contact_id,
+            })
+            .select('id')
+            .single();
+
+          if (createError) throw createError;
+          threadId = newThread?.id;
+        }
+      }
+
+      if (!threadId) throw new Error('Could not find or create message thread');
+
+      const { error: msgError } = await supabase
+        .from('messages')
+        .insert({
+          thread_id: threadId,
+          author_id: proposal.contact_id || null,
+          author_name: proposal.contact_name || 'Customer',
+          author_type: 'customer',
+          body: comment.trim(),
+          is_internal: false,
+          is_read: false,
+          context_room_id: null,
+          context_line_item_id: null,
+          context_label: null,
+        });
+
+      if (msgError) throw msgError;
+
+      setComment('');
+      setShowQA(true);
+    } catch (error) {
+      console.error('Error submitting change request:', error);
+      alert('Failed to send feedback. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -902,6 +974,18 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <p className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed ml-6">
                           {room.description}
                         </p>
+                        <button
+                          onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
+                          className="mt-3 ml-6 flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          Comment on this scope
+                          {unreadByContext[room.id] > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                              {unreadByContext[room.id]}
+                            </span>
+                          )}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1165,7 +1249,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   className="w-full px-4 py-3.5 border-2 border-blue-500 text-blue-600 rounded-xl hover:bg-blue-50 flex items-center justify-center gap-2 font-bold transition-all duration-200 hover:scale-105"
                 >
                   <MessageSquare className="w-5 h-5" />
-                  Ask Questions
+                  Ask Questions / Comment
                 </button>
 
                 {canTakeAction && (
@@ -1243,10 +1327,11 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
                 <button
+                  onClick={handleSubmitChangeRequest}
                   disabled={submitting || !comment.trim() || comment === 'open'}
                   className="w-full mt-3 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 font-bold transition-colors"
                 >
-                  Submit Feedback
+                  {submitting ? 'Sending...' : 'Submit Feedback'}
                 </button>
               </div>
             )}
