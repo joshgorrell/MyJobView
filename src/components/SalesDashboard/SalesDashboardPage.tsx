@@ -145,8 +145,8 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange }: Sale
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Sales Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold text-white">Sales Dashboard</h1>
+          <p className="text-sm text-gray-300 mt-0.5">
             {isManagerView ? `Viewing: ${data.repDisplayName}` : data.repDisplayName}
           </p>
         </div>
@@ -160,7 +160,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange }: Sale
           )}
           <button
             onClick={refresh}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
@@ -170,7 +170,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange }: Sale
       </div>
 
       {/* Tab navigation */}
-      <div className="flex items-center gap-1 mb-6 overflow-x-auto border-b border-gray-200">
+      <div className="flex items-center gap-1 mb-6 overflow-x-auto border-b border-gray-700">
         {TAB_CONFIG.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -180,8 +180,8 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange }: Sale
               onClick={() => setActiveTab(tab.key)}
               className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-400 text-blue-400'
+                  : 'border-transparent text-gray-300 hover:text-white hover:border-gray-500'
               }`}
             >
               <Icon className="w-4 h-4" />
