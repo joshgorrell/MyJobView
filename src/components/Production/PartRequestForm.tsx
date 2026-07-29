@@ -5,11 +5,12 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface PartRequestFormProps {
   workOrderId: string;
+  projectId?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function PartRequestForm({ workOrderId, onSuccess, onCancel }: PartRequestFormProps) {
+export function PartRequestForm({ workOrderId, projectId, onSuccess, onCancel }: PartRequestFormProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -81,21 +82,35 @@ export function PartRequestForm({ workOrderId, onSuccess, onCancel }: PartReques
         photoUrl = publicUrl;
       }
 
-      const { error } = await supabase
-        .from('parts_requests')
+      const { data: requestData, error: reqError } = await supabase
+        .from('product_requests')
         .insert({
-          technician_id: profile.id,
+          requested_by: profile.id,
+          request_type: 'job',
           work_order_id: workOrderId,
-          part_name: formData.part_name.trim(),
-          part_number: formData.part_number.trim() || null,
-          quantity: formData.quantity,
-          urgency: formData.urgency,
-          reason: formData.reason.trim(),
-          estimated_cost: formData.estimated_cost ? parseFloat(formData.estimated_cost) : null,
-          photo_url: photoUrl
-        });
+          project_id: projectId || null,
+          notes: formData.reason.trim(),
+          priority: formData.urgency === 'immediate' || formData.urgency === 'today' ? 'urgent' : 'normal',
+        })
+        .select('id')
+        .single();
 
-      if (error) throw error;
+      if (reqError) throw reqError;
+
+      if (photoUrl || formData.part_name.trim() || formData.part_number.trim() || formData.quantity > 0 || (formData.estimated_cost && parseFloat(formData.estimated_cost) > 0)) {
+        const { error: itemError } = await supabase
+          .from('product_request_items')
+          .insert({
+            request_id: requestData.id,
+            product_name: formData.part_name.trim(),
+            model_number: formData.part_number.trim() || null,
+            quantity_requested: formData.quantity,
+            estimated_cost: formData.estimated_cost ? parseFloat(formData.estimated_cost) : null,
+            notes: photoUrl ? `Photo: ${photoUrl}` : null,
+          });
+
+        if (itemError) throw itemError;
+      }
 
       setFormData({
         part_name: '',

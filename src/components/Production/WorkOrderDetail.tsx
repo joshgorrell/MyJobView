@@ -128,15 +128,19 @@ interface TimeEntry {
 
 interface PartRequest {
   id: string;
-  part_name: string;
-  quantity: number;
   status: string;
-  urgency: string;
-  requested_at: string;
-  notes: string;
-  technician: {
+  priority: string;
+  notes: string | null;
+  created_at: string;
+  requested_by_profile: {
     full_name: string;
-  };
+  } | null;
+  product_request_items: {
+    id: string;
+    product_name: string;
+    quantity_requested: number;
+    estimated_cost: number | null;
+  }[];
 }
 
 interface JobCompletion {
@@ -353,10 +357,18 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           .eq('work_order_id', workOrderId)
           .order('entry_date', { ascending: false }),
         supabase
-          .from('parts_requests')
-          .select('*, technician:profiles!technician_id(full_name)')
+          .from('product_requests')
+          .select(`
+            id,
+            status,
+            priority,
+            notes,
+            created_at,
+            requested_by_profile:profiles!product_requests_requested_by_fkey(full_name),
+            product_request_items(id, product_name, quantity_requested, estimated_cost)
+          `)
           .eq('work_order_id', workOrderId)
-          .order('requested_at', { ascending: false }),
+          .order('created_at', { ascending: false }),
         supabase
           .from('job_photos')
           .select('*')
@@ -1290,20 +1302,24 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-gray-900">{request.part_name}</span>
+                          <span className="font-semibold text-gray-900">
+                            {request.product_request_items?.map(i => i.product_name).join(', ') || 'Parts Request'}
+                          </span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getPartStatusColor(request.status)}`}>
                             {request.status}
                           </span>
-                          {request.urgency === 'urgent' && (
+                          {request.priority === 'urgent' && (
                             <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
                               Urgent
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600">Qty: {request.quantity}</p>
+                        <p className="text-sm text-gray-600">
+                          Qty: {request.product_request_items?.map(i => i.quantity_requested).join(', ') || '—'}
+                        </p>
                         {request.notes && <p className="text-sm text-gray-600 mt-1">{request.notes}</p>}
                         <p className="text-xs text-gray-400 mt-2">
-                          Requested by {request.technician.full_name} · {new Date(request.requested_at).toLocaleDateString()}
+                          Requested by {request.requested_by_profile?.full_name || 'Unknown'} · {new Date(request.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -1662,6 +1678,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="bg-white rounded-xl w-full max-w-lg">
             <PartRequestForm
               workOrderId={workOrderId}
+              projectId={workOrder.project_id}
               onSuccess={() => { setShowPartRequestForm(false); loadWorkOrderData(); }}
               onCancel={() => setShowPartRequestForm(false)}
             />
@@ -1690,6 +1707,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       {showAddPartsModal && (
         <AddPartsModal
           workOrderId={workOrderId}
+          projectId={workOrder.project_id}
           onClose={() => setShowAddPartsModal(false)}
           onSuccess={() => { setShowAddPartsModal(false); loadWorkOrderData(); }}
         />

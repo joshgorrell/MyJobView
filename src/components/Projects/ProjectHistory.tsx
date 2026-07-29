@@ -13,6 +13,7 @@ import {
   Send,
   AlertCircle,
   Timer,
+  Package,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -32,6 +33,8 @@ interface WorkOrderEntry {
   notes?: string | null;
   internal_notes?: string | null;
   time_entries: TimeEntry[];
+  part_requests: PartRequestSummary[];
+  parts_used: PartUsedSummary[];
 }
 
 interface TimeEntry {
@@ -42,6 +45,23 @@ interface TimeEntry {
   total_hours: number | null;
   notes: string | null;
   technician?: { full_name: string } | null;
+}
+
+interface PartRequestSummary {
+  id: string;
+  status: string;
+  priority: string;
+  notes: string | null;
+  created_at: string;
+  product_request_items: { product_name: string; quantity_requested: number }[];
+}
+
+interface PartUsedSummary {
+  id: string;
+  part_name: string;
+  quantity: number;
+  unit_cost: number | null;
+  created_at: string;
 }
 
 interface ProjectNote {
@@ -151,34 +171,81 @@ export default function ProjectHistory({ projectId }: ProjectHistoryProps) {
       // Load time entries for all work orders in one query
       const woIds = wos.map((w: any) => w.id);
       let timeEntriesMap: Record<string, TimeEntry[]> = {};
+      let partRequestsMap: Record<string, PartRequestSummary[]> = {};
+      let partsUsedMap: Record<string, PartUsedSummary[]> = {};
 
       if (woIds.length > 0) {
-        const { data: teData } = await supabase
-          .from('time_entries')
-          .select(`
-            id,
-            work_order_id,
-            entry_date,
-            clock_in_time,
-            clock_out_time,
-            total_hours,
-            notes,
-            technician:profiles!technician_id(full_name)
-          `)
-          .in('work_order_id', woIds)
-          .order('entry_date', { ascending: false });
+        const [teRes, prRes, spuRes] = await Promise.all([
+          supabase
+            .from('time_entries')
+            .select(`
+              id,
+              work_order_id,
+              entry_date,
+              clock_in_time,
+              clock_out_time,
+              total_hours,
+              notes,
+              technician:profiles!technician_id(full_name)
+            `)
+            .in('work_order_id', woIds)
+            .order('entry_date', { ascending: false }),
 
-        (teData || []).forEach((te: any) => {
+          supabase
+            .from('product_requests')
+            .select(`
+              id,
+              work_order_id,
+              status,
+              priority,
+              notes,
+              created_at,
+              product_request_items(product_name, quantity_requested)
+            `)
+            .in('work_order_id', woIds)
+            .order('created_at', { ascending: false }),
+
+          supabase
+            .from('service_parts_used')
+            .select(`
+              id,
+              work_order_id,
+              part_name,
+              quantity,
+              unit_cost,
+              created_at
+            `)
+            .in('work_order_id', woIds)
+            .order('created_at', { ascending: false }),
+        ]);
+
+        (teRes.data || []).forEach((te: any) => {
           if (!timeEntriesMap[te.work_order_id]) {
             timeEntriesMap[te.work_order_id] = [];
           }
           timeEntriesMap[te.work_order_id].push(te);
+        });
+
+        (prRes.data || []).forEach((pr: any) => {
+          if (!partRequestsMap[pr.work_order_id]) {
+            partRequestsMap[pr.work_order_id] = [];
+          }
+          partRequestsMap[pr.work_order_id].push(pr);
+        });
+
+        (spuRes.data || []).forEach((spu: any) => {
+          if (!partsUsedMap[spu.work_order_id]) {
+            partsUsedMap[spu.work_order_id] = [];
+          }
+          partsUsedMap[spu.work_order_id].push(spu);
         });
       }
 
       const enrichedWOs: WorkOrderEntry[] = wos.map((w: any) => ({
         ...w,
         time_entries: timeEntriesMap[w.id] || [],
+        part_requests: partRequestsMap[w.id] || [],
+        parts_used: partsUsedMap[w.id] || [],
       }));
 
       setWorkOrders(enrichedWOs);
@@ -249,6 +316,10 @@ export default function ProjectHistory({ projectId }: ProjectHistoryProps) {
     );
   }, 0);
 
+  const totalPartsCount = workOrders.reduce((sum, wo) => {
+    return sum + wo.part_requests.length + wo.parts_used.length;
+  }, 0);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -260,14 +331,18 @@ export default function ProjectHistory({ projectId }: ProjectHistoryProps) {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       {/* Summary Bar */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Work Orders</div>
           <div className="text-2xl font-bold text-white">{workOrders.length}</div>
         </div>
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Hours Logged</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Hours</div>
           <div className="text-2xl font-bold text-white">{totalHours.toFixed(2)}</div>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Parts</div>
+          <div className="text-2xl font-bold text-white">{totalPartsCount}</div>
         </div>
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Notes</div>
@@ -577,6 +652,64 @@ function WorkOrderCard({
               <div className="p-4 flex items-center gap-2 text-xs text-gray-500">
                 <AlertCircle size={13} />
                 No time entries logged yet
+              </div>
+            )}
+
+            {/* Parts Requests */}
+            {wo.part_requests.length > 0 && (
+              <div className="p-4">
+                <div className="text-xs text-gray-400 font-medium mb-3 uppercase tracking-wide flex items-center gap-1.5">
+                  <Package size={12} />
+                  Parts Requests ({wo.part_requests.length})
+                </div>
+                <div className="space-y-2">
+                  {wo.part_requests.map((pr) => (
+                    <div key={pr.id} className="bg-gray-900 rounded-lg px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-medium text-white">
+                          {pr.product_request_items?.map(i => i.product_name).join(', ') || 'Parts Request'}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {pr.priority === 'urgent' && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-red-900/60 text-red-300 border border-red-700">Urgent</span>
+                          )}
+                          <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[pr.status] || 'bg-gray-700 text-gray-300'}`}>
+                            {pr.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Qty: {pr.product_request_items?.map(i => i.quantity_requested).join(', ') || '—'}
+                        {pr.notes && <span className="ml-2">· {pr.notes}</span>}
+                        <span className="ml-2">· {fmtDate(pr.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Parts Used */}
+            {wo.parts_used.length > 0 && (
+              <div className="p-4">
+                <div className="text-xs text-gray-400 font-medium mb-3 uppercase tracking-wide flex items-center gap-1.5">
+                  <Wrench size={12} />
+                  Parts Used ({wo.parts_used.length})
+                </div>
+                <div className="space-y-2">
+                  {wo.parts_used.map((spu) => (
+                    <div key={spu.id} className="flex items-center justify-between gap-3 bg-gray-900 rounded-lg px-3 py-2.5">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{spu.part_name}</div>
+                        <div className="text-xs text-gray-400">{fmtDate(spu.created_at)}</div>
+                      </div>
+                      <div className="flex-shrink-0 text-sm text-gray-300 tabular-nums">
+                        Qty: {spu.quantity}
+                        {spu.unit_cost != null && <span className="ml-2 text-gray-500">${spu.unit_cost.toFixed(2)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

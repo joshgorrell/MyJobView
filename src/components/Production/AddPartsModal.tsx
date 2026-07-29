@@ -4,6 +4,7 @@ import { X, Plus, Search, Package, DollarSign, Hash } from 'lucide-react';
 
 interface AddPartsModalProps {
   workOrderId: string;
+  projectId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -26,7 +27,7 @@ interface PartEntry {
   warranty_item: boolean;
 }
 
-export function AddPartsModal({ workOrderId, onClose, onSuccess }: AddPartsModalProps) {
+export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: AddPartsModalProps) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -125,6 +126,7 @@ export function AddPartsModal({ workOrderId, onClose, onSuccess }: AddPartsModal
     try {
       const partsToInsert = parts.map(part => ({
         work_order_id: workOrderId,
+        project_id: projectId || null,
         product_id: part.product_id,
         part_name: part.part_name,
         part_sku: part.part_sku || null,
