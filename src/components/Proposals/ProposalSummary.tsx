@@ -1041,33 +1041,21 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
                   Open Portal Preview
                 </button>
                 <button
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setQaContext({ roomId: null, lineItemId: null, label: null });
-                      setShowQA(true);
-                      setShowPortalDropdown(false);
-                    }}
-                    className="flex-1 px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 relative"
-                  >
-                    <MessageSquare size={16} />
-                    Customer Q&A
-                    {unreadQaCount > 0 && (
-                      <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
-                        {unreadQaCount}
-                      </span>
-                    )}
-                  </button>
-                  <QaDot
-                    hasMessages={messagesByContext['general'] || unreadQaCount > 0}
-                    unreadCount={unreadByContext['general'] || 0}
-                    onClick={() => {
-                      setQaContext({ roomId: null, lineItemId: null, label: null });
-                      setShowQA(true);
-                      setShowPortalDropdown(false);
-                    }}
-                  />
-                </div>
+                  onClick={() => {
+                    setQaContext({ roomId: null, lineItemId: null, label: null });
+                    setShowQA(true);
+                    setShowPortalDropdown(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <MessageSquare size={16} />
+                  Customer Q&A
+                  {unreadQaCount > 0 && (
+                    <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                      {unreadQaCount}
+                    </span>
+                  )}
+                </button>
                 <div className="border-t border-gray-200 my-1"></div>
                 <button
                   onClick={handleEmailProposal}

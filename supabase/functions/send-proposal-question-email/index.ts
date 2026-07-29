@@ -23,6 +23,7 @@ Deno.serve(async (req: Request) => {
       repEmail,
       repName,
       authorName,
+      proposalUrl: payloadProposalUrl,
     } = await req.json();
 
     if (!repEmail) {
@@ -61,7 +62,7 @@ Deno.serve(async (req: Request) => {
     const fromName = settings?.from_name || settings?.company_name || 'Your Company';
     const replyTo = settings?.reply_to_email || fromEmail;
     const portalUrl = settings?.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`;
-    const proposalUrl = `${portalUrl}/proposals/${proposalId}`;
+    const proposalUrl = payloadProposalUrl || `${portalUrl}/proposals/${proposalId}`;
 
     const subject = `New question on Proposal ${proposalNumber || ''}`;
     const contextLine = contextLabel ? `<p><strong>Re: ${contextLabel}</strong></p>` : '';

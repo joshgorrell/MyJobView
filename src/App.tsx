@@ -113,7 +113,7 @@ const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m 
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
 const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxInstructions').then(m => ({ default: m.default })));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
-const ProposalMessagesAdmin = lazy(() => import('./components/Proposals/ProposalMessagesAdmin').then(m => ({ default: m.ProposalMessagesAdmin })));
+const CustomerQuestions = lazy(() => import('./components/Sales/CustomerQuestions').then(m => ({ default: m.CustomerQuestions })));
 const PTOManagement = lazy(() => import('./components/Admin/PTOManagement').then(m => ({ default: m.PTOManagement })));
 const MyTimeOff = lazy(() => import('./components/Dispatch/MyTimeOff').then(m => ({ default: m.MyTimeOff })));
 const StickyNotes = lazy(() => import('./components/Sales/StickyNotes').then(m => ({ default: m.default })));
@@ -884,6 +884,8 @@ function AppContent() {
               }}
               onNavigateToSalesOrders={() => setActiveTab('sales_orders')}
               onNavigateToSalesStats={() => setActiveTab('sales_dashboard')}
+              autoOpenQA={typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('openQA') === 'true'}
+              autoThreadId={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('threadId') : null}
             />
           )}
           {activeTab === 'messages' && checkModuleAccess('messages') && (
@@ -1067,7 +1069,21 @@ function AppContent() {
 
           {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
 
-          {activeTab === 'proposal_messages_admin' && ['admin', 'manager', 'sales_manager', 'sales'].includes(profile.role) && <ProposalMessagesAdmin key={activeTab} />}
+          {activeTab === 'customer_questions' && ['admin', 'manager', 'sales', 'bd', 'office_manager'].includes(profile.role) && (
+            <CustomerQuestions
+              key={activeTab}
+              onOpenProposal={(proposalId, threadId) => {
+                setOpenProposalId(proposalId);
+                setActiveTab('proposals');
+                if (threadId) {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('openQA', 'true');
+                  url.searchParams.set('threadId', threadId);
+                  window.history.pushState({}, '', url);
+                }
+              }}
+            />
+          )}
 
           {activeTab === 'vehicle-tracking' && (profile.role === 'admin' || profile.role === 'manager') && <VehicleManagement key={activeTab} />}
 

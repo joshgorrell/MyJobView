@@ -54,6 +54,8 @@ interface ProposalBuilderCompactProps {
   aiPrefillRooms?: ProposalRoomPrefill[];
   changeOrderId?: string;
   onCORefresh?: () => void;
+  autoOpenQA?: boolean;
+  autoThreadId?: string | null;
 }
 
 interface RoomWithItems extends ProposalRoom {
@@ -500,7 +502,7 @@ function FilterModal({
   );
 }
 
-export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateToSalesOrder, targetRoomIds: externalTargetRoomIds, onTargetRoomsChange, isStandalone = false, onProposalIdChange, aiPrefillRooms, changeOrderId, onCORefresh }: ProposalBuilderCompactProps) {
+export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateToSalesOrder, targetRoomIds: externalTargetRoomIds, onTargetRoomsChange, isStandalone = false, onProposalIdChange, aiPrefillRooms, changeOrderId, onCORefresh, autoOpenQA = false, autoThreadId = null }: ProposalBuilderCompactProps) {
   const isCoMode = !!changeOrderId;
   const { profile } = useAuth();
   const [proposal, setProposal] = useState<any>(null);
@@ -669,6 +671,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
   const [coverPageImage, setCoverPageImage] = useState<string | null>(null);
   const [showQA, setShowQA] = useState(false);
+  const [autoQaThreadId, setAutoQaThreadId] = useState<string | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
   const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
   const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
@@ -726,6 +729,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       loadQaMessages();
     }
   }, [proposalId]);
+
+  // Auto-open QA panel when navigated from email link
+  useEffect(() => {
+    if (autoOpenQA && !loading && !showQA) {
+      setShowQA(true);
+      if (autoThreadId) {
+        setAutoQaThreadId(autoThreadId);
+      }
+    }
+  }, [autoOpenQA, autoThreadId, loading, showQA]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -7125,11 +7138,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         <ProposalQA
           proposalId={proposalId}
           isPortal={false}
-          onClose={() => { setShowQA(false); setQaContext({ roomId: null, lineItemId: null, label: null }); loadQaMessages(); }}
+          onClose={() => { setShowQA(false); setAutoQaThreadId(null); setQaContext({ roomId: null, lineItemId: null, label: null }); loadQaMessages(); }}
           contextRoomId={qaContext.roomId}
           contextLineItemId={qaContext.lineItemId}
           contextLabel={qaContext.label}
           onMessagesChanged={loadQaMessages}
+          autoThreadId={autoQaThreadId}
         />
       )}
     </div>

@@ -14,9 +14,11 @@ interface ProposalsViewProps {
   onAiPrefillConsumed?: () => void;
   onNavigateToSalesOrders?: () => void;
   onNavigateToSalesStats?: () => void;
+  autoOpenQA?: boolean;
+  autoThreadId?: string | null;
 }
 
-export default function ProposalsView({ isStandalone = false, openProposalId, onProposalOpened, onSelectSalesOrder, aiPrefill, onAiPrefillConsumed, onNavigateToSalesOrders, onNavigateToSalesStats }: ProposalsViewProps) {
+export default function ProposalsView({ isStandalone = false, openProposalId, onProposalOpened, onSelectSalesOrder, aiPrefill, onAiPrefillConsumed, onNavigateToSalesOrders, onNavigateToSalesStats, autoOpenQA = false, autoThreadId = null }: ProposalsViewProps) {
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(() => {
     // Initialize selectedProposalId from URL if in standalone mode
     if (isStandalone) {
@@ -29,6 +31,18 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   const [showVideoLibrary, setShowVideoLibrary] = useState(false);
   const [targetRoomIds, setTargetRoomIds] = useState<Set<string>>(new Set());
   const [pendingPrefillRooms, setPendingPrefillRooms] = useState<ProposalPrefill['rooms'] | undefined>(undefined);
+
+  // Read openQA/threadId from URL params in standalone mode
+  const urlOpenQA = (() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('openQA') === 'true';
+  })();
+  const urlThreadId = (() => {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('threadId');
+  })();
+  const effectiveAutoOpenQA = autoOpenQA || urlOpenQA;
+  const effectiveAutoThreadId = autoThreadId || urlThreadId;
 
   useEffect(() => {
     if (isStandalone) {
@@ -88,6 +102,8 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
         onTargetRoomsChange={setTargetRoomIds}
         isStandalone={isStandalone}
         aiPrefillRooms={pendingPrefillRooms}
+        autoOpenQA={effectiveAutoOpenQA}
+        autoThreadId={effectiveAutoThreadId}
         onProposalIdChange={(newProposalId) => {
           setSelectedProposalId(newProposalId);
           if (isStandalone) {
