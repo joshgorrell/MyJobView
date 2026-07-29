@@ -14,7 +14,7 @@ import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
 import { getIcon } from './lib/iconMap';
-import { X, LogOut, FileText, Bug, MessageSquare } from 'lucide-react';
+import { X, LogOut, FileText, Bug, MessageSquare, TrendingUp } from 'lucide-react';
 import { QuickActionModal } from './components/Shared/QuickActionModal';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
@@ -618,6 +618,17 @@ function AppContent() {
 
   if (currentPath === '/sales-tv-dashboard') {
     if (!user || !profile) return <LoginForm />;
+    if (!['admin', 'manager', 'sales_manager'].includes(profile.role)) {
+      return (
+        <div className="h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <TrendingUp size={64} className="mx-auto text-gray-600 mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+            <p className="text-gray-400">You don't have permission to access the Sales TV Dashboard.</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <Suspense fallback={<LoadingFallback />}>
         <SalesTVDashboard />

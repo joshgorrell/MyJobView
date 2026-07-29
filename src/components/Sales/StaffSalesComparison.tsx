@@ -239,34 +239,34 @@ export function StaffSalesComparison({ filteredRepIds }: StaffSalesComparisonPro
       setStaffProfiles(profilesResult.data || []);
 
       if (rangeMode === 'last_90') {
-        const windowStart = new Date();
-        windowStart.setDate(windowStart.getDate() - 90);
+        const repIds = (profilesResult.data || []).map(p => p.id);
+        let rpcRows: { rep_id: string; created_at: string; amount: number }[] = [];
 
-        const [soResult, invResult] = await Promise.all([
-          supabase
-            .from('sales_orders')
-            .select('id, contract_total, sales_rep_id, created_by, created_at')
-            .eq('organization_id', profile.organization_id)
-            .gte('created_at', windowStart.toISOString())
-            .not('status', 'in', '(cancelled,voided)'),
-          supabase
-            .from('invoices')
-            .select('id, total, created_by, invoice_date')
-            .eq('company_id', profile.organization_id)
-            .gte('invoice_date', windowStart.toISOString().split('T')[0])
-            .not('status', 'in', '(void,draft)'),
-        ]);
+        if (repIds.length > 0) {
+          const { data: rpcData } = await supabase.rpc('get_sales_team_dashboard', {
+            p_rep_ids: repIds,
+          });
 
-        const rows: { rep_id: string; created_at: string; amount: number }[] = [];
-        (soResult.data || []).forEach(so => {
-          const repId = so.sales_rep_id || so.created_by;
-          if (repId) rows.push({ rep_id: repId, created_at: so.created_at, amount: Number(so.contract_total) || 0 });
-        });
-        (invResult.data || []).forEach(inv => {
-          if (inv.created_by) rows.push({ rep_id: inv.created_by, created_at: inv.invoice_date, amount: Number(inv.total) || 0 });
-        });
+          if (rpcData && !rpcData.error && Array.isArray(rpcData.reps)) {
+            (rpcData.reps as Array<Record<string, unknown>>).forEach((rep) => {
+              const repId = rep.repId as string;
+              const trend = rep.monthlyTrend as Array<{ month: string; total: number }> | undefined;
+              if (trend && Array.isArray(trend)) {
+                const last3 = trend.slice(0, 3);
+                last3.forEach((m) => {
+                  const [year, month] = m.month.split('-').map(Number);
+                  rpcRows.push({
+                    rep_id: repId,
+                    created_at: new Date(year, month - 1, 1).toISOString(),
+                    amount: Number(m.total) || 0,
+                  });
+                });
+              }
+            });
+          }
+        }
 
-        setRaw90Data(rows);
+        setRaw90Data(rpcRows);
         setStats([]);
       } else {
         let statsQuery = supabase
@@ -311,7 +311,7 @@ export function StaffSalesComparison({ filteredRepIds }: StaffSalesComparisonPro
   }, [filteredRepIds?.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { chartData, staffIds, leaderboard, grandAvg, periodLabel, slots } = useMemo(() => {
-    // ── 90-day mode: weekly buckets from raw sales_orders data ───────────────
+    // ── 90-day mode: weekly buckets from RPC monthly trend data ─────────────
     if (rangeMode === 'last_90') {
       const windowStart = new Date();
       windowStart.setDate(windowStart.getDate() - 90);

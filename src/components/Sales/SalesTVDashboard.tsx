@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { fetchTvDashboardData, fetchAllRepGoalProgress, type TvDashboardData, type RepGoalProgress } from '../../lib/salesKpis';
 import {
   Wifi, WifiOff, Clock, TrendingUp, TrendingDown, DollarSign, Percent,
@@ -35,6 +36,7 @@ const EMPTY_DATA: TvDashboardData = {
 };
 
 export default function SalesTVDashboard() {
+  const { profile } = useAuth();
   const [data, setData] = useState<TvDashboardData>(EMPTY_DATA);
   const [repProgress, setRepProgress] = useState<RepGoalProgress[]>([]);
   const [officeKpis, setOfficeKpis] = useState<OfficeKpi[]>([]);
@@ -50,21 +52,26 @@ export default function SalesTVDashboard() {
   }, []);
 
   const loadOrg = useCallback(async () => {
-    const { data } = await supabase.from('organizations').select('name, logo_url').limit(1).maybeSingle();
+    if (!profile?.organization_id) return;
+    const { data } = await supabase
+      .from('organizations')
+      .select('name, logo_url')
+      .eq('id', profile.organization_id)
+      .maybeSingle();
     if (data) {
       setOrgName(data.name || '');
       setOrgLogo(data.logo_url || '');
     }
-  }, []);
+  }, [profile?.organization_id]);
 
   const loadAllData = useCallback(async () => {
     try {
-      const { data: orgData } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
-      if (!orgData) return;
+      if (!profile?.organization_id) return;
+      const orgId = profile.organization_id;
 
       const [tvData, reps] = await Promise.all([
-        fetchTvDashboardData(orgData.id),
-        fetchAllRepGoalProgress(orgData.id),
+        fetchTvDashboardData(orgId),
+        fetchAllRepGoalProgress(orgId),
       ]);
 
       setData(tvData);
@@ -75,12 +82,11 @@ export default function SalesTVDashboard() {
       console.error('TV Dashboard load error:', err);
       setIsConnected(false);
     }
-  }, []);
+  }, [profile?.organization_id]);
 
   const loadOfficeKpis = useCallback(async () => {
     try {
-      const { data: orgData } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
-      if (!orgData) return;
+      if (!profile?.organization_id) return;
 
       const { data: offices } = await supabase
         .from('company_offices')
@@ -107,7 +113,7 @@ export default function SalesTVDashboard() {
     } catch (err) {
       console.error('Office KPIs load error:', err);
     }
-  }, []);
+  }, [profile?.organization_id]);
 
   useEffect(() => {
     loadOrg();
