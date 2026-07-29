@@ -63,7 +63,9 @@ export async function fetchSalesKpis(
     .lte('created_at', endIso);
 
   if (scope.type === 'rep') {
-    ordersQuery = ordersQuery.or(`sales_rep_id.eq.${scope.repId},created_by.eq.${scope.repId}`);
+    // Centralized sales-credit rule: sales_rep_id is primary; created_by is legacy fallback only when sales_rep_id IS NULL.
+    // This avoids double-counting rows where both sales_rep_id and created_by point to the same rep.
+    ordersQuery = ordersQuery.or(`sales_rep_id.eq.${scope.repId},and(sales_rep_id.is.null,created_by.eq.${scope.repId})`);
   } else if (scope.type === 'office') {
     ordersQuery = ordersQuery.eq('contact_id', scope.officeId);
   }

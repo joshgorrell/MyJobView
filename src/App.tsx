@@ -12,7 +12,7 @@ import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
-import type { SalesRepAIContext } from './components/Sales/SalesDashboard';
+import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
 import { getIcon } from './lib/iconMap';
 import { X, LogOut, FileText, Bug, MessageSquare } from 'lucide-react';
 import { QuickActionModal } from './components/Shared/QuickActionModal';
@@ -75,7 +75,7 @@ const ProductsManagement = lazy(() => import('./components/Products/ProductsMana
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
 const AppointmentsCalendar = lazy(() => import('./components/Appointments/AppointmentsCalendar').then(m => ({ default: m.AppointmentsCalendar })));
 const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopout').then(m => ({ default: m.CalendarPopout })));
-const SalesDashboard = lazy(() => import('./components/Sales/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
+const SalesDashboard = lazy(() => import('./components/SalesDashboard/SalesDashboardPage').then(m => ({ default: m.SalesDashboardPage })));
 const PipelineBoard = lazy(() => import('./components/Sales/PipelineBoard').then(m => ({ default: m.PipelineBoard })));
 const ProspectsPage = lazy(() => import('./components/Sales/ProspectsPage').then(m => ({ default: m.ProspectsPage })));
 const SalesActivity = lazy(() => import('./components/Sales/SalesActivity').then(m => ({ default: m.SalesActivity })));
