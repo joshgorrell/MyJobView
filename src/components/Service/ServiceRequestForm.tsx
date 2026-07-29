@@ -638,7 +638,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   return (
     <>
     <QuickActionModal
-      title={isEditMode ? 'Update & Resubmit' : 'New Work Order Request'}
+      title={isEditMode ? 'Update & Resubmit' : 'Work Order Request'}
       subtitle={isEditMode ? 'Address feedback, then resubmit for review' : 'Request a new service or project work order'}
       icon={isEditMode ? <RotateCcw className="w-5 h-5 text-white" /> : <FileText className="w-5 h-5 text-white" />}
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
