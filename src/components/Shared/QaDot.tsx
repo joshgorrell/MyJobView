@@ -25,7 +25,7 @@ export function QaDot({ hasMessages, unreadCount, onClick }: QaDotProps) {
       onClick={onClick}
       title={hasUnread ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}` : 'View messages'}
       aria-label={hasUnread ? `${unreadCount} unread messages` : 'View messages'}
-      className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-white transition-colors flex-shrink-0 ${hasUnread ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+      className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-white transition-colors flex-shrink-0 ${hasUnread ? 'bg-amber-500 hover:bg-amber-600' : 'bg-gray-500 hover:bg-gray-600'}`}
     >
       <span className="text-[10px] font-bold leading-none">
         {hasUnread ? (unreadCount > 9 ? '9+' : unreadCount) : ''}

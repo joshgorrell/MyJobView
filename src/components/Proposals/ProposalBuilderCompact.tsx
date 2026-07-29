@@ -7129,6 +7129,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           contextRoomId={qaContext.roomId}
           contextLineItemId={qaContext.lineItemId}
           contextLabel={qaContext.label}
+          onMessagesChanged={loadQaMessages}
         />
       )}
     </div>

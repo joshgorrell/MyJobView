@@ -27,9 +27,10 @@ interface ProposalQAProps {
   contextRoomId?: string | null;
   contextLineItemId?: string | null;
   contextLabel?: string | null;
+  onMessagesChanged?: () => void;
 }
 
-export function ProposalQA({ proposalId, isPortal = false, customerName, onClose, embedded = false, contextRoomId = null, contextLineItemId = null, contextLabel = null }: ProposalQAProps) {
+export function ProposalQA({ proposalId, isPortal = false, customerName, onClose, embedded = false, contextRoomId = null, contextLineItemId = null, contextLabel = null, onMessagesChanged }: ProposalQAProps) {
   const { profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -173,6 +174,7 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
         .from('messages')
         .update({ is_read: true })
         .in('id', unreadMessages.map(m => m.id));
+      onMessagesChanged?.();
     }
   }
 
@@ -205,6 +207,7 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
 
       setNewMessage('');
       setIsInternal(false);
+      onMessagesChanged?.();
     } catch (error) {
       console.error('Error sending message:', error);
       alert('Failed to send message. Please try again.');

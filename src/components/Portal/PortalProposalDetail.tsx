@@ -1550,6 +1550,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           contextRoomId={qaContext.roomId}
           contextLineItemId={qaContext.lineItemId}
           contextLabel={qaContext.label}
+          onMessagesChanged={loadUnreadCounts}
         />
       )}
 
