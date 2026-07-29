@@ -13,6 +13,9 @@ interface Message {
   is_read: boolean;
   is_internal: boolean;
   created_at: string;
+  context_room_id: string | null;
+  context_line_item_id: string | null;
+  context_label: string | null;
 }
 
 interface ProposalQAProps {
@@ -21,9 +24,12 @@ interface ProposalQAProps {
   customerName?: string;
   onClose?: () => void;
   embedded?: boolean;
+  contextRoomId?: string | null;
+  contextLineItemId?: string | null;
+  contextLabel?: string | null;
 }
 
-export function ProposalQA({ proposalId, isPortal = false, customerName, onClose, embedded = false }: ProposalQAProps) {
+export function ProposalQA({ proposalId, isPortal = false, customerName, onClose, embedded = false, contextRoomId = null, contextLineItemId = null, contextLabel = null }: ProposalQAProps) {
   const { profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -31,7 +37,16 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
   const [sending, setSending] = useState(false);
   const [isInternal, setIsInternal] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [activeContextRoomId, setActiveContextRoomId] = useState<string | null>(contextRoomId);
+  const [activeContextLineItemId, setActiveContextLineItemId] = useState<string | null>(contextLineItemId);
+  const [activeContextLabel, setActiveContextLabel] = useState<string | null>(contextLabel);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setActiveContextRoomId(contextRoomId);
+    setActiveContextLineItemId(contextLineItemId);
+    setActiveContextLabel(contextLabel);
+  }, [contextRoomId, contextLineItemId, contextLabel]);
 
   useEffect(() => {
     initializeThread();
@@ -172,7 +187,10 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
           author_type: isPortal ? 'customer' : 'staff',
           body: newMessage.trim(),
           is_internal: isPortal ? false : isInternal,
-          is_read: false
+          is_read: false,
+          context_room_id: activeContextRoomId,
+          context_line_item_id: activeContextLineItemId,
+          context_label: activeContextLabel
         });
 
       if (error) throw error;
@@ -268,6 +286,14 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
                         <span className="text-xs font-medium text-orange-600">Internal</span>
                       )}
                     </div>
+                    {msg.context_label && (
+                      <div className={`flex items-center gap-1 px-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isOwnMessage ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
+                          <MessageSquare className="w-2.5 h-2.5" />
+                          Re: {msg.context_label}
+                        </span>
+                      </div>
+                    )}
                     <div
                       className={`px-4 py-2 rounded-lg ${
                         isOwnMessage
@@ -284,6 +310,22 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {(activeContextLabel || activeContextRoomId || activeContextLineItemId) && (
+          <div className="px-4 pt-3 pb-1 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-200">
+              <MessageSquare className="w-3 h-3" />
+              Re: {activeContextLabel || 'this item'}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setActiveContextRoomId(null); setActiveContextLineItemId(null); setActiveContextLabel(null); }}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
           {!isPortal && (
@@ -361,7 +403,7 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
           </div>
         ) : (
           messages.map((msg) => {
-            const isOwnMessage = isPortal ? msg.sender_type === 'customer' : msg.sender_type === 'rep';
+            const isOwnMessage = isPortal ? msg.author_type === 'customer' : msg.author_type === 'staff';
 
             return (
               <div
@@ -371,12 +413,20 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
                 <div className={`max-w-[75%] ${isOwnMessage ? 'items-end' : 'items-start'} space-y-1`}>
                   <div className="flex items-center gap-2 px-1">
                     <span className="text-xs font-medium text-gray-600">
-                      {msg.sender_name}
+                      {msg.author_name}
                     </span>
                     <span className="text-xs text-gray-400">
                       {formatTime(msg.created_at)}
                     </span>
                   </div>
+                  {msg.context_label && (
+                    <div className={`flex items-center gap-1 px-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isOwnMessage ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
+                        <MessageSquare className="w-2.5 h-2.5" />
+                        Re: {msg.context_label}
+                      </span>
+                    </div>
+                  )}
                   <div
                     className={`px-4 py-2 rounded-lg ${
                       isOwnMessage
@@ -384,7 +434,7 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
                         : 'bg-white text-gray-900 border border-gray-200'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                    <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
                   </div>
                 </div>
               </div>
@@ -393,6 +443,22 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {(activeContextLabel || activeContextRoomId || activeContextLineItemId) && (
+        <div className="px-4 pt-3 pb-1 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-200">
+            <MessageSquare className="w-3 h-3" />
+            Re: {activeContextLabel || 'this item'}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setActiveContextRoomId(null); setActiveContextLineItemId(null); setActiveContextLabel(null); }}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white rounded-b-lg">
         {!isPortal && (

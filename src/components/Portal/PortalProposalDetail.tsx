@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, HelpCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
@@ -222,6 +222,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [relatedInvoices, setRelatedInvoices] = useState<PortalInvoice[]>([]);
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
   const [paymentUnavailableInvoice, setPaymentUnavailableInvoice] = useState<PortalInvoice | null>(null);
+  const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
 
   useEffect(() => {
     loadProposalDetails();
@@ -793,7 +794,14 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                       <div className="bg-blue-500/20 p-2 rounded-lg">
                         <Package className="w-5 h-5 text-blue-400" />
                       </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white">{room.name}</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-white flex-1">{room.name}</h3>
+                      <button
+                        onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-blue-200 hover:text-white text-xs font-medium rounded-lg transition-colors"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5" />
+                        Ask about this room
+                      </button>
                     </div>
                   </div>
 
@@ -866,7 +874,16 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 </td>
                               )}
                               <td className="py-4">
-                                <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                                  <button
+                                    onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
+                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                                    title="Ask about this item"
+                                  >
+                                    <HelpCircle className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                               {template?.show_quantity && (
                                 <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
@@ -964,7 +981,16 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 </td>
                               )}
                               <td className="py-4">
-                                <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                                  <button
+                                    onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
+                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                                    title="Ask about this item"
+                                  >
+                                    <HelpCircle className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                               {template?.show_quantity && (
                                 <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
@@ -1024,7 +1050,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="lg:sticky lg:top-20 lg:self-start space-y-6">
             {/* Proposal Summary Card */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
@@ -1332,7 +1358,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           proposalId={proposalId}
           isPortal={true}
           customerName={customerName}
-          onClose={() => setShowQA(false)}
+          onClose={() => { setShowQA(false); setQaContext({ roomId: null, lineItemId: null, label: null }); }}
+          contextRoomId={qaContext.roomId}
+          contextLineItemId={qaContext.lineItemId}
+          contextLabel={qaContext.label}
         />
       )}
 
