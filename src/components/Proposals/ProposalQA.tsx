@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, X, Loader, ArrowLeft, ImagePlus, Link as LinkIcon } from 'lucide-react';
+import { MessageSquare, Send, X, Loader, ImagePlus, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -103,14 +103,6 @@ export function ProposalQA({
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 640);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     setActiveContextRoomId(contextRoomId);
@@ -533,14 +525,10 @@ export function ProposalQA({
   }
 
   return (
-    <div className={`${isMobile ? 'fixed inset-0 w-full h-full' : 'fixed bottom-4 right-4 w-96 h-[500px]'} bg-white ${isMobile ? '' : 'rounded-lg shadow-2xl border border-gray-200'} flex flex-col z-50`}>
-      <div className={`flex items-center justify-between p-4 border-b border-gray-200 bg-blue-600 text-white ${isMobile ? '' : 'rounded-t-lg'}`}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[85vh] overflow-hidden">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-blue-600 text-white sm:rounded-t-2xl">
         <div className="flex items-center gap-2">
-          {isMobile && onClose && (
-            <button onClick={onClose} className="p-1 hover:bg-blue-700 rounded transition-colors -ml-1">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          )}
           <MessageSquare className="w-5 h-5" />
           <h3 className="font-semibold">Questions & Comments</h3>
           {unreadCount > 0 && (
@@ -617,6 +605,7 @@ export function ProposalQA({
 
       {contextBadge}
       {composeArea}
+      </div>
     </div>
   );
 }
