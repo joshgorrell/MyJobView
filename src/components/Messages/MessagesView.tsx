@@ -139,7 +139,10 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
   const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager';
 
   const loadThreads = useCallback(async () => {
-    if (!profile?.organization_id) return;
+    if (!profile?.organization_id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
 
