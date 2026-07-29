@@ -124,6 +124,8 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
   const [uploading, setUploading] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [replyContextLabel, setReplyContextLabel] = useState<string | null>(null);
+  const [showQuestionSummary, setShowQuestionSummary] = useState(true);
   const [newThreadForm, setNewThreadForm] = useState({
     subject: '',
     context_type: 'contact' as 'contact' | 'proposal' | 'project',
@@ -396,6 +398,7 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
         is_read: true,
         attachment_url: attachmentUrl,
         attachment_type: attachmentType,
+        context_label: replyContextLabel,
       });
 
       if (error) throw error;
@@ -403,6 +406,7 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
       setNewMessage('');
       setIsInternal(false);
       setPendingAttachment(null);
+      setReplyContextLabel(null);
       await loadMessages(selectedThread.id);
       await loadThreads();
     } catch (error) {
@@ -623,7 +627,7 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
                   return (
                     <button
                       key={thread.id}
-                      onClick={() => setSelectedThread(thread)}
+                      onClick={() => { setSelectedThread(thread); setShowQuestionSummary(true); }}
                       className={`w-full p-3 sm:p-4 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation ${
                         selectedThread?.id === thread.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                       } ${thread.unread_count > 0 ? 'bg-blue-50/50' : ''}`}
@@ -765,6 +769,104 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* Unanswered questions summary for proposal threads */}
+              {selectedThread.proposal_id && !isInternal && (() => {
+                const customerMessages = messages.filter(m => m.author_type === 'customer' && !m.is_internal);
+                const lastStaffIdx = (() => {
+                  for (let i = messages.length - 1; i >= 0; i--) {
+                    if (messages[i].author_type === 'staff') return i;
+                  }
+                  return -1;
+                })();
+                const unanswered = customerMessages.filter((_, idx) => {
+                  const msgIdx = messages.indexOf(customerMessages[idx]);
+                  return msgIdx > lastStaffIdx;
+                });
+                if (unanswered.length === 0 || !showQuestionSummary) return null;
+                const grouped = unanswered.reduce((acc, m) => {
+                  const key = m.context_label || 'General';
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(m);
+                  return acc;
+                }, {} as Record<string, Message[]>);
+
+                return (
+                  <div className="mx-3 sm:mx-4 mt-3 mb-1 rounded-lg border border-blue-200 bg-blue-50/60 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-blue-100/50">
+                      <div className="flex items-center gap-2">
+                        <HelpCircle className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-900">
+                          {unanswered.length} unanswered question{unanswered.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setShowQuestionSummary(false)}
+                        className="text-blue-400 hover:text-blue-600 p-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="p-3 space-y-2 max-h-32 overflow-y-auto">
+                      {Object.entries(grouped).map(([label, msgs]) => (
+                        <div key={label}>
+                          {label !== 'General' && (
+                            <p className="text-xs font-medium text-blue-700 mb-0.5 flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" />
+                              {label}
+                            </p>
+                          )}
+                          {msgs.map(m => (
+                            <p key={m.id} className="text-xs text-gray-700 line-clamp-2 pl-3 border-l-2 border-blue-200">
+                              {m.body}
+                            </p>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-3 py-2 bg-blue-100/30 border-t border-blue-200/50">
+                      <p className="text-xs text-blue-600">
+                        Your reply below will be sent to the customer and will address all open questions.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Reply context tag selector for proposal threads */}
+              {selectedThread.proposal_id && !isInternal && (() => {
+                const contextLabels = [...new Set(
+                  messages
+                    .filter(m => m.author_type === 'customer' && m.context_label)
+                    .map(m => m.context_label!)
+                )];
+                if (contextLabels.length === 0) return null;
+                return (
+                  <div className="mx-3 sm:mx-4 mt-2 flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-gray-500">Tag reply to:</span>
+                    <button
+                      onClick={() => setReplyContextLabel(null)}
+                      className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                        !replyContextLabel ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      General
+                    </button>
+                    {contextLabels.map(label => (
+                      <button
+                        key={label}
+                        onClick={() => setReplyContextLabel(label)}
+                        className={`text-xs px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
+                          replyContextLabel === label ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        <MessageSquare className="w-2.5 h-2.5" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
               {/* Composer */}
               <div className="p-3 sm:p-4 border-t border-gray-200">
                 {pendingAttachment && (
@@ -777,6 +879,15 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
                     <span className="text-xs text-blue-700 flex-1 truncate">Attachment ready</span>
                     <button type="button" onClick={() => setPendingAttachment(null)} className="text-gray-400 hover:text-gray-600">
                       <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                {replyContextLabel && (
+                  <div className="mb-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-xs text-blue-700 font-medium">Re: {replyContextLabel}</span>
+                    <button type="button" onClick={() => setReplyContextLabel(null)} className="text-blue-400 hover:text-blue-600 ml-auto">
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
