@@ -207,6 +207,7 @@ export function ProposalQA({ proposalId, isPortal = false, customerName, onClose
 
       setNewMessage('');
       setIsInternal(false);
+      await loadMessages();
       onMessagesChanged?.();
     } catch (error) {
       console.error('Error sending message:', error);
