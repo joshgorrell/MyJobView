@@ -48,6 +48,10 @@ export interface SalesDashboardResult {
   closeRate: CloseRateInfo;
   runRate90Day: number;
   monthlyTrend: MonthlyTrendPoint[];
+  ytdTotal?: number;
+  ytdCount?: number;
+  prevYearTotal?: number;
+  allTimeTotal?: number;
 }
 
 export interface LeaderboardEntry {

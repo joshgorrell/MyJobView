@@ -77,12 +77,12 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange }: Sale
     onRepContextChange({
       repName: data.repDisplayName,
       thisMonthTotal: currentMonth,
-      ytdTotal: data.bookedSales.total,
-      prevYearFull: data.bookedSales.prevTotal,
-      ytdVsPriorPct: data.bookedSales.prevTotal > 0
-        ? Math.round(((data.bookedSales.total - data.bookedSales.prevTotal) / data.bookedSales.prevTotal) * 100)
+      ytdTotal: data.ytdTotal ?? data.bookedSales.total,
+      prevYearFull: data.prevYearTotal ?? data.bookedSales.prevTotal,
+      ytdVsPriorPct: (data.prevYearTotal ?? data.bookedSales.prevTotal) > 0
+        ? Math.round((((data.ytdTotal ?? data.bookedSales.total) - (data.prevYearTotal ?? data.bookedSales.prevTotal)) / (data.prevYearTotal ?? data.bookedSales.prevTotal)) * 100)
         : null,
-      ytdVsPriorDir: data.bookedSales.total > data.bookedSales.prevTotal ? 'up' : data.bookedSales.total < data.bookedSales.prevTotal ? 'down' : 'flat',
+      ytdVsPriorDir: (data.ytdTotal ?? data.bookedSales.total) > (data.prevYearTotal ?? data.bookedSales.prevTotal) ? 'up' : (data.ytdTotal ?? data.bookedSales.total) < (data.prevYearTotal ?? data.bookedSales.prevTotal) ? 'down' : 'flat',
       rolling3Pct: null,
       rolling3Dir: 'flat',
       rolling12Pct: null,
@@ -90,7 +90,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange }: Sale
       careerAvg: data.bookedSales.avgSale,
       annualQuota: goal.annualQuota,
       quotaProgress: goal.hasQuota ? goal.pctAchieved : null,
-      allTimeTotal: data.bookedSales.total,
+      allTimeTotal: data.allTimeTotal ?? data.bookedSales.total,
     });
   }, [data, onRepContextChange]);
 
