@@ -19,7 +19,10 @@ import {
   RotateCcw,
   AlertTriangle,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  Camera,
+  Trash2,
+  Briefcase
 } from 'lucide-react';
 
 interface EditingRequest {
@@ -62,6 +65,14 @@ interface AIPrefill {
   notes?: string;
 }
 
+interface ProjectOption {
+  id: string;
+  name: string;
+  project_number: string;
+  status: string;
+  job_site_address: any;
+}
+
 interface ServiceRequestFormProps {
   onClose: () => void;
   onSuccess?: () => void;
@@ -69,6 +80,8 @@ interface ServiceRequestFormProps {
   editingRequest?: EditingRequest;
   aiPrefill?: AIPrefill | null;
 }
+
+const MAX_PHOTOS = 3;
 
 export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, editingRequest, aiPrefill }: ServiceRequestFormProps) {
   const { profile } = useAuth();
@@ -79,6 +92,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [searching, setSearching] = useState(false);
   const [salesReps, setSalesReps] = useState<any[]>([]);
   const aiPrefillApplied = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditMode = !!editingRequest;
   const [showSuccess, setShowSuccess] = useState(false);
@@ -94,6 +108,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [showSaveToContactPrompt, setShowSaveToContactPrompt] = useState(false);
   const [pendingContactUpdates, setPendingContactUpdates] = useState<Record<string, string>>({});
   const [savingToContact, setSavingToContact] = useState(false);
+
+  const [requestType, setRequestType] = useState<'service' | 'project'>('service');
+  const [customerProjects, setCustomerProjects] = useState<ProjectOption[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   const [formData, setFormData] = useState({
     contact_id: editingRequest?.contact_id || prefilledContactId || null,
@@ -171,6 +194,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (formData.contact_id && requestType === 'project') {
+      loadCustomerProjects(formData.contact_id);
+    } else {
+      setCustomerProjects([]);
+      setSelectedProjectId('');
+    }
+  }, [formData.contact_id, requestType]);
 
   async function loadSalesReps() {
     try {
@@ -271,6 +303,43 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     }
   }
 
+  async function loadCustomerProjects(contactId: string) {
+    setLoadingProjects(true);
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, project_number, status, job_site_address')
+        .eq('contact_id', contactId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCustomerProjects(data || []);
+
+      if (data && data.length === 1) {
+        selectProject(data[0]);
+      }
+    } catch (error) {
+      console.error('Error loading customer projects:', error);
+      setCustomerProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  }
+
+  function selectProject(project: ProjectOption) {
+    setSelectedProjectId(project.id);
+    const addr = project.job_site_address;
+    if (addr && typeof addr === 'object') {
+      setFormData(prev => ({
+        ...prev,
+        job_location_address: addr.street || addr.address || prev.job_location_address,
+        job_location_city: addr.city || prev.job_location_city,
+        job_location_state: addr.state || prev.job_location_state,
+        job_location_zip: addr.zip || addr.zip_code || prev.job_location_zip,
+      }));
+    }
+  }
+
   function selectContact(contact: any) {
     setOriginalContact({
       phone: contact.phone || '',
@@ -293,6 +362,47 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     }));
     setSearchQuery('');
     setSearchResults([]);
+  }
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    const remaining = MAX_PHOTOS - photos.length;
+    const toAdd = files.slice(0, remaining);
+
+    if (toAdd.length === 0) return;
+
+    const newPreviews = toAdd.map(f => URL.createObjectURL(f));
+    setPhotos(prev => [...prev, ...toAdd]);
+    setPhotoPreviews(prev => [...prev, ...newPreviews]);
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function removePhoto(index: number) {
+    URL.revokeObjectURL(photoPreviews[index]);
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadPhotos(requestId: string): Promise<string[]> {
+    if (photos.length === 0) return [];
+
+    const paths: string[] = [];
+    for (let i = 0; i < photos.length; i++) {
+      const file = photos[i];
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `${requestId}/photo_${i + 1}.${ext}`;
+      const { error } = await supabase.storage
+        .from('attachments')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Error uploading photo:', error);
+      } else {
+        paths.push(fileName);
+      }
+    }
+    return paths;
   }
 
   function getContactUpdates(): Record<string, string> {
@@ -349,6 +459,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       return;
     }
 
+    if (requestType === 'project' && !selectedProjectId) {
+      alert('Please select a project');
+      return;
+    }
+
     // Check if the user added info that was missing from the contact record
     if (!isEditMode && formData.contact_id && originalContact) {
       const updates = getContactUpdates();
@@ -367,7 +482,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
     try {
       if (!profile?.id) {
-        alert('You must be logged in to submit a service request.');
+        alert('You must be logged in to submit a work order request.');
         setLoading(false);
         return;
       }
@@ -376,6 +491,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       if (formData.billable_by === 'assigned_sales_rep' && !billableByUserId) {
         billableByUserId = profile?.id || null;
       }
+
+      const isProject = requestType === 'project';
+      const billableType = isProject ? 'billable' : formData.billable_type;
+      const billableBy = isProject ? 'admin' : formData.billable_by;
+      const billableByUserIdFinal = isProject ? null : billableByUserId;
 
       if (isEditMode && editingRequest) {
         const { error } = await supabase
@@ -389,9 +509,9 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             job_location_state: formData.job_location_state || null,
             job_location_zip: formData.job_location_zip || null,
             job_description: formData.job_description,
-            billable_type: formData.billable_type,
-            billable_by: formData.billable_by,
-            billable_by_user_id: billableByUserId,
+            billable_type: billableType,
+            billable_by: billableBy,
+            billable_by_user_id: billableByUserIdFinal,
             priority: formData.priority,
             estimated_duration: formData.estimated_duration || null,
             requested_date: formData.requested_date || null,
@@ -456,9 +576,9 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           job_location_state: formData.job_location_state || null,
           job_location_zip: formData.job_location_zip || null,
           job_description: formData.job_description,
-          billable_type: formData.billable_type,
-          billable_by: formData.billable_by,
-          billable_by_user_id: billableByUserId,
+          billable_type: billableType,
+          billable_by: billableBy,
+          billable_by_user_id: billableByUserIdFinal,
           priority: formData.priority,
           estimated_duration: formData.estimated_duration || null,
           requested_date: formData.requested_date || null,
@@ -466,14 +586,33 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           notes: formData.notes || null,
           offline_created: !navigator.onLine,
           synced_at: navigator.onLine ? new Date().toISOString() : null,
-          source_type: 'staff_form'
+          source_type: 'staff_form',
+          request_type: requestType,
+          project_id: isProject ? selectedProjectId : null,
+          attachments: [] as any[]
         })
         .select()
         .single();
 
       if (requestError) {
-        console.error('Error creating service request:', requestError);
-        throw new Error(`Failed to create service request: ${requestError.message}`);
+        console.error('Error creating work order request:', requestError);
+        throw new Error(`Failed to create work order request: ${requestError.message}`);
+      }
+
+      // Upload photos if any
+      if (photos.length > 0 && serviceRequest?.id) {
+        setUploadingPhotos(true);
+        try {
+          const photoPaths = await uploadPhotos(serviceRequest.id);
+          if (photoPaths.length > 0) {
+            await supabase
+              .from('service_requests')
+              .update({ attachments: photoPaths })
+              .eq('id', serviceRequest.id);
+          }
+        } finally {
+          setUploadingPhotos(false);
+        }
       }
 
       setShowSuccess(true);
@@ -485,26 +624,27 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         }
       }, 900);
     } catch (error: any) {
-      console.error('Error submitting service request:', error);
+      console.error('Error submitting work order request:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
-      alert(`Failed to submit service request: ${errorMessage}`);
+      alert(`Failed to submit work order request: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   }
 
-  const isValid = formData.customer_name && formData.job_location_address && formData.job_description;
+  const isValid = formData.customer_name && formData.job_location_address && formData.job_description &&
+    (requestType === 'service' || selectedProjectId);
 
   return (
     <>
     <QuickActionModal
-      title={isEditMode ? 'Update & Resubmit' : 'New Service Request'}
-      subtitle={isEditMode ? 'Address feedback, then resubmit for review' : 'Create and dispatch a new service job'}
+      title={isEditMode ? 'Update & Resubmit' : 'New Work Order Request'}
+      subtitle={isEditMode ? 'Address feedback, then resubmit for review' : 'Request a new service or project work order'}
       icon={isEditMode ? <RotateCcw className="w-5 h-5 text-white" /> : <FileText className="w-5 h-5 text-white" />}
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
       onClose={onClose}
       showSuccess={showSuccess}
-      successMessage="Service Request Created!"
+      successMessage="Work Order Request Created!"
     >
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1">
 
@@ -519,8 +659,44 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </div>
           )}
 
+          {/* Request Type Toggle */}
+          {!isEditMode && (
+            <div className="space-y-3">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <Briefcase className="w-5 h-5" />
+                Request Type
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setRequestType('service')}
+                  className={`py-3 rounded-lg border font-semibold transition-all flex items-center justify-center gap-2 ${
+                    requestType === 'service'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-blue-500'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  Service
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestType('project')}
+                  className={`py-3 rounded-lg border font-semibold transition-all flex items-center justify-center gap-2 ${
+                    requestType === 'project'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-emerald-500'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Project
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Customer Section */}
-          <div className="space-y-4">
+          <div className="space-y-4 border-t border-gray-700 pt-4">
             <h3 className="font-semibold text-white flex items-center gap-2">
               <User className="w-5 h-5" />
               Customer
@@ -697,6 +873,44 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             )}
           </div>
 
+          {/* Project Selector (Project mode only) */}
+          {requestType === 'project' && formData.contact_id && !isEditMode && (
+            <div className="space-y-3 border-t border-gray-700 pt-4">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <Briefcase className="w-5 h-5" />
+                Project
+              </h3>
+              {loadingProjects ? (
+                <div className="text-center py-4 text-gray-400">
+                  <div className="animate-spin inline-block w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+                  <p className="mt-2">Loading projects...</p>
+                </div>
+              ) : customerProjects.length === 0 ? (
+                <div className="text-center py-4 text-gray-400 border border-dashed border-gray-600 rounded-lg">
+                  <p>No projects found for this customer.</p>
+                  <p className="text-sm mt-1">Select a different customer or create a project first.</p>
+                </div>
+              ) : (
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => {
+                    const proj = customerProjects.find(p => p.id === e.target.value);
+                    if (proj) selectProject(proj);
+                    else setSelectedProjectId(e.target.value);
+                  }}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-white"
+                >
+                  <option value="">Select a project *</option>
+                  {customerProjects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.project_number}) — {p.status}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* Location Section */}
           <div className="space-y-4 border-t border-gray-700 pt-4">
             <h3 className="font-semibold text-white flex items-center gap-2">
@@ -768,65 +982,69 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             />
           </div>
 
-          {/* Billable Type */}
-          <div className="space-y-4 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              Billable Type
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, billable_type: 'billable' }))}
-                className={`py-3 rounded-lg border font-semibold transition-all ${
-                  formData.billable_type === 'billable'
-                    ? 'bg-green-600 text-white border-green-600'
-                    : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-green-500'
-                }`}
-              >
-                Billable
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, billable_type: 'warranty' }))}
-                className={`py-3 rounded-lg border font-semibold transition-all ${
-                  formData.billable_type === 'warranty'
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-blue-500'
-                }`}
-              >
-                Warranty
-              </button>
+          {/* Billable Type (Service mode only) */}
+          {requestType === 'service' && (
+            <div className="space-y-4 border-t border-gray-700 pt-4">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Billable Type
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, billable_type: 'billable' }))}
+                  className={`py-3 rounded-lg border font-semibold transition-all ${
+                    formData.billable_type === 'billable'
+                      ? 'bg-green-600 text-white border-green-600'
+                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-green-500'
+                  }`}
+                >
+                  Billable
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, billable_type: 'warranty' }))}
+                  className={`py-3 rounded-lg border font-semibold transition-all ${
+                    formData.billable_type === 'warranty'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-blue-500'
+                  }`}
+                >
+                  Warranty
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Billable By */}
-          <div className="space-y-3 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white">Billable By</h3>
-            <select
-              value={formData.billable_by}
-              onChange={(e) => setFormData(prev => ({ ...prev, billable_by: e.target.value as any }))}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
-            >
-              <option value="admin">Admin</option>
-              <option value="dispatch">Dispatch</option>
-              <option value="assigned_sales_rep">Assigned Sales Rep (Me)</option>
-              <option value="other_sales_rep">Other Sales Rep</option>
-            </select>
-
-            {formData.billable_by === 'other_sales_rep' && (
+          {/* Billable By (Service mode only) */}
+          {requestType === 'service' && (
+            <div className="space-y-3 border-t border-gray-700 pt-4">
+              <h3 className="font-semibold text-white">Billable By</h3>
               <select
-                value={formData.billable_by_user_id || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, billable_by_user_id: e.target.value || null }))}
+                value={formData.billable_by}
+                onChange={(e) => setFormData(prev => ({ ...prev, billable_by: e.target.value as any }))}
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
               >
-                <option value="">Select Sales Rep</option>
-                {salesReps.map(rep => (
-                  <option key={rep.id} value={rep.id}>{rep.full_name}</option>
-                ))}
+                <option value="admin">Admin</option>
+                <option value="dispatch">Dispatch</option>
+                <option value="assigned_sales_rep">Assigned Sales Rep (Me)</option>
+                <option value="other_sales_rep">Other Sales Rep</option>
               </select>
-            )}
-          </div>
+
+              {formData.billable_by === 'other_sales_rep' && (
+                <select
+                  value={formData.billable_by_user_id || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, billable_by_user_id: e.target.value || null }))}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                >
+                  <option value="">Select Sales Rep</option>
+                  {salesReps.map(rep => (
+                    <option key={rep.id} value={rep.id}>{rep.full_name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           {/* Priority */}
           <div className="space-y-3 border-t border-gray-700 pt-4">
@@ -911,6 +1129,52 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </div>
           </div>
 
+          {/* Photo Upload (both modes, max 3) */}
+          <div className="space-y-3 border-t border-gray-700 pt-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              Photos (Optional, up to {MAX_PHOTOS})
+            </h3>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoSelect}
+              disabled={photos.length >= MAX_PHOTOS}
+              className="hidden"
+            />
+            {photoPreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                {photoPreviews.map((preview, i) => (
+                  <div key={i} className="relative group">
+                    <img src={preview} alt={`Photo ${i + 1}`} className="w-full h-24 object-cover rounded-lg border border-gray-600" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {photos.length < MAX_PHOTOS && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+              >
+                <Paperclip className="w-5 h-5" />
+                {photos.length === 0 ? 'Attach Photos' : `Add More (${photos.length}/${MAX_PHOTOS})`}
+              </button>
+            )}
+            {photos.length >= MAX_PHOTOS && (
+              <p className="text-xs text-gray-500 text-center">Maximum {MAX_PHOTOS} photos reached.</p>
+            )}
+          </div>
+
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
             <button
@@ -922,22 +1186,22 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </button>
             <button
               type="submit"
-              disabled={!isValid || loading}
+              disabled={!isValid || loading || uploadingPhotos}
               className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
                 isEditMode
                   ? 'bg-gradient-to-r from-amber-600 to-orange-700 text-white hover:opacity-90'
                   : 'bg-gradient-to-r from-blue-600 to-cyan-700 text-white hover:opacity-90'
               }`}
             >
-              {loading ? (
-                isEditMode ? 'Resubmitting...' : 'Creating...'
+              {loading || uploadingPhotos ? (
+                'Creating...'
               ) : isEditMode ? (
                 <>
                   <RotateCcw className="w-4 h-4" />
                   Resubmit for Review
                 </>
               ) : (
-                'Create Service Request'
+                'Create Work Order Request'
               )}
             </button>
           </div>

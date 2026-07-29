@@ -27,6 +27,8 @@ export interface ServiceRequestContext {
   requested_date: string | null;
   requested_time: string | null;
   source_type: string;
+  request_type: 'service' | 'project' | null;
+  project_id: string | null;
 }
 
 interface CreateWorkOrderModalProps {
@@ -170,12 +172,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     customer_zip: serviceRequest?.job_location_zip || '',
 
     // Work order details
-    project_id: projectId || '',
-    type: (projectId ? 'project' : 'service') as 'project' | 'service' | 'site_survey' | 'warranty',
-    billable_type: (projectId ? 'project' : serviceRequest?.billable_type === 'warranty' ? 'warranty' : 'billable') as 'billable' | 'warranty' | 'project',
+    project_id: projectId || serviceRequest?.project_id || '',
+    type: (projectId || serviceRequest?.project_id ? 'project' : 'service') as 'project' | 'service' | 'site_survey' | 'warranty',
+    billable_type: (projectId || serviceRequest?.project_id ? 'project' : serviceRequest?.billable_type === 'warranty' ? 'warranty' : 'billable') as 'billable' | 'warranty' | 'project',
     warranty_reference_type: 'service' as 'project' | 'service',
     warranty_reference_id: '',
-    title: serviceRequest ? `Service: ${serviceRequest.job_description.substring(0, 60)}` : '',
+    title: serviceRequest ? `${serviceRequest.request_type === 'project' ? 'Project' : 'Service'}: ${serviceRequest.job_description.substring(0, 60)}` : '',
     description: serviceRequest?.job_description || '',
     priority: serviceRequest?.priority === 'emergency' ? 'urgent' : serviceRequest?.priority === 'urgent' ? 'high' : 'medium',
     start_date: serviceRequest?.requested_date || '',
