@@ -29,6 +29,8 @@ import ProposalNotificationHistory from './ProposalNotificationHistory';
 import ApprovalActionModal from './ApprovalActionModal';
 import { PreSendValidationModal } from './PreSendValidationModal';
 import { ReactivateProposalModal } from './ReactivateProposalModal';
+import { ProposalQA } from './ProposalQA';
+import { QaDot } from '../Shared/QaDot';
 import BulkUpdateConfirmationModal from './BulkUpdateConfirmationModal';
 import BulkUpdateProjectInfoModal from './BulkUpdateProjectInfoModal';
 import TwoPhaseLaborEditor from './TwoPhaseLaborEditor';
@@ -666,6 +668,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   } | null>(null);
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
   const [coverPageImage, setCoverPageImage] = useState<string | null>(null);
+  const [showQA, setShowQA] = useState(false);
+  const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
+  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
+  const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
 
   // CO mode state
   const [coLineItems, setCoLineItems] = useState<COLineItemRecord[]>([]);
@@ -717,6 +723,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       loadColumnPreferences();
       loadLaborPhases();
       loadProposalReadiness();
+      loadQaMessages();
     }
   }, [proposalId]);
 
@@ -1238,6 +1245,35 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     } finally {
       setGeneratingPdf(false);
     }
+  }
+
+  async function loadQaMessages() {
+    try {
+      const { data: thread } = await supabase
+        .from('message_threads')
+        .select('id')
+        .eq('proposal_id', proposalId)
+        .eq('context_type', 'proposal')
+        .maybeSingle();
+      if (!thread) return;
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select('context_room_id, context_line_item_id, is_read, author_type, is_internal')
+        .eq('thread_id', thread.id)
+        .eq('is_internal', false);
+      if (!msgs) return;
+      const hasMsg: Record<string, boolean> = {};
+      const unread: Record<string, number> = {};
+      for (const m of msgs) {
+        const key = m.context_line_item_id || m.context_room_id || 'general';
+        hasMsg[key] = true;
+        if (!m.is_read && m.author_type === 'customer') {
+          unread[key] = (unread[key] || 0) + 1;
+        }
+      }
+      setMessagesByContext(hasMsg);
+      setUnreadByContext(unread);
+    } catch {}
   }
 
   async function loadProposalReadiness() {
@@ -4483,6 +4519,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 >
                                   {room.name}
                                 </h3>
+                                {room.id !== '__unassigned__' && (
+                                  <QaDot
+                                    hasMessages={messagesByContext[room.id] || false}
+                                    unreadCount={unreadByContext[room.id] || 0}
+                                    onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
+                                  />
+                                )}
                                 {room.id !== '__unassigned__' && room.description && room.show_scope && (
                                   <span className="text-xs text-gray-400 italic">
                                     {room.description}
@@ -4664,6 +4707,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         {isNested && !isCoRemoved && '↳ '}
                                         {item.description}
                                       </span>
+                                      <QaDot
+                                        hasMessages={messagesByContext[item.id] || false}
+                                        unreadCount={unreadByContext[item.id] || 0}
+                                        onClick={() => { setQaContext({ roomId: room.id, lineItemId: item.id, label: item.description }); setShowQA(true); }}
+                                      />
                                       {isCoAdded && (
                                         <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-emerald-800 text-emerald-300 shrink-0">NEW</span>
                                       )}
@@ -7072,6 +7120,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           </div>
         </div>,
         document.body
+      )}
+      {showQA && (
+        <ProposalQA
+          proposalId={proposalId}
+          isPortal={false}
+          onClose={() => { setShowQA(false); setQaContext({ roomId: null, lineItemId: null, label: null }); loadQaMessages(); }}
+          contextRoomId={qaContext.roomId}
+          contextLineItemId={qaContext.lineItemId}
+          contextLabel={qaContext.label}
+        />
       )}
     </div>
   );
