@@ -1067,7 +1067,7 @@ function AppContent() {
 
           {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
 
-          {activeTab === 'proposal_messages_admin' && profile.role === 'admin' && <ProposalMessagesAdmin key={activeTab} />}
+          {activeTab === 'proposal_messages_admin' && ['admin', 'manager', 'sales_manager', 'sales'].includes(profile.role) && <ProposalMessagesAdmin key={activeTab} />}
 
           {activeTab === 'vehicle-tracking' && (profile.role === 'admin' || profile.role === 'manager') && <VehicleManagement key={activeTab} />}
 

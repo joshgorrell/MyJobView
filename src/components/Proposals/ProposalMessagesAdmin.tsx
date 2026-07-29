@@ -1,54 +1,50 @@
 import { useState, useEffect } from 'react';
-import { MessageSquare, Search, Filter, Clock, CheckCircle, AlertCircle, ExternalLink, User } from 'lucide-react';
+import { MessageSquare, Search, Filter, Clock, CheckCircle, AlertCircle, ExternalLink, User, HelpCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { ProposalQA } from './ProposalQA';
 
-interface MessageWithProposal {
-  id: string;
+interface ThreadWithProposal {
+  thread_id: string;
   proposal_id: string;
-  sender_type: 'customer' | 'rep';
-  sender_name: string;
-  message: string;
-  is_read: boolean;
-  created_at: string;
-  proposal: {
-    proposal_number: string;
-    title: string;
-    status: string;
-    created_by: string;
-    contact: {
-      full_name: string;
-      email: string;
-    };
-    creator: {
-      full_name: string;
-    };
-  };
-  unread_rep_count: number;
-  last_response_time?: string;
+  proposal_number: string;
+  proposal_title: string;
+  proposal_status: string;
+  contact_name: string;
+  rep_name: string;
+  rep_id: string;
+  latest_customer_message: string;
+  latest_customer_message_at: string;
+  context_label: string | null;
+  unread_count: number;
+  last_rep_response_at: string | null;
 }
 
 export function ProposalMessagesAdmin() {
-  const [messages, setMessages] = useState<MessageWithProposal[]>([]);
+  const { profile } = useAuth();
+  const [threads, setThreads] = useState<ThreadWithProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'unanswered' | 'unread'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'unanswered' | 'unread' | 'open_questions'>('all');
   const [selectedProposal, setSelectedProposal] = useState<string | null>(null);
 
+  const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'sales_manager';
+
   useEffect(() => {
-    loadMessages();
+    loadThreads();
 
     const channel = supabase
       .channel('proposal_messages_admin')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'proposal_messages',
+          table: 'messages',
+          filter: 'author_type=eq.customer',
         },
         () => {
-          loadMessages();
+          loadThreads();
         }
       )
       .subscribe();
@@ -56,92 +52,105 @@ export function ProposalMessagesAdmin() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [profile?.id, profile?.role, profile?.organization_id]);
 
-  async function loadMessages() {
+  async function loadThreads() {
+    if (!profile?.organization_id) return;
     try {
-      const { data: messagesData, error } = await supabase
-        .from('proposal_messages')
+      let query = supabase
+        .from('message_threads')
         .select(`
           id,
+          subject,
           proposal_id,
-          sender_type,
-          sender_name,
-          message,
-          is_read,
-          created_at,
+          assigned_sales_rep_id,
+          last_message_at,
           proposal:proposals (
+            id,
             proposal_number,
             title,
             status,
             created_by,
             contact:contacts (
-              full_name,
-              email
+              full_name
             ),
             creator:profiles!proposals_created_by_fkey (
               full_name
             )
           )
         `)
-        .eq('sender_type', 'customer')
-        .order('created_at', { ascending: false });
+        .eq('organization_id', profile.organization_id)
+        .not('proposal_id', 'is', null);
+
+      if (!isPrivileged && profile?.id) {
+        query = query.eq('assigned_sales_rep_id', profile.id);
+      }
+
+      const { data: threadsData, error } = await query.order('last_message_at', { ascending: false });
 
       if (error) throw error;
 
-      const groupedByProposal = new Map<string, MessageWithProposal[]>();
-      messagesData?.forEach((msg: any) => {
-        const key = msg.proposal_id;
-        if (!groupedByProposal.has(key)) {
-          groupedByProposal.set(key, []);
-        }
-        groupedByProposal.get(key)!.push(msg);
-      });
+      const enriched: ThreadWithProposal[] = [];
 
-      const enrichedMessages = await Promise.all(
-        Array.from(groupedByProposal.entries()).map(async ([proposalId, msgs]) => {
-          const { count } = await supabase
-            .from('proposal_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('proposal_id', proposalId)
-            .eq('sender_type', 'customer')
-            .eq('is_read', false);
+      for (const thread of threadsData || []) {
+        const proposal = Array.isArray(thread.proposal) ? thread.proposal[0] : thread.proposal;
+        if (!proposal) continue;
 
-          const { data: lastRepResponse } = await supabase
-            .from('proposal_messages')
-            .select('created_at')
-            .eq('proposal_id', proposalId)
-            .eq('sender_type', 'rep')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        const { data: customerMsgs } = await supabase
+          .from('messages')
+          .select('id, body, created_at, context_label, is_read')
+          .eq('thread_id', thread.id)
+          .eq('author_type', 'customer')
+          .eq('is_internal', false)
+          .order('created_at', { ascending: false })
+          .limit(20);
 
-          const latestCustomerMsg = msgs[0];
-          return {
-            ...latestCustomerMsg,
-            unread_rep_count: count || 0,
-            last_response_time: lastRepResponse?.created_at,
-          };
-        })
-      );
+        if (!customerMsgs || customerMsgs.length === 0) continue;
 
-      setMessages(enrichedMessages as MessageWithProposal[]);
+        const unreadCount = customerMsgs.filter(m => !m.is_read).length;
+        const latest = customerMsgs[0];
+
+        const { data: lastRepResponse } = await supabase
+          .from('messages')
+          .select('created_at')
+          .eq('thread_id', thread.id)
+          .eq('author_type', 'staff')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        enriched.push({
+          thread_id: thread.id,
+          proposal_id: proposal.id,
+          proposal_number: proposal.proposal_number,
+          proposal_title: proposal.title || '',
+          proposal_status: proposal.status,
+          contact_name: proposal.contact?.full_name || 'Unknown Customer',
+          rep_name: proposal.creator?.full_name || 'Unassigned',
+          rep_id: thread.assigned_sales_rep_id || proposal.created_by,
+          latest_customer_message: latest.body,
+          latest_customer_message_at: latest.created_at,
+          context_label: latest.context_label,
+          unread_count: unreadCount,
+          last_rep_response_at: lastRepResponse?.created_at || null,
+        });
+      }
+
+      setThreads(enriched);
     } catch (error) {
-      console.error('Error loading messages:', error);
+      console.error('Error loading threads:', error);
     } finally {
       setLoading(false);
     }
   }
 
-  function calculateResponseTime(customerMsgTime: string, repResponseTime?: string) {
+  function calculateResponseTime(customerMsgTime: string, repResponseTime?: string | null) {
     if (!repResponseTime) return null;
-
     const custTime = new Date(customerMsgTime).getTime();
     const repTime = new Date(repResponseTime).getTime();
     const diffMs = repTime - custTime;
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
-
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
     return `${Math.floor(diffHours / 24)}d`;
@@ -154,33 +163,36 @@ export function ProposalMessagesAdmin() {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
   }
 
-  const filteredMessages = messages.filter((msg) => {
+  const filteredThreads = threads.filter((t) => {
     const matchesSearch =
-      msg.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.proposal.proposal_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.proposal.contact?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.proposal.creator?.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      t.proposal_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.proposal_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.contact_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.rep_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.latest_customer_message.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (filterStatus === 'unanswered') {
-      return matchesSearch && !msg.last_response_time;
+      return matchesSearch && !t.last_rep_response_at;
     }
     if (filterStatus === 'unread') {
-      return matchesSearch && msg.unread_rep_count > 0;
+      return matchesSearch && t.unread_count > 0;
+    }
+    if (filterStatus === 'open_questions') {
+      return matchesSearch && t.unread_count > 0;
     }
     return matchesSearch;
   });
 
   const stats = {
-    total: messages.length,
-    unanswered: messages.filter(m => !m.last_response_time).length,
-    unread: messages.filter(m => m.unread_rep_count > 0).length,
+    total: threads.length,
+    unanswered: threads.filter(t => !t.last_rep_response_at).length,
+    unread: threads.filter(t => t.unread_count > 0).length,
   };
 
   if (selectedProposal) {
@@ -204,8 +216,12 @@ export function ProposalMessagesAdmin() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Proposal Messages</h1>
-        <p className="text-gray-600">Monitor all customer questions and ensure timely responses</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Proposal Q&A Messages</h1>
+        <p className="text-gray-600">
+          {isPrivileged
+            ? 'Monitor all customer questions across your team and ensure timely responses'
+            : 'Monitor customer questions on your proposals and respond promptly'}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -264,6 +280,7 @@ export function ProposalMessagesAdmin() {
                 <option value="all">All Messages</option>
                 <option value="unanswered">Unanswered</option>
                 <option value="unread">Unread</option>
+                <option value="open_questions">Open Questions</option>
               </select>
             </div>
           </div>
@@ -274,7 +291,7 @@ export function ProposalMessagesAdmin() {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-4 text-gray-600">Loading messages...</p>
           </div>
-        ) : filteredMessages.length === 0 ? (
+        ) : filteredThreads.length === 0 ? (
           <div className="p-12 text-center">
             <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-600 font-medium">No messages found</p>
@@ -286,36 +303,32 @@ export function ProposalMessagesAdmin() {
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {filteredMessages.map((msg) => {
-              const responseTime = calculateResponseTime(msg.created_at, msg.last_response_time);
-              const hasResponse = !!msg.last_response_time;
-              const isUrgent = !hasResponse && new Date().getTime() - new Date(msg.created_at).getTime() > 3600000; // 1 hour
+            {filteredThreads.map((t) => {
+              const responseTime = calculateResponseTime(t.latest_customer_message_at, t.last_rep_response_at);
+              const hasResponse = !!t.last_rep_response_at;
+              const isUrgent = !hasResponse && new Date().getTime() - new Date(t.latest_customer_message_at).getTime() > 3600000;
 
               return (
                 <div
-                  key={msg.id}
+                  key={t.thread_id}
                   className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
-                    msg.unread_rep_count > 0 ? 'bg-blue-50' : ''
+                    t.unread_count > 0 ? 'bg-blue-50' : ''
                   }`}
-                  onClick={() => setSelectedProposal(msg.proposal_id)}
+                  onClick={() => setSelectedProposal(t.proposal_id)}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-semibold text-gray-900">
-                          {msg.proposal.proposal_number}
-                        </span>
-                        {msg.proposal.title && (
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="font-semibold text-gray-900">{t.proposal_number}</span>
+                        {t.proposal_title && (
                           <>
                             <span className="text-gray-400">•</span>
-                            <span className="text-sm text-gray-600 truncate">
-                              {msg.proposal.title}
-                            </span>
+                            <span className="text-sm text-gray-600 truncate">{t.proposal_title}</span>
                           </>
                         )}
-                        {msg.unread_rep_count > 0 && (
+                        {t.unread_count > 0 && (
                           <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-medium rounded-full">
-                            {msg.unread_rep_count} unread
+                            {t.unread_count} unread
                           </span>
                         )}
                         {!hasResponse && (
@@ -330,20 +343,29 @@ export function ProposalMessagesAdmin() {
                       <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                         <div className="flex items-center gap-1">
                           <User className="w-4 h-4" />
-                          <span>{msg.proposal.contact?.full_name || 'Unknown Customer'}</span>
+                          <span>{t.contact_name}</span>
                         </div>
                         <span className="text-gray-400">→</span>
-                        <span>Rep: {msg.proposal.creator?.full_name || 'Unassigned'}</span>
+                        <span>Rep: {t.rep_name}</span>
                       </div>
 
+                      {t.context_label && (
+                        <div className="flex items-center gap-1 mb-2">
+                          <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
+                          <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                            Re: {t.context_label}
+                          </span>
+                        </div>
+                      )}
+
                       <p className="text-sm text-gray-700 line-clamp-2 mb-2">
-                        <span className="font-medium">{msg.sender_name}:</span> {msg.message}
+                        {t.latest_customer_message}
                       </p>
 
                       <div className="flex items-center gap-4 text-xs text-gray-500">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          <span>{getTimeSinceMessage(msg.created_at)}</span>
+                          <span>{getTimeSinceMessage(t.latest_customer_message_at)}</span>
                         </div>
                         {hasResponse && responseTime && (
                           <div className="flex items-center gap-1">

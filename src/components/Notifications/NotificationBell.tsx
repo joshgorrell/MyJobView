@@ -65,13 +65,6 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
           loadAllNotifications();
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'proposal_messages' },
-        () => {
-          loadAllNotifications();
-        }
-      )
       .subscribe();
 
     return () => {
@@ -112,7 +105,7 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
         });
       }
 
-      // Load unread messages from threads where user is involved
+      // Load unread customer messages from threads where user is involved
       const { data: threads } = await supabase
         .from('message_threads')
         .select(`
@@ -122,11 +115,15 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
           messages!inner (
             id,
             author_id,
+            author_type,
+            is_internal,
             body,
             created_at
           )
         `)
         .neq('messages.author_id', profile.id)
+        .eq('messages.author_type', 'customer')
+        .eq('messages.is_internal', false)
         .order('last_message_at', { ascending: false })
         .limit(10);
 

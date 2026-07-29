@@ -228,12 +228,43 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
   const [paymentUnavailableInvoice, setPaymentUnavailableInvoice] = useState<PortalInvoice | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
+  const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadProposalDetails();
     if (!previewMode) trackProposalView();
     setTimeout(() => setAnimate(true), 100);
   }, [proposalId]);
+
+  useEffect(() => {
+    loadUnreadCounts();
+  }, [proposalId]);
+
+  async function loadUnreadCounts() {
+    try {
+      const { data: thread } = await supabase
+        .from('message_threads')
+        .select('id')
+        .eq('proposal_id', proposalId)
+        .eq('context_type', 'proposal')
+        .maybeSingle();
+      if (!thread) return;
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select('context_room_id, context_line_item_id')
+        .eq('thread_id', thread.id)
+        .eq('author_type', 'customer')
+        .eq('is_internal', false)
+        .eq('is_read', false);
+      if (!msgs) return;
+      const counts: Record<string, number> = {};
+      for (const m of msgs) {
+        const key = m.context_line_item_id || m.context_room_id || 'general';
+        counts[key] = (counts[key] || 0) + 1;
+      }
+      setUnreadByContext(counts);
+    } catch {}
+  }
 
   async function trackProposalDownload() {
     if (previewMode) return;
@@ -830,10 +861,15 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                       <h3 className="text-lg sm:text-xl font-bold text-white flex-1">{room.name}</h3>
                       <button
                         onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-blue-200 hover:text-white text-xs font-medium rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-blue-200 hover:text-white text-xs font-medium rounded-lg transition-colors relative"
                       >
                         <HelpCircle className="w-3.5 h-3.5" />
                         Ask about this room
+                        {unreadByContext[room.id] > 0 && (
+                          <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                            {unreadByContext[room.id]}
+                          </span>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -911,10 +947,15 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
                                   <button
                                     onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
-                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0 relative"
                                     title="Ask about this item"
                                   >
                                     <HelpCircle className="w-3.5 h-3.5" />
+                                    {unreadByContext[item.id] > 0 && (
+                                      <span className="absolute -top-1.5 -right-1.5 px-1 py-0 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] text-center leading-tight">
+                                        {unreadByContext[item.id]}
+                                      </span>
+                                    )}
                                   </button>
                                 </div>
                               </td>
@@ -1018,10 +1059,15 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
                                   <button
                                     onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
-                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                                    className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0 relative"
                                     title="Ask about this item"
                                   >
                                     <HelpCircle className="w-3.5 h-3.5" />
+                                    {unreadByContext[item.id] > 0 && (
+                                      <span className="absolute -top-1.5 -right-1.5 px-1 py-0 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] text-center leading-tight">
+                                        {unreadByContext[item.id]}
+                                      </span>
+                                    )}
                                   </button>
                                 </div>
                               </td>
