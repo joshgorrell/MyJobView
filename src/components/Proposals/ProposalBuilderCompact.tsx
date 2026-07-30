@@ -4406,7 +4406,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         )}
 
         {/* Line Items Area */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <div className="flex-1 flex flex-col min-w-0">
             {rooms.length === 0 && unassignedItems.filter(i => isCoMode || !i.is_hidden).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <Package className="w-16 h-16 text-gray-600 mb-4" />
@@ -4414,7 +4414,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 <p className="text-gray-500 text-sm mb-4">Click "Add" in the toolbar to add your first item</p>
               </div>
             ) : (
-              <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+              <div style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
                 {/* Collapse/Expand All Button */}
                 <div className="bg-gray-850 border-b border-gray-700 px-3 py-2 flex items-center justify-between">
                   <div className="text-xs text-gray-400">
@@ -4438,7 +4438,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     )}
                   </button>
                 </div>
-                <table className="w-full text-xs sm:text-xs" style={{ minWidth: '1200px' }}>
+                <table className="w-full text-xs sm:text-xs">
                   <thead className="bg-gray-800 text-gray-400">
                     <tr>
                       <th className="text-center py-2 px-2 w-16">
