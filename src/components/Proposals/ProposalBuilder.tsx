@@ -1444,7 +1444,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
   return (
     <div className={`flex flex-col lg:flex-row ${inline && !isCoMode ? 'h-auto' : 'h-auto lg:h-[calc(100vh-4rem)]'}`}>
-      <div className={`flex-1 p-3 sm:p-4 lg:p-6 ${inline && !isCoMode ? '' : 'overflow-y-auto'}`}>
+      <div className="flex-1 p-3 sm:p-4 lg:p-6">
         <div className="max-w-7xl mx-auto">
           {isCoMode && (() => {
             const liveChangeAmount = coLineItems.reduce((sum, i) => sum + (i.change_amount || 0), 0);
@@ -1491,7 +1491,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
                         {modifiedCount > 0 && <span className="text-amber-400">{modifiedCount} modified</span>}
                       </div>
                     </div>
-                    <div className="divide-y divide-gray-700/40 max-h-64 overflow-y-auto">
+                    <div className="divide-y divide-gray-700/40">
                       {coLineItems.map(item => {
                         const isAdd = item.action_type === 'add';
                         const isRemove = item.action_type === 'remove';
@@ -1663,8 +1663,8 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
                       rows={2}
                     />
 
-                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                      <table className="min-w-full" style={{ minWidth: '480px' }}>
+                    <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="min-w-full">
                         <thead className="text-xs text-gray-400 border-b border-gray-700">
                           <tr>
                             <th className="text-left py-2 px-2 w-8">
