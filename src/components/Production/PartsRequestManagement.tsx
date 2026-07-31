@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Briefcase, Building2, ExternalLink, Filter, Calendar } from 'lucide-react';
+import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Briefcase, Building2, ExternalLink, Filter, Calendar, Flag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
@@ -944,6 +944,14 @@ export function PartsRequestManagement() {
                           </span>
                           {request.priority === 'urgent' && (
                             <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-medium">URGENT</span>
+                          )}
+                          {request.notes && (
+                            <div className="group relative inline-flex">
+                              <Flag className="w-4 h-4 text-amber-500 fill-amber-400 cursor-help" />
+                              <div className="hidden group-hover:block absolute z-30 top-full left-0 mt-1 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg whitespace-normal">
+                                {request.notes}
+                              </div>
+                            </div>
                           )}
                           <span className="inline-flex items-center gap-1 text-xs text-gray-500">
                             {getSourceIcon(request)}
