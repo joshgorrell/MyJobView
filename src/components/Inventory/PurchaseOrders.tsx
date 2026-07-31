@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, ShoppingCart, Package, Truck, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, ShoppingCart, Package, Truck, CheckCircle, XCircle, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
@@ -9,6 +9,7 @@ interface PurchaseOrder {
   id: string;
   po_number: string;
   vendor_name: string;
+  vendor_email: string | null;
   warehouse_name: string;
   status: string;
   order_date: string;
@@ -62,6 +63,7 @@ export function PurchaseOrders() {
           id: po.id,
           po_number: po.po_number,
           vendor_name: po.vendors.vendor_name,
+          vendor_email: po.vendors.email || null,
           warehouse_name: po.warehouses.name,
           status: po.status,
           order_date: po.order_date,
@@ -229,6 +231,40 @@ function PurchaseOrderCard({
   onReceive: () => void;
   onUpdate: () => void;
 }) {
+  const [emailing, setEmailing] = useState(false);
+
+  const handleEmailPO = async () => {
+    if (!po.vendor_email) {
+      alert('This vendor does not have an email address on file');
+      return;
+    }
+    if (!confirm(`Email PO ${po.po_number} to ${po.vendor_name} at ${po.vendor_email}?`)) return;
+
+    setEmailing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-purchase-order-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ poId: po.id }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to send email');
+      }
+      alert(`PO ${po.po_number} emailed to ${po.vendor_name}`);
+      onUpdate();
+    } catch (err: any) {
+      alert(`Error emailing PO: ${err.message}`);
+    } finally {
+      setEmailing(false);
+    }
+  };
+
   const StatusIcon = {
     draft: Package,
     sent: Truck,
@@ -298,6 +334,16 @@ function PurchaseOrderCard({
           >
             Receive Items
           </button>
+          {(po.status === 'draft' || po.status === 'sent') && (
+            <button
+              onClick={handleEmailPO}
+              disabled={emailing}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            >
+              <Mail className="w-4 h-4" />
+              {emailing ? 'Sending...' : 'Email to Vendor'}
+            </button>
+          )}
           {po.status === 'draft' && (
             <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium">
               Edit

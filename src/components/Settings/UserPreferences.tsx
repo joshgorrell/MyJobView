@@ -28,6 +28,7 @@ export function UserPreferences() {
     notify_on_fishbowl: true,
     notify_on_escalated: true,
     notify_on_lead_status: true,
+    notify_on_product_requests: true,
   });
   const [proposalTemplates, setProposalTemplates] = useState<any[]>([]);
   const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
@@ -54,7 +55,7 @@ export function UserPreferences() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('notify_on_mention, notify_on_lead_assigned, notify_on_fishbowl, notify_on_escalated, notify_on_lead_status, google_calendar_connected, google_calendar_email')
+        .select('notify_on_mention, notify_on_lead_assigned, notify_on_fishbowl, notify_on_escalated, notify_on_lead_status, notify_on_product_requests, google_calendar_connected, google_calendar_email')
         .eq('id', profile.id)
         .single();
 
@@ -66,6 +67,7 @@ export function UserPreferences() {
           notify_on_fishbowl: data.notify_on_fishbowl ?? true,
           notify_on_escalated: data.notify_on_escalated ?? true,
           notify_on_lead_status: data.notify_on_lead_status ?? true,
+          notify_on_product_requests: data.notify_on_product_requests ?? true,
         });
         setCalendarConnected(data.google_calendar_connected ?? false);
         setCalendarEmail(data.google_calendar_email || '');
@@ -227,6 +229,7 @@ export function UserPreferences() {
           notify_on_fishbowl: preferences.notify_on_fishbowl,
           notify_on_escalated: preferences.notify_on_escalated,
           notify_on_lead_status: preferences.notify_on_lead_status,
+          notify_on_product_requests: preferences.notify_on_product_requests,
         })
         .eq('id', profile.id);
 
@@ -856,6 +859,23 @@ export function UserPreferences() {
               <div className="font-semibold text-gray-900">Priority Lead Status Updates</div>
               <div className="text-sm text-gray-600 mt-1">
                 Receive notifications when your High or Urgent priority leads are claimed or status changes
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preferences.notify_on_product_requests}
+              onChange={(e) => setPreferences({ ...preferences, notify_on_product_requests: e.target.checked })}
+              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-gray-900">Product Request Notifications</div>
+              <div className="text-sm text-gray-600 mt-1">
+                Receive email notifications when new product/parts requests are submitted for purchasing
               </div>
             </div>
           </label>

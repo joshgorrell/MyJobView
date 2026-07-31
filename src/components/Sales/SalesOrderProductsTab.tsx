@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Package, Loader2, Hash, Tag, ChevronDown, ChevronRight, LayoutList, Clock, Wrench, Building2, LayoutGrid, List, Columns2 as Columns, Check, Printer } from 'lucide-react';
+import { Package, Loader2, Hash, Tag, ChevronDown, ChevronRight, LayoutList, Clock, Wrench, Building2, LayoutGrid, List, Columns2 as Columns, Check, Printer, AlertCircle, ShoppingCart } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
 import { SalesOrderProductDetailModal } from './SalesOrderProductDetailModal';
 import {
@@ -92,6 +92,9 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
   const [visibleColumns, setVisibleColumns] = useState<Set<GridColumnKey>>(loadColumnPrefs);
   const [showColumnsMenu, setShowColumnsMenu] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [stockMap, setStockMap] = useState<Record<string, number>>({});
+  const [requestingItem, setRequestingItem] = useState<ProductLineItem | null>(null);
+  const [requestSaving, setRequestSaving] = useState(false);
   const columnsMenuRef = useRef<HTMLDivElement>(null);
   const groupMenuRef = useRef<HTMLDivElement>(null);
 
@@ -158,6 +161,20 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
 
       setRooms(roomsRes.data || []);
       setItems(allItems);
+
+      // Fetch stock levels for all product_ids
+      const productIds = allItems.map(i => i.product_id).filter(Boolean) as string[];
+      if (productIds.length > 0) {
+        const { data: invData } = await supabase
+          .from('product_inventory')
+          .select('product_id, quantity_on_hand')
+          .in('product_id', productIds);
+        const stock: Record<string, number> = {};
+        (invData || []).forEach((row: any) => {
+          stock[row.product_id] = (stock[row.product_id] || 0) + (row.quantity_on_hand || 0);
+        });
+        setStockMap(stock);
+      }
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
@@ -183,6 +200,50 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     }
     setVisibleColumns(next);
     saveColumnPrefs(next);
+  }
+
+  async function submitPartRequest(item: ProductLineItem) {
+    if (!item.product_id || !item.quantity) return;
+    setRequestSaving(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) { alert('You must be signed in to request parts'); return; }
+
+      const { data: req, error: reqError } = await supabase
+        .from('product_requests')
+        .insert({
+          requested_by: userId,
+          request_type: 'job',
+          sales_order_id: order.id,
+          priority: 'normal',
+          status: 'pending',
+          notes: `Auto-generated from Sales Order ${order.order_number} - ${item.description}`,
+        })
+        .select()
+        .single();
+      if (reqError) throw reqError;
+
+      const { error: itemError } = await supabase
+        .from('product_request_items')
+        .insert({
+          request_id: req.id,
+          product_id: item.product_id,
+          product_name: item.description || item.products?.name || '',
+          model_number: item.products?.sku || null,
+          vendor: item.products?.vendors?.vendor_name || item.products?.vendor || null,
+          quantity_requested: item.quantity,
+          estimated_cost: item.cost ? item.cost * item.quantity : null,
+        });
+      if (itemError) throw itemError;
+
+      alert('Parts request created successfully! Purchasing has been notified.');
+      setRequestingItem(null);
+    } catch (err: any) {
+      alert(`Error creating parts request: ${err.message}`);
+    } finally {
+      setRequestSaving(false);
+    }
   }
 
   if (loading) {
@@ -620,8 +681,81 @@ function CleanItemRow({
               <span className="text-xs text-amber-400">{fmt(item.labor_hours!)} hrs</span>
             </div>
           )}
+          {/* Stock indicator and request button */}
+          {item.product_id && item.quantity && !isLaborOnly && (
+            <div className="mt-1.5 flex items-center justify-end gap-2">
+              {(() => {
+                const onHand = stockMap[item.product_id!] || 0;
+                const needsOrder = onHand < item.quantity;
+                if (!needsOrder) {
+                  return (
+                    <span className="inline-flex items-center gap-1 text-xs text-green-400">
+                      <Check className="w-3 h-3" />
+                      In Stock
+                    </span>
+                  );
+                }
+                return (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-400">
+                      <AlertCircle className="w-3 h-3" />
+                      Needs Ordering ({onHand} on hand)
+                    </span>
+                    <button
+                      onClick={() => setRequestingItem(item)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      <ShoppingCart className="w-3 h-3" />
+                      Request
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Request modal for this item */}
+      {requestingItem?.id === item.id && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Request Parts</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will create a parts request for purchasing to order. The item will be linked to this sales order.
+            </p>
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Product:</span>
+                <span className="font-medium text-gray-900">{item.description || item.products?.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Quantity needed:</span>
+                <span className="font-medium text-gray-900">{item.quantity}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">On hand:</span>
+                <span className="font-medium text-gray-900">{stockMap[item.product_id!] || 0}</span>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setRequestingItem(null)}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => submitPartRequest(item)}
+                disabled={requestSaving}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {requestSaving ? 'Creating...' : 'Create Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

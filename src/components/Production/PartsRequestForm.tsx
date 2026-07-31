@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Search, Trash2, Package, User, Briefcase, Truck, ShoppingCart, Wrench, ClipboardList } from 'lucide-react';
+import { X, Plus, Search, Trash2, Package, User, Briefcase, Truck, ShoppingCart, Wrench, ClipboardList, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -49,6 +49,7 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
   const [officeId, setOfficeId] = useState('');
   const [assignedTo, setAssignedTo] = useState(user?.id || '');
   const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
+  const [dateNeeded, setDateNeeded] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<RequestItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -313,6 +314,7 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
         assigned_to: sourceType === 'general' ? (assignedTo || null) : null,
         priority,
         status: 'pending',
+        date_needed: dateNeeded || null,
         notes
       };
 
@@ -631,17 +633,31 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
               </div>
             )}
 
-            {/* Priority */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-              >
-                <option value="normal">Normal</option>
-                <option value="urgent">Urgent</option>
-              </select>
+            {/* Priority and Date Needed */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                >
+                  <option value="normal">Normal</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Date Needed</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    value={dateNeeded}
+                    onChange={(e) => setDateNeeded(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Product Search (always available) */}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Briefcase, Building2, ExternalLink, Filter } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Briefcase, Building2, ExternalLink, Filter, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
@@ -21,6 +21,7 @@ interface ProductRequest {
   status: string;
   notes: string;
   created_at: string;
+  date_needed: string | null;
   requester: {
     first_name: string;
     last_name: string;
@@ -57,7 +58,7 @@ interface ProductRequest {
 }
 
 type MainTab = 'open' | 'fulfilled';
-type ViewMode = 'requests' | 'vendors';
+type ViewMode = 'requests' | 'vendors' | 'job';
 
 const OPEN_STATUSES = ['pending', 'approved'];
 const FULFILLED_STATUSES = ['po_created', 'ordered', 'received', 'rejected'];
@@ -289,6 +290,71 @@ export function PartsRequestManagement() {
     return grouped;
   }, [filteredOpen]);
 
+  // Job grouping for open requests only
+  const itemsByJob = useMemo(() => {
+    const grouped: Record<string, Array<{
+      itemId: string;
+      requestId: string;
+      requestNumber: string;
+      productName: string;
+      modelNumber: string;
+      vendor: string;
+      quantityRequested: number;
+      estimatedCost: number | null;
+      requester: string;
+      createdAt: string;
+      priority: string;
+      customerName: string;
+      sourceLabel: string;
+      dateNeeded: string | null;
+    }>> = {};
+
+    filteredOpen.forEach(request => {
+      const jobKey = getJobKey(request);
+      if (!grouped[jobKey]) grouped[jobKey] = [];
+      (request.items || []).forEach(item => {
+        grouped[jobKey].push({
+          itemId: item.id,
+          requestId: request.id,
+          requestNumber: request.id.slice(0, 8),
+          productName: item.product_name,
+          modelNumber: item.model_number,
+          vendor: item.vendor || '',
+          quantityRequested: item.quantity_requested,
+          estimatedCost: item.estimated_cost,
+          requester: `${request.requester?.first_name || ''} ${request.requester?.last_name || ''}`.trim(),
+          createdAt: request.created_at,
+          priority: request.priority,
+          customerName: getCustomerName(request),
+          sourceLabel: getSourceLabel(request),
+          dateNeeded: request.date_needed,
+        });
+      });
+    });
+
+    return grouped;
+  }, [filteredOpen]);
+
+  const getJobKey = (req: ProductRequest): string => {
+    if (req.sales_order?.order_number) return `SO-${req.sales_order.order_number}`;
+    if (req.work_order?.wo_number) return `WO-${req.work_order.wo_number}`;
+    if (req.project?.project_number) return `PROJ-${req.project.project_number}`;
+    if (req.service_request_id) return `SR-${req.service_request_id.slice(0, 8)}`;
+    return 'General / Stock';
+  };
+
+  // Deep-link auto-open: if requestId is in the URL, auto-expand that request
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestId = params.get('requestId');
+    if (requestId && filteredOpen.length > 0) {
+      const found = filteredOpen.find(r => r.id === requestId);
+      if (found) {
+        setSelectedRequest(found);
+      }
+    }
+  }, [filteredOpen]);
+
   const toggleItemSelection = (itemId: string) => {
     const next = new Set(selectedItems);
     if (next.has(itemId)) next.delete(itemId);
@@ -308,22 +374,68 @@ export function PartsRequestManagement() {
     setSelectedItems(next);
   };
 
+  const selectAllJobItems = (jobKey: string) => {
+    const jobItems = itemsByJob[jobKey] || [];
+    const next = new Set(selectedItems);
+    const allSelected = jobItems.every(item => next.has(item.itemId));
+    if (allSelected) {
+      jobItems.forEach(item => next.delete(item.itemId));
+    } else {
+      jobItems.forEach(item => next.add(item.itemId));
+    }
+    setSelectedItems(next);
+  };
+
+  const resolveVendorId = async (vendorName: string): Promise<string | null> => {
+    if (!vendorName) return null;
+    const { data } = await supabase
+      .from('vendors')
+      .select('id')
+      .ilike('vendor_name', vendorName)
+      .limit(1)
+      .maybeSingle();
+    return data?.id || null;
+  };
+
   const createPurchaseOrder = async (request: ProductRequest) => {
     try {
       const reqItems = request.items || [];
+      const vendors = [...new Set(reqItems.map(i => i.vendor).filter(Boolean))];
+      if (vendors.length > 1) {
+        alert(`This request has items from ${vendors.length} different vendors. A purchase order can only be for one vendor. Please use the By Vendor view to create separate POs per vendor.`);
+        return;
+      }
+
+      const vendorName = vendors[0] || '';
+      const vendorId = await resolveVendorId(vendorName);
+      if (!vendorId) {
+        alert(`Could not find vendor "${vendorName}" in the vendor database. Please add the vendor first or use the By Vendor view.`);
+        return;
+      }
+
+      const { data: warehouse } = await supabase
+        .from('warehouses')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      if (!warehouse) {
+        alert('No warehouse found. Please create a warehouse first.');
+        return;
+      }
+
       const totalCost = reqItems.reduce((sum, item) => sum + (item.estimated_cost || 0), 0);
-      const vendorName = reqItems[0]?.vendor || 'Multiple Vendors';
       const customerName = getCustomerName(request);
       const officeName = request.office?.office_name || 'N/A';
 
       const { data: po, error: poError } = await supabase
         .from('purchase_orders')
         .insert({
-          vendor: vendorName,
+          vendor_id: vendorId,
+          warehouse_id: warehouse.id,
           total: totalCost,
           status: 'draft',
-          requested_by: request.requested_by,
-          notes: `Generated from Parts Request #${request.id.slice(0, 8)}\nSource: ${getSourceLabel(request)}${getSourceRef(request) ? ` (${getSourceRef(request)})` : ''}\nCustomer: ${customerName || 'N/A'}\nOffice: ${officeName}\n\n${request.notes || ''}`
+          notes: `Generated from Parts Request #${request.id.slice(0, 8)}\nSource: ${getSourceLabel(request)}${getSourceRef(request) ? ` (${getSourceRef(request)})` : ''}\nCustomer: ${customerName || 'N/A'}\nOffice: ${officeName}\n\n${request.notes || ''}`,
+          created_by: user?.id
         })
         .select()
         .single();
@@ -332,10 +444,12 @@ export function PartsRequestManagement() {
 
       const poItems = reqItems.map(item => ({
         po_id: po.id,
-        product_id: null,
+        product_id: item.product_id || null,
         product_name: item.product_name,
+        model_number: item.model_number,
+        vendor: item.vendor,
         quantity: item.quantity_approved || item.quantity_requested,
-        unit_price: item.estimated_cost ? item.estimated_cost / item.quantity_requested : 0,
+        unit_price: item.estimated_cost && item.quantity_requested ? item.estimated_cost / item.quantity_requested : 0,
         total_price: item.estimated_cost || 0,
         product_request_item_id: item.id
       }));
@@ -345,17 +459,23 @@ export function PartsRequestManagement() {
         .insert(poItems);
       if (itemsError) throw itemsError;
 
-      // Link each request item back to the PO and mark ordered
-      await supabase
-        .from('product_request_items')
-        .update({ purchase_order_id: po.id, ordered_status: 'ordered', ordered_quantity: item.quantity_approved || item.quantity_requested })
-        .in('id', reqItems.map(i => i.id));
+      // Update each request item individually with its own quantity
+      for (const item of reqItems) {
+        await supabase
+          .from('product_request_items')
+          .update({
+            purchase_order_id: po.id,
+            ordered_status: 'ordered',
+            ordered_quantity: item.quantity_approved || item.quantity_requested
+          })
+          .eq('id', item.id);
+      }
 
       await updateRequestStatus(request.id, 'po_created');
-      alert(`Purchase Order #${po.id.slice(0, 8)} created successfully!`);
-    } catch (error) {
+      alert(`Purchase Order ${po.po_number} created successfully!`);
+    } catch (error: any) {
       console.error('Error creating PO:', error);
-      alert('Error creating purchase order');
+      alert(`Error creating purchase order: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -379,19 +499,41 @@ export function PartsRequestManagement() {
       return;
     }
 
+    const vendors = [...new Set(itemsData.map((item: any) => item.vendor).filter(Boolean))];
+    if (vendors.length > 1) {
+      alert(`Selected items span ${vendors.length} vendors. A purchase order can only be for one vendor. Please select items from a single vendor.`);
+      return;
+    }
+
     try {
+      const vendorName = vendors[0] || '';
+      const vendorId = await resolveVendorId(vendorName);
+      if (!vendorId) {
+        alert(`Could not find vendor "${vendorName}" in the vendor database. Please add the vendor first.`);
+        return;
+      }
+
+      const { data: warehouse } = await supabase
+        .from('warehouses')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      if (!warehouse) {
+        alert('No warehouse found. Please create a warehouse first.');
+        return;
+      }
+
       const totalCost = itemsData.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
-      const vendors = [...new Set(itemsData.map((item: any) => item.vendor))];
-      const vendorName = vendors.length === 1 ? vendors[0] : 'Multiple Vendors';
 
       const { data: po, error: poError } = await supabase
         .from('purchase_orders')
         .insert({
-          vendor: vendorName,
+          vendor_id: vendorId,
+          warehouse_id: warehouse.id,
           total: totalCost,
           status: 'draft',
-          requested_by: user?.id,
-          notes: `Combined PO from ${itemsData.length} product request items across ${new Set(itemsData.map((i: any) => i.requestId)).size} request(s)`
+          notes: `Combined PO from ${itemsData.length} product request items across ${new Set(itemsData.map((i: any) => i.requestId)).size} request(s)`,
+          created_by: user?.id
         })
         .select()
         .single();
@@ -400,10 +542,12 @@ export function PartsRequestManagement() {
 
       const poItems = itemsData.map((item: any) => ({
         po_id: po.id,
-        product_id: null,
+        product_id: item.productId || null,
         product_name: item.productName,
+        model_number: item.modelNumber || null,
+        vendor: item.vendor || null,
         quantity: item.quantityRequested,
-        unit_price: item.estimatedCost ? item.estimatedCost / item.quantityRequested : 0,
+        unit_price: item.estimatedCost && item.quantityRequested ? item.estimatedCost / item.quantityRequested : 0,
         total_price: item.estimatedCost || 0,
         product_request_item_id: item.itemId
       }));
@@ -413,12 +557,17 @@ export function PartsRequestManagement() {
         .insert(poItems);
       if (itemsError) throw itemsError;
 
-      // Link items back to PO and mark ordered
-      const itemIds = itemsData.map((item: any) => item.itemId);
-      await supabase
-        .from('product_request_items')
-        .update({ purchase_order_id: po.id, ordered_status: 'ordered', ordered_quantity: itemsData.find((i: any) => i.itemId === itemIds[0])?.quantityRequested || 0 })
-        .in('id', itemIds);
+      // Update each item individually with its own quantity
+      for (const item of itemsData) {
+        await supabase
+          .from('product_request_items')
+          .update({
+            purchase_order_id: po.id,
+            ordered_status: 'ordered',
+            ordered_quantity: item.quantityRequested
+          })
+          .eq('id', item.itemId);
+      }
 
       // Update each affected request: if all items are now ordered, set status to po_created
       const requestIds = [...new Set(itemsData.map((item: any) => item.requestId))];
@@ -433,7 +582,7 @@ export function PartsRequestManagement() {
         }
       }
 
-      alert(`Purchase Order #${po.id.slice(0, 8)} created with ${itemsData.length} items!`);
+      alert(`Purchase Order ${po.po_number} created with ${itemsData.length} items!`);
       setSelectedItems(new Set());
       await loadRequests();
     } catch (error: any) {
@@ -526,6 +675,14 @@ export function PartsRequestManagement() {
             >
               By Vendor
             </button>
+            <button
+              onClick={() => { setViewMode('job'); setSelectedItems(new Set()); }}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                viewMode === 'job' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              By Job
+            </button>
           </div>
         )}
 
@@ -566,8 +723,8 @@ export function PartsRequestManagement() {
           </select>
         </div>
 
-        {/* Selected items action bar (vendor view) */}
-        {mainTab === 'open' && viewMode === 'vendors' && canManage && selectedItems.size > 0 && (
+        {/* Selected items action bar (vendor and job view) */}
+        {mainTab === 'open' && (viewMode === 'vendors' || viewMode === 'job') && canManage && selectedItems.size > 0 && (
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="text-sm text-blue-900">
               <strong>{selectedItems.size}</strong> item(s) selected
@@ -666,6 +823,85 @@ export function PartsRequestManagement() {
                 })}
             </div>
           )
+        ) : mainTab === 'open' && viewMode === 'job' && canManage ? (
+          // Job view
+          Object.keys(itemsByJob).length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No open items</h3>
+              <p className="text-gray-600">All product requests have been processed</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(itemsByJob)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([jobKey, items]) => {
+                  const totalCost = items.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
+                  const allSelected = items.every(item => selectedItems.has(item.itemId));
+                  const someSelected = items.some(item => selectedItems.has(item.itemId));
+                  const earliestDate = items.map(i => i.dateNeeded).filter(Boolean).sort()[0];
+                  return (
+                    <div key={jobKey} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                            onChange={() => selectAllJobItems(jobKey)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{jobKey}</h3>
+                            <p className="text-sm text-gray-600">
+                              {items.length} item(s) - Est. Total: {formatCurrency(totalCost)}
+                              {items[0]?.customerName && ` - ${items[0].customerName}`}
+                              {earliestDate && <span className="ml-2 text-amber-600 font-medium">Needed by {new Date(earliestDate).toLocaleDateString()}</span>}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-gray-200">
+                        {items.map(item => (
+                          <div key={item.itemId} className="px-4 py-3 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedItems.has(item.itemId)}
+                                onChange={() => toggleItemSelection(item.itemId)}
+                                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 text-sm">{item.productName}</div>
+                                <div className="text-sm text-gray-600 mt-0.5">
+                                  Model: {item.modelNumber || 'N/A'} - Vendor: {item.vendor || 'N/A'}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                                  <span>Request #{item.requestNumber}</span>
+                                  <span>Qty: {item.quantityRequested}</span>
+                                  {item.estimatedCost ? <span>Cost: {formatCurrency(item.estimatedCost)}</span> : null}
+                                  <span>By: {item.requester}</span>
+                                  <span className="text-blue-600">{item.sourceLabel}</span>
+                                  {item.priority === 'urgent' && (
+                                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">URGENT</span>
+                                  )}
+                                  {item.dateNeeded && (
+                                    <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
+                                      <Calendar className="w-3 h-3" />
+                                      {new Date(item.dateNeeded).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )
         ) : activeList.length === 0 ? (
           // Empty state
           <div className="text-center py-12 bg-gray-50 rounded-lg">
@@ -718,6 +954,12 @@ export function PartsRequestManagement() {
                         <div className="text-xs sm:text-sm text-gray-600 mt-1">
                           {(request.items || []).length} item(s)
                           {customer && <> - {customer}</>}
+                          {request.date_needed && (
+                            <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-medium">
+                              <Calendar className="w-3 h-3" />
+                              Needed by {new Date(request.date_needed).toLocaleDateString()}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
