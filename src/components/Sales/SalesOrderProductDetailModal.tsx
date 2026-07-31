@@ -106,7 +106,48 @@ export function SalesOrderProductDetailModal({
         .maybeSingle();
 
       if (error) throw error;
-      if (!p) return;
+
+      if (!p) {
+        // Product not found in catalog — build a minimal panel from line item data so the modal is never blank
+        const fallbackName = lineItem.products?.name || lineItem.description;
+        setProductName(fallbackName);
+        setPanelData({
+          productId: null,
+          productName: fallbackName,
+          sku: lineItem.products?.sku || null,
+          upc: null,
+          category: null,
+          subcategory: null,
+          inventoryType: null,
+          itemColor: null,
+          itemSize: null,
+          manufacturerName: null,
+          imageUrl: null,
+          manufacturerUrl: null,
+          supplierUrl: null,
+          productSheetUrl: null,
+          installVideoUrl: null,
+          description: null,
+          specifications: null,
+          unitPrice: lineItem.unit_price,
+          cost: 0,
+          msrp: null,
+          quantity: lineItem.quantity,
+          unit: lineItem.unit || 'ea',
+          laborHours: 0,
+          laborRate: 0,
+          laborPhaseId: null,
+          laborPhaseName: null,
+          classId: null,
+          taskNotes: null,
+          showTaskNotes: false,
+          isTaxable: false,
+          isHidden: false,
+          isCustomerSupplied: false,
+          isLaborItem: false,
+        });
+        return;
+      }
 
       const mfr = Array.isArray(p.manufacturers) ? p.manufacturers[0] ?? null : p.manufacturers;
       const lp = Array.isArray(p.labor_phases) ? p.labor_phases[0] ?? null : p.labor_phases;
@@ -363,6 +404,15 @@ export function SalesOrderProductDetailModal({
           ) : panelData ? (
             <>
               <ProductDetailPanel mode="view" data={panelData} />
+
+              {!panelData.productId && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="text-xs text-amber-700">
+                    This line item's product is no longer in the catalog. Showing details from the saved line item.
+                  </span>
+                </div>
+              )}
 
               {/* Where It's Used in This Job */}
               {(proposalId || orderId || projectId) && (
