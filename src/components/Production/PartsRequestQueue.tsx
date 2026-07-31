@@ -424,7 +424,7 @@ export function PartsRequestQueue() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-              )
+              )}
 
               {request.status === 'approved' && (
                 <button
