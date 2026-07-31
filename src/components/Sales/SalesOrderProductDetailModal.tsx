@@ -91,6 +91,48 @@ export function SalesOrderProductDetailModal({
   }, [lineItem.id]);
 
   async function loadProduct() {
+    if (!lineItem.product_id) {
+      const fallbackName = lineItem.products?.name || lineItem.description;
+      setProductName(fallbackName);
+      setPanelData({
+        productId: null,
+        productName: fallbackName,
+        sku: lineItem.products?.sku || null,
+        upc: null,
+        category: null,
+        subcategory: null,
+        inventoryType: null,
+        itemColor: null,
+        itemSize: null,
+        manufacturerName: null,
+        imageUrl: null,
+        manufacturerUrl: null,
+        supplierUrl: null,
+        productSheetUrl: null,
+        installVideoUrl: null,
+        description: null,
+        specifications: null,
+        unitPrice: lineItem.unit_price,
+        cost: 0,
+        msrp: null,
+        quantity: lineItem.quantity,
+        unit: lineItem.unit || 'ea',
+        laborHours: 0,
+        laborRate: 0,
+        laborPhaseId: null,
+        laborPhaseName: null,
+        classId: null,
+        taskNotes: null,
+        showTaskNotes: false,
+        isTaxable: false,
+        isHidden: false,
+        isCustomerSupplied: false,
+        isLaborItem: false,
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: p, error } = await supabase
         .from('products')
