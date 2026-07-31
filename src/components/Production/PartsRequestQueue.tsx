@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { Package, Check, X, Clock, AlertCircle, DollarSign, User, Calendar, Truck, CheckCircle } from 'lucide-react';
+import { Package, Check, X, Clock, AlertCircle, DollarSign, User, Calendar, Truck, CheckCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -39,6 +39,7 @@ export function PartsRequestQueue() {
   const [statusFilter, setStatusFilter] = useState('requested');
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [confirmInstallId, setConfirmInstallId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRequests();
@@ -169,6 +170,19 @@ export function PartsRequestQueue() {
     } catch (error) {
       console.error('Error marking as delivered:', error);
       alert('Failed to update status');
+    }
+  }
+
+  async function deleteRequest(requestId: string) {
+    try {
+      const { error } = await supabase
+        .from('parts_requests')
+        .delete()
+        .eq('id', requestId);
+      if (error) throw error;
+      loadRequests();
+    } catch (error: any) {
+      alert(`Failed to delete request: ${error.message || 'Unknown error'}`);
     }
   }
 
@@ -399,8 +413,18 @@ export function PartsRequestQueue() {
                     <X className="w-4 h-4" />
                     Deny
                   </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDeleteId(request.id);
+                    }}
+                    className="px-3 py-2 bg-gray-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 hover:text-red-700 flex items-center justify-center gap-1"
+                    title="Delete this request"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              )}
+              )
 
               {request.status === 'approved' && (
                 <button
@@ -448,6 +472,21 @@ export function PartsRequestQueue() {
           ))
         )}
       </div>
+      <ConfirmModal
+        isOpen={!!confirmDeleteId}
+        title="Delete Request"
+        message="Delete this parts request? This cannot be undone."
+        variant="danger"
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            const id = confirmDeleteId;
+            setConfirmDeleteId(null);
+            deleteRequest(id);
+          }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
       <ConfirmModal
         isOpen={!!confirmInstallId}
         title="Mark as Installed"

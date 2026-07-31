@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Briefcase, Building2, ExternalLink, Filter, Calendar, Flag } from 'lucide-react';
+import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Briefcase, Building2, ExternalLink, Filter, Calendar, Flag, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
@@ -70,6 +70,7 @@ export function PartsRequestManagement() {
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showChangeVendor, setShowChangeVendor] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>('open');
   const [viewMode, setViewMode] = useState<ViewMode>('requests');
   const [filterType, setFilterType] = useState<string>('all');
@@ -148,6 +149,25 @@ export function PartsRequestManagement() {
       await loadRequests();
     } catch (error) {
       console.error('Error updating status:', error);
+    }
+  };
+
+  const hasPurchaseOrder = (request: ProductRequest): boolean =>
+    (request.items || []).some(item => !!item.purchase_order_id);
+
+  const canDeleteRequest = (request: ProductRequest): boolean =>
+    canManage || request.requested_by === user?.id;
+
+  const deleteRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('product_requests')
+        .delete()
+        .eq('id', requestId);
+      if (error) throw error;
+      await loadRequests();
+    } catch (error: any) {
+      alert(`Failed to delete request: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -971,13 +991,39 @@ export function PartsRequestManagement() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-left sm:text-right flex-shrink-0">
-                      <div className="text-xs sm:text-sm font-medium text-gray-900 capitalize">
-                        {request.status.replace('_', ' ')}
+                    <div className="flex items-start gap-2 flex-shrink-0">
+                      <div className="text-left sm:text-right">
+                        <div className="text-xs sm:text-sm font-medium text-gray-900 capitalize">
+                          {request.status.replace('_', ' ')}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {new Date(request.created_at).toLocaleDateString()}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {new Date(request.created_at).toLocaleDateString()}
-                      </div>
+                      {canDeleteRequest(request) && (
+                        <div className="group relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (hasPurchaseOrder(request)) return;
+                              setConfirmDeleteId(request.id);
+                            }}
+                            disabled={hasPurchaseOrder(request)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              hasPurchaseOrder(request)
+                                ? 'text-gray-300 cursor-not-allowed'
+                                : 'text-red-500 hover:bg-red-50 hover:text-red-700'
+                            }`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          {hasPurchaseOrder(request) && (
+                            <div className="hidden group-hover:block absolute z-30 top-full right-0 mt-1 w-56 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg whitespace-normal">
+                              Cannot delete: a purchase order has already been created from this request. Delete the related PO first.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1070,11 +1116,30 @@ export function PartsRequestManagement() {
           request={selectedRequest}
           onClose={() => setSelectedRequest(null)}
           canManage={canManage}
+          canDelete={canDeleteRequest(selectedRequest)}
+          hasPO={hasPurchaseOrder(selectedRequest)}
           onApprove={() => { updateRequestStatus(selectedRequest.id, 'approved'); setSelectedRequest(null); }}
           onReject={() => { updateRequestStatus(selectedRequest.id, 'rejected'); setSelectedRequest(null); }}
           onCreatePO={() => { createPurchaseOrder(selectedRequest); setSelectedRequest(null); }}
+          onDelete={() => { setConfirmDeleteId(selectedRequest.id); setSelectedRequest(null); }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={!!confirmDeleteId}
+        title="Delete Request"
+        message="Delete this product request? This cannot be undone."
+        variant="danger"
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            const id = confirmDeleteId;
+            setConfirmDeleteId(null);
+            deleteRequest(id);
+          }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
 
       {showChangeVendor && (
         <ChangeVendorModal
@@ -1089,13 +1154,16 @@ export function PartsRequestManagement() {
 
 // --- Request Detail Modal ---
 
-function RequestDetailModal({ request, onClose, canManage, onApprove, onReject, onCreatePO }: {
+function RequestDetailModal({ request, onClose, canManage, canDelete, hasPO, onApprove, onReject, onCreatePO, onDelete }: {
   request: ProductRequest;
   onClose: () => void;
   canManage: boolean;
+  canDelete: boolean;
+  hasPO: boolean;
   onApprove: () => void;
   onReject: () => void;
   onCreatePO: () => void;
+  onDelete: () => void;
 }) {
   const customer = (() => {
     if (request.sales_order?.contact) {
@@ -1215,40 +1283,55 @@ function RequestDetailModal({ request, onClose, canManage, onApprove, onReject, 
         </div>
 
         {/* Footer Actions */}
-        {canManage && isOpen && (
-          <div className="sticky bottom-0 bg-white p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-2">
-            {request.status === 'pending' && (
-              <>
-                <button
-                  onClick={onApprove}
-                  className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={onCreatePO}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
-                >
-                  Create PO
-                </button>
-                <button
-                  onClick={onReject}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm"
-                >
-                  Reject
-                </button>
-              </>
-            )}
-            {request.status === 'approved' && (
+        <div className="sticky bottom-0 bg-white p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-2">
+          {canDelete && (
+            <div className="flex-1 flex justify-start">
+              <button
+                onClick={onDelete}
+                disabled={hasPO}
+                className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                  hasPO
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                }`}
+                title={hasPO ? 'Cannot delete: a purchase order has been created from this request' : ''}
+              >
+                <Trash2 className="w-4 h-4 inline mr-1" />
+                Delete
+              </button>
+            </div>
+          )}
+          {canManage && isOpen && request.status === 'pending' && (
+            <>
+              <button
+                onClick={onApprove}
+                className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm"
+              >
+                Approve
+              </button>
               <button
                 onClick={onCreatePO}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
               >
-                Create Purchase Order
+                Create PO
               </button>
-            )}
-          </div>
-        )}
+              <button
+                onClick={onReject}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm"
+              >
+                Reject
+              </button>
+            </>
+          )}
+          {canManage && isOpen && request.status === 'approved' && (
+            <button
+              onClick={onCreatePO}
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+            >
+              Create Purchase Order
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
