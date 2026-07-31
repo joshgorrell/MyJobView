@@ -45,15 +45,15 @@ interface ProductFormProps {
   readOnly?: boolean;
   onClose: () => void;
   onSave: (productData?: any) => void;
-  allowOneOffItem?: boolean; // Show "Add to Catalog" toggle for proposal context
+
 }
 
-export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave, allowOneOffItem = false }: ProductFormProps) {
+export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave }: ProductFormProps) {
   const { profile } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [addToCatalog, setAddToCatalog] = useState(true); // Default to true
+
 
   // Dropdown options
   const [categories, setCategories] = useState<Category[]>([]);
@@ -886,24 +886,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         updated_at: new Date().toISOString()
       };
 
-      // If this is a one-off item (not being added to catalog), return the data
-      if (allowOneOffItem && !addToCatalog) {
-        const oneOffItemData = {
-          ...productData,
-          // Include lookup names for display
-          manufacturer_name: selectedManufacturer?.name || null,
-          vendor_name: selectedVendor?.vendor_name || null,
-          labor_phase_name: selectedLaborPhase?.name || null,
-          isOneOff: true
-        };
-        clearSavedData();
-        setHasSavedDraft(false);
-        onSave(oneOffItemData);
-        onClose();
-        return;
-      }
 
-      // Otherwise, save to catalog as normal
       console.log('=== SAVING PRODUCT ===');
       console.log('Product ID:', productId);
       console.log('Product Data:', JSON.stringify(productData, null, 2));
@@ -2014,22 +1997,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
         {/* Footer Actions */}
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
-          {allowOneOffItem && !productId ? (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={addToCatalog}
-                onChange={(e) => setAddToCatalog(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700">
-                Add to Product Catalog
-              </span>
-              <span className="text-xs text-gray-500">(Uncheck for one-time use only)</span>
-            </label>
-          ) : (
-            <div></div>
-          )}
+          <div></div>
           <div className="flex items-center gap-3 flex-wrap">
             {saveSuccess && (
               <div className="text-green-600 font-medium flex items-center gap-2">
@@ -2057,7 +2025,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : (addToCatalog ? 'Save Product' : 'Add to Proposal')}
+              {saving ? 'Saving...' : 'Save Product'}
             </button>
           </div>
         </div>

@@ -523,7 +523,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
         const lineItem: any = {
           proposal_id: proposalId,
           room_id: roomId,
-          product_id: item.product_id || null,
+          product_id: item.product_id,
           description: formData.description,
           quantity: formData.quantity,
           unit: formData.unit,

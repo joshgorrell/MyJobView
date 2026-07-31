@@ -204,31 +204,10 @@ export default function AddItemToAreasModal({
 
   async function handleProductCreated(productData: any) {
     setShowNewProductForm(false);
-    if (productData?.isOneOff) {
-      const tempProduct: Product = {
-        id: null as any,
-        name: productData.manufacturer_model_number || productData.name,
-        description: productData.sales_description || productData.description,
-        unit_price: productData.our_price || productData.unit_price,
-        our_price: productData.our_price,
-        cost: productData.cost,
-        unit: productData.unit,
-        sku: productData.sku,
-        manufacturer_model_number: productData.manufacturer_model_number,
-        category: productData.category,
-        item_type: productData.item_type,
-        is_taxable: productData.is_taxable,
-        labor_phase_id: productData.labor_phase_id,
-        default_labor_hours: productData.default_labor_hours,
-        oneOffData: productData,
-      } as any;
-      handleProductSelect(tempProduct);
-    } else {
-      await loadAll();
-      if (productData?.id) {
-        const product = products.find(p => p.id === productData.id);
-        if (product) handleProductSelect(product);
-      }
+    await loadAll();
+    if (productData?.id) {
+      const product = products.find(p => p.id === productData.id);
+      if (product) handleProductSelect(product);
     }
   }
 
@@ -324,7 +303,6 @@ export default function AddItemToAreasModal({
     }
     setSaving(true);
     try {
-      const isOneOff = !selectedProduct.id || String(selectedProduct.id).startsWith('null');
       const effPrice = form.is_customer_supplied ? 0 : form.unit_price;
       const effCost = form.is_customer_supplied ? 0 : form.cost;
       const effLaborHrs = form.labor_hours;
@@ -337,6 +315,7 @@ export default function AddItemToAreasModal({
         const mainItem: any = {
           proposal_id: proposalId,
           room_id: roomId,
+          product_id: selectedProduct.id,
           description: form.description,
           quantity: form.quantity,
           unit: form.unit,
@@ -358,12 +337,6 @@ export default function AddItemToAreasModal({
           display_mode: pendingAccessories.length > 0 ? form.display_mode : null,
           sort_order: 9999,
         };
-        if (isOneOff) {
-          mainItem.product_id = null;
-          mainItem.item_name = selectedProduct.name || (selectedProduct as any).manufacturer_model_number;
-        } else {
-          mainItem.product_id = selectedProduct.id;
-        }
         const { data: inserted, error } = await supabase.from('proposal_line_items').insert(mainItem).select().single();
         if (error) throw error;
         if (pendingAccessories.length > 0 && inserted) {
@@ -720,7 +693,7 @@ export default function AddItemToAreasModal({
 
       {/* Sub-modals */}
       {showNewProductForm && (
-        <SinglePageProductForm allowOneOffItem={true} onSave={handleProductCreated} onClose={() => setShowNewProductForm(false)} />
+        <SinglePageProductForm onSave={handleProductCreated} onClose={() => setShowNewProductForm(false)} />
       )}
 
       {showAccessorySelector && (

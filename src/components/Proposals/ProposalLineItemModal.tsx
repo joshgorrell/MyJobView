@@ -293,7 +293,7 @@ export default function ProposalLineItemModal({
       const lineItems = Array.from(selectedAreasForCopy).map((roomId, idx) => ({
         proposal_id: proposalId,
         room_id: roomId,
-        product_id: item.product_id ?? null,
+        product_id: item.product_id,
         description: form.description,
         quantity: form.quantity,
         unit: form.unit,

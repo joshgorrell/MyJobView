@@ -10,7 +10,7 @@ interface LineItem {
   unit: string | null;
   unit_price: number;
   line_total: number;
-  product_id: string | null;
+  product_id: string;
   products?: {
     name: string;
     sku: string | null;
@@ -70,7 +70,7 @@ export function SalesOrderProductDetailModal({
   projectId,
 }: SalesOrderProductDetailModalProps) {
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
-  const [loading, setLoading] = useState(!!lineItem.product_id);
+  const [loading, setLoading] = useState(true);
   const [productName, setProductName] = useState(lineItem.products?.name || lineItem.description);
   const [category, setCategory] = useState<string | null>(null);
   const [subcategory, setSubcategory] = useState<string | null>(null);
@@ -84,14 +84,9 @@ export function SalesOrderProductDetailModal({
   const [jobUsageExpanded, setJobUsageExpanded] = useState(true);
 
   useEffect(() => {
-    if (lineItem.product_id) {
-      loadProduct();
-      if (proposalId || orderId || projectId) {
-        loadJobUsage();
-      }
-    } else {
-      setPanelData(null);
-      setLoading(false);
+    loadProduct();
+    if (proposalId || orderId || projectId) {
+      loadJobUsage();
     }
   }, [lineItem.id]);
 
@@ -107,7 +102,7 @@ export function SalesOrderProductDetailModal({
           default_labor_hours, labor_phase_id,
           manufacturers(name), labor_phases(name, default_price)
         `)
-        .eq('id', lineItem.product_id!)
+        .eq('id', lineItem.product_id)
         .maybeSingle();
 
       if (error) throw error;
@@ -164,8 +159,8 @@ export function SalesOrderProductDetailModal({
 
   const loadJobUsage = useCallback(async () => {
     if (!lineItem.product_id) return;
-    setJobUsageLoading(true);
     const pid = lineItem.product_id;
+    setJobUsageLoading(true);
 
     try {
       const queries: Promise<void>[] = [];
@@ -370,7 +365,7 @@ export function SalesOrderProductDetailModal({
               <ProductDetailPanel mode="view" data={panelData} />
 
               {/* Where It's Used in This Job */}
-              {(proposalId || orderId || projectId) && lineItem.product_id && (
+              {(proposalId || orderId || projectId) && (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <button
                     onClick={() => setJobUsageExpanded(v => !v)}
@@ -579,17 +574,7 @@ export function SalesOrderProductDetailModal({
                 </div>
               )}
             </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                <Package className="w-6 h-6 text-gray-400" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-700">{lineItem.description}</p>
-                <p className="text-xs text-gray-400 mt-1">No catalog product linked to this line item</p>
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* Footer */}

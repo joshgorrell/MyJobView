@@ -344,21 +344,21 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
     }
   }
 
-  async function addLineItem(roomId: string, product: Product | null, customData?: Partial<ProposalLineItem>) {
+  async function addLineItem(roomId: string, product: Product, customData?: Partial<ProposalLineItem>) {
     if (!proposal) return;
 
     const newItem: any = {
       proposal_id: proposalId,
       room_id: roomId,
-      product_id: product?.id || null,
-      description: customData?.description || product?.name || '',
+      product_id: product.id,
+      description: customData?.description || product.name || '',
       quantity: customData?.quantity || 1,
-      unit: customData?.unit || product?.unit || 'each',
-      unit_price: customData?.unit_price || product?.unit_price || 0,
-      cost: customData?.cost || product?.cost || 0,
+      unit: customData?.unit || product.unit || 'each',
+      unit_price: customData?.unit_price || product.unit_price || 0,
+      cost: customData?.cost || product.cost || 0,
       line_total: 0,
       sort_order: rooms.find(r => r.id === roomId)?.line_items.length || 0,
-      is_custom: !product,
+      is_custom: false,
       class_id: customData?.class_id || (product as any)?.default_class_id || null
     };
 

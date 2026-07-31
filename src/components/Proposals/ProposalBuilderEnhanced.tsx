@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProposalRoom, ProposalLineItem, Product, ProposalWithDetails } from '../../lib/types';
-import { LayoutGrid, LayoutList, Rows } from 'lucide-react';
+import { LayoutGrid, LayoutList, Rows2 as Rows } from 'lucide-react';
 import ProductSelector from './ProductSelector';
 import ProposalSummary from './ProposalSummary';
 import ProposalBuilderStandard from './ProposalBuilderStandard';
@@ -186,21 +186,21 @@ export default function ProposalBuilderEnhanced({ proposalId, onSave }: Proposal
     }
   }
 
-  async function addLineItem(roomId: string, product: Product | null, customData?: Partial<ProposalLineItem>) {
+  async function addLineItem(roomId: string, product: Product, customData?: Partial<ProposalLineItem>) {
     if (!proposal) return;
 
     const newItem: any = {
       proposal_id: proposalId,
       room_id: roomId,
-      product_id: product?.id || null,
-      description: customData?.description || product?.name || '',
+      product_id: product.id,
+      description: customData?.description || product.name || '',
       quantity: customData?.quantity || 1,
-      unit: customData?.unit || product?.unit || 'each',
-      unit_price: customData?.unit_price || product?.unit_price || 0,
-      cost: customData?.cost || product?.cost || 0,
+      unit: customData?.unit || product.unit || 'each',
+      unit_price: customData?.unit_price || product.unit_price || 0,
+      cost: customData?.cost || product.cost || 0,
       line_total: 0,
       sort_order: rooms.find(r => r.id === roomId)?.line_items.length || 0,
-      is_custom: !product
+      is_custom: false
     };
 
     newItem.line_total = newItem.quantity * newItem.unit_price;

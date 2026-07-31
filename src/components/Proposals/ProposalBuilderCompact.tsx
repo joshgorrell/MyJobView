@@ -817,9 +817,26 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               labor_phase_id: matched.labor_phase_id ?? null,
             });
           } else {
+            // No matching product found — create one in the catalog first
+            const { data: newProduct, error: prodError } = await supabase
+              .from('products')
+              .insert({
+                name: item.description,
+                unit_price: 0,
+                cost: 0,
+                unit: item.unit || 'each',
+                item_type: item.itemType || 'material',
+                is_active: true,
+                is_taxable: true,
+              })
+              .select()
+              .single();
+            if (prodError) throw prodError;
+
             await supabase.from('proposal_line_items').insert({
               proposal_id: proposalId,
               room_id: newRoom.id,
+              product_id: newProduct.id,
               description: item.description,
               quantity: item.quantity,
               unit: item.unit,
@@ -827,7 +844,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               cost: 0,
               line_total: 0,
               sort_order: j,
-              is_custom: true,
+              is_custom: false,
               item_type: item.itemType,
               labor_hours: item.laborHours ?? null,
               is_taxable: true,

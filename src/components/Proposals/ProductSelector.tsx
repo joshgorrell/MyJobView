@@ -92,37 +92,11 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
 
   async function handleProductCreated(productData: any) {
     setShowNewProductForm(false);
-
-    // Check if it's a one-off item or saved to catalog
-    if (productData?.isOneOff) {
-      // Create a temporary product object for one-off items
-      const tempProduct: Product = {
-        id: null as any, // Will be null for one-off items
-        name: productData.manufacturer_model_number || productData.name,
-        description: productData.sales_description || productData.description,
-        unit_price: productData.our_price || productData.unit_price,
-        our_price: productData.our_price,
-        cost: productData.cost,
-        unit: productData.unit,
-        sku: productData.sku,
-        manufacturer_model_number: productData.manufacturer_model_number,
-        category: productData.category,
-        item_type: productData.item_type,
-        is_taxable: productData.is_taxable,
-        labor_phase_id: productData.labor_phase_id,
-        default_labor_hours: productData.default_labor_hours,
-        // Store the full one-off data for later use
-        oneOffData: productData
-      };
-      onSelect(tempProduct);
-    } else {
-      // Product was saved to catalog, reload products and select it
-      await loadProducts();
-      if (productData?.id) {
-        const product = products.find(p => p.id === productData.id);
-        if (product) {
-          onSelect(product);
-        }
+    await loadProducts();
+    if (productData?.id) {
+      const product = products.find(p => p.id === productData.id);
+      if (product) {
+        onSelect(product);
       }
     }
   }
@@ -351,7 +325,6 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
 
       {showNewProductForm && (
         <SinglePageProductForm
-          allowOneOffItem={true}
           onSave={handleProductCreated}
           onClose={() => setShowNewProductForm(false)}
         />

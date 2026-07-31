@@ -14,7 +14,7 @@ export interface GridLineItem {
   parent_item_id: string | null;
   sort_order: number;
   room_id: string | null;
-  product_id: string | null;
+  product_id: string;
   labor_hours: number | null;
   labor_rate: number | null;
   labor_total: number | null;

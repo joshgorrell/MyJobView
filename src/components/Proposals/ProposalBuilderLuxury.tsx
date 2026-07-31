@@ -112,7 +112,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
           unit_price: itemData.unit_price,
           line_total: itemData.quantity * itemData.unit_price,
           sort_order: nextSortOrder,
-          product_id: itemData.product_id || null
+          product_id: itemData.product_id
         })
         .select('*, products(*)')
         .single();
@@ -152,7 +152,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
           unit_price: itemData.unit_price,
           line_total: itemData.quantity * itemData.unit_price,
           sort_order: nextSortOrder,
-          product_id: itemData.product_id || null
+          product_id: itemData.product_id
         };
       });
 

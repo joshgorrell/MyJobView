@@ -83,15 +83,10 @@ function saveColumnPrefs(cols: Set<GridColumnKey>) {
 
 function summarizeDuplicates(items: ProductLineItem[]): ProductLineItem[] {
   const byProduct = new Map<string, ProductLineItem[]>();
-  const noProduct: ProductLineItem[] = [];
   items.forEach(item => {
-    if (item.product_id) {
-      const arr = byProduct.get(item.product_id) || [];
-      arr.push(item);
-      byProduct.set(item.product_id, arr);
-    } else {
-      noProduct.push(item);
-    }
+    const arr = byProduct.get(item.product_id) || [];
+    arr.push(item);
+    byProduct.set(item.product_id, arr);
   });
   const merged: ProductLineItem[] = [];
   byProduct.forEach(group => {
@@ -115,7 +110,7 @@ function summarizeDuplicates(items: ProductLineItem[]): ProductLineItem[] {
       });
     }
   });
-  return [...merged, ...noProduct];
+  return merged;
 }
 
 export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
