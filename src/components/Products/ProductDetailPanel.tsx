@@ -108,7 +108,7 @@ export default function ProductDetailPanel({
   const marginBg = margin >= 30 ? 'bg-emerald-50 border-emerald-200' : margin >= 15 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-full">
+    <div className="flex flex-col lg:flex-row gap-4">
       {isEdit && (
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       )}
