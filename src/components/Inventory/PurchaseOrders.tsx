@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, ShoppingCart, Package, Truck, CheckCircle, XCircle, Mail } from 'lucide-react';
+import { Plus, ShoppingCart, Package, Truck, CheckCircle, XCircle, Mail, Flag, Building2, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
@@ -17,6 +17,10 @@ interface PurchaseOrder {
   total: number;
   items_count: number;
   items_received: number;
+  bill_to_name: string | null;
+  ship_to_name: string | null;
+  internal_note: string | null;
+  external_note: string | null;
 }
 
 export function PurchaseOrders() {
@@ -71,6 +75,10 @@ export function PurchaseOrders() {
           total: po.total,
           items_count: itemsCount,
           items_received: itemsReceived,
+          bill_to_name: po.bill_to_name || null,
+          ship_to_name: po.ship_to_name || null,
+          internal_note: po.internal_note || null,
+          external_note: po.external_note || null,
         };
       });
 
@@ -291,7 +299,17 @@ function PurchaseOrderCard({
             <StatusIcon className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{po.po_number}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">{po.po_number}</h3>
+              {po.internal_note && (
+                <div className="group relative inline-flex">
+                  <Flag className="w-4 h-4 text-amber-500 fill-amber-400 cursor-help" />
+                  <div className="hidden group-hover:block absolute z-30 top-full left-0 mt-1 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg whitespace-normal">
+                    {po.internal_note}
+                  </div>
+                </div>
+              )}
+            </div>
             <p className="text-sm text-gray-600">{po.vendor_name}</p>
             <p className="text-xs text-gray-500 mt-1">Warehouse: {po.warehouse_name}</p>
           </div>
@@ -300,6 +318,36 @@ function PurchaseOrderCard({
           {po.status.charAt(0).toUpperCase() + po.status.slice(1)}
         </span>
       </div>
+
+      {(po.bill_to_name || po.ship_to_name) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          {po.bill_to_name && (
+            <div className="flex items-start gap-2 text-sm">
+              <Building2 className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-xs text-gray-500">Bill To</span>
+                <p className="font-medium text-gray-700">{po.bill_to_name}</p>
+              </div>
+            </div>
+          )}
+          {po.ship_to_name && (
+            <div className="flex items-start gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-xs text-gray-500">Ship To</span>
+                <p className="font-medium text-gray-700">{po.ship_to_name}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {po.external_note && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <span className="text-xs font-medium text-amber-700">Vendor Instructions: </span>
+          <span className="text-sm text-amber-800">{po.external_note}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-4 mb-4">
         <div>

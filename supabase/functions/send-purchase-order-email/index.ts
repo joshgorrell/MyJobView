@@ -60,6 +60,22 @@ Deno.serve(async (req: Request) => {
       )
       .join("\n");
 
+    // Build Bill To block
+    const billToLines = [
+      po.bill_to_name,
+      po.bill_to_address,
+      [po.bill_to_city, po.bill_to_state, po.bill_to_zip].filter(Boolean).join(", "),
+    ].filter(Boolean);
+    const billToBlock = billToLines.length > 0 ? billToLines.join("\n") : "N/A";
+
+    // Build Ship To block
+    const shipToLines = [
+      po.ship_to_name,
+      po.ship_to_address,
+      [po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(", "),
+    ].filter(Boolean);
+    const shipToBlock = shipToLines.length > 0 ? shipToLines.join("\n") : "N/A";
+
     const emailBody = `
 Purchase Order: ${po.po_number}
 
@@ -72,6 +88,12 @@ PO Number: ${po.po_number}
 Order Date: ${po.order_date}
 ${po.expected_date ? `Expected Date: ${po.expected_date}` : ""}
 
+Bill To:
+${billToBlock}
+
+Ship To:
+${shipToBlock}
+
 Items:
 ${items}
 
@@ -79,6 +101,8 @@ Subtotal: $${po.subtotal || 0}
 ${po.shipping_cost ? `Shipping: $${po.shipping_cost}` : ""}
 ${po.tax_amount ? `Tax: $${po.tax_amount}` : ""}
 Total: $${po.total || 0}
+
+${po.external_note ? `Vendor Instructions:\n${po.external_note}` : ""}
 
 ${po.notes ? `Notes: ${po.notes}` : ""}
 
