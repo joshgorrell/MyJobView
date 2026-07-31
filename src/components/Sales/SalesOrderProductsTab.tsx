@@ -725,6 +725,9 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
             setSelectedItem(null);
             loadData();
           }}
+          orderId={order.id}
+          proposalId={order.proposal_id}
+          projectId={order.project?.id ?? null}
         />
       )}
 
