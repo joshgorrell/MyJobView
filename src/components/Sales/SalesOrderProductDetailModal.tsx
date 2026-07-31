@@ -353,7 +353,7 @@ export function SalesOrderProductDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-screen sm:h-auto sm:max-h-[92vh]">
+      <div className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-screen sm:h-[92vh]">
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0 flex-1">
