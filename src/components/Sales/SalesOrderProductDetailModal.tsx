@@ -137,10 +137,10 @@ export function SalesOrderProductDetailModal({
       const { data: p, error } = await supabase
         .from('products')
         .select(`
-          id, manufacturer_model_number, name, category, subcategory, sku, upc,
-          inventory_type, item_color, item_size, cost, our_price, unit_price, msrp,
+          id, manufacturer_model_number, name, category, sku, upc,
+          inventory_type, item_color, cost, our_price, unit_price, msrp,
           image_url, thumbnail_url, manufacturer_url, supplier_url,
-          product_sheet_url, install_video_url, description, specifications,
+          datasheet_url, installation_video_url, description,
           default_labor_hours, labor_phase_id,
           manufacturers(name), labor_phases(name, default_price)
         `)
@@ -196,7 +196,7 @@ export function SalesOrderProductDetailModal({
 
       setProductName(p.manufacturer_model_number || p.name || lineItem.description);
       setCategory(p.category || null);
-      setSubcategory(p.subcategory || null);
+      setSubcategory(null);
 
       setPanelData({
         productId: p.id,
@@ -204,18 +204,18 @@ export function SalesOrderProductDetailModal({
         sku: p.sku || null,
         upc: p.upc || null,
         category: p.category || null,
-        subcategory: p.subcategory || null,
+        subcategory: null,
         inventoryType: p.inventory_type || null,
         itemColor: p.item_color || null,
-        itemSize: p.item_size || null,
+        itemSize: null,
         manufacturerName: mfr?.name || null,
         imageUrl: p.image_url || p.thumbnail_url || null,
         manufacturerUrl: p.manufacturer_url || null,
         supplierUrl: p.supplier_url || null,
-        productSheetUrl: p.product_sheet_url || null,
-        installVideoUrl: p.install_video_url || null,
+        productSheetUrl: p.datasheet_url || null,
+        installVideoUrl: p.installation_video_url || null,
         description: p.description || null,
-        specifications: p.specifications || null,
+        specifications: null,
         unitPrice: Number(p.our_price || p.unit_price || 0),
         cost: Number(p.cost || 0),
         msrp: p.msrp ? Number(p.msrp) : null,
