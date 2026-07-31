@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Building2, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw } from 'lucide-react';
+import { Building2, Building, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { CompanySettings as CompanySettingsType, CompanyOffice } from '../../lib/types';
@@ -516,6 +516,19 @@ export function CompanySettings() {
 
   async function updateOffice(office: CompanyOffice) {
     try {
+      // If this office is being marked as headquarters, clear the flag on all other offices first
+      // so the unique constraint (one HQ per org) is never violated.
+      if (office.is_headquarters) {
+        const otherOffices = offices.filter(o => o.id !== office.id && o.is_headquarters);
+        if (otherOffices.length > 0) {
+          const { error: clearError } = await supabase
+            .from('company_offices')
+            .update({ is_headquarters: false, updated_at: new Date().toISOString() })
+            .in('id', otherOffices.map(o => o.id));
+          if (clearError) throw clearError;
+        }
+      }
+
       const { error } = await supabase
         .from('company_offices')
         .update({
@@ -528,6 +541,7 @@ export function CompanySettings() {
           zip: office.zip,
           latitude: office.latitude,
           longitude: office.longitude,
+          is_headquarters: office.is_headquarters ?? false,
           display_order: office.display_order,
           updated_at: new Date().toISOString()
         })
@@ -535,10 +549,26 @@ export function CompanySettings() {
 
       if (error) throw error;
       alert('Office updated successfully');
+      loadOffices();
     } catch (error) {
       console.error('Error updating office:', error);
       alert('Failed to update office');
     }
+  }
+
+  function toggleHeadquarters(officeId: string) {
+    const office = offices.find(o => o.id === officeId);
+    if (!office) return;
+    const newValue = !office.is_headquarters;
+    // Optimistically update local state: clear HQ on all others, set on this one.
+    const updated = offices.map(o =>
+      o.id === officeId
+        ? { ...o, is_headquarters: newValue }
+        : newValue
+          ? { ...o, is_headquarters: false }
+          : o
+    );
+    setOffices(updated);
   }
 
   async function addOffice() {
@@ -1734,7 +1764,15 @@ export function CompanySettings() {
           {offices.map((office, index) => (
             <div key={office.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-gray-900">Office {index + 1}</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium text-gray-900">Office {index + 1}</h4>
+                  {office.is_headquarters && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+                      <Building className="w-3 h-3" />
+                      Headquarters
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={() => deleteOffice(office.id)}
                   className="text-red-600 hover:text-red-700"
@@ -1742,6 +1780,16 @@ export function CompanySettings() {
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
+                <input
+                  type="checkbox"
+                  checked={!!office.is_headquarters}
+                  onChange={() => toggleHeadquarters(office.id)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Mark as headquarters
+              </label>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div>

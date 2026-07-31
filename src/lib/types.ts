@@ -245,6 +245,9 @@ export interface CompanyOffice {
   city: string | null;
   state: string | null;
   zip: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_headquarters?: boolean;
   display_order: number;
   created_at: string;
   updated_at: string;

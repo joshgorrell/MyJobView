@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Package, Loader2, Hash, Tag, ChevronDown, ChevronRight, LayoutList, Clock, Wrench, Building2, LayoutGrid, List, Columns2 as Columns, Check, Printer, AlertCircle, ShoppingCart } from 'lucide-react';
+import { Package, Loader2, Hash, Tag, ChevronDown, ChevronRight, LayoutList, Clock, Wrench, Building2, LayoutGrid, List, Columns2 as Columns, Check, Printer, AlertCircle, ShoppingCart, Layers, X } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
 import { SalesOrderProductDetailModal } from './SalesOrderProductDetailModal';
 import {
@@ -81,6 +81,43 @@ function saveColumnPrefs(cols: Set<GridColumnKey>) {
   } catch {}
 }
 
+function summarizeDuplicates(items: ProductLineItem[]): ProductLineItem[] {
+  const byProduct = new Map<string, ProductLineItem[]>();
+  const noProduct: ProductLineItem[] = [];
+  items.forEach(item => {
+    if (item.product_id) {
+      const arr = byProduct.get(item.product_id) || [];
+      arr.push(item);
+      byProduct.set(item.product_id, arr);
+    } else {
+      noProduct.push(item);
+    }
+  });
+  const merged: ProductLineItem[] = [];
+  byProduct.forEach(group => {
+    if (group.length === 1) {
+      merged.push(group[0]);
+    } else {
+      const first = group[0];
+      const totalQty = group.reduce((s, i) => s + (i.quantity || 0), 0);
+      const totalLine = group.reduce((s, i) => s + (i.line_total || 0), 0);
+      const totalLaborHrs = group.reduce((s, i) => s + (i.labor_hours || 0), 0);
+      const totalLaborTotal = group.reduce((s, i) => s + (i.labor_total || 0), 0);
+      merged.push({
+        ...first,
+        id: `merged-${first.product_id}`,
+        product_id: first.product_id,
+        quantity: totalQty,
+        line_total: totalLine,
+        labor_hours: totalLaborHrs || null,
+        labor_total: totalLaborTotal || null,
+        _roomName: null,
+      });
+    }
+  });
+  return [...merged, ...noProduct];
+}
+
 export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [items, setItems] = useState<ProductLineItem[]>([]);
@@ -95,6 +132,9 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [requestingItem, setRequestingItem] = useState<ProductLineItem | null>(null);
   const [requestSaving, setRequestSaving] = useState(false);
+  const [summarize, setSummarize] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRequestSaving, setBulkRequestSaving] = useState(false);
   const columnsMenuRef = useRef<HTMLDivElement>(null);
   const groupMenuRef = useRef<HTMLDivElement>(null);
 
@@ -162,7 +202,6 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
       setRooms(roomsRes.data || []);
       setItems(allItems);
 
-      // Fetch stock levels for all product_ids
       const productIds = allItems.map(i => i.product_id).filter(Boolean) as string[];
       if (productIds.length > 0) {
         const { data: invData } = await supabase
@@ -200,6 +239,32 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     }
     setVisibleColumns(next);
     saveColumnPrefs(next);
+  }
+
+  function toggleSelectItem(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectSection(sectionKey: string, sectionItemIds: string[]) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const allSelected = sectionItemIds.length > 0 && sectionItemIds.every(id => next.has(id));
+      if (allSelected) {
+        sectionItemIds.forEach(id => next.delete(id));
+      } else {
+        sectionItemIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
   }
 
   async function submitPartRequest(item: ProductLineItem) {
@@ -246,6 +311,82 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     }
   }
 
+  async function submitBulkPartRequest(selected: ProductLineItem[]) {
+    const requestable = selected.filter(i => i.product_id && i.quantity && isVisibleItem(i) && !i.is_hidden);
+    if (requestable.length === 0) {
+      alert('No requestable products selected.');
+      return;
+    }
+
+    setBulkRequestSaving(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) { alert('You must be signed in to request parts'); return; }
+
+      // Group by vendor so each vendor gets its own clean request.
+      const byVendor = new Map<string, ProductLineItem[]>();
+      requestable.forEach(item => {
+        const vendor = item.products?.vendors?.vendor_name || item.products?.vendor || 'No Vendor';
+        const arr = byVendor.get(vendor) || [];
+        arr.push(item);
+        byVendor.set(vendor, arr);
+      });
+
+      let createdCount = 0;
+      for (const [vendor, vendorItems] of byVendor) {
+        // Summarize duplicates within this vendor group
+        const summarized = new Map<string, ProductLineItem>();
+        vendorItems.forEach(item => {
+          const existing = summarized.get(item.product_id!);
+          if (existing) {
+            existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
+            existing.line_total = (existing.line_total || 0) + (item.line_total || 0);
+          } else {
+            summarized.set(item.product_id!, { ...item });
+          }
+        });
+
+        const { data: req, error: reqError } = await supabase
+          .from('product_requests')
+          .insert({
+            requested_by: userId,
+            request_type: 'job',
+            sales_order_id: order.id,
+            priority: 'normal',
+            status: 'pending',
+            notes: `Auto-generated from Sales Order ${order.order_number} - ${vendor} (${summarized.size} product${summarized.size !== 1 ? 's' : ''})`,
+          })
+          .select()
+          .single();
+        if (reqError) throw reqError;
+
+        const itemsToInsert = Array.from(summarized.values()).map(item => ({
+          request_id: req.id,
+          product_id: item.product_id,
+          product_name: item.description || item.products?.name || '',
+          model_number: item.products?.sku || null,
+          vendor: vendor,
+          quantity_requested: item.quantity,
+          estimated_cost: item.cost ? item.cost * item.quantity : null,
+        }));
+
+        const { error: itemError } = await supabase
+          .from('product_request_items')
+          .insert(itemsToInsert);
+        if (itemError) throw itemError;
+        createdCount++;
+      }
+
+      alert(`Created ${createdCount} parts request${createdCount !== 1 ? 's' : ''} (${byVendor.size} vendor${byVendor.size !== 1 ? 's' : ''}). Purchasing has been notified.`);
+      clearSelection();
+    } catch (err: any) {
+      alert(`Error creating parts requests: ${err.message}`);
+    } finally {
+      setBulkRequestSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -255,6 +396,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
   }
 
   const visibleItems = items.filter(i => isVisibleItem(i) && !i.is_hidden);
+  const displayItems = summarize ? summarizeDuplicates(visibleItems) : visibleItems;
 
   if (visibleItems.length === 0) {
     return (
@@ -266,17 +408,19 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     );
   }
 
-  const grandTotal = visibleItems.reduce((sum, i) => sum + (i.line_total || 0), 0);
-  const totalQty = visibleItems.reduce((sum, i) => sum + (i.quantity || 0), 0);
-  const totalLaborHours = visibleItems.reduce((sum, i) => sum + (i.labor_hours || 0), 0);
-  const totalLaborTotal = visibleItems.reduce((sum, i) => sum + (i.labor_total || 0), 0);
+  const grandTotal = displayItems.reduce((sum, i) => sum + (i.line_total || 0), 0);
+  const totalQty = displayItems.reduce((sum, i) => sum + (i.quantity || 0), 0);
+  const totalLaborHours = displayItems.reduce((sum, i) => sum + (i.labor_hours || 0), 0);
+  const totalLaborTotal = displayItems.reduce((sum, i) => sum + (i.labor_total || 0), 0);
 
-  const sections = buildSections(visibleItems, groupBy, rooms);
-
+  const sections = buildSections(displayItems, groupBy, rooms);
   const roomOrGroupLabel = 'Room / Area';
 
+  const selectedItems = displayItems.filter(i => selectedIds.has(i.id));
+  const hasSelection = selectedItems.length > 0;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-20">
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
@@ -284,8 +428,8 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
             <Package className="w-4 h-4 text-blue-400" />
             <span className="text-xs text-gray-400">Line Items</span>
           </div>
-          <div className="text-lg font-bold text-white">{visibleItems.length}</div>
-          <div className="text-[10px] text-gray-600 mt-0.5">total items</div>
+          <div className="text-lg font-bold text-white">{displayItems.length}</div>
+          <div className="text-[10px] text-gray-600 mt-0.5">{summarize ? 'summarized' : 'total items'}</div>
         </div>
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
           <div className="flex items-center gap-2 mb-2">
@@ -397,6 +541,26 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           }
         </button>
 
+        {/* Separator */}
+        <div className="w-px h-5 bg-gray-700 mx-0.5" />
+
+        {/* Summarize Duplicates toggle */}
+        <button
+          onClick={() => {
+            setSummarize(v => !v);
+            clearSelection();
+          }}
+          title="Merge identical products into single rows"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap ${
+            summarize
+              ? 'bg-blue-600 border-blue-500 text-white'
+              : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700/50'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Summarize</span>
+        </button>
+
         {/* Columns (grid mode only) */}
         {viewMode === 'grid' && (
           <>
@@ -484,8 +648,15 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           }
           roomOrGroupLabel={roomOrGroupLabel}
           onRowClick={setSelectedItem}
+          onSkuClick={setSelectedItem}
           collapsedSections={collapsed}
           onToggleSection={toggleSection}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelectItem}
+          onToggleSelectSection={(sectionKey: string) => {
+            const section = sections.find(s => s.key === sectionKey);
+            if (section) toggleSelectSection(sectionKey, section.items.map(i => i.id));
+          }}
         />
       ) : (
         <CleanView
@@ -493,8 +664,57 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           collapsedSections={collapsed}
           onToggleSection={toggleSection}
           onClickItem={setSelectedItem}
+          onSkuClick={setSelectedItem}
           groupBy={groupBy}
+          stockMap={stockMap}
+          requestingItem={requestingItem}
+          setRequestingItem={setRequestingItem}
+          submitPartRequest={submitPartRequest}
+          requestSaving={requestSaving}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelectItem}
+          onToggleSelectSection={toggleSelectSection}
         />
+      )}
+
+      {/* Bulk request action bar */}
+      {hasSelection && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-gray-900/95 backdrop-blur border-t border-blue-500/30 px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 text-sm text-white">
+              <ShoppingCart className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              <span className="font-medium">{selectedItems.length}</span>
+              <span className="text-gray-400">item{selectedItems.length !== 1 ? 's' : ''} selected</span>
+            </div>
+            {(() => {
+              const vendors = new Set(selectedItems.map(i => i.products?.vendors?.vendor_name || i.products?.vendor || 'No Vendor'));
+              if (vendors.size > 1) {
+                return <span className="text-xs text-amber-400 hidden sm:inline">({vendors.size} vendors — will create {vendors.size} separate requests)</span>;
+              }
+              return null;
+            })()}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={clearSelection}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Clear</span>
+            </button>
+            <button
+              onClick={() => submitBulkPartRequest(selectedItems)}
+              disabled={bulkRequestSaving}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {bulkRequestSaving ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating...</>
+              ) : (
+                <><ShoppingCart className="w-3.5 h-3.5" /> Request Selected</>
+              )}
+            </button>
+          </div>
+        </div>
       )}
 
       {selectedItem && (
@@ -506,6 +726,47 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
             loadData();
           }}
         />
+      )}
+
+      {/* Single-item request modal (clean view) */}
+      {requestingItem && !hasSelection && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Request Parts</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will create a parts request for purchasing to order. The item will be linked to this sales order.
+            </p>
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Product:</span>
+                <span className="font-medium text-gray-900">{requestingItem.description || requestingItem.products?.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Quantity needed:</span>
+                <span className="font-medium text-gray-900">{requestingItem.quantity}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">On hand:</span>
+                <span className="font-medium text-gray-900">{stockMap[requestingItem.product_id!] || 0}</span>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setRequestingItem(null)}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => submitPartRequest(requestingItem)}
+                disabled={requestSaving}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {requestSaving ? 'Creating...' : 'Create Request'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -570,19 +831,40 @@ function CleanView({
   collapsedSections,
   onToggleSection,
   onClickItem,
+  onSkuClick,
   groupBy,
+  stockMap,
+  requestingItem,
+  setRequestingItem,
+  submitPartRequest,
+  requestSaving,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectSection,
 }: {
   sections: SectionDef[];
   collapsedSections: Set<string>;
   onToggleSection: (key: string) => void;
   onClickItem: (item: ProductLineItem) => void;
+  onSkuClick: (item: ProductLineItem) => void;
   groupBy: GroupBy;
+  stockMap: Record<string, number>;
+  requestingItem: ProductLineItem | null;
+  setRequestingItem: (item: ProductLineItem | null) => void;
+  submitPartRequest: (item: ProductLineItem) => Promise<void>;
+  requestSaving: boolean;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectSection: (sectionKey: string, sectionItemIds: string[]) => void;
 }) {
   return (
     <div className="space-y-3">
       {sections.map(section => {
         const sectionTotal = section.items.reduce((s, i) => s + (i.line_total || 0), 0);
         const isCollapsed = collapsedSections.has(section.key);
+        const sectionIds = section.items.map(i => i.id);
+        const sectionAll = sectionIds.length > 0 && sectionIds.every(id => selectedIds.has(id));
+        const sectionSome = !sectionAll && sectionIds.some(id => selectedIds.has(id));
 
         return (
           <div key={section.key} className="rounded-lg border border-gray-700 overflow-hidden">
@@ -595,6 +877,14 @@ function CleanView({
                   ? <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                   : <ChevronDown className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                 }
+                <input
+                  type="checkbox"
+                  checked={sectionAll}
+                  ref={el => { if (el) el.indeterminate = sectionSome; }}
+                  onChange={(e) => { e.stopPropagation(); onToggleSelectSection(section.key, sectionIds); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 cursor-pointer accent-blue-500 flex-shrink-0"
+                />
                 {(groupBy === 'manufacturer' || groupBy === 'vendor') && (
                   <Building2 className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
                 )}
@@ -609,7 +899,19 @@ function CleanView({
             {!isCollapsed && (
               <div className="divide-y divide-gray-700/40">
                 {section.items.map(item => (
-                  <CleanItemRow key={item.id} item={item} onClickItem={onClickItem} />
+                  <CleanItemRow
+                    key={item.id}
+                    item={item}
+                    onClickItem={onClickItem}
+                    onSkuClick={onSkuClick}
+                    stockMap={stockMap}
+                    requestingItem={requestingItem}
+                    setRequestingItem={setRequestingItem}
+                    submitPartRequest={submitPartRequest}
+                    requestSaving={requestSaving}
+                    selected={selectedIds.has(item.id)}
+                    onToggleSelect={() => onToggleSelect(item.id)}
+                  />
                 ))}
                 <div className="px-4 py-3 bg-gray-800/30 flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-400">Section Subtotal</span>
@@ -627,9 +929,25 @@ function CleanView({
 function CleanItemRow({
   item,
   onClickItem,
+  onSkuClick,
+  stockMap,
+  requestingItem,
+  setRequestingItem,
+  submitPartRequest,
+  requestSaving,
+  selected,
+  onToggleSelect,
 }: {
   item: ProductLineItem;
   onClickItem: (item: ProductLineItem) => void;
+  onSkuClick: (item: ProductLineItem) => void;
+  stockMap: Record<string, number>;
+  requestingItem: ProductLineItem | null;
+  setRequestingItem: (item: ProductLineItem | null) => void;
+  submitPartRequest: (item: ProductLineItem) => Promise<void>;
+  requestSaving: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const sku = item.products?.sku;
   const classColor = item.proposal_classes?.color;
@@ -643,6 +961,13 @@ function CleanItemRow({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-2 min-w-0 flex-1">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1.5 w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 cursor-pointer accent-blue-500 flex-shrink-0"
+          />
           {classColor && (
             <span className="mt-1.5 w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: classColor }} />
           )}
@@ -654,7 +979,12 @@ function CleanItemRow({
               </div>
             ) : sku ? (
               <>
-                <div className="font-mono text-xs text-cyan-400">{sku}</div>
+                <div
+                  className="font-mono text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-2 decoration-dashed cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); onSkuClick(item); }}
+                >
+                  {sku}
+                </div>
                 <div className="text-sm text-gray-200 mt-0.5">{item.description}</div>
               </>
             ) : (
@@ -702,7 +1032,7 @@ function CleanItemRow({
                       Needs Ordering ({onHand} on hand)
                     </span>
                     <button
-                      onClick={() => setRequestingItem(item)}
+                      onClick={(e) => { e.stopPropagation(); setRequestingItem(item); }}
                       className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                     >
                       <ShoppingCart className="w-3 h-3" />
@@ -715,47 +1045,6 @@ function CleanItemRow({
           )}
         </div>
       </div>
-
-      {/* Request modal for this item */}
-      {requestingItem?.id === item.id && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Request Parts</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              This will create a parts request for purchasing to order. The item will be linked to this sales order.
-            </p>
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Product:</span>
-                <span className="font-medium text-gray-900">{item.description || item.products?.name}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Quantity needed:</span>
-                <span className="font-medium text-gray-900">{item.quantity}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">On hand:</span>
-                <span className="font-medium text-gray-900">{stockMap[item.product_id!] || 0}</span>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setRequestingItem(null)}
-                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => submitPartRequest(item)}
-                disabled={requestSaving}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {requestSaving ? 'Creating...' : 'Create Request'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

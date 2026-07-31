@@ -112,9 +112,13 @@ interface LineItemGridProps {
   visibleColumns: Set<GridColumnKey>;
   roomOrGroupLabel?: string;
   onRowClick?: (item: GridLineItem) => void;
+  onSkuClick?: (item: GridLineItem) => void;
   collapsedSections: Set<string>;
   onToggleSection: (key: string) => void;
   showCollapseAll?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectSection?: (sectionKey: string) => void;
 }
 
 export function LineItemGrid({
@@ -122,11 +126,16 @@ export function LineItemGrid({
   visibleColumns,
   roomOrGroupLabel = 'Room / Area',
   onRowClick,
+  onSkuClick,
   collapsedSections,
   onToggleSection,
   showCollapseAll = false,
+  selectedIds: controlledSelectedIds,
+  onToggleSelect: controlledToggleSelect,
+  onToggleSelectSection,
 }: LineItemGridProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
+  const selectedIds = controlledSelectedIds ?? internalSelectedIds;
 
   const allItemIds = sections.flatMap(s => s.items.map(i => i.id));
   const allSelected = allItemIds.length > 0 && allItemIds.every(id => selectedIds.has(id));
@@ -134,19 +143,23 @@ export function LineItemGrid({
 
   function toggleSelectAll() {
     if (allSelected) {
-      setSelectedIds(new Set());
+      controlledToggleSelect ? allItemIds.forEach(id => controlledToggleSelect(id)) : setInternalSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(allItemIds));
+      controlledToggleSelect ? allItemIds.forEach(id => controlledToggleSelect(id)) : setInternalSelectedIds(new Set(allItemIds));
     }
   }
 
   function toggleSelectItem(id: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    if (controlledToggleSelect) {
+      controlledToggleSelect(id);
+    } else {
+      setInternalSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }
   }
 
   const colCount = visibleColumns.size + 1;
@@ -167,6 +180,9 @@ export function LineItemGrid({
                   className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 cursor-pointer accent-blue-500"
                 />
               </th>
+              {onToggleSelectSection && (
+                <th className="w-1" />
+              )}
               {visibleColumns.has('manufacturer') && (
                 <th className="text-left py-2 px-3 whitespace-nowrap text-xs">{COLUMN_LABELS.manufacturer}</th>
               )}
@@ -218,7 +234,28 @@ export function LineItemGrid({
                     }`}
                     onClick={() => onToggleSection(section.key)}
                   >
-                    <td colSpan={colCount} className="py-2.5 px-3">
+                    {onToggleSelectSection && (
+                      <td
+                        className="py-2.5 px-2 w-8"
+                        onClick={(e) => { e.stopPropagation(); onToggleSelectSection(section.key); }}
+                      >
+                        {(() => {
+                          const sectionIds = section.items.map(i => i.id);
+                          const sectionAll = sectionIds.length > 0 && sectionIds.every(id => selectedIds.has(id));
+                          const sectionSome = !sectionAll && sectionIds.some(id => selectedIds.has(id));
+                          return (
+                            <input
+                              type="checkbox"
+                              checked={sectionAll}
+                              ref={el => { if (el) el.indeterminate = sectionSome; }}
+                              onChange={() => onToggleSelectSection(section.key)}
+                              className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 cursor-pointer accent-blue-500"
+                            />
+                          );
+                        })()}
+                      </td>
+                    )}
+                    <td colSpan={colCount - (onToggleSelectSection ? 1 : 0)} className="py-2.5 px-3">
                       <div className="flex items-center gap-2">
                         {collapsed
                           ? <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
@@ -241,6 +278,7 @@ export function LineItemGrid({
                       item={item}
                       visibleColumns={visibleColumns}
                       onRowClick={onRowClick}
+                      onSkuClick={onSkuClick}
                       selected={selectedIds.has(item.id)}
                       onToggleSelect={() => toggleSelectItem(item.id)}
                     />
@@ -250,7 +288,7 @@ export function LineItemGrid({
                   {!collapsed && (
                     <tr className="border-t border-gray-700 bg-gray-800/30">
                       <td
-                        colSpan={colCount - 1}
+                        colSpan={colCount - 1 - (onToggleSelectSection ? 1 : 0)}
                         className="py-2 px-3 text-xs font-semibold text-gray-500 text-right"
                       >
                         Section Subtotal
@@ -300,6 +338,7 @@ export function LineItemGrid({
                       item={item}
                       visibleColumns={visibleColumns}
                       onRowClick={onRowClick}
+                      onSkuClick={onSkuClick}
                     />
                   ))}
                   <div className="px-4 py-3 bg-gray-800/50 flex items-center justify-between">
@@ -320,12 +359,14 @@ function GridRow({
   item,
   visibleColumns,
   onRowClick,
+  onSkuClick,
   selected,
   onToggleSelect,
 }: {
   item: GridLineItem;
   visibleColumns: Set<GridColumnKey>;
   onRowClick?: (item: GridLineItem) => void;
+  onSkuClick?: (item: GridLineItem) => void;
   selected: boolean;
   onToggleSelect: () => void;
 }) {
@@ -369,10 +410,10 @@ function GridRow({
         <td
           className="py-2 px-3 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]"
           title={sku || ''}
-          onClick={sku && onRowClick ? (e) => { e.stopPropagation(); onRowClick(item); } : undefined}
+          onClick={sku && onSkuClick ? (e) => { e.stopPropagation(); onSkuClick(item); } : undefined}
         >
           {sku ? (
-            <span className={`font-mono text-cyan-400 ${onRowClick ? 'hover:text-cyan-300 underline underline-offset-2 decoration-dashed cursor-pointer' : ''}`}>
+            <span className={`font-mono text-cyan-400 ${onSkuClick ? 'hover:text-cyan-300 underline underline-offset-2 decoration-dashed cursor-pointer' : onRowClick ? 'hover:text-cyan-300 underline underline-offset-2 decoration-dashed cursor-pointer' : ''}`}>
               {sku}
             </span>
           ) : (
@@ -480,10 +521,12 @@ function MobileGridCard({
   item,
   visibleColumns,
   onRowClick,
+  onSkuClick,
 }: {
   item: GridLineItem;
   visibleColumns: Set<GridColumnKey>;
   onRowClick?: (item: GridLineItem) => void;
+  onSkuClick?: (item: GridLineItem) => void;
 }) {
   const sku = item.products?.sku;
   const manufacturer = item.products?.manufacturers?.name;
@@ -510,7 +553,10 @@ function MobileGridCard({
               </div>
             ) : sku ? (
               <>
-                <div className="text-sm font-mono text-cyan-400 leading-snug">{sku}</div>
+                <div
+                  className={`text-sm font-mono text-cyan-400 leading-snug ${onSkuClick ? 'hover:text-cyan-300 underline underline-offset-2 decoration-dashed cursor-pointer' : ''}`}
+                  onClick={onSkuClick ? (e) => { e.stopPropagation(); onSkuClick(item); } : undefined}
+                >{sku}</div>
                 <div className="text-[11px] text-gray-400 mt-0.5">{item.description}</div>
               </>
             ) : (
