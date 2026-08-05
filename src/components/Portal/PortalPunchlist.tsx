@@ -788,26 +788,26 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   const content = (
     <div className="space-y-3">
       {isImpersonating && previewContactId && (
-        <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-3">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-orange-400" />
+              <Eye className="w-4 h-4 text-amber-500" />
               <div>
-                <div className="text-sm font-medium text-white">Portal Preview Mode</div>
-                <div className="text-xs text-gray-400">Viewing customer's punchlist portal</div>
+                <div className="text-sm font-medium text-gray-900">Portal Preview Mode</div>
+                <div className="text-xs text-gray-500">Viewing customer's punchlist portal</div>
               </div>
             </div>
           </div>
         </div>
       )}
       {isImpersonating && !previewContactId && (
-        <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-3">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Eye className="w-5 h-5 text-orange-400" />
+              <Eye className="w-5 h-5 text-amber-500" />
               <div>
-                <div className="text-sm font-medium text-white">Viewing as Customer</div>
-                <div className="text-xs text-gray-400">{impersonatingName}</div>
+                <div className="text-sm font-medium text-gray-900">Viewing as Customer</div>
+                <div className="text-xs text-gray-500">{impersonatingName}</div>
               </div>
             </div>
             <button
@@ -816,7 +816,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                 localStorage.removeItem('admin_impersonating_name');
                 window.close();
               }}
-              className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
+              className="px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded text-sm"
             >
               Exit Preview
             </button>

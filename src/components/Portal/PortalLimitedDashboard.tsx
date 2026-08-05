@@ -18,6 +18,7 @@ export function PortalLimitedDashboard() {
   const [loading, setLoading] = useState(true);
   const [contactName, setContactName] = useState('');
   const [contactId, setContactId] = useState<string | null>(null);
+  const [proposalsEnabled, setProposalsEnabled] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -60,6 +61,13 @@ export function PortalLimitedDashboard() {
       if (contact) {
         setContactName(`${contact.first_name} ${contact.last_name}`.trim() || 'Customer');
       }
+
+      // Load module visibility settings
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('portal_proposals_enabled')
+        .maybeSingle();
+      setProposalsEnabled(settings?.portal_proposals_enabled ?? true);
 
       // Load active proposals
       const { data: proposalsData } = await supabase
@@ -151,6 +159,7 @@ export function PortalLimitedDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Your Proposals Section */}
+        {proposalsEnabled && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Your Proposals</h2>
@@ -217,6 +226,7 @@ export function PortalLimitedDashboard() {
             </div>
           )}
         </div>
+        )}
 
         {/* Upgrade to VIP Section */}
         <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 rounded-2xl shadow-xl p-6 sm:p-8 text-white mb-8">

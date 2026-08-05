@@ -144,6 +144,34 @@ function LoadingFallback() {
   );
 }
 
+// Portal module guard: checks if a module is enabled before rendering
+function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; children: React.ReactNode }) {
+  const [allowed, setAllowed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('company_settings')
+      .select(`${moduleKey}`)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setAllowed(data?.[moduleKey] ?? false);
+      })
+      .catch(() => {
+        if (!cancelled) setAllowed(false);
+      });
+    return () => { cancelled = true; };
+  }, [moduleKey]);
+
+  if (allowed === null) return <LoadingFallback />;
+  if (!allowed) {
+    window.location.replace('/portal');
+    return <LoadingFallback />;
+  }
+  return <>{children}</>;
+}
+
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
   const { footerDepartments, getUserModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
@@ -509,7 +537,9 @@ function AppContent() {
   if (currentPath === '/portal/punchlist') {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <PortalPunchlist />
+        <PortalModuleGuard moduleKey="portal_tasks_enabled">
+          <PortalPunchlist />
+        </PortalModuleGuard>
       </Suspense>
     );
   }
@@ -517,7 +547,9 @@ function AppContent() {
   if (currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <PortalProposals />
+        <PortalModuleGuard moduleKey="portal_proposals_enabled">
+          <PortalProposals />
+        </PortalModuleGuard>
       </Suspense>
     );
   }

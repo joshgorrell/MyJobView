@@ -329,7 +329,7 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
     <div className="min-h-screen bg-gray-50">
       {isImpersonating && (
         <div className="bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium">
-          Admin View: Viewing portal as {impersonatingName || 'customer'}
+          Admin Preview: Viewing portal as {impersonatingName || 'customer'}
         </div>
       )}
       <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
@@ -358,6 +358,14 @@ export function PortalProposals({ isEmbedded = false }: PortalProposalsProps = {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {content}
       </main>
+
+      <footer className="border-t border-gray-200 mt-8 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-3 text-xs text-gray-400">
+          <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Privacy Policy</a>
+          <span>·</span>
+          <a href="/eula" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Terms of Service</a>
+        </div>
+      </footer>
     </div>
   );
 }
