@@ -220,7 +220,7 @@ export default function PortalMessages() {
 
   if (!hasVipAccess) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-12 text-center">
           <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">VIP Feature</h3>
@@ -236,7 +236,7 @@ export default function PortalMessages() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <div className="mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">Messages</h1>
         <p className="text-gray-500 text-sm">Communicate with your project team</p>

@@ -7,35 +7,35 @@ export function PortalContactUs() {
   return (
     <div className="min-h-screen bg-gray-50">
       {isImpersonating && (
-        <div className="bg-orange-600 text-white px-4 py-2 text-center text-sm font-medium">
-          Admin View: Previewing as {impersonatingName || 'customer'}
+        <div className="bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium">
+          Admin Preview: Viewing portal as {impersonatingName || 'customer'}
         </div>
       )}
 
-      <header className="bg-[#0f2347] sticky top-0 z-40 shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center gap-3">
+      <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16 sm:h-20 gap-3">
             <a
               href="/portal"
-              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-              title="Back to Dashboard"
+              className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px]"
             >
-              <ArrowLeft className="w-5 h-5 text-white" />
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm font-medium">Dashboard</span>
             </a>
             <img
               src="/el_logo_color_(2).png"
               alt="Electronic Life"
-              className="h-9 object-contain"
+              className="h-8 sm:h-10 object-contain flex-shrink-0"
             />
-            <div>
-              <h1 className="text-lg font-bold text-white leading-tight">Contact Us</h1>
-              <p className="text-xs text-blue-200">Get in touch with our support team</p>
+            <div className="hidden sm:block border-l border-white/20 pl-4">
+              <p className="text-white font-semibold text-sm leading-tight">Contact Us</p>
+              <p className="text-blue-300 text-xs">Get in touch with our support team</p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
           <div className="text-center max-w-xl mx-auto">
             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -78,6 +78,14 @@ export function PortalContactUs() {
           </div>
         </div>
       </main>
+
+      <footer className="border-t border-gray-200 mt-8 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-3 text-xs text-gray-400">
+          <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Privacy Policy</a>
+          <span>·</span>
+          <a href="/eula" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Terms of Service</a>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -117,33 +117,33 @@ export function PortalLimitedDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       {isImpersonating && (
-        <div className="bg-orange-600 text-white px-4 py-2 text-center text-sm font-medium">
-          Admin View: Viewing limited portal as {impersonatingName || 'customer'}
+        <div className="bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium">
+          Admin Preview: Viewing portal as {impersonatingName || 'customer'}
         </div>
       )}
 
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-4">
+      <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 sm:h-20">
+            <div className="flex items-center gap-3 sm:gap-4">
               <img
                 src="/el_logo_color_(2).png"
                 alt="Electronic Life"
-                className="h-12 object-contain"
+                className="h-8 sm:h-10 object-contain"
               />
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Customer Portal</h1>
-                <p className="text-sm text-gray-600">Welcome back, {contactName}</p>
+              <div className="hidden sm:block border-l border-white/20 pl-4">
+                <p className="text-white font-semibold text-sm leading-tight">Customer Portal</p>
+                <p className="text-blue-300 text-xs">{contactName || 'Welcome back'}</p>
               </div>
             </div>
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-sm font-medium min-h-[44px]"
             >
               <LogOut className="w-4 h-4" />
-              {isImpersonating ? 'Exit Preview' : 'Sign Out'}
+              <span className="hidden sm:inline">{isImpersonating ? 'Exit Preview' : 'Sign Out'}</span>
             </button>
           </div>
         </div>

@@ -413,8 +413,11 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-400">Loading VIP membership options...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading VIP membership options...</p>
+        </div>
       </div>
     );
   }
@@ -422,41 +425,43 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
   const impersonatingName = localStorage.getItem('admin_impersonating_name');
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {impersonatingName && (
-        <div className="bg-orange-600 text-white px-4 py-2 text-center text-sm font-medium">
-          Admin View: Previewing as {impersonatingName}
+        <div className="bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium">
+          Admin Preview: Viewing portal as {impersonatingName}
         </div>
       )}
-      <header className="bg-[#0f2347] sticky top-0 z-40 shadow-lg">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
-          <a
-            href="/portal"
-            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-            title="Back to Dashboard"
-          >
-            <ArrowLeft className="w-5 h-5 text-white" />
-          </a>
-          <img
-            src="/el_logo_color_(2).png"
-            alt="Electronic Life"
-            className="h-9 object-contain"
-          />
-          <div>
-            <h1 className="text-lg font-bold text-white leading-tight">VIP Membership</h1>
-            <p className="text-xs text-blue-200">Premium service & priority support</p>
+      <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16 sm:h-20 gap-3">
+            <a
+              href="/portal"
+              className="flex items-center gap-1.5 px-3 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[44px]"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm font-medium">Dashboard</span>
+            </a>
+            <img
+              src="/el_logo_color_(2).png"
+              alt="Electronic Life"
+              className="h-8 sm:h-10 object-contain flex-shrink-0"
+            />
+            <div className="hidden sm:block border-l border-white/20 pl-4">
+              <p className="text-white font-semibold text-sm leading-tight">VIP Membership</p>
+              <p className="text-blue-300 text-xs">Premium service & priority support</p>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
 
-      <div className="bg-gradient-to-r from-yellow-900/20 to-amber-900/20 border border-yellow-700 rounded-lg p-6">
+      <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-6">
         <div className="flex items-center gap-3 mb-3">
-          <Star className="w-8 h-8 text-yellow-400" />
+          <Star className="w-8 h-8 text-yellow-500" />
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white">VIP Membership</h2>
-            <p className="text-gray-300">Premium support and priority service</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">VIP Membership</h2>
+            <p className="text-gray-600">Premium support and priority service</p>
           </div>
         </div>
       </div>
@@ -493,7 +498,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
           {/* Benefits grid */}
           <div>
-            <h3 className="text-lg sm:text-xl font-bold text-white mb-5">Everything VIP Includes</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-5">Everything VIP Includes</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {BENEFITS.map((benefit) => {
                 const Icon = benefit.icon;
@@ -512,7 +517,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           </div>
 
           {/* How It Works */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          <div className="bg-white rounded-lg border border-gray-200 p-7 shadow-sm">
             <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-7 text-center">How It Works</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-7">
               {HOW_IT_WORKS.map((step) => (
@@ -530,30 +535,30 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
       )}
 
       {currentSubscription && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           {/* Status Badge */}
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-lg sm:text-xl font-bold text-white mb-2 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-green-400" />
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-green-500" />
                 Current Membership
               </h3>
-              <p className="text-xl sm:text-2xl font-bold text-white mb-2">
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
                 {currentSubscription.plan.plan_name}
               </p>
               {currentSubscription.plan.description && (
-                <p className="text-gray-300 mb-4">{currentSubscription.plan.description}</p>
+                <p className="text-gray-600 mb-4">{currentSubscription.plan.description}</p>
               )}
             </div>
             <div className={`${
               currentSubscription.status === 'trial'
-                ? 'bg-blue-900/30 border-blue-700'
-                : 'bg-green-900/30 border-green-700'
+                ? 'bg-blue-50 border-blue-200'
+                : 'bg-green-50 border-green-200'
             } border px-3 py-1 rounded-full`}>
               <span className={`${
                 currentSubscription.status === 'trial'
-                  ? 'text-blue-300'
-                  : 'text-green-300'
+                  ? 'text-blue-700'
+                  : 'text-green-700'
               } text-sm font-medium`}>
                 {currentSubscription.status === 'trial' ? 'Free Trial' : 'Active'}
               </span>
@@ -569,14 +574,14 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             const daysRemaining = Math.ceil((trialEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
             return (
-              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mb-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
                 <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <Clock className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <h4 className="font-semibold text-yellow-200 mb-1">
+                    <h4 className="font-semibold text-amber-900 mb-1">
                       Free Trial - {daysRemaining} {daysRemaining === 1 ? 'Day' : 'Days'} Remaining
                     </h4>
-                    <p className="text-yellow-300 text-sm mb-3">
+                    <p className="text-amber-700 text-sm mb-3">
                       Your 90-day test and tune trial expires on {trialEnd.toLocaleDateString('en-US', {
                         month: 'long',
                         day: 'numeric',
@@ -585,13 +590,12 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     </p>
                     <button
                       onClick={() => {
-                        // Scroll to available plans
                         const plansSection = document.querySelector('#available-plans');
                         if (plansSection) {
                           plansSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }
                       }}
-                      className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm flex items-center gap-2"
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium text-sm flex items-center gap-2"
                     >
                       <Star className="w-4 h-4" />
                       Subscribe to Keep Access
@@ -606,9 +610,9 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             {currentSubscription.status === 'trial' ? (
               <>
-                <div className="bg-gray-900 rounded-lg p-4">
+                <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-500 mb-1">Trial Started</div>
-                  <div className="text-xl font-bold text-white">
+                  <div className="text-xl font-bold text-gray-900">
                     {currentSubscription.trial_started_date
                       ? new Date(currentSubscription.trial_started_date).toLocaleDateString('en-US', {
                           month: 'short',
@@ -623,9 +627,9 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     }
                   </div>
                 </div>
-                <div className="bg-gray-900 rounded-lg p-4">
+                <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-500 mb-1">Trial Expires</div>
-                  <div className="text-xl font-bold text-white">
+                  <div className="text-xl font-bold text-gray-900">
                     {currentSubscription.trial_end_date
                       ? new Date(currentSubscription.trial_end_date).toLocaleDateString('en-US', {
                           month: 'short',
@@ -636,9 +640,9 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     }
                   </div>
                 </div>
-                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
-                  <div className="text-sm text-blue-400 mb-1">Days Remaining</div>
-                  <div className="text-2xl sm:text-3xl font-bold text-blue-300">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="text-sm text-blue-600 mb-1">Days Remaining</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-blue-700">
                     {currentSubscription.trial_end_date && (() => {
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
@@ -651,27 +655,27 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
               </>
             ) : (
               <>
-                <div className="bg-gray-900 rounded-lg p-4">
+                <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-500 mb-1">Monthly Cost</div>
-                  <div className="text-xl font-bold text-white">
+                  <div className="text-xl font-bold text-gray-900">
                     ${currentSubscription.plan.amount}
-                    <span className="text-sm text-gray-400 font-normal ml-1">
+                    <span className="text-sm text-gray-500 font-normal ml-1">
                       /{getBillingFrequencyLabel(currentSubscription.plan.billing_frequency).replace('per ', '')}
                     </span>
                   </div>
                 </div>
-                <div className="bg-gray-900 rounded-lg p-4">
+                <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-500 mb-1">Member Since</div>
-                  <div className="text-xl font-bold text-white">
+                  <div className="text-xl font-bold text-gray-900">
                     {new Date(currentSubscription.start_date).toLocaleDateString('en-US', {
                       month: 'short',
                       year: 'numeric'
                     })}
                   </div>
                 </div>
-                <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
-                  <div className="text-sm text-green-400 mb-1">Renews On</div>
-                  <div className="text-xl font-bold text-green-300">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="text-sm text-green-600 mb-1">Renews On</div>
+                  <div className="text-xl font-bold text-green-700">
                     {new Date(currentSubscription.next_billing_date).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -684,26 +688,26 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           </div>
 
           {/* Benefits Section */}
-          <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 mb-4">
-            <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
-              <Check className="w-5 h-5 text-blue-400" />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <Check className="w-5 h-5 text-blue-500" />
               Your Benefits
             </h4>
-            <ul className="space-y-2 text-gray-300">
+            <ul className="space-y-2 text-gray-700">
               <li className="flex items-start gap-2">
-                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                 <span>Unlimited punchlist access</span>
               </li>
               <li className="flex items-start gap-2">
-                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                 <span>Priority scheduling for service requests</span>
               </li>
               <li className="flex items-start gap-2">
-                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                 <span>Regular maintenance visits</span>
               </li>
               <li className="flex items-start gap-2">
-                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                 <span>Exclusive member support</span>
               </li>
             </ul>
@@ -714,7 +718,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             {currentSubscription.status !== 'trial' && (
               <button
                 onClick={() => setShowPaymentSettings(true)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm flex items-center gap-2"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm flex items-center gap-2"
               >
                 <Settings className="w-4 h-4" />
                 Payment Settings
@@ -722,7 +726,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             )}
             <button
               onClick={() => setShowCancelModal(true)}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
             >
               {currentSubscription.status === 'trial' ? 'Cancel Trial' : 'Cancel Membership'}
             </button>
@@ -751,14 +755,14 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           )}
 
           {currentSubscription?.status === 'trial' && (
-            <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border-2 border-yellow-700 rounded-lg p-6 mb-6">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-6 mb-6">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-yellow-900/40 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-6 h-6 text-yellow-400" />
+                <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-6 h-6 text-amber-500" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-white mb-2">What Happens After Your Trial?</h3>
-                  <div className="space-y-3 text-gray-300 text-sm mb-4">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">What Happens After Your Trial?</h3>
+                  <div className="space-y-3 text-gray-700 text-sm mb-4">
                     <p>
                       Your <strong>90-Day Test & Tune trial</strong> will automatically end on{' '}
                       {new Date(currentSubscription.trial_end_date!).toLocaleDateString('en-US', {
@@ -769,24 +773,24 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                        <AlertCircle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                         <span><strong>Punchlist access will end</strong> - You won't be able to create new service items</span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                        <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                         <span><strong>Your data is saved</strong> - All your punchlist history remains accessible</span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                        <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                         <span><strong>No automatic billing</strong> - We won't charge you unless you subscribe</span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <TrendingUp className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <TrendingUp className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                         <span><strong>Easy to continue</strong> - Subscribe anytime to restore full access</span>
                       </div>
                     </div>
                   </div>
-                  <p className="text-gray-300 text-sm">
+                  <p className="text-gray-600 text-sm">
                     Ready to keep your VIP benefits? Choose a plan below to continue enjoying priority service,
                     punchlist access, and regular maintenance after your trial ends.
                   </p>
@@ -796,10 +800,10 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           )}
 
           <div id="available-plans">
-            <h3 className="text-lg sm:text-xl font-bold text-white mb-4">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
               {currentSubscription?.status === 'trial' ? 'Keep Your VIP Access' : 'Available Plans'}
             </h3>
-            <p className="text-gray-300 mb-6">
+            <p className="text-gray-600 mb-6">
               {currentSubscription?.status === 'trial'
                 ? 'Choose a plan to continue enjoying uninterrupted VIP benefits after your trial expires.'
                 : 'Choose the VIP plan that best fits your needs. All plans include punchlist access, priority service, and regular maintenance.'
@@ -807,45 +811,45 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {availablePlans.map((plan) => (
               <div
                 key={plan.id}
-                className="bg-gray-800 border border-gray-700 rounded-lg p-6 hover:border-blue-500 hover:shadow-md transition-colors"
+                className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:shadow-md transition-colors"
               >
                 <div className="flex items-center gap-2 mb-4">
-                  <Package className="w-6 h-6 text-blue-400" />
-                  <h4 className="text-lg sm:text-xl font-bold text-white">{plan.plan_name}</h4>
+                  <Package className="w-6 h-6 text-blue-500" />
+                  <h4 className="text-lg sm:text-xl font-bold text-gray-900">{plan.plan_name}</h4>
                 </div>
 
                 {plan.description && (
-                  <p className="text-gray-300 mb-4 min-h-[60px]">{plan.description}</p>
+                  <p className="text-gray-600 mb-4 min-h-[60px]">{plan.description}</p>
                 )}
 
                 <div className="mb-6">
-                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2">
+                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
                     ${plan.amount}
                   </div>
-                  <div className="text-gray-400">
+                  <div className="text-gray-500">
                     {getBillingFrequencyLabel(plan.billing_frequency)}
                   </div>
                 </div>
 
                 <ul className="space-y-3 mb-6">
-                  <li className="flex items-start gap-2 text-gray-300">
-                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                  <li className="flex items-start gap-2 text-gray-700">
+                    <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>Unlimited punchlist access</span>
                   </li>
-                  <li className="flex items-start gap-2 text-gray-300">
-                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                  <li className="flex items-start gap-2 text-gray-700">
+                    <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>Priority service scheduling</span>
                   </li>
-                  <li className="flex items-start gap-2 text-gray-300">
-                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                  <li className="flex items-start gap-2 text-gray-700">
+                    <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>Regular maintenance visits</span>
                   </li>
-                  <li className="flex items-start gap-2 text-gray-300">
-                    <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                  <li className="flex items-start gap-2 text-gray-700">
+                    <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>Dedicated support</span>
                   </li>
                 </ul>
@@ -865,21 +869,21 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           </div>
 
           {/* Business VIP Inquiry Section */}
-          <div className="mt-8 bg-gradient-to-r from-blue-900/40 to-indigo-900/40 backdrop-blur-sm border border-blue-500/30 rounded-lg p-6 sm:p-8">
+          <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 sm:p-8">
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="flex-shrink-0">
-                <div className="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                  <Building2 className="w-8 h-8 text-blue-400" />
+                <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Building2 className="w-8 h-8 text-blue-500" />
                 </div>
               </div>
               <div className="flex-1 text-center md:text-left">
-                <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
                   Business VIP Plans Available
                 </h3>
-                <p className="text-gray-300 mb-3">
+                <p className="text-gray-600 mb-3">
                   Need a VIP plan for your business? We offer customized service programs with multi-location support, dedicated account management, and flexible billing.
                 </p>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-500 text-sm">
                   Contact us to discuss a tailored solution for your business needs.
                 </p>
               </div>
@@ -898,10 +902,10 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
       )}
 
       {!currentSubscription && availablePlans.length === 0 && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-          <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No VIP Plans Available</h3>
-          <p className="text-gray-400">
+        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No VIP Plans Available</h3>
+          <p className="text-gray-500">
             VIP membership plans are not currently available. Please contact us for more information.
           </p>
         </div>
@@ -916,10 +920,10 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       {/* Purchase Modal */}
       {showPurchaseModal && selectedPlan && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 border border-gray-700">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-md w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">
+              <h3 className="text-xl font-bold text-gray-900">
                 {currentSubscription?.status === 'trial' ? 'Upgrade to Paid Membership' : 'Subscribe to VIP Plan'}
               </h3>
               <button
@@ -927,20 +931,20 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                   setShowPurchaseModal(false);
                   setSelectedPlan(null);
                 }}
-                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-gray-900 rounded-lg p-4 mb-6">
-              <div className="text-lg font-bold text-white mb-2">{selectedPlan.plan_name}</div>
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <div className="text-lg font-bold text-gray-900 mb-2">{selectedPlan.plan_name}</div>
               {selectedPlan.description && (
-                <p className="text-gray-300 text-sm mb-3">{selectedPlan.description}</p>
+                <p className="text-gray-600 text-sm mb-3">{selectedPlan.description}</p>
               )}
-              <div className="text-2xl sm:text-3xl font-bold text-white">
+              <div className="text-2xl sm:text-3xl font-bold text-gray-900">
                 ${selectedPlan.amount}
-                <span className="text-sm text-gray-400 font-normal ml-2">
+                <span className="text-sm text-gray-500 font-normal ml-2">
                   {getBillingFrequencyLabel(selectedPlan.billing_frequency)}
                 </span>
               </div>
@@ -948,19 +952,19 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
             {contactInfo && (
               <div className="mb-6">
-                <div className="text-sm font-medium text-gray-400 mb-2">Billing Contact</div>
-                <div className="bg-gray-900 rounded-lg p-3 text-sm">
-                  <div className="text-white font-medium">{contactInfo.full_name}</div>
-                  <div className="text-gray-400">{contactInfo.email}</div>
-                  {contactInfo.phone && <div className="text-gray-400">{contactInfo.phone}</div>}
+                <div className="text-sm font-medium text-gray-700 mb-2">Billing Contact</div>
+                <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                  <div className="text-gray-900 font-medium">{contactInfo.full_name}</div>
+                  <div className="text-gray-500">{contactInfo.email}</div>
+                  {contactInfo.phone && <div className="text-gray-500">{contactInfo.phone}</div>}
                 </div>
               </div>
             )}
 
-            <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-start gap-2">
-                <CreditCard className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-blue-200">
+                <CreditCard className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-blue-800">
                   <p className="font-medium mb-1">
                     {currentSubscription?.status === 'trial'
                       ? 'Convert Your Trial to Paid Membership'
@@ -974,7 +978,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     }
                   </p>
                   {!currentSubscription && (
-                    <p className="mt-2 text-xs text-blue-300">
+                    <p className="mt-2 text-xs text-blue-600">
                       Note: Free 90-day trials are only available through direct invitation from our company.
                     </p>
                   )}
@@ -988,7 +992,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                   setShowPurchaseModal(false);
                   setSelectedPlan(null);
                 }}
-                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg"
               >
                 Cancel
               </button>
@@ -1006,30 +1010,30 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       {/* Address Modal */}
       {showAddressModal && selectedPlan && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-2xl w-full p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-2xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">Service Address</h3>
+              <h3 className="text-xl font-bold text-gray-900">Service Address</h3>
               <button
                 onClick={() => {
                   setShowAddressModal(false);
                   setSelectedPlan(null);
                 }}
-                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="mb-4">
-              <p className="text-gray-300 text-sm">
+              <p className="text-gray-600 text-sm">
                 Please provide your service address for VIP membership activation.
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label htmlFor="street_address" className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="street_address" className="block text-sm font-medium text-gray-700 mb-2">
                   Street Address *
                 </label>
                 <input
@@ -1038,14 +1042,14 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                   value={addressData.street_address}
                   onChange={(e) => setAddressData({ ...addressData, street_address: e.target.value })}
                   required
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="123 Main St"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
                     City *
                   </label>
                   <input
@@ -1054,13 +1058,13 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     value={addressData.city}
                     onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
                     required
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="City"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
                     State *
                   </label>
                   <input
@@ -1070,13 +1074,13 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     onChange={(e) => setAddressData({ ...addressData, state: e.target.value.toUpperCase() })}
                     required
                     maxLength={2}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="KS"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="zip_code" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="zip_code" className="block text-sm font-medium text-gray-700 mb-2">
                     ZIP Code *
                   </label>
                   <input
@@ -1088,7 +1092,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                       setAddressData({ ...addressData, zip_code: value });
                     }}
                     required
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="12345"
                   />
                 </div>
@@ -1101,7 +1105,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                   setShowAddressModal(false);
                   setShowPurchaseModal(true);
                 }}
-                className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium"
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg font-medium"
               >
                 Back
               </button>
@@ -1119,29 +1123,29 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       {/* Payment Modal */}
       {showPaymentModal && selectedPlan && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-2xl w-full p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-2xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">Complete Payment</h3>
+              <h3 className="text-xl font-bold text-gray-900">Complete Payment</h3>
               <button
                 onClick={() => {
                   setShowPaymentModal(false);
                   setSelectedPlan(null);
                 }}
-                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-gray-900 rounded-lg p-4 mb-6">
-              <div className="text-lg font-bold text-white mb-1">{selectedPlan.plan_name}</div>
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <div className="text-lg font-bold text-gray-900 mb-1">{selectedPlan.plan_name}</div>
               {selectedPlan.description && (
-                <p className="text-gray-300 text-sm mb-3">{selectedPlan.description}</p>
+                <p className="text-gray-600 text-sm mb-3">{selectedPlan.description}</p>
               )}
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-gray-900">
                 ${selectedPlan.amount}
-                <span className="text-sm text-gray-400 font-normal ml-2">
+                <span className="text-sm text-gray-500 font-normal ml-2">
                   {getBillingFrequencyLabel(selectedPlan.billing_frequency)}
                 </span>
               </div>
@@ -1161,13 +1165,13 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       {/* Payment Settings Modal */}
       {showPaymentSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-2xl w-full p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-2xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">Payment Settings</h3>
+              <h3 className="text-xl font-bold text-gray-900">Payment Settings</h3>
               <button
                 onClick={() => setShowPaymentSettings(false)}
-                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1183,7 +1187,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowPaymentSettings(false)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg"
               >
                 Close
               </button>
@@ -1194,40 +1198,40 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       {/* Cancel Modal */}
       {showCancelModal && currentSubscription && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 border border-gray-700">
+        <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-md w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">Cancel VIP Membership?</h3>
+              <h3 className="text-xl font-bold text-gray-900">Cancel VIP Membership?</h3>
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400"
+                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="mb-6">
-              <p className="text-gray-300 mb-4">
+              <p className="text-gray-600 mb-4">
                 Are you sure you want to cancel your VIP membership? You will lose access to:
               </p>
               <ul className="space-y-2 mb-4">
-                <li className="flex items-start gap-2 text-gray-300">
-                  <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <li className="flex items-start gap-2 text-gray-700">
+                  <X className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
                   <span>Punchlist portal access</span>
                 </li>
-                <li className="flex items-start gap-2 text-gray-300">
-                  <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <li className="flex items-start gap-2 text-gray-700">
+                  <X className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
                   <span>Priority service scheduling</span>
                 </li>
-                <li className="flex items-start gap-2 text-gray-300">
-                  <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <li className="flex items-start gap-2 text-gray-700">
+                  <X className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
                   <span>Regular maintenance visits</span>
                 </li>
               </ul>
-              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <div className="flex items-start gap-2">
-                  <Clock className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-yellow-200">
+                  <Clock className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-amber-800">
                     You will have access until your next billing date on{' '}
                     {new Date(currentSubscription.next_billing_date).toLocaleDateString()}
                   </div>
@@ -1238,7 +1242,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg"
               >
                 Keep Membership
               </button>
@@ -1253,6 +1257,14 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         </div>
       )}
       </main>
+
+      <footer className="border-t border-gray-200 mt-8 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-3 text-xs text-gray-400">
+          <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Privacy Policy</a>
+          <span>·</span>
+          <a href="/eula" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Terms of Service</a>
+        </div>
+      </footer>
     </div>
   );
 }
