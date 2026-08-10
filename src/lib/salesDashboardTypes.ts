@@ -87,6 +87,7 @@ export interface AttentionItem {
 }
 
 export type DashboardTab =
+  | 'daily_recap'
   | 'overview'
   | 'performance'
   | 'pipeline'

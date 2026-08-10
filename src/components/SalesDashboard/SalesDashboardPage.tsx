@@ -11,7 +11,8 @@ import { SalesGoalLeaderboard } from './SalesGoalLeaderboard';
 import { SalesAttentionList } from './SalesAttentionList';
 import { ManagerRepSelector } from './ManagerRepSelector';
 import { DashboardSkeleton } from './DashboardSkeleton';
-import { RefreshCw, AlertCircle, LayoutDashboard, TrendingUp, FileText, Users, Activity, History, BarChart3 } from 'lucide-react';
+import { RefreshCw, AlertCircle, LayoutDashboard, TrendingUp, FileText, Users, Activity, History, BarChart3, Sunrise } from 'lucide-react';
+import { DailyRecap } from './DailyRecap';
 
 export interface SalesRepAIContext {
   repName: string;
@@ -33,9 +34,11 @@ export interface SalesRepAIContext {
 interface SalesDashboardPageProps {
   onProposalClick?: (proposalId: string) => void;
   onRepContextChange?: (ctx: SalesRepAIContext | null) => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 const TAB_CONFIG: { key: DashboardTab; label: string; icon: typeof LayoutDashboard }[] = [
+  { key: 'daily_recap', label: 'Daily Recap', icon: Sunrise },
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
   { key: 'performance', label: 'Performance', icon: TrendingUp },
   { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
@@ -44,9 +47,9 @@ const TAB_CONFIG: { key: DashboardTab; label: string; icon: typeof LayoutDashboa
   { key: 'history', label: 'History', icon: History },
 ];
 
-export function SalesDashboardPage({ onProposalClick, onRepContextChange }: SalesDashboardPageProps) {
+export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavigateToTab }: SalesDashboardPageProps) {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('daily_recap');
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
 
   const isManager = profile?.role
@@ -192,6 +195,20 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange }: Sale
       </div>
 
       {/* Tab content */}
+      {activeTab === 'daily_recap' && (
+        <DailyRecap
+          repId={effectiveRepId}
+          isManagerView={isManagerView}
+          onNavigate={(tab, _recordId) => {
+            if (onNavigateToTab) {
+              onNavigateToTab(tab);
+            } else {
+              handleNavigate(tab as any);
+            }
+          }}
+        />
+      )}
+
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <AnnualGoalHero data={data} />

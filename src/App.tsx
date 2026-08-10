@@ -1004,6 +1004,7 @@ function AppContent() {
                 setActiveTab('proposals');
               }}
               onRepContextChange={setSalesRepAIContext}
+              onNavigateToTab={(tab) => setActiveTab(tab)}
             />
           )}
           {activeTab === 'sales_orders' && checkModuleAccess('sales_orders') && (
