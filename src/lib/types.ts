@@ -17,6 +17,7 @@ export interface Profile {
   can_edit_contacts?: boolean;
   can_edit_contact_assignments?: boolean;
   can_delete_invoices?: boolean;
+  can_create_purchase_orders?: boolean;
   can_create_work_orders?: boolean;
   last_seen_fishbowl_at: string | null;
   last_seen_punchlist_at: string | null;

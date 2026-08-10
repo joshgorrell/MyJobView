@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Warehouse, AlertTriangle, TrendingUp, TrendingDown, BarChart3, Inbox, PackageSearch, ArrowRightLeft, List } from 'lucide-react';
+import { Package, Warehouse, AlertTriangle, TrendingUp, TrendingDown, BarChart3, Inbox, PackageSearch, ArrowRightLeft, List, ClipboardList } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { InventoryList } from './InventoryList';
@@ -8,6 +8,7 @@ import { WarehouseReceive } from './WarehouseReceive';
 import { WarehousePick } from './WarehousePick';
 import { WarehouseTransfer } from './WarehouseTransfer';
 import { StockLevels } from './StockLevels';
+import { PurchaseOrders } from './PurchaseOrders';
 
 interface DashboardStats {
   total_products: number;
@@ -17,7 +18,7 @@ interface DashboardStats {
   total_warehouses: number;
 }
 
-type TabType = 'overview' | 'inventory' | 'alerts' | 'receive' | 'pick' | 'transfer' | 'stock_levels';
+type TabType = 'overview' | 'inventory' | 'alerts' | 'receive' | 'pick' | 'transfer' | 'stock_levels' | 'purchase_orders';
 
 export function InventoryDashboard() {
   const { profile } = useAuth();
@@ -181,6 +182,17 @@ export function InventoryDashboard() {
               Inventory List
             </button>
             <button
+              onClick={() => setActiveTab('purchase_orders')}
+              className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+                activeTab === 'purchase_orders'
+                  ? 'text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              Purchase Orders
+            </button>
+            <button
               onClick={() => setActiveTab('stock_levels')}
               className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
                 activeTab === 'stock_levels'
@@ -250,6 +262,9 @@ export function InventoryDashboard() {
           )}
           {activeTab === 'stock_levels' && (
             <StockLevels />
+          )}
+          {activeTab === 'purchase_orders' && (
+            <PurchaseOrders />
           )}
           {activeTab === 'receive' && (
             <WarehouseReceive />

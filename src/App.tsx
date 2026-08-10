@@ -71,6 +71,7 @@ const PartsRequestManagement = lazy(() => import('./components/Production/PartsR
 const JobPhotosGallery = lazy(() => import('./components/Production/JobPhotosGallery').then(m => ({ default: m.JobPhotosGallery })));
 const TechStats = lazy(() => import('./components/Production/TechStats').then(m => ({ default: m.TechStats })));
 const InventoryDashboard = lazy(() => import('./components/Inventory/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
+const PurchaseOrders = lazy(() => import('./components/Inventory/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
 const ProductsManagement = lazy(() => import('./components/Products/ProductsManagement'));
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
 const AppointmentsCalendar = lazy(() => import('./components/Appointments/AppointmentsCalendar').then(m => ({ default: m.AppointmentsCalendar })));
@@ -959,6 +960,7 @@ function AppContent() {
           {activeTab === 'calendar' && checkModuleAccess('calendar') && <AppointmentsCalendar key={activeTab} />}
           {activeTab === 'products_catalog' && checkModuleAccess('products_catalog') && <ProductsManagement key={activeTab} />}
           {activeTab === 'inventory' && checkModuleAccess('inventory') && <InventoryDashboard key={activeTab} />}
+          {activeTab === 'purchase_orders' && checkModuleAccess('purchase_orders') && <PurchaseOrders key={activeTab} />}
           {activeTab === 'job_photos' && checkModuleAccess('job_photos') && (
             <JobPhotosGallery
               key={activeTab}

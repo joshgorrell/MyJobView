@@ -29,6 +29,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     role_id: (user as any).role_id || '',
     email_leads: user.email_leads,
     can_create_proposals: (user as any).can_create_proposals ?? true,
+    can_create_purchase_orders: (user as any).can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(user.role),
     can_view_prospects: (user as any).can_view_prospects ?? false,
     can_view_all_tasks: (user as any).can_view_all_tasks ?? true,
     can_view_all_pipeline: (user as any).can_view_all_pipeline ?? true,
@@ -190,6 +191,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         role_id: formData.role_id || null,
         email_leads: formData.email_leads,
         can_create_proposals: formData.can_create_proposals,
+        can_create_purchase_orders: formData.can_create_purchase_orders,
         can_view_prospects: formData.can_view_prospects,
         can_view_all_tasks: formData.can_view_all_tasks,
         can_view_all_pipeline: formData.can_view_all_pipeline,
@@ -520,6 +522,24 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                 </div>
               </div>
             )}
+
+            <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.can_create_purchase_orders}
+                  onChange={(e) => setFormData({ ...formData, can_create_purchase_orders: e.target.checked })}
+                  className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-cyan-400" />
+                    <span className="text-sm font-medium text-white">Can Create Purchase Orders</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Allow this user to create, submit, email, and delete draft purchase orders.</p>
+                </div>
+              </label>
+            </div>
 
             <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-3">
               <label className="flex items-start gap-3 cursor-pointer">

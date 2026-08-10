@@ -121,10 +121,10 @@ Thank you for your prompt service.
       throw new Error(`Failed to send email: ${emailError.message}`);
     }
 
-    // Update PO status to 'sent'
+    // Emailing a PO submits it automatically.
     await supabase
       .from("purchase_orders")
-      .update({ status: "sent" })
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
       .eq("id", poId);
 
     return new Response(JSON.stringify({ message: "PO emailed to vendor", vendorEmail }), {
