@@ -33,25 +33,27 @@ export function InventoryDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   useEffect(() => {
-    if (profile?.company_id) {
-      loadStats();
-    }
-  }, [profile?.company_id]);
+    void loadStats();
+  }, [profile?.id]);
 
   async function loadStats() {
-    if (!profile?.company_id) {
+    const companyId = (profile as typeof profile & { company_id?: string | null })?.company_id;
+    if (!companyId) {
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
+      const timeout = new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error('Inventory loading timed out')), 10000);
+      });
 
-      const [productsRes, inventoryRes, warehousesRes] = await Promise.all([
+      const [productsRes, inventoryRes, warehousesRes] = await Promise.race([Promise.all([
         supabase
           .from('products')
           .select('id, cost', { count: 'exact' })
-          .eq('company_id', profile.company_id)
+          .eq('company_id', companyId)
           .eq('is_active', true),
         supabase
           .from('product_inventory')
@@ -61,13 +63,13 @@ export function InventoryDashboard() {
             reorder_point,
             products!inner(cost, company_id)
           `)
-          .eq('products.company_id', profile.company_id),
+          .eq('products.company_id', companyId),
         supabase
           .from('warehouses')
           .select('id', { count: 'exact' })
-          .eq('company_id', profile.company_id)
+          .eq('company_id', companyId)
           .eq('is_active', true),
-      ]);
+      ]), timeout]);
 
       const totalProducts = productsRes.count || 0;
       const totalWarehouses = warehousesRes.count || 0;

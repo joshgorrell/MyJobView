@@ -24,8 +24,8 @@ if ('serviceWorker' in navigator) {
           }
         });
       })
-      .catch((error) => {
-        console.error('Service Worker registration failed:', error);
+      .catch(() => {
+        // Service workers are unavailable in some hosted development browsers.
       });
 
     // Reload page when new service worker takes control

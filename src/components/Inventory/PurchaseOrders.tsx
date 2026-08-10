@@ -68,12 +68,20 @@ export function PurchaseOrders() {
 
   useEffect(() => {
     void loadOrders();
-  }, [profile?.company_id]);
+  }, [profile?.organization_id]);
 
   async function loadOrders() {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
     try {
       setLoading(true);
       setLoadError('');
+      if (!profile?.organization_id) {
+        setOrders([]);
+        setLoadError('Your account is not linked to an organization yet.');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('purchase_orders')
         .select(`
@@ -83,8 +91,10 @@ export function PurchaseOrders() {
           warehouses!inner(name),
           po_items(id, quantity, quantity_received)
         `)
+        .eq('organization_id', profile.organization_id)
         .neq('status', 'cancelled')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .abortSignal(controller.signal);
 
       if (error) throw error;
 
@@ -112,6 +122,7 @@ export function PurchaseOrders() {
       console.error('Error loading purchase orders:', error);
       setLoadError('Purchase orders could not be loaded. Please try again.');
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }
