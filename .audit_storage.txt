@@ -1,0 +1,57 @@
+INSERT ['anon'] | Allow anonymous uploads during signup => (bucket_id = 'organization_logos'::text)
+DELETE ['authenticated'] | Allow authenticated deletes contract sigs => ((bucket_id = 'security-contract-signatures'::text) AND ((storage.foldername(name))[1] IN ( SELECT (security_contracts.id)::text AS id FROM security_contracts W
+INSERT ['authenticated'] | Allow authenticated uploads => (bucket_id = 'organization_logos'::text)
+INSERT ['authenticated'] | Allow authenticated uploads contract sigs => (bucket_id = 'security-contract-signatures'::text)
+DELETE ['authenticated'] | Allow organization admins to delete logos => ((bucket_id = 'organization_logos'::text) AND ((EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text,
+UPDATE ['authenticated'] | Allow organization admins to update logos => ((bucket_id = 'organization_logos'::text) AND ((EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text,
+SELECT ['public'] | Anyone can view attachments => (bucket_id = 'attachments'::text)
+SELECT ['anon', 'authenticated'] | Anyone can view purchase orders => (bucket_id = 'purchase-orders'::text)
+DELETE ['authenticated'] | Authenticated users can delete product images => (bucket_id = 'product-images'::text)
+UPDATE ['authenticated'] | Authenticated users can update product images => (bucket_id = 'product-images'::text)
+UPDATE ['authenticated'] | Authenticated users can update purchase orders => (bucket_id = 'purchase-orders'::text)
+INSERT ['authenticated'] | Authenticated users can upload attachments => (bucket_id = 'attachments'::text)
+INSERT ['authenticated'] | Authenticated users can upload contact business cards => (bucket_id = 'contact-business-cards'::text)
+INSERT ['authenticated'] | Authenticated users can upload job photos => (bucket_id = 'job-photos'::text)
+INSERT ['authenticated'] | Authenticated users can upload product images => (bucket_id = 'product-images'::text)
+INSERT ['authenticated'] | Authenticated users can upload purchase orders => (bucket_id = 'purchase-orders'::text)
+INSERT ['authenticated'] | Authenticated users can upload to job_photos => (bucket_id = 'job_photos'::text)
+INSERT ['authenticated'] | Customers can upload to own task folders => ((bucket_id = 'punchlist-photos'::text) AND ((EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, '
+DELETE ['authenticated'] | Only admins can delete company logo => ((bucket_id = 'company_logo'::text) AND (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))))
+UPDATE ['authenticated'] | Only admins can update company logo => ((bucket_id = 'company_logo'::text) AND (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))))
+INSERT ['authenticated'] | Only admins can upload company logo => ((bucket_id = 'company_logo'::text) AND (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))))
+SELECT ['authenticated'] | Portal users can read message attachments => ((bucket_id = 'message-attachments'::text) AND (( SELECT ((auth.jwt() -> 'user_metadata'::text) ->> 'is_portal_user'::text)) = 'true'::text))
+SELECT ['authenticated'] | Portal users can read proposal recordings => ((bucket_id = 'proposal-recordings'::text) AND (( SELECT ((auth.jwt() -> 'user_metadata'::text) ->> 'is_portal_user'::text)) = 'true'::text))
+INSERT ['authenticated'] | Portal users can upload message attachments => ((bucket_id = 'message-attachments'::text) AND (( SELECT ((auth.jwt() -> 'user_metadata'::text) ->> 'is_portal_user'::text)) = 'true'::text))
+DELETE ['authenticated'] | Staff can delete message attachments => ((bucket_id = 'message-attachments'::text) AND (EXISTS ( SELECT 1 FROM profiles pr WHERE ((pr.id = ( SELECT auth.uid() AS uid)) AND ((pr.role IS NULL) OR (pr.ro
+DELETE ['authenticated'] | Staff can delete proposal recordings => ((bucket_id = 'proposal-recordings'::text) AND (EXISTS ( SELECT 1 FROM profiles pr WHERE ((pr.id = ( SELECT auth.uid() AS uid)) AND ((pr.role IS NULL) OR (pr.ro
+DELETE ['authenticated'] | Staff can delete their attachments => ((bucket_id = 'attachments'::text) AND ((storage.foldername(name))[1] IN ( SELECT (profiles.id)::text AS id FROM profiles WHERE (profiles.id = auth.uid()))))
+SELECT ['authenticated'] | Staff can read message attachments => ((bucket_id = 'message-attachments'::text) AND (EXISTS ( SELECT 1 FROM profiles pr WHERE ((pr.id = ( SELECT auth.uid() AS uid)) AND ((pr.role IS NULL) OR (pr.ro
+SELECT ['authenticated'] | Staff can read proposal recordings => ((bucket_id = 'proposal-recordings'::text) AND (EXISTS ( SELECT 1 FROM profiles pr WHERE ((pr.id = ( SELECT auth.uid() AS uid)) AND ((pr.role IS NULL) OR (pr.ro
+INSERT ['authenticated'] | Staff can upload attachments => ((bucket_id = 'attachments'::text) AND ((storage.foldername(name))[1] IN ( SELECT (profiles.id)::text AS id FROM profiles WHERE (profiles.id = auth.uid()))))
+INSERT ['authenticated'] | Staff can upload message attachments => ((bucket_id = 'message-attachments'::text) AND (EXISTS ( SELECT 1 FROM profiles pr WHERE ((pr.id = ( SELECT auth.uid() AS uid)) AND ((pr.role IS NULL) OR (pr.ro
+INSERT ['authenticated'] | Staff can upload proposal recordings => ((bucket_id = 'proposal-recordings'::text) AND (EXISTS ( SELECT 1 FROM profiles pr WHERE ((pr.id = ( SELECT auth.uid() AS uid)) AND ((pr.role IS NULL) OR (pr.ro
+SELECT ['authenticated'] | Staff can view attachments in their company => ((bucket_id = 'attachments'::text) AND ((storage.foldername(name))[1] IN ( SELECT (profiles.id)::text AS id FROM profiles WHERE (profiles.id = auth.uid()))))
+SELECT ['authenticated'] | Staff can view customer signatures => ((bucket_id = 'customer_signatures'::text) AND (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text,
+SELECT ['authenticated'] | Staff can view job photos => ((bucket_id = 'job_photos'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()
+DELETE ['authenticated'] | Techs can delete own job photos => ((bucket_id = 'job_photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+DELETE ['authenticated'] | Techs can delete own parts request photos => ((bucket_id = 'parts_request_photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+INSERT ['authenticated'] | Techs can upload customer signatures => ((bucket_id = 'customer_signatures'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+INSERT ['authenticated'] | Techs can upload job photos => ((bucket_id = 'job_photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+INSERT ['authenticated'] | Techs can upload parts request photos => ((bucket_id = 'parts_request_photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+SELECT ['authenticated'] | Techs can view own parts request photos => ((bucket_id = 'parts_request_photos'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = 
+DELETE ['authenticated'] | Users can delete own attachments or admins can delete any => ((bucket_id = 'attachments'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid(
+DELETE ['authenticated'] | Users can delete own job photos => ((bucket_id = 'job-photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+DELETE ['authenticated'] | Users can delete own punchlist photos => ((bucket_id = 'punchlist-photos'::text) AND ((EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, '
+DELETE ['authenticated'] | Users can delete own uploads from job_photos => ((bucket_id = 'job_photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+DELETE ['authenticated'] | Users can delete tax certificates for their contacts => ((bucket_id = 'tax-certificates'::text) AND ((storage.foldername(name))[1] IN ( SELECT (contacts.id)::text AS id FROM contacts WHERE ((contacts.assigned_to = au
+DELETE ['authenticated'] | Users can delete their odometer photos => ((bucket_id = 'odometer-photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+DELETE ['authenticated'] | Users can delete their own business card photo => ((bucket_id = 'business_card_photos'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = 
+DELETE ['authenticated'] | Users can delete their own contact business cards => ((bucket_id = 'contact-business-cards'::text) AND (auth.uid() = owner))
+UPDATE ['authenticated'] | Users can update tax certificates for their contacts => ((bucket_id = 'tax-certificates'::text) AND ((storage.foldername(name))[1] IN ( SELECT (contacts.id)::text AS id FROM contacts WHERE ((contacts.assigned_to = au
+UPDATE ['authenticated'] | Users can update their own business card photo => ((bucket_id = 'business_card_photos'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = 
+UPDATE ['authenticated'] | Users can update their own contact business cards => ((bucket_id = 'contact-business-cards'::text) AND (auth.uid() = owner))
+INSERT ['authenticated'] | Users can upload tax certificates for their contacts => ((bucket_id = 'tax-certificates'::text) AND ((storage.foldername(name))[1] IN ( SELECT (contacts.id)::text AS id FROM contacts WHERE ((contacts.assigned_to = au
+INSERT ['authenticated'] | Users can upload their odometer photos => ((bucket_id = 'odometer-photos'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+INSERT ['authenticated'] | Users can upload their own business card photo => ((bucket_id = 'business_card_photos'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = 
+SELECT ['authenticated'] | Users can view tax certificates for their contacts => ((bucket_id = 'tax-certificates'::text) AND ((storage.foldername(name))[1] IN ( SELECT (contacts.id)::text AS id FROM contacts WHERE ((contacts.assigned_to = au
+SELECT ['authenticated'] | Users can view their odometer photos => ((bucket_id = 'odometer-photos'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = auth.

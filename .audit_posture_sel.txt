@@ -1,0 +1,200 @@
+======================================================================
+portal_access_tokens rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [DELETE] Service role only delete portal access tokens roles=['service_role']
+     USING: true
+     CHECK: 
+  [INSERT] Service role only insert portal access tokens roles=['service_role']
+     USING: 
+     CHECK: true
+  [SELECT] Service role only select portal access tokens roles=['service_role']
+     USING: true
+     CHECK: 
+  [UPDATE] Service role only update portal access tokens roles=['service_role']
+     USING: true
+     CHECK: true
+======================================================================
+punchlist_access_grants rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [DELETE] Internal users can delete access grants roles=['authenticated']
+     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'sales_manager'::text, 'manager'::text, 'office_manager'::text, 'project_manager'::text, 'service_manager'::text])))))
+     CHECK: 
+  [SELECT] Portal users can view their own punchlist access roles=['authenticated']
+     USING: (contact_id IN ( SELECT profiles.contact_id    FROM profiles   WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = 'portal_user'::text))))
+     CHECK: 
+  [INSERT] punchlist_access_grants_insert_same_org roles=['authenticated']
+     USING: 
+     CHECK: (organization_id = get_user_org_id())
+  [SELECT] punchlist_access_grants_select_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] punchlist_access_grants_update_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: (organization_id = get_user_org_id())
+======================================================================
+recurring_subscriptions rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [INSERT] Anonymous users can create subscriptions for VIP signup roles=['anon']
+     USING: 
+     CHECK: ((contact_id IS NOT NULL) AND (plan_id IS NOT NULL) AND (status = ANY (ARRAY['active'::text, 'trial'::text])))
+  [INSERT] Portal users can create own subscriptions roles=['authenticated']
+     USING: 
+     CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.contact_id = recurring_subscriptions.contact_id))))
+  [UPDATE] Portal users can update own subscriptions roles=['authenticated']
+     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth_uid()) AND (profiles.contact_id = recurring_subscriptions.contact_id))))
+     CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth_uid()) AND (profiles.contact_id = recurring_subscriptions.contact_id))))
+  [SELECT] Portal users can view their own subscriptions roles=['authenticated']
+     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = 'portal_user'::text) AND (profiles.contact_id = recurring_subscriptions.contact_id))))
+     CHECK: 
+  [DELETE] recurring_subscriptions_delete_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [INSERT] recurring_subscriptions_insert_same_org roles=['authenticated']
+     USING: 
+     CHECK: (organization_id = get_user_org_id())
+  [SELECT] recurring_subscriptions_select_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] recurring_subscriptions_update_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: (organization_id = get_user_org_id())
+======================================================================
+payment_methods rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [INSERT] Anonymous users can create payment methods for VIP signup roles=['anon']
+     USING: 
+     CHECK: (contact_id IS NOT NULL)
+  [DELETE] payment_methods_delete_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [INSERT] payment_methods_insert_same_org roles=['authenticated']
+     USING: 
+     CHECK: (organization_id = get_user_org_id())
+  [SELECT] payment_methods_select_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] payment_methods_update_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: (organization_id = get_user_org_id())
+======================================================================
+customer_satisfaction rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [SELECT] Anonymous can read record by token roles=['anon']
+     USING: true
+     CHECK: 
+  [UPDATE] Anonymous can submit feedback via token roles=['anon']
+     USING: (response_token IS NOT NULL)
+     CHECK: (response_token IS NOT NULL)
+  [INSERT] Users can create satisfaction records in their org roles=['authenticated']
+     USING: 
+     CHECK: (organization_id IN ( SELECT profiles.organization_id    FROM profiles   WHERE (profiles.id = ( SELECT auth.uid() AS uid))))
+  [DELETE] Users can delete satisfaction records in their org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] Users can update satisfaction records in their org roles=['authenticated']
+     USING: (organization_id IN ( SELECT profiles.organization_id    FROM profiles   WHERE (profiles.id = ( SELECT auth.uid() AS uid))))
+     CHECK: (organization_id IN ( SELECT profiles.organization_id    FROM profiles   WHERE (profiles.id = ( SELECT auth.uid() AS uid))))
+  [SELECT] Users can view satisfaction records in their org roles=['authenticated']
+     USING: (organization_id IN ( SELECT profiles.organization_id    FROM profiles   WHERE (profiles.id = ( SELECT auth.uid() AS uid))))
+     CHECK: 
+======================================================================
+punchlist_tasks rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [DELETE] Portal users can delete their own draft tasks roles=['authenticated']
+     USING: (((((auth.jwt() -> 'app_metadata'::text) ->> 'is_portal_user'::text))::boolean = true) AND (contact_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'contact_id'::text))::uuid) AND (status = 'draft'::text))
+     CHECK: 
+  [INSERT] Portal users can insert own punchlist tasks via metadata roles=['authenticated']
+     USING: 
+     CHECK: (((((auth.jwt() -> 'app_metadata'::text) ->> 'is_portal_user'::text))::boolean = true) AND (contact_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'contact_id'::text))::uuid) AND (organization_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'organization_id'::text))::uuid))
+  [UPDATE] Portal users can update their own punchlist tasks roles=['authenticated']
+     USING: (((((auth.jwt() -> 'app_metadata'::text) ->> 'is_portal_user'::text))::boolean = true) AND (contact_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'contact_id'::text))::uuid))
+     CHECK: (((((auth.jwt() -> 'app_metadata'::text) ->> 'is_portal_user'::text))::boolean = true) AND (contact_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'contact_id'::text))::uuid))
+  [SELECT] Portal users can view their own punchlist tasks roles=['authenticated']
+     USING: (((((auth.jwt() -> 'app_metadata'::text) ->> 'is_portal_user'::text))::boolean = true) AND (contact_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'contact_id'::text))::uuid))
+     CHECK: 
+  [DELETE] punchlist_tasks_delete_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [INSERT] punchlist_tasks_insert_same_org roles=['authenticated']
+     USING: 
+     CHECK: ((organization_id = get_user_org_id()) OR (((((auth.jwt() -> 'app_metadata'::text) ->> 'is_portal_user'::text))::boolean = true) AND (organization_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'organization_id'::text))::uuid)))
+  [SELECT] punchlist_tasks_select_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] punchlist_tasks_update_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: (organization_id = get_user_org_id())
+======================================================================
+proposals rls= True
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [SELECT] Portal users can view their proposals roles=['authenticated']
+     USING: (contact_id IN ( SELECT contacts.id    FROM contacts   WHERE (contacts.portal_user_id = ( SELECT auth.uid() AS uid))))
+     CHECK: 
+  [DELETE] proposals_delete_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [INSERT] proposals_insert_same_org roles=['authenticated']
+     USING: 
+     CHECK: (organization_id = get_user_org_id())
+  [SELECT] proposals_select_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] proposals_update_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: (organization_id = get_user_org_id())
+======================================================================
+contacts rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [UPDATE] Anon can update contact via security contract magic link roles=['anon']
+     USING: (EXISTS ( SELECT 1    FROM security_contracts sc   WHERE ((sc.contact_id = contacts.id) AND (sc.magic_link_token IS NOT NULL) AND (sc.magic_link_expires_at > now()))))
+     CHECK: (EXISTS ( SELECT 1    FROM security_contracts sc   WHERE ((sc.contact_id = contacts.id) AND (sc.magic_link_token IS NOT NULL) AND (sc.magic_link_expires_at > now()))))
+  [SELECT] Anonymous users can view specific contacts roles=['anon']
+     USING: (EXISTS ( SELECT 1    FROM security_contracts   WHERE ((security_contracts.contact_id = contacts.id) AND (security_contracts.magic_link_token IS NOT NULL) AND (security_contracts.magic_link_expires_at > now()))))
+     CHECK: 
+  [SELECT] Portal users can view their own contact roles=['authenticated']
+     USING: (portal_user_id = auth_uid())
+     CHECK: 
+  [INSERT] anon_kiosk_insert_contacts roles=['anon']
+     USING: 
+     CHECK: ((email IS NOT NULL) AND (phone IS NOT NULL) AND ((contact_name IS NOT NULL) OR ((first_name IS NOT NULL) AND (last_name IS NOT NULL))) AND (organization_id IS NOT NULL))
+  [DELETE] contacts_delete_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [INSERT] contacts_insert_same_org roles=['authenticated']
+     USING: 
+     CHECK: (organization_id = get_user_org_id())
+  [SELECT] contacts_select_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] contacts_update_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: (organization_id = get_user_org_id())
+======================================================================
+security_contracts rls= True
+  GRANT anon ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  GRANT authenticated ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] upd= all ins= all
+  [UPDATE] Anonymous users can update contracts via magic link roles=['anon']
+     USING: ((magic_link_token IS NOT NULL) AND (magic_link_expires_at > now()))
+     CHECK: ((magic_link_token IS NOT NULL) AND (magic_link_expires_at > now()))
+  [SELECT] Anonymous users can view contracts via magic link roles=['anon']
+     USING: ((magic_link_token IS NOT NULL) AND (magic_link_expires_at > now()))
+     CHECK: 
+  [DELETE] security_contracts_delete_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [INSERT] security_contracts_insert_same_org roles=['authenticated']
+     USING: 
+     CHECK: (organization_id = get_user_org_id())
+  [SELECT] security_contracts_select_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: 
+  [UPDATE] security_contracts_update_same_org roles=['authenticated']
+     USING: (organization_id = get_user_org_id())
+     CHECK: (organization_id = get_user_org_id())

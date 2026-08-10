@@ -1,0 +1,13 @@
+### VIEWS
+entries_pending_auto_clock_out | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+gps_capture_stats_by_day | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+gps_capture_stats_by_technician | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+home_clock_events_pending_review | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+job_photo_stats | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+pending_invites_with_details | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+proposals_with_revision_count | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+session_analytics_by_device | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+session_analytics_by_location | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+time_entries_with_project | invoker= True | grants= [('anon', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']), ('authenticated', ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])] | reads= None
+
+### FUNCTIONS with anon EXECUTE
