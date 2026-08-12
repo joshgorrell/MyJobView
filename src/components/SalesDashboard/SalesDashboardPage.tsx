@@ -13,6 +13,7 @@ import { ManagerRepSelector } from './ManagerRepSelector';
 import { DashboardSkeleton } from './DashboardSkeleton';
 import { RefreshCw, AlertCircle, LayoutDashboard, TrendingUp, FileText, Users, Activity, History, BarChart3, Sunrise } from 'lucide-react';
 import { DailyRecap } from './DailyRecap';
+import { DailySalesTotalsPanel } from './DailySalesTotalsPanel';
 
 export interface SalesRepAIContext {
   repName: string;
@@ -196,21 +197,31 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
       {/* Tab content */}
       {activeTab === 'daily_recap' && (
-        <DailyRecap
-          repId={effectiveRepId}
-          isManagerView={isManagerView}
-          onNavigate={(tab, _recordId) => {
-            if (onNavigateToTab) {
-              onNavigateToTab(tab);
-            } else {
-              handleNavigate(tab as any);
-            }
-          }}
-        />
+        <div className="space-y-6">
+          <DailySalesTotalsPanel
+            repId={effectiveRepId}
+            onUpdateReport={profile?.role === 'admin' ? () => onNavigateToTab?.('daily_sales_report_import') : undefined}
+          />
+          <DailyRecap
+            repId={effectiveRepId}
+            isManagerView={isManagerView}
+            onNavigate={(tab, _recordId) => {
+              if (onNavigateToTab) {
+                onNavigateToTab(tab);
+              } else {
+                handleNavigate(tab as any);
+              }
+            }}
+          />
+        </div>
       )}
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          <DailySalesTotalsPanel
+            repId={effectiveRepId}
+            onUpdateReport={profile?.role === 'admin' ? () => onNavigateToTab?.('daily_sales_report_import') : undefined}
+          />
           <AnnualGoalHero data={data} />
           <SalesKpiGrid data={data} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

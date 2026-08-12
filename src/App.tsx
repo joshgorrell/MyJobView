@@ -42,6 +42,7 @@ const SecurityContractCSVImport = lazy(() => import('./components/Admin/Security
 const MaintenanceAgreements = lazy(() => import('./components/Finance/MaintenanceAgreements'));
 const EquipmentWarrantyAgreements = lazy(() => import('./components/Finance/EquipmentWarrantyAgreements'));
 const HistoricalSalesImport = lazy(() => import('./components/Admin/HistoricalSalesImport').then(m => ({ default: m.HistoricalSalesImport })));
+const DailySalesReportImport = lazy(() => import('./components/Admin/DailySalesReportImport').then(m => ({ default: m.DailySalesReportImport })));
 const TasksView = lazy(() => import('./components/Tasks/TasksView').then(m => ({ default: m.TasksView })));
 const TaskForm = lazy(() => import('./components/Tasks/TaskForm').then(m => ({ default: m.TaskForm })));
 const UserPreferences = lazy(() => import('./components/Settings/UserPreferences').then(m => ({ default: m.UserPreferences })));
@@ -309,6 +310,7 @@ function AppContent() {
       if (!currentTab || currentTab === 'feed') return;
 
       if (currentTab === 'settings' && profile.role === 'admin') return;
+      if (currentTab === 'daily_sales_report_import' && profile.role === 'admin') return;
       if (currentTab === 'preferences') return;
 
       const hasAccess = checkModuleAccessRef.current(currentTab);
@@ -1135,6 +1137,8 @@ function AppContent() {
           {activeTab === 'equipment_warranty' && checkModuleAccess('equipment_warranty') && <EquipmentWarrantyAgreements key={activeTab} />}
 
           {activeTab === 'historical_sales_import' && profile.role === 'admin' && <HistoricalSalesImport key={activeTab} />}
+
+          {activeTab === 'daily_sales_report_import' && profile.role === 'admin' && <DailySalesReportImport key={activeTab} />}
 
           {activeTab === 'my_time_off' && <MyTimeOff key={activeTab} />}
         </Suspense>
