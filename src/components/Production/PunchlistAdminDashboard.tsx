@@ -23,7 +23,6 @@ import {
   HelpCircle,
   Star,
   TrendingUp,
-  Sparkles,
   AlertCircle,
   Layers,
   ArrowRight,
@@ -1053,32 +1052,6 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     </div>
                   </div>
 
-                  {/* Promotional Access */}
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                        <Sparkles className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-gray-900 mb-2 text-lg">3. Promotional Invite (Temporary Access)</h4>
-                        <p className="text-sm text-gray-700 mb-2">
-                          <strong>When:</strong> Sales/staff manually sends promotional invitation
-                        </p>
-                        <p className="text-sm text-gray-700 mb-2">
-                          <strong>Duration:</strong> 90 days (configurable)
-                        </p>
-                        <p className="text-sm text-gray-700 mb-2">
-                          <strong>How to Grant:</strong> Manually from the Customers tab using "Send Invite" button. Choose the customer,
-                          select "Promotional\" access type, and the system creates the grant and sends the invitation email.
-                        </p>
-                        <p className="text-sm text-gray-700">
-                          <strong>Use Case:</strong> Marketing tool to showcase your premium customer portal to prospects or existing customers.
-                          Let them experience the convenience of digital service requests to encourage VIP membership upgrades. Great for
-                          promotional campaigns or as a value-add for specific customer segments.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -1089,13 +1062,11 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                   Access Priority Order
                 </h4>
                 <p className="text-sm text-gray-700 mb-3">
-                  If a customer has multiple access types (e.g., both VIP membership and a promotional invite), the system
-                  follows this priority order:
+                  If a customer has multiple access types, the system follows this priority order:
                 </p>
                 <ol className="text-sm text-gray-700 space-y-2 ml-4">
                   <li><strong>1. VIP Membership</strong> - Highest priority, ongoing access</li>
-                  <li><strong>2. Promotional Access</strong> - Marketing/sales invite</li>
-                  <li><strong>3. Test & Tune</strong> - Project-based warranty access</li>
+                  <li><strong>2. Test & Tune</strong> - Project-based warranty access</li>
                 </ol>
                 <p className="text-sm text-gray-600 mt-3">
                   The customer's portal will display their current access type and days remaining (if applicable).
@@ -1125,7 +1096,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     <h5 className="font-semibold text-gray-900 mb-2">Manual Invitation:</h5>
                     <p className="text-sm text-gray-700">
                       Go to the <strong>Customers</strong> tab → Click "Send Invite" → Select a customer → Choose access type
-                      (Test & Tune or Promotional) → The system creates the database access grant and sends the invitation email automatically.
+                      (Test & Tune or Test & Tune No Portal) → The system creates the database access grant and sends the invitation email automatically.
                     </p>
                   </div>
                   <div className="border border-gray-200 rounded-lg p-4">

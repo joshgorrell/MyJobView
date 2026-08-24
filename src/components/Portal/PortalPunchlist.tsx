@@ -1676,7 +1676,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                   <p className="text-base font-bold text-gray-900 capitalize">
                     {accessInfo.access_type === 'vip_membership' && 'VIP Membership'}
                     {accessInfo.access_type === 'test_and_tune' && 'Test & Tune Program'}
-                    {accessInfo.access_type === 'promotional' && 'Promotional Access'}
+                    {accessInfo.access_type === 'test_and_tune_no_portal' && 'Test & Tune (No Portal)'}
                   </p>
                   {accessInfo.days_remaining !== null && (
                     <p className="text-sm text-gray-600 mt-1">{accessInfo.days_remaining} days remaining</p>

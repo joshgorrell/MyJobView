@@ -21,7 +21,6 @@ import {
   CheckCheck,
   Star,
   TrendingUp,
-  Sparkles,
   Users,
   PauseCircle,
   Link,
@@ -433,7 +432,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
   const [expiredAccess, setExpiredAccess] = useState<any[]>([]);
   const [declinedInvites, setDeclinedInvites] = useState<PendingInvite[]>([]);
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
-  const [accessTypeFilter, setAccessTypeFilter] = useState<'all' | 'vip_membership' | 'promotional' | 'test_and_tune' | 'test_and_tune_no_portal'>('all');
+  const [accessTypeFilter, setAccessTypeFilter] = useState<'all' | 'vip_membership' | 'test_and_tune' | 'test_and_tune_no_portal'>('all');
   const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'awaiting' | 'active' | 'expired' | 'declined'>('all');
   const [loading, setLoading] = useState(true);
   const [declineReason, setDeclineReason] = useState('');
@@ -453,12 +452,12 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
   const [showSendConfirmation, setShowSendConfirmation] = useState(false);
   const [inviteToSend, setInviteToSend] = useState<PendingInvite | null>(null);
   const [editableEmail, setEditableEmail] = useState('');
-  const [selectedInviteType, setSelectedInviteType] = useState<'test_and_tune' | 'test_and_tune_no_portal' | 'promotional' | 'vip_signup' | null>(null);
+  const [selectedInviteType, setSelectedInviteType] = useState<'test_and_tune' | 'test_and_tune_no_portal' | 'vip_signup' | null>(null);
   const [inviteModalStep, setInviteModalStep] = useState<'type' | 'confirm'>('type');
   const [vipSignupLinkCopied, setVipSignupLinkCopied] = useState(false);
   const [showManualSendConfirmation, setShowManualSendConfirmation] = useState(false);
   const [manualInviteEmail, setManualInviteEmail] = useState('');
-  const [manualInviteType, setManualInviteType] = useState<'test_and_tune' | 'test_and_tune_no_portal' | 'promotional' | 'vip_signup' | null>(null);
+  const [manualInviteType, setManualInviteType] = useState<'test_and_tune' | 'test_and_tune_no_portal' | 'vip_signup' | null>(null);
   const [sendingInvite, setSendingInvite] = useState(false);
   const [sendingManualInvite, setSendingManualInvite] = useState(false);
   const [resendingEmailFor, setResendingEmailFor] = useState<string | null>(null);
@@ -585,7 +584,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
       setExpiredAccess(expired);
 
       // Load all customers with any form of punchlist access
-      // This combines VIP subscriptions, Test & Tune, and Promotional access
+      // This combines VIP subscriptions and Test & Tune access
       const { data: allAccessData, error: allAccessError } = await supabase.rpc('get_all_punchlist_customers');
 
       if (allAccessError) {
@@ -711,7 +710,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
             contact_name: inviteToSend.contact_name,
             project_name: inviteToSend.project_name,
             expiration_date: grant?.expiration_date,
-            access_type: selectedInviteType === 'promotional' ? 'promotional' : selectedInviteType === 'test_and_tune_no_portal' ? 'test_and_tune_no_portal' : 'test_and_tune'
+            access_type: selectedInviteType === 'test_and_tune_no_portal' ? 'test_and_tune_no_portal' : 'test_and_tune'
           }
         });
 
@@ -722,7 +721,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
 
       console.log('[Punchlist] Send invite process completed successfully');
       const sentName = inviteToSend.contact_name;
-      const sentAccessType = selectedInviteType === 'promotional' ? 'promotional' : selectedInviteType === 'test_and_tune_no_portal' ? 'test_and_tune_no_portal' : 'test_and_tune';
+      const sentAccessType = selectedInviteType === 'test_and_tune_no_portal' ? 'test_and_tune_no_portal' : 'test_and_tune';
       closeSendConfirmation();
       showSuccessAnimation(sentName, 'send', sentAccessType);
       loadInvites();
@@ -1376,7 +1375,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
               >
                 <option value="all">All Types</option>
                 <option value="vip_membership">VIP ({allCustomers.filter(c => c.access_type === 'vip_membership').length})</option>
-                <option value="promotional">Promo ({allCustomers.filter(c => c.access_type === 'promotional').length})</option>
                 <option value="test_and_tune">T&amp;T ({allCustomers.filter(c => c.access_type === 'test_and_tune').length})</option>
                 <option value="test_and_tune_no_portal">No Portal ({allCustomers.filter(c => c.access_type === 'test_and_tune_no_portal').length})</option>
               </select>
@@ -1637,29 +1635,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                 </button>
 
                 <button
-                  onClick={() => setManualInviteType('promotional')}
-                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
-                    manualInviteType === 'promotional'
-                      ? 'border-amber-500 bg-amber-900/20'
-                      : 'border-gray-700 bg-gray-900 hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${manualInviteType === 'promotional' ? 'bg-amber-600' : 'bg-gray-700'}`}>
-                      <Sparkles className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">Promotional</span>
-                        <span className="text-xs px-1.5 py-0.5 bg-amber-900/50 text-amber-300 rounded-full border border-amber-700">Limited Trial</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">General invite for prospects or existing customers to explore the portal.</p>
-                    </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1 ${manualInviteType === 'promotional' ? 'border-amber-500 bg-amber-500' : 'border-gray-600'}`} />
-                  </div>
-                </button>
-
-                <button
                   onClick={() => setManualInviteType('vip_signup')}
                   className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
                     manualInviteType === 'vip_signup'
@@ -1749,11 +1724,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
               accessLabel = 'VIP Member';
               accessColor = 'text-amber-400 bg-amber-900/30 border-amber-700';
               daysRemaining = null;
-            } else if (customer.access_type === 'promotional') {
-              accessIcon = <Sparkles className="w-3.5 h-3.5" />;
-              accessLabel = 'Promotional';
-              accessColor = 'text-green-400 bg-green-900/30 border-green-700';
-              daysRemaining = customer.days_remaining;
             } else if (customer.access_type === 'test_and_tune') {
               accessIcon = <TrendingUp className="w-3.5 h-3.5" />;
               accessLabel = 'Test & Tune';
@@ -2425,21 +2395,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                 </div>
               )}
 
-              {manualInviteType === 'promotional' && (
-                <div className="p-3 border rounded-lg bg-amber-900/30 border-amber-600">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <div className="text-sm font-semibold text-amber-400">Promotional Access (90 Days)</div>
-                  </div>
-                  <ul className="text-sm text-gray-300 space-y-1">
-                    <li>• Grant 90-day promotional punchlist access</li>
-                    <li>• Allow customer to explore proposals, invoices, and messaging</li>
-                    <li>• Send welcome email with login instructions</li>
-                    <li>• <span className="font-medium text-amber-400">Expires after 90 days</span></li>
-                  </ul>
-                </div>
-              )}
-
               {manualInviteType === 'vip_signup' && (
                 <div className="p-3 border rounded-lg bg-yellow-900/30 border-yellow-600">
                   <div className="flex items-center gap-2 mb-2">
@@ -2570,32 +2525,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                     </div>
                   </button>
 
-                  {/* Promotional */}
-                  <button
-                    onClick={() => setSelectedInviteType('promotional')}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                      selectedInviteType === 'promotional'
-                        ? 'border-amber-500 bg-amber-900/20'
-                        : 'border-gray-700 bg-gray-800 hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${selectedInviteType === 'promotional' ? 'bg-amber-600' : 'bg-gray-700'}`}>
-                        <Sparkles className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-white text-sm">Promotional</span>
-                          <span className="text-xs px-2 py-0.5 bg-amber-900/50 text-amber-300 rounded-full border border-amber-700">Limited Trial</span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                          A general-purpose portal invite for prospects or existing customers. Gives temporary access to explore proposals, project status, invoices, and direct messaging — no program enrollment required.
-                        </p>
-                      </div>
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1 ${selectedInviteType === 'promotional' ? 'border-amber-500 bg-amber-500' : 'border-gray-600'}`} />
-                    </div>
-                  </button>
-
                   {/* VIP Signup */}
                   <button
                     onClick={() => setSelectedInviteType('vip_signup')}
@@ -2672,33 +2601,30 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                   <div className={`flex items-center gap-3 p-3 rounded-lg border ${
                     selectedInviteType === 'test_and_tune' ? 'bg-cyan-900/20 border-cyan-700' :
                     selectedInviteType === 'test_and_tune_no_portal' ? 'bg-cyan-900/20 border-cyan-800' :
-                    selectedInviteType === 'promotional' ? 'bg-amber-900/20 border-amber-700' :
                     'bg-yellow-900/20 border-yellow-700'
                   }`}>
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
                       selectedInviteType === 'test_and_tune' ? 'bg-cyan-600' :
                       selectedInviteType === 'test_and_tune_no_portal' ? 'bg-cyan-700' :
-                      selectedInviteType === 'promotional' ? 'bg-amber-600' : 'bg-yellow-600'
+                      'bg-yellow-600'
                     }`}>
                       {selectedInviteType === 'test_and_tune' && <TrendingUp className="w-4 h-4 text-white" />}
                       {selectedInviteType === 'test_and_tune_no_portal' && <CheckCheck className="w-4 h-4 text-white" />}
-                      {selectedInviteType === 'promotional' && <Sparkles className="w-4 h-4 text-white" />}
                       {selectedInviteType === 'vip_signup' && <Star className="w-4 h-4 text-white" />}
                     </div>
                     <div>
                       <div className={`text-xs font-semibold ${
                         selectedInviteType === 'test_and_tune' ? 'text-cyan-300' :
                         selectedInviteType === 'test_and_tune_no_portal' ? 'text-cyan-300' :
-                        selectedInviteType === 'promotional' ? 'text-amber-300' : 'text-yellow-300'
+                        'text-yellow-300'
                       }`}>
                         {selectedInviteType === 'test_and_tune' ? 'Test & Tune' :
                          selectedInviteType === 'test_and_tune_no_portal' ? 'Test & Tune (No Portal)' :
-                         selectedInviteType === 'promotional' ? 'Promotional' : 'VIP Signup'}
+                         'VIP Signup'}
                       </div>
                       <div className="text-xs text-gray-400">
                         {selectedInviteType === 'test_and_tune' && '90-day free trial · Welcome email included'}
                         {selectedInviteType === 'test_and_tune_no_portal' && '90 days · Email only · No portal link sent'}
-                        {selectedInviteType === 'promotional' && 'Limited trial access · Portal invite email'}
                         {selectedInviteType === 'vip_signup' && 'Share the signup link with your customer'}
                       </div>
                     </div>
@@ -2741,7 +2667,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                       </div>
                     </div>
                   ) : (
-                    /* Test & Tune / Promotional email flow */
+                    /* Test & Tune email flow */
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -2776,16 +2702,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                           <div>• <span className="text-gray-400">No portal link will be included in the email</span></div>
                           <div>• Portal access is ready and can be shared with the customer later if needed</div>
                           <div>• <span className="text-yellow-400">Access expires after 90 days</span> unless customer subscribes</div>
-                        </div>
-                      )}
-
-                      {selectedInviteType === 'promotional' && (
-                        <div className="p-3 bg-amber-900/20 border border-amber-800 rounded-lg text-xs text-amber-300 space-y-1">
-                          <div className="font-semibold text-amber-200 mb-1.5">This will:</div>
-                          <div>• Grant temporary portal access to explore features</div>
-                          <div>• Send a portal invite email with login instructions</div>
-                          <div>• Provide access to proposals, projects, invoices, and messaging</div>
-                          <div>• <span className="text-yellow-400">Access expires</span> unless customer subscribes to a VIP plan</div>
                         </div>
                       )}
 
@@ -2860,8 +2776,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
         let accessIcon: React.ReactNode, accessLabel: string, accessColor: string, daysRemaining: number | null;
         if (customer.access_type === 'vip_membership') {
           accessIcon = <Star className="w-3.5 h-3.5" />; accessLabel = 'VIP Member'; accessColor = 'text-amber-400 bg-amber-900/30 border-amber-700'; daysRemaining = null;
-        } else if (customer.access_type === 'promotional') {
-          accessIcon = <Sparkles className="w-3.5 h-3.5" />; accessLabel = 'Promotional'; accessColor = 'text-green-400 bg-green-900/30 border-green-700'; daysRemaining = customer.days_remaining;
         } else if (customer.access_type === 'test_and_tune') {
           accessIcon = <TrendingUp className="w-3.5 h-3.5" />; accessLabel = 'Test & Tune'; accessColor = 'text-blue-400 bg-blue-900/30 border-blue-700'; daysRemaining = customer.days_remaining;
         } else if (customer.access_type === 'test_and_tune_no_portal') {
@@ -3102,18 +3016,15 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                   const isResend = sendSuccessOverlay.type === 'resend';
                   const accessType = sendSuccessOverlay.accessType;
                   const isVIP = accessType === 'vip_signup';
-                  const isPromotional = accessType === 'promotional';
                   const isNoPortal = accessType === 'test_and_tune_no_portal';
 
                   const iconBg = isResend ? 'bg-blue-900/40 border-blue-500' : isVIP ? 'bg-amber-900/40 border-amber-400' : 'bg-cyan-900/40 border-cyan-500';
                   const iconColor = isResend ? 'text-blue-400' : isVIP ? 'text-amber-400' : 'text-cyan-400';
-                  const headline = isResend ? 'Login Link Resent!' : isVIP ? 'VIP Invite Sent!' : isPromotional ? 'Promotional Access Sent!' : 'Invite Sent!';
+                  const headline = isResend ? 'Login Link Resent!' : isVIP ? 'VIP Invite Sent!' : 'Invite Sent!';
                   const subtitle = isResend
                     ? 'A fresh 30-day login link was emailed'
                     : isVIP
                     ? 'VIP membership invitation delivered'
-                    : isPromotional
-                    ? 'Promotional portal access activated'
                     : isNoPortal
                     ? '90-Day Test & Tune trial activated'
                     : '90-Day Test & Tune trial activated';

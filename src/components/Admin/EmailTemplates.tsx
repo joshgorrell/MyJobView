@@ -56,7 +56,7 @@ const TEMPLATE_TYPES = [
   },
   {
     value: 'punchlist_invite',
-    label: 'Promotional Punchlist Invite',
+    label: 'Punchlist Invite',
     category: 'Punchlist Invites',
     placeholders: ['{{customer_name}}', '{{company_name}}', '{{portal_link}}', '{{project_name}}', '{{expiration_date}}']
   },
