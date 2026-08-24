@@ -201,7 +201,7 @@ export function TestTuneAnalytics({ permissions }: TestTuneAnalyticsProps) {
       if (!map.has(key)) map.set(key, { month: label, provisional: 0, approved: 0, paid: 0, denied: 0 });
       const e = map.get(key)!;
       const status = b.status as keyof Omit<typeof e, 'month'>;
-      if (status in e) (e[status] as number)++;
+      if (status in e) e[status] = (e[status] as number) + 1;
     });
 
     return Array.from(map.entries())
