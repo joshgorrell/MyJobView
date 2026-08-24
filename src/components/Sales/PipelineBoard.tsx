@@ -9,7 +9,7 @@ import ConnectionForm from '../Connections/ConnectionForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import PrintProspectsView from '../Leads/PrintProspectsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, Calendar, Eye, EyeOff, CreditCard as Edit, ChevronRight, Filter, Users, CircleUser as UserCircle, X, Plus, Search, Building2, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Calendar, Eye, EyeOff, CreditCard as Edit, ChevronRight, Filter, Users, CircleUser as UserCircle, X, Plus, Search, Building2, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
 
 interface Contact {
   id: string;
@@ -1027,6 +1027,12 @@ export function PipelineBoard() {
                           {item.lead_source === 'kiosk' && (
                             <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
                               <span>📱 Kiosk Entry</span>
+                            </div>
+                          )}
+                          {item.lead_source === 'email_forward' && (
+                            <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
+                              <MailOpen className="w-3 h-3" />
+                              <span>Email Forward</span>
                             </div>
                           )}
                         </div>

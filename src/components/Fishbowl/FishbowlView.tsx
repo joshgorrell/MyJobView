@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Fish, AlertCircle, Building2, Mail, Phone, Tag, Clock, Award } from 'lucide-react';
+import { Fish, AlertCircle, Building2, Mail, Phone, Tag, Clock, Award, MailOpen } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { LeadWithDetails } from '../../lib/types';
 import { formatDistanceToNow } from '../../lib/utils';
@@ -316,6 +316,13 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
                   </div>
                 )}
 
+                {lead.lead_source === 'email_forward' && (
+                  <div className="flex items-center gap-2 text-blue-600 text-sm mb-2 font-semibold">
+                    <MailOpen className="w-4 h-4" />
+                    <span>Email Forward</span>
+                  </div>
+                )}
+
                 <div className="space-y-1 mb-3">
                   {lead.email && (
                     <div className="flex items-center gap-2 text-gray-600 text-sm">
@@ -361,6 +368,8 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
                       switch (lead.lead_source) {
                         case 'kiosk':
                           return '📱 Kiosk Entry';
+                        case 'email_forward':
+                          return '✉️ Email Forward';
                         case 'website':
                           return '🌐 Website Form';
                         case 'referral':

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, AtSign, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, Clock, FileText } from 'lucide-react';
+import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, AtSign, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, Clock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Lead, LeadMessage, LeadTag, Profile } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,6 +42,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
     opportunity_description: '',
     assigned_to: '',
   });
+  const [showRawEmail, setShowRawEmail] = useState(false);
 
   useEffect(() => {
     loadLead();
@@ -228,6 +229,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           is_fishbowl: !newAssignee,
           status: newAssignee ? 'claimed' : 'unclaimed',
           claimed_at: wasUnassigned && newAssignee ? new Date().toISOString() : lead.claimed_at,
+          is_incomplete: false,
         })
         .eq('id', leadId);
 
@@ -988,6 +990,43 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
               <p className="text-xs text-gray-500 mt-2">
                 {savingReminder ? 'Saving reminder...' : 'Set a follow-up date to create a Google Calendar reminder (requires Google Calendar connection in My Settings)'}
               </p>
+            </div>
+          )}
+
+          {!isEditing && lead.is_incomplete && (
+            <div className="bg-amber-50 border-2 border-amber-400 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900 text-sm mb-1">AI-Extracted Lead — Verification Needed</h3>
+                  <p className="text-amber-800 text-xs mb-3">
+                    This lead was created from a forwarded email. Contact details were extracted by AI and may need verification. Please review and complete the contact information, then save.
+                  </p>
+                  {lead.raw_email_subject && (
+                    <div className="mb-2">
+                      <span className="font-medium text-amber-900 text-xs">Original Subject:</span>{' '}
+                      <span className="text-amber-800 text-xs">{lead.raw_email_subject}</span>
+                    </div>
+                  )}
+                  {lead.raw_email_content && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowRawEmail(!showRawEmail)}
+                        className="flex items-center gap-1 text-amber-700 hover:text-amber-900 text-xs font-medium"
+                      >
+                        {showRawEmail ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        {showRawEmail ? 'Hide Original Email' : 'View Original Email'}
+                      </button>
+                      {showRawEmail && (
+                        <div className="mt-2 bg-white border border-amber-200 rounded-lg p-3 max-h-64 overflow-y-auto">
+                          <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono">{lead.raw_email_content}</pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

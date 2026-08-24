@@ -39,12 +39,15 @@ export interface Lead {
   created_by: string | null;
   office_id: string | null;
   is_fishbowl: boolean;
-  lead_source?: 'manual' | 'kiosk' | 'website' | 'referral' | 'import' | 'other';
+  lead_source?: 'manual' | 'kiosk' | 'website' | 'referral' | 'import' | 'other' | 'email_forward';
   claimed_at: string | null;
   escalated_at: string | null;
   qbo_customer_id: string | null;
   time_to_claim_seconds: number | null;
   unclaimed_duration_seconds: number | null;
+  is_incomplete?: boolean;
+  raw_email_content?: string | null;
+  raw_email_subject?: string | null;
   created_at: string;
   updated_at: string;
 }
