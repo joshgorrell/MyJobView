@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, Plus, User, TrendingUp, Settings } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, Plus, User, TrendingUp, Settings, AlertTriangle, Zap } from 'lucide-react';
 import { useToast } from '../Shared/Toast';
 
 interface PTOPolicy {
@@ -23,6 +23,10 @@ interface PTORequest {
   reason: string | null;
   status: string;
   submitted_at: string;
+  is_same_day_callin: boolean | null;
+  points_deducted: number | null;
+  override_advance_notice: boolean | null;
+  override_reason: string | null;
   employee: {
     id: string;
     full_name: string;
@@ -158,19 +162,26 @@ export function PTOManagement() {
     }
   }
 
-  async function handleRequestAction(requestId: string, action: 'approve' | 'deny', notes?: string) {
+  async function handleRequestAction(requestId: string, action: 'approve' | 'deny', notes?: string, overrideAdvance?: boolean) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const updateData: Record<string, unknown> = {
+        status: action === 'approve' ? 'approved' : 'denied',
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        review_notes: notes || null
+      };
+
+      if (overrideAdvance) {
+        updateData.override_advance_notice = true;
+        updateData.override_reason = notes || 'Manager override';
+      }
+
       const { error } = await supabase
         .from('pto_requests')
-        .update({
-          status: action === 'approve' ? 'approved' : 'denied',
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
-          review_notes: notes || null
-        })
+        .update(updateData)
         .eq('id', requestId);
 
       if (error) throw error;
@@ -339,6 +350,18 @@ export function PTOManagement() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900">{request.policy.policy_name}</div>
                         <div className="text-xs text-gray-500 capitalize">{request.policy.pto_type.replace('_', ' ')}</div>
+                        {request.is_same_day_callin && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
+                            <AlertTriangle className="w-3 h-3" />
+                            Same-day call-in
+                          </span>
+                        )}
+                        {request.points_deducted != null && request.points_deducted > 0 && (
+                          <span className="inline-flex items-center gap-1 mt-1 ml-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                            <Zap className="w-3 h-3" />
+                            -{request.points_deducted} pts
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {new Date(request.start_date).toLocaleDateString()} - {new Date(request.end_date).toLocaleDateString()}
@@ -359,19 +382,32 @@ export function PTOManagement() {
                       </td>
                       <td className="px-4 py-3">
                         {request.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleRequestAction(request.id, 'approve')}
-                              className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleRequestAction(request.id, 'deny')}
-                              className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                            >
-                              Deny
-                            </button>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleRequestAction(request.id, 'approve')}
+                                className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleRequestAction(request.id, 'deny')}
+                                className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                              >
+                                Deny
+                              </button>
+                            </div>
+                            {request.policy.pto_type === 'vacation' && (
+                              <button
+                                onClick={() => {
+                                  const reason = window.prompt('Enter override reason for approving vacation with less than 14 days notice:');
+                                  if (reason) handleRequestAction(request.id, 'approve', reason, true);
+                                }}
+                                className="px-3 py-1 bg-amber-600 text-white text-xs rounded hover:bg-amber-700"
+                              >
+                                Override 14-day rule
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>

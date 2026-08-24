@@ -54,6 +54,8 @@ interface ClockEntry {
   break_minutes: number;
   status: string;
   notes: string | null;
+  leave_type: string | null;
+  pto_request_id: string | null;
   admin_adjusted: boolean;
   adjustment_reason: string | null;
   offline_entry: boolean;
@@ -177,6 +179,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [leaveFilter, setLeaveFilter] = useState<string>('all'); // all, work, leave
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'this_week' | 'week' | 'month' | 'custom'>('this_week');
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -1866,6 +1869,16 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                         )}
                         {entry.auto_clocked_out && entry.auto_clock_out_approved && (
                           <CheckCircle className="w-3 h-3 text-green-500" title="Approved" />
+                        )}
+                        {entry.leave_type && (
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                            entry.leave_type === 'sick' ? 'bg-red-50 text-red-700 border-red-300' :
+                            entry.leave_type === 'vacation' ? 'bg-blue-50 text-blue-700 border-blue-300' :
+                            entry.leave_type === 'personal' ? 'bg-purple-50 text-purple-700 border-purple-300' :
+                            'bg-gray-50 text-gray-700 border-gray-300'
+                          }`} title={entry.leave_type}>
+                            {entry.leave_type === 'jury_duty' ? 'Jury' : entry.leave_type.charAt(0).toUpperCase() + entry.leave_type.slice(1)}
+                          </span>
                         )}
                         {entry.admin_adjusted && <AlertCircle className="w-3 h-3 text-yellow-600" title="Admin adjusted" />}
                         {entry.offline_entry && !entry.admin_reviewed && <AlertCircle className="w-3 h-3 text-orange-600" title="Offline" />}

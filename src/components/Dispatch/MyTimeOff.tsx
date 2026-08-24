@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar, Clock, Plus, X, CheckCircle, XCircle, AlertCircle, TrendingUp } from 'lucide-react';
+import { Calendar, Clock, Plus, X, CheckCircle, XCircle, AlertCircle, TrendingUp, AlertTriangle } from 'lucide-react';
 
 interface PTOBalance {
   id: string;
@@ -50,10 +50,14 @@ export function MyTimeOff() {
   const [hours, setHours] = useState('8');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [ptoSettings, setPtoSettings] = useState({ vacation_advance_days: 14, same_day_callin_cutoff_time: '07:00', same_day_callin_points_loss: 10 });
+  const [sameDayWarning, setSameDayWarning] = useState<string | null>(null);
+  const [vacationWarning, setVacationWarning] = useState<string | null>(null);
 
   useEffect(() => {
     loadBalances();
     loadRequests();
+    loadPtoSettings();
 
     const channel = supabase
       .channel('my-pto-changes')
@@ -77,6 +81,60 @@ export function MyTimeOff() {
       channel.unsubscribe();
     };
   }, [user?.id]);
+
+  async function loadPtoSettings() {
+    try {
+      const { data } = await supabase
+        .from('company_settings')
+        .select('pto_vacation_advance_days, pto_same_day_callin_cutoff_time, pto_same_day_callin_points_loss')
+        .maybeSingle();
+      if (data) {
+        setPtoSettings({
+          vacation_advance_days: data.pto_vacation_advance_days ?? 14,
+          same_day_callin_cutoff_time: (data.pto_same_day_callin_cutoff_time ?? '07:00:00').slice(0, 5),
+          same_day_callin_points_loss: data.pto_same_day_callin_points_loss ?? 10,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading PTO settings:', error);
+    }
+  }
+
+  function getSelectedPolicyType(): string | undefined {
+    const bal = balances.find(b => b.policy.id === selectedPolicy);
+    return bal?.policy.pto_type;
+  }
+
+  function checkSameDayWarning() {
+    if (!startDate) { setSameDayWarning(null); return; }
+    const today = new Date().toISOString().slice(0, 10);
+    const policyType = getSelectedPolicyType();
+    if (startDate === today && policyType && !['bereavement', 'jury_duty', 'unpaid'].includes(policyType)) {
+      const nowTime = new Date().toTimeString().slice(0, 5);
+      if (nowTime > ptoSettings.same_day_callin_cutoff_time) {
+        setSameDayWarning(`Calling in for today after ${ptoSettings.same_day_callin_cutoff_time} will deduct ${ptoSettings.same_day_callin_points_loss} points from your rewards balance.`);
+      } else {
+        setSameDayWarning(null);
+      }
+    } else {
+      setSameDayWarning(null);
+    }
+  }
+
+  function checkVacationWarning() {
+    const policyType = getSelectedPolicyType();
+    if (policyType !== 'vacation' || !startDate) { setVacationWarning(null); return; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < ptoSettings.vacation_advance_days) {
+      setVacationWarning(`Vacation requests must be submitted at least ${ptoSettings.vacation_advance_days} days in advance. Your manager can override this, but the request may be denied.`);
+    } else {
+      setVacationWarning(null);
+    }
+  }
 
   async function loadBalances() {
     if (!user?.id) return;
@@ -124,6 +182,27 @@ export function MyTimeOff() {
     if (!user?.id || !selectedPolicy || !startDate || !endDate) {
       alert('Please fill in all required fields');
       return;
+    }
+
+    const policyType = getSelectedPolicyType();
+
+    // Enforce 14-day advance notice for vacation
+    if (policyType === 'vacation') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < ptoSettings.vacation_advance_days) {
+        alert(`Vacation requests must be submitted at least ${ptoSettings.vacation_advance_days} days in advance. Please contact your manager if you need an exception.`);
+        return;
+      }
+    }
+
+    // Confirm same-day call-in points deduction
+    if (sameDayWarning) {
+      const confirmed = window.confirm(`${sameDayWarning}\n\nDo you want to proceed?`);
+      if (!confirmed) return;
     }
 
     setSubmitting(true);
@@ -387,7 +466,7 @@ export function MyTimeOff() {
                 </label>
                 <select
                   value={selectedPolicy}
-                  onChange={(e) => setSelectedPolicy(e.target.value)}
+                  onChange={(e) => { setSelectedPolicy(e.target.value); setTimeout(() => { checkSameDayWarning(); checkVacationWarning(); }, 50); }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Select type...</option>
@@ -398,6 +477,20 @@ export function MyTimeOff() {
                   ))}
                 </select>
               </div>
+
+              {vacationWarning && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-amber-800">{vacationWarning}</span>
+                </div>
+              )}
+
+              {sameDayWarning && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-300 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-red-800">{sameDayWarning}</span>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -422,7 +515,7 @@ export function MyTimeOff() {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => { setStartDate(e.target.value); setTimeout(() => { checkSameDayWarning(); checkVacationWarning(); }, 50); }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
