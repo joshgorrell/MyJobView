@@ -51,17 +51,11 @@ const ProposalsView = lazy(() => import('./components/Proposals/ProposalsView'))
 const ConnectionsView = lazy(() => import('./components/Connections/ConnectionsView'));
 const ImprovementsView = lazy(() => import('./components/Improvements/ImprovementsView').then(m => ({ default: m.ImprovementsView })));
 const RecurView = lazy(() => import('./components/Recur/RecurView'));
-const DispatchDashboard = lazy(() => import('./components/Dispatch/DispatchDashboard').then(m => ({ default: m.DispatchDashboard })));
-const TechMap = lazy(() => import('./components/Dispatch/TechMap').then(m => ({ default: m.TechMap })));
-const TechStatusDashboard = lazy(() => import('./components/Dispatch/TechStatusDashboard').then(m => ({ default: m.TechStatusDashboard })));
+const DispatchConsole = lazy(() => import('./components/Dispatch/DispatchConsole').then(m => ({ default: m.DispatchConsole })));
+const ServiceRequestConsole = lazy(() => import('./components/Dispatch/ServiceRequestConsole').then(m => ({ default: m.ServiceRequestConsole })));
 const TravelBonusQueue = lazy(() => import('./components/Dispatch/TravelBonusQueue').then(m => ({ default: m.TravelBonusQueue })));
-const ServiceRequestQueue = lazy(() => import('./components/Dispatch/ServiceRequestQueue').then(m => ({ default: m.ServiceRequestQueue })));
-const ServiceRequestAnalytics = lazy(() => import('./components/Dispatch/ServiceRequestAnalytics').then(m => ({ default: m.ServiceRequestAnalytics })));
 const ProjectWorkOrdersQueue = lazy(() => import('./components/Dispatch/ProjectWorkOrdersQueue').then(m => ({ default: m.ProjectWorkOrdersQueue })));
-const JobStatusPanel = lazy(() => import('./components/Dispatch/JobStatusPanel').then(m => ({ default: m.JobStatusPanel })));
-const JobAcceptanceQueue = lazy(() => import('./components/Dispatch/JobAcceptanceQueue').then(m => ({ default: m.JobAcceptanceQueue })));
 const DispatchCustomerComms = lazy(() => import('./components/Dispatch/DispatchCustomerComms').then(m => ({ default: m.DispatchCustomerComms })));
-const TechSkillsFilter = lazy(() => import('./components/Dispatch/TechSkillsFilter').then(m => ({ default: m.TechSkillsFilter })));
 const WorkOrdersList = lazy(() => import('./components/Production/WorkOrdersList').then(m => ({ default: m.WorkOrdersList })));
 const WorkOrderDetail = lazy(() => import('./components/Production/WorkOrderDetail').then(m => ({ default: m.WorkOrderDetail })));
 const ChangeOrdersView = lazy(() => import('./components/Production/ChangeOrdersView').then(m => ({ default: m.ChangeOrdersView })));
@@ -972,8 +966,8 @@ function AppContent() {
           )}
           {activeTab === 'parts_requests' && checkModuleAccess('parts_requests') && <PartsRequestManagement key={activeTab} />}
           {activeTab === 'service_billing' && checkModuleAccess('service_billing') && <ServiceBillingQueue key={activeTab} />}
-          {activeTab === 'tech_map' && checkModuleAccess('tech_map') && <TechMap key={activeTab} />}
-          {activeTab === 'tech_status' && checkModuleAccess('tech_status') && <TechStatusDashboard key={activeTab} />}
+          {activeTab === 'tech_map' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="map" />}
+          {activeTab === 'tech_status' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="tech_status" />}
           {(activeTab === 'travel_bonus' || activeTab === 'travel_bonus_settings') && checkModuleAccess('travel_bonus') && <TravelBonusQueue key="travel_bonus" />}
 
           {activeTab === 'work_orders' && checkModuleAccess('work_orders') && (
@@ -996,7 +990,7 @@ function AppContent() {
             </div>
           )}
           {activeTab === 'tech_center' && checkModuleAccess('tech_center') && <TechnicianWorkCenter key={activeTab} />}
-          {activeTab === 'tech_stats' && checkModuleAccess('tech_stats') && <TechStats key={activeTab} onNavigate={setActiveTab} />}
+          {activeTab === 'tech_stats' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="tech_stats" />}
 
           {activeTab === 'sales_dashboard' && checkModuleAccess('sales_dashboard') && (
             <SalesDashboard
@@ -1020,7 +1014,7 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'sales_performance' && checkModuleAccess('sales_performance') && <SalesPerformance key={activeTab} />}
+          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={(tab) => setActiveTab(tab)} />}
           {activeTab === 'sales_activity' && checkModuleAccess('sales_activity') && <SalesActivity key={activeTab} />}
           {activeTab === 'pipeline_board' && checkModuleAccess('pipeline_board') && <PipelineBoard key={activeTab} />}
           {activeTab === 'prospects' && checkModuleAccess('prospects') && <ProspectsPage key={activeTab} />}
@@ -1041,16 +1035,16 @@ function AppContent() {
           {activeTab === 'report_templates' && checkModuleAccess('report_templates') && <ProposalTemplateManager key={activeTab} />}
 
           {activeTab === 'individual_dashboard' && checkModuleAccess('individual_dashboard') && <IndividualDashboard key={activeTab} onNavigate={setActiveTab} />}
-          {activeTab === 'team_leaderboard' && checkModuleAccess('team_leaderboard') && <TeamLeaderboard key={activeTab} />}
+          {activeTab === 'team_leaderboard' && checkModuleAccess('individual_dashboard') && <IndividualDashboard key={activeTab} onNavigate={setActiveTab} />}
 
-          {activeTab === 'dispatch_dashboard' && checkModuleAccess('dispatch_dashboard') && <DispatchDashboard key={activeTab} onNavigate={setActiveTab} />}
-          {activeTab === 'service_requests' && checkModuleAccess('service_requests') && <ServiceRequestQueue key={activeTab} />}
-          {activeTab === 'service_request_analytics' && checkModuleAccess('service_request_analytics') && <ServiceRequestAnalytics key={activeTab} />}
+          {activeTab === 'dispatch_dashboard' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} onNavigate={setActiveTab} />}
+          {activeTab === 'service_requests' && checkModuleAccess('service_requests') && <ServiceRequestConsole key={activeTab} />}
+          {activeTab === 'service_request_analytics' && checkModuleAccess('service_requests') && <ServiceRequestConsole key={activeTab} initialTab="analytics" />}
           {activeTab === 'project_work_orders' && checkModuleAccess('work_orders') && <ProjectWorkOrdersQueue key={activeTab} />}
-          {activeTab === 'job_status' && checkModuleAccess('dispatch_dashboard') && <JobStatusPanel key={activeTab} />}
-          {activeTab === 'job_acceptance' && checkModuleAccess('dispatch_dashboard') && <JobAcceptanceQueue key={activeTab} />}
+          {activeTab === 'job_status' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_status" />}
+          {activeTab === 'job_acceptance' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_acceptance" />}
           {activeTab === 'customer_comms' && checkModuleAccess('dispatch_dashboard') && <DispatchCustomerComms key={activeTab} />}
-          {activeTab === 'tech_skills' && checkModuleAccess('dispatch_dashboard') && <TechSkillsFilter key={activeTab} onTechnicianSelect={(techId) => console.log('Selected tech:', techId)} />}
+          {activeTab === 'tech_skills' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="tech_skills" />}
           {activeTab === 'daily_clock' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} />}
           {activeTab === 'daily_clock_sessions' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} initialTab="sessions" />}
 
@@ -1066,10 +1060,10 @@ function AppContent() {
 
           {activeTab === 'vip-plans' && checkModuleAccess('vip-plans') && <VIPPlanManagement key={activeTab} />}
           {activeTab === 'contract_management' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
-          {activeTab === 'security_onboarding' && checkModuleAccess('security_onboarding') && <SecurityOnboarding key={activeTab} onNavigateToContracts={() => setActiveTab('contract_management')} canAccessContractManagement={checkModuleAccess('contract_management')} />}
+          {activeTab === 'security_onboarding' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
           {activeTab === 'tax_reports' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={checkModuleAccess('tax_filing_guide') ? () => setActiveTab('tax_filing_guide') : undefined} />}
-          {activeTab === 'tax_filing_guide' && checkModuleAccess('tax_filing_guide') && <SalesTaxInstructions key={activeTab} />}
-          {activeTab === 'bonus_approvals' && checkModuleAccess('bonus_approvals') && <BonusApprovalDashboard key={activeTab} />}
+          {activeTab === 'tax_filing_guide' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={() => setActiveTab('tax_reports')} />}
+          {activeTab === 'bonus_approvals' && checkModuleAccess('commissions_management') && <CommissionsPage key={activeTab} />}
 
           {activeTab === 'portal_punchlist' && checkModuleAccess('punchlist') && <PortalPunchlist key={activeTab} />}
 
@@ -1132,9 +1126,9 @@ function AppContent() {
 
           {activeTab === 'contract_import' && profile.role === 'admin' && <SecurityContractCSVImport key={activeTab} />}
 
-          {activeTab === 'maintenance_agreements' && checkModuleAccess('maintenance_agreements') && <MaintenanceAgreements key={activeTab} />}
+          {activeTab === 'maintenance_agreements' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
 
-          {activeTab === 'equipment_warranty' && checkModuleAccess('equipment_warranty') && <EquipmentWarrantyAgreements key={activeTab} />}
+          {activeTab === 'equipment_warranty' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
 
           {activeTab === 'historical_sales_import' && profile.role === 'admin' && <HistoricalSalesImport key={activeTab} />}
 
