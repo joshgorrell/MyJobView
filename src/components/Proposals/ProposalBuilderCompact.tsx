@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare, Monitor } from 'lucide-react';
 import {
   recordCOAction,
   recordCOModifierChange,
@@ -622,6 +622,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [sending, setSending] = useState(false);
   const [recalling, setRecalling] = useState(false);
   const [showPortalDropdown, setShowPortalDropdown] = useState(false);
+  const [showDeliverDropdown, setShowDeliverDropdown] = useState(false);
+  const [previewHideCosts, setPreviewHideCosts] = useState(false);
   const [showPortalPreview, setShowPortalPreview] = useState(false);
   const [showMoreOptionsMenu, setShowMoreOptionsMenu] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -3468,102 +3470,136 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </>
             )}
 
-            {/* Send/Portal Button */}
+            {/* Deliver Dropdown */}
             {proposal?.status !== 'approved' && (
-              <>
-                {(proposal?.status === 'designing' || proposal?.status === 'ready_to_submit') ? (
-                  <div className="flex items-center gap-2">
-                    {proposalReadiness && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowDeliverDropdown(!showDeliverDropdown)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs ${
+                    (proposal?.status === 'sent' || proposal?.status === 'portal')
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : proposalReadiness?.isReady
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-gray-600/50 text-gray-300 hover:bg-gray-600/70 border border-gray-500/50'
+                  }`}
+                  title="Deliver proposal to customer"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span className="hidden sm:inline">Deliver</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {showDeliverDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowDeliverDropdown(false)} />
+                    <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[200px]">
+                      {/* Submit to Portal */}
                       <button
-                        onClick={() => setShowSettings(true)}
-                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                          proposalReadiness.isReady
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                        onClick={() => {
+                          setShowDeliverDropdown(false);
+                          handleSendToPortal();
+                        }}
+                        disabled={sending}
+                        className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm disabled:opacity-50 ${
+                          proposalReadiness?.isReady
+                            ? 'text-blue-600 hover:bg-blue-50'
+                            : 'text-gray-400 hover:bg-gray-50'
                         }`}
-                        title={`${proposalReadiness.overallProgress}% complete - Click to review settings`}
+                        title={proposalReadiness?.isReady ? "Submit to customer portal" : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
                       >
-                        {proposalReadiness.isReady ? (
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        ) : (
-                          <AlertCircle className="w-3.5 h-3.5" />
+                        <Globe className="w-4 h-4" />
+                        <span className="flex-1">Submit to Portal</span>
+                        {!proposalReadiness?.isReady && (
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
                         )}
-                        <span className="hidden sm:inline">{proposalReadiness.overallProgress}%</span>
                       </button>
-                    )}
-                    <button
-                      onClick={handleSendToPortal}
-                      disabled={sending}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs disabled:opacity-50 ${
-                        proposalReadiness?.isReady
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                          : 'bg-gray-600/50 text-gray-300 hover:bg-gray-600/70 border border-gray-500/50'
-                      }`}
-                      title={proposalReadiness?.isReady ? "Send to Customer Portal" : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete — finish settings, scope, billing & contract before sending`}
-                    >
-                      <Mail className="w-4 h-4" />
-                      <span className="hidden sm:inline">{sending ? 'Sending...' : 'Send'}</span>
-                    </button>
-                  </div>
-                ) : (proposal?.status === 'sent' || proposal?.status === 'portal' || proposal?.status === 'expired') && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowPortalDropdown(!showPortalDropdown)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium text-xs"
-                      title="Portal Actions"
-                    >
-                      <Eye className="w-4 h-4" />
-                      <span className="hidden sm:inline">Portal</span>
-                      <ChevronDown className="w-3 h-3" />
-                    </button>
 
-                    {showPortalDropdown && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setShowPortalDropdown(false)} />
-                        <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[180px]">
-                          <button
-                            onClick={openPortalPreview}
-                            className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            Preview
-                          </button>
-                          {proposal?.status === 'expired' && (
-                            <>
-                              <div className="border-t border-gray-200 my-1" />
-                              <button
-                                onClick={() => {
-                                  setShowReactivateModal(true);
-                                  setShowPortalDropdown(false);
-                                }}
-                                className="w-full px-3 py-2 text-left text-green-600 hover:bg-green-50 flex items-center gap-2 text-sm"
-                              >
-                                <RefreshCw className="w-4 h-4" />
-                                Reactivate
-                              </button>
-                            </>
+                      {/* Email */}
+                      <button
+                        onClick={() => {
+                          setShowEmailProposalModal(true);
+                          setShowDeliverDropdown(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm ${
+                          proposalReadiness?.isReady
+                            ? 'text-gray-700 hover:bg-gray-100'
+                            : 'text-gray-400 hover:bg-gray-50'
+                        }`}
+                        title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
+                      >
+                        <Mail className="w-4 h-4" />
+                        <span className="flex-1">Email Proposal</span>
+                        {!proposalReadiness?.isReady && (
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                        )}
+                      </button>
+
+                      {/* Download PDF */}
+                      <button
+                        onClick={() => {
+                          loadPdfTemplates();
+                          setShowPdfModal(true);
+                          setShowDeliverDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download PDF</span>
+                      </button>
+
+                      <div className="border-t border-gray-200 my-1" />
+
+                      {/* Present Live */}
+                      <button
+                        onClick={() => {
+                          openPortalPreview();
+                          setShowDeliverDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                      >
+                        <Monitor className="w-4 h-4" />
+                        <span>Present Live</span>
+                      </button>
+
+                      {/* Portal management for already-sent proposals */}
+                      {(proposal?.status === 'sent' || proposal?.status === 'portal' || proposal?.status === 'expired') && (
+                        <>
+                          <div className="border-t border-gray-200 my-1" />
+                          {proposal?.status === 'expired' ? (
+                            <button
+                              onClick={() => {
+                                setShowReactivateModal(true);
+                                setShowDeliverDropdown(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-green-600 hover:bg-green-50 flex items-center gap-2 text-sm"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              Reactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                handleRecallProposal();
+                                setShowDeliverDropdown(false);
+                              }}
+                              disabled={recalling}
+                              className="w-full px-3 py-2 text-left text-amber-600 hover:bg-amber-50 flex items-center gap-2 text-sm disabled:opacity-50"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              {recalling ? 'Recalling...' : 'Recall from Portal'}
+                            </button>
                           )}
-                          {proposal?.status !== 'expired' && (
-                            <>
-                              <div className="border-t border-gray-200 my-1" />
-                              <button
-                                onClick={handleRecallProposal}
-                                disabled={recalling}
-                                className="w-full px-3 py-2 text-left text-amber-600 hover:bg-amber-50 flex items-center gap-2 text-sm disabled:opacity-50"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                                {recalling ? 'Recalling...' : 'Recall'}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
+              </div>
+            )}
 
-                {/* Status Actions Dropdown */}
-                <div className="relative">
+            {/* Status Actions Dropdown */}
+            {proposal?.status !== 'approved' && (
+            <div className="relative">
                   <button
                     onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs ${
@@ -3643,7 +3679,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     </>
                   )}
                 </div>
-              </>
             )}
 
             {/* Add Item Button */}
@@ -3724,37 +3759,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           {activeFilterCount}
                         </span>
                       )}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setShowEmailProposalModal(true);
-                        setShowMoreOptionsMenu(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm ${
-                        proposalReadiness?.isReady
-                          ? 'text-gray-700 hover:bg-gray-100'
-                          : 'text-gray-400 hover:bg-gray-50'
-                      }`}
-                      title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete — finish settings before emailing`}
-                    >
-                      <Mail className="w-4 h-4" />
-                      <span className="flex-1">Email Proposal</span>
-                      {!proposalReadiness?.isReady && (
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        loadPdfTemplates();
-                        setShowPdfModal(true);
-                        setShowMoreOptionsMenu(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Download PDF</span>
                     </button>
 
                     <div className="border-t border-gray-200 my-1" />
@@ -7142,6 +7146,27 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             )}
             <div className="flex-1" />
             <button
+              onClick={() => setPreviewHideCosts(!previewHideCosts)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-all ${
+                previewHideCosts
+                  ? 'bg-blue-600 text-white border-blue-500 hover:bg-blue-700'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-700 border-gray-600 hover:border-gray-500'
+              }`}
+              title={previewHideCosts ? 'Show prices in preview' : 'Hide prices in preview'}
+            >
+              {previewHideCosts ? (
+                <>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Show Prices</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Hide Prices</span>
+                </>
+              )}
+            </button>
+            <button
               onClick={() => setShowPortalPreview(false)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600 hover:border-gray-500 rounded-lg transition-all"
             >
@@ -7155,6 +7180,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               onBack={() => setShowPortalPreview(false)}
               previewMode={true}
               templateOverrideId={proposal?.report_template_id ?? null}
+              hideCostsOverride={previewHideCosts}
             />
           </div>
         </div>,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProposalWithDetails } from '../../lib/types';
-import { Save, Send, Eye, DollarSign, Users, RefreshCw, Clock, Mail, MessageSquare, RotateCcw, ChevronDown, ExternalLink, Activity, X, Check, Download, Globe, EyeOff, CreditCard as Edit2, Calendar, Ban, AlertTriangle } from 'lucide-react';
+import { Save, Send, Eye, DollarSign, Users, RefreshCw, Clock, Mail, MessageSquare, RotateCcw, ChevronDown, ExternalLink, Activity, X, Check, Download, Globe, EyeOff, CreditCard as Edit2, Calendar, Ban, AlertTriangle, Monitor } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ResubmitProposalModal from './ResubmitProposalModal';
@@ -1004,14 +1004,23 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
         </button>
 
         {(currentStatus === 'designing' || currentStatus === 'ready_to_submit') ? (
-          <button
-            onClick={handleSendToPortal}
-            disabled={sending}
-            className="w-full py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 text-white rounded-lg font-medium flex items-center justify-center gap-2"
-          >
-            <Mail size={18} />
-            {sending ? 'Sending...' : 'Send to Portal'}
-          </button>
+          <>
+            <button
+              onClick={handleSendToPortal}
+              disabled={sending}
+              className="w-full py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+            >
+              <Mail size={18} />
+              {sending ? 'Sending...' : 'Send to Portal'}
+            </button>
+            <button
+              onClick={openPortalPreview}
+              className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+            >
+              <Monitor size={18} />
+              Present Live
+            </button>
+          </>
         ) : (
           <div className="relative" ref={dropdownRef}>
             <button
@@ -1036,8 +1045,8 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
                   onClick={openPortalPreview}
                   className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                 >
-                  <ExternalLink size={16} />
-                  Open Portal Preview
+                  <Monitor size={16} />
+                  Present Live
                 </button>
                 <button
                   onClick={() => {

@@ -206,9 +206,11 @@ interface PortalProposalDetailProps {
   hideExpiration?: boolean;
   /** Override the display number shown in the header (e.g. Sales Order number instead of proposal number) */
   overrideDisplayNumber?: string;
+  /** When true, hide all price/cost columns (used by live present mode) */
+  hideCostsOverride?: boolean;
 }
 
-export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMode = false, templateOverrideId, hideExpiration = false, overrideDisplayNumber }: PortalProposalDetailProps) {
+export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMode = false, templateOverrideId, hideExpiration = false, overrideDisplayNumber, hideCostsOverride = false }: PortalProposalDetailProps) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [rooms, setRooms] = useState<ProposalRoom[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -981,10 +983,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                             {template?.show_quantity && (
                               <th className="text-center py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Qty</th>
                             )}
-                            {template?.show_unit_price && (
+                            {template?.show_unit_price && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Price</th>
                             )}
-                            {template?.show_line_item_total && (
+                            {template?.show_line_item_total && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Total</th>
                             )}
                           </tr>
@@ -1014,12 +1016,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               {template?.show_quantity && (
                                 <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
                               )}
-                              {template?.show_unit_price && (
+                              {template?.show_unit_price && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm text-gray-700">
                                   {formatCurrency(item.unit_price)}
                                 </td>
                               )}
-                              {template?.show_line_item_total && (
+                              {template?.show_line_item_total && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
                                   {formatCurrency(item.line_total)}
                                 </td>
@@ -1027,15 +1029,15 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                             </tr>
                           ))}
                         </tbody>
-                        {template?.show_area_subtotals && (
+                        {template?.show_area_subtotals && !hideCostsOverride && (
                           <tfoot className="bg-gray-50">
                             <tr>
                               <td colSpan={
                                 (showImages ? 1 : 0) +
                                 1 +
                                 (template?.show_quantity ? 1 : 0) +
-                                (template?.show_unit_price ? 1 : 0) +
-                                (template?.show_line_item_total ? 1 : 0) - 1
+                                (template?.show_unit_price && !hideCostsOverride ? 1 : 0) +
+                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) - 1
                               } className="pt-4 pb-4 pr-4 text-right font-bold text-gray-900 text-sm uppercase tracking-wide">
                                 Room Subtotal:
                               </td>
@@ -1081,10 +1083,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                             {template?.show_quantity && (
                               <th className="text-center py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Qty</th>
                             )}
-                            {template?.show_unit_price && (
+                            {template?.show_unit_price && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Price</th>
                             )}
-                            {template?.show_line_item_total && (
+                            {template?.show_line_item_total && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Total</th>
                             )}
                           </tr>
@@ -1114,12 +1116,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               {template?.show_quantity && (
                                 <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
                               )}
-                              {template?.show_unit_price && (
+                              {template?.show_unit_price && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm text-gray-700">
                                   {formatCurrency(item.unit_price)}
                                 </td>
                               )}
-                              {template?.show_line_item_total && (
+                              {template?.show_line_item_total && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
                                   {formatCurrency(item.line_total)}
                                 </td>
@@ -1134,8 +1136,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 (showImages ? 1 : 0) +
                                 1 +
                                 (template?.show_quantity ? 1 : 0) +
-                                (template?.show_unit_price ? 1 : 0) +
-                                (template?.show_line_item_total ? 1 : 0) - 1
+                                (template?.show_unit_price && !hideCostsOverride ? 1 : 0) +
+                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) - 1
                               } className="pt-4 pb-4 pr-4 text-right font-bold text-gray-900 text-sm uppercase tracking-wide">
                                 Subtotal:
                               </td>
@@ -1180,6 +1182,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               </div>
 
               {/* Total Amount */}
+              {!hideCostsOverride && (
               <div className="mb-6">
                 <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
                   <div className="text-center">
@@ -1190,6 +1193,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   </div>
                 </div>
               </div>
+              )}
 
               {!hideExpiration && proposal.valid_until && (
                 <div className="mb-6 flex items-center gap-2 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
