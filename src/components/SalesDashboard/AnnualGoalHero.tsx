@@ -1,9 +1,10 @@
-import { Target, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, Minus, Trophy } from 'lucide-react';
 import { computeGoalProgress } from '../../lib/salesDashboardCalculations';
 import type { SalesDashboardResult } from '../../lib/salesDashboardTypes';
 
 interface AnnualGoalHeroProps {
   data: SalesDashboardResult;
+  teamRank?: { rank: number; total: number } | null;
 }
 
 function formatCurrency(value: number): string {
@@ -12,7 +13,7 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-export function AnnualGoalHero({ data }: AnnualGoalHeroProps) {
+export function AnnualGoalHero({ data, teamRank }: AnnualGoalHeroProps) {
   const goal = computeGoalProgress(data);
 
   if (!goal.hasQuota) {
@@ -57,6 +58,12 @@ export function AnnualGoalHero({ data }: AnnualGoalHeroProps) {
               {goal.status !== 'on_track' && <TrendIcon className="w-3 h-3" />}
               {statusLabel}
             </span>
+            {teamRank && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                <Trophy className="w-3 h-3" />
+                #{teamRank.rank} of {teamRank.total}
+              </span>
+            )}
           </div>
         </div>
 

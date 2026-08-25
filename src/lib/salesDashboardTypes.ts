@@ -39,6 +39,57 @@ export interface MonthlyTrendPoint {
   count: number;
 }
 
+export interface HotLead {
+  id: string;
+  companyName: string;
+  contactName: string;
+  estimatedValue: number;
+  priority: string;
+  status: string;
+}
+
+export interface StaleLead {
+  id: string;
+  companyName: string;
+  contactName: string;
+  estimatedValue: number;
+  priority: string;
+  lastContactDate: string | null;
+  daysSinceContact: number;
+}
+
+export interface DeclineReason {
+  reason: string;
+  count: number;
+  byCustomer: number;
+  byRep: number;
+}
+
+export interface RecentProposal {
+  id: string;
+  proposalNumber: string;
+  status: string;
+  total: number;
+  customerName: string;
+  createdAt: string;
+}
+
+export interface RecentActivityItem {
+  id: string;
+  type: 'connection' | 'lead_created' | 'proposal_created';
+  createdAt: string;
+  title: string;
+  description: string;
+}
+
+export interface PeriodStats {
+  contactsAdded: number;
+  connectionsLogged: number;
+  proposalsCreated: number;
+  proposalsExpired: number;
+  proposalsDeclined: number;
+}
+
 export interface SalesDashboardResult {
   repId: string;
   repDisplayName: string;
@@ -52,6 +103,14 @@ export interface SalesDashboardResult {
   ytdCount?: number;
   prevYearTotal?: number;
   allTimeTotal?: number;
+  hotLeads?: HotLead[];
+  staleLeads?: StaleLead[];
+  declineReasons?: DeclineReason[];
+  expiredProposalsCount?: number;
+  teamRank?: { rank: number; total: number } | null;
+  recentProposals?: RecentProposal[];
+  recentActivity?: RecentActivityItem[];
+  periodStats?: PeriodStats;
 }
 
 export interface LeaderboardEntry {
@@ -89,10 +148,8 @@ export interface AttentionItem {
 export type DashboardTab =
   | 'daily_recap'
   | 'overview'
-  | 'performance'
   | 'pipeline'
   | 'proposals'
-  | 'activity'
-  | 'history';
+  | 'activity';
 
 export type DashboardScope = 'self' | 'rep' | 'team';

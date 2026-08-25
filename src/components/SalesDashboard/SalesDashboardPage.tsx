@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
 import { useSalesDashboard, useSalesLeaderboard } from '../../hooks/useSalesDashboard';
 import { computeGoalProgress, computeAttentionItems } from '../../lib/salesDashboardCalculations';
 import type { DashboardTab, SalesDashboardResult } from '../../lib/salesDashboardTypes';
@@ -11,7 +10,13 @@ import { SalesGoalLeaderboard } from './SalesGoalLeaderboard';
 import { SalesAttentionList } from './SalesAttentionList';
 import { ManagerRepSelector } from './ManagerRepSelector';
 import { DashboardSkeleton } from './DashboardSkeleton';
-import { RefreshCw, AlertCircle, LayoutDashboard, TrendingUp, FileText, Users, Activity, History, BarChart3, Sunrise } from 'lucide-react';
+import { HotLeadsCard } from './HotLeadsCard';
+import { StaleLeadsCard } from './StaleLeadsCard';
+import { DeclineReasonsCard } from './DeclineReasonsCard';
+import { PeriodStatsRow } from './PeriodStatsRow';
+import { RecentProposalsCard } from './RecentProposalsCard';
+import { RecentActivityCard } from './RecentActivityCard';
+import { RefreshCw, AlertCircle, LayoutDashboard, FileText, Activity, BarChart3, Sunrise } from 'lucide-react';
 import { DailyRecap } from './DailyRecap';
 import { DailySalesTotalsPanel } from './DailySalesTotalsPanel';
 
@@ -41,11 +46,9 @@ interface SalesDashboardPageProps {
 const TAB_CONFIG: { key: DashboardTab; label: string; icon: typeof LayoutDashboard }[] = [
   { key: 'daily_recap', label: 'Daily Recap', icon: Sunrise },
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { key: 'performance', label: 'Performance', icon: TrendingUp },
   { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
   { key: 'proposals', label: 'Proposals', icon: FileText },
   { key: 'activity', label: 'Activity', icon: Activity },
-  { key: 'history', label: 'History', icon: History },
 ];
 
 export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavigateToTab }: SalesDashboardPageProps) {
@@ -57,7 +60,6 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     ? ['admin', 'manager', 'sales_manager'].includes(profile.role)
     : false;
 
-  // For regular reps: always show their own data. For managers: default to self.
   const effectiveRepId = isManager
     ? (selectedRepId || profile?.id || null)
     : (profile?.id || null);
@@ -71,7 +73,6 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
   const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
 
-  // Emit AI context when data changes
   useEffect(() => {
     if (!onRepContextChange || !data) return;
 
@@ -106,6 +107,20 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const handleNavigate = useCallback((tab: string) => {
     setActiveTab(tab as DashboardTab);
   }, []);
+
+  const handleNavigateToPipeline = useCallback(() => {
+    if (onNavigateToTab) onNavigateToTab('pipeline_board');
+    else handleNavigate('pipeline');
+  }, [onNavigateToTab, handleNavigate]);
+
+  const handleNavigateToProposals = useCallback(() => {
+    if (onNavigateToTab) onNavigateToTab('proposals');
+    else if (onProposalClick) onProposalClick('');
+  }, [onNavigateToTab, onProposalClick]);
+
+  const handleNavigateToActivity = useCallback(() => {
+    if (onNavigateToTab) onNavigateToTab('sales_activity');
+  }, [onNavigateToTab]);
 
   if (loading) {
     return (
@@ -218,12 +233,9 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <DailySalesTotalsPanel
-            repId={effectiveRepId}
-            onUpdateReport={profile?.role === 'admin' ? () => onNavigateToTab?.('daily_sales_report_import') : undefined}
-          />
-          <AnnualGoalHero data={data} />
+          <AnnualGoalHero data={data} teamRank={data.teamRank ?? null} />
           <SalesKpiGrid data={data} />
+          {data.periodStats && <PeriodStatsRow stats={data.periodStats} />}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <SalesTrendChart data={data} />
@@ -233,14 +245,17 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             </div>
           </div>
           <SalesAttentionList items={attentionItems} onNavigate={handleNavigate} />
-        </div>
-      )}
-
-      {activeTab === 'performance' && (
-        <div className="space-y-6">
-          <AnnualGoalHero data={data} />
-          <SalesTrendChart data={data} />
-          <SalesKpiGrid data={data} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <HotLeadsCard leads={data.hotLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
+            <StaleLeadsCard leads={data.staleLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <RecentProposalsCard proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
+            <RecentActivityCard activities={data.recentActivity ?? []} onNavigateToActivity={handleNavigateToActivity} />
+          </div>
+          {(data.declineReasons ?? []).length > 0 && (
+            <DeclineReasonsCard reasons={data.declineReasons ?? []} />
+          )}
         </div>
       )}
 
@@ -248,7 +263,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
         <div className="space-y-6">
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-sm font-medium text-gray-700 mb-4">Pipeline Summary</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Pipeline Value</p>
                 <p className="text-2xl font-bold text-gray-900">
@@ -259,43 +274,40 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Active Proposals</p>
                 <p className="text-2xl font-bold text-gray-900">{data.pipeline.count}</p>
               </div>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Close Rate</p>
+                <p className="text-2xl font-bold text-gray-900">{data.closeRate.pct}%</p>
+                <p className="text-xs text-gray-400 mt-0.5">{data.closeRate.wonCount} won / {data.closeRate.wonCount + data.closeRate.lostCount} closed</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Run Rate (90d)</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {data.runRate90Day >= 1000 ? `$${(data.runRate90Day / 1000).toFixed(0)}K` : `$${data.runRate90Day.toFixed(0)}`}
+                </p>
+              </div>
             </div>
           </div>
-          <SalesKpiGrid data={data} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <HotLeadsCard leads={data.hotLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
+            <StaleLeadsCard leads={data.staleLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
+          </div>
+          <RecentProposalsCard proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
         </div>
       )}
 
       {activeTab === 'proposals' && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Proposals</h3>
-          <p className="text-sm text-gray-500">
-            Your proposals are being loaded. Use the main Proposals tab in the sidebar for the full list.
-          </p>
-          {onProposalClick && (
-            <button
-              onClick={() => onProposalClick('')}
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              Go to Proposals
-            </button>
+        <div className="space-y-6">
+          <RecentProposalsCard proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
+          {(data.declineReasons ?? []).length > 0 && (
+            <DeclineReasonsCard reasons={data.declineReasons ?? []} />
           )}
         </div>
       )}
 
       {activeTab === 'activity' && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Activity</h3>
-          <p className="text-sm text-gray-500">
-            Detailed activity tracking is available in the Sales Activity module.
-          </p>
-        </div>
-      )}
-
-      {activeTab === 'history' && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Sales History</h3>
-          <SalesTrendChart data={data} />
+        <div className="space-y-6">
+          <RecentActivityCard activities={data.recentActivity ?? []} onNavigateToActivity={handleNavigateToActivity} />
+          {data.periodStats && <PeriodStatsRow stats={data.periodStats} />}
         </div>
       )}
     </div>

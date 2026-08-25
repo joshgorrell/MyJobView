@@ -259,5 +259,21 @@ export function computeAttentionItems(data: SalesDashboardResult): AttentionItem
     });
   }
 
-  return items.slice(0, 5);
+  if (data.expiredProposalsCount && data.expiredProposalsCount > 0) {
+    items.push({
+      severity: 'warning',
+      title: `${data.expiredProposalsCount} Expired Proposal${data.expiredProposalsCount !== 1 ? 's' : ''}`,
+      description: 'Follow up on expired proposals to re-engage those customers.',
+      actionLabel: 'View Proposals',
+      actionTab: 'proposals',
+    });
+  }
+
+  return items.slice(0, 6);
+}
+
+export function formatCurrencyValue(value: number): string {
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+  return `${value.toFixed(0)}`;
 }

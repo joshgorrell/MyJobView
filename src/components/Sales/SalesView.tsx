@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { SalesDashboard } from './SalesDashboard';
 import { PipelineBoard } from './PipelineBoard';
-import { SalesActivity } from './SalesActivity';
-import { SalesPerformance } from './SalesPerformance';
 import { ContactsView } from '../Contacts/ContactsView';
 import ProposalsView from '../Proposals/ProposalsView';
 import ProjectsView from '../Projects/ProjectsView';
@@ -16,20 +13,16 @@ import VideoLibrary from './VideoLibrary';
 import { OfficeSalesBreakdown } from './OfficeSalesBreakdown';
 import { SalesOrdersView } from './SalesOrdersView';
 import {
-  LayoutDashboard,
   Target,
-  Activity,
-  TrendingUp,
   Users,
   FileText,
   FolderOpen,
-  DollarSign,
-  Percent,
   Receipt,
   PhoneCall,
   LineChart,
   Film,
-  Building2
+  Building2,
+  DollarSign
 } from 'lucide-react';
 
 interface SalesViewProps {
@@ -46,7 +39,7 @@ interface QuickStats {
   serviceRequestsAwaitingContact: number;
 }
 
-export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
+export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
   const { profile } = useAuth();
   const [activeView, setActiveView] = useState(initialView);
   const [officeFilter, setOfficeFilter] = useState<{ id: string; name: string } | null>(null);
@@ -155,47 +148,12 @@ export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
     }
   }
 
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}K`;
-    }
-    return `$${value.toFixed(0)}`;
-  };
-
-  const targetProgress = Math.min(
-    Math.round((quickStats.monthlyRevenue / quickStats.monthlyGoal) * 100),
-    100
-  );
-
   const allViews = [
-    {
-      id: 'dashboard',
-      name: 'Dashboard',
-      icon: LayoutDashboard,
-      component: SalesDashboard,
-      badge: 0
-    },
     {
       id: 'pipeline',
       name: 'Pipeline',
       icon: Target,
       component: PipelineBoard,
-      badge: 0
-    },
-    {
-      id: 'activity',
-      name: 'Activity',
-      icon: Activity,
-      component: SalesActivity,
-      badge: 0
-    },
-    {
-      id: 'performance',
-      name: 'Performance',
-      icon: TrendingUp,
-      component: SalesPerformance,
       badge: 0
     },
     {
@@ -246,7 +204,7 @@ export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
       id: 'by_office',
       name: 'By Office',
       icon: Building2,
-      component: SalesDashboard as React.ComponentType,
+      component: OfficeSalesBreakdown,
       badge: 0
     }] : []),
     // Commissions tab - visible to all sales-eligible roles (personal view of own commissions)
@@ -268,7 +226,7 @@ export function SalesView({ initialView = 'dashboard' }: SalesViewProps) {
 
   const views = allViews;
 
-  const ActiveComponent = views.find(v => v.id === activeView)?.component || SalesDashboard;
+  const ActiveComponent = views.find(v => v.id === activeView)?.component || PipelineBoard;
 
   function handleNavigateToOffice(officeId: string, officeName: string) {
     setOfficeFilter({ id: officeId, name: officeName });
