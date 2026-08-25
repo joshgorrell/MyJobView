@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
-import { QaDot } from '../Shared/QaDot';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
 
 interface ProposalRecording {
@@ -936,11 +935,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <Package className="w-5 h-5 text-blue-400" />
                       </div>
                       <h3 className="text-lg sm:text-xl font-bold text-white flex-1">{room.name}</h3>
-                      <QaDot
-                        hasMessages={messagesByContext[room.id] || false}
-                        unreadCount={unreadByContext[room.id] || 0}
-                        onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
-                      />
                     </div>
                   </div>
 
@@ -972,13 +966,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <p className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed ml-6">
                           {room.description}
                         </p>
-                        <div className="mt-3 ml-6">
-                          <QaDot
-                            hasMessages={messagesByContext[room.id] || false}
-                            unreadCount={unreadByContext[room.id] || 0}
-                            onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
-                          />
-                        </div>
                       </div>
                     </div>
                   )}
@@ -1022,11 +1009,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               <td className="py-4">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
-                                  <QaDot
-                                    hasMessages={messagesByContext[item.id] || false}
-                                    unreadCount={unreadByContext[item.id] || 0}
-                                    onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
-                                  />
                                 </div>
                               </td>
                               {template?.show_quantity && (
@@ -1127,11 +1109,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               <td className="py-4">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
-                                  <QaDot
-                                    hasMessages={messagesByContext[item.id] || false}
-                                    unreadCount={unreadByContext[item.id] || 0}
-                                    onClick={() => { setQaContext({ roomId: room?.id || null, lineItemId: item.id, label: item.description }); setShowQA(true); }}
-                                  />
                                 </div>
                               </td>
                               {template?.show_quantity && (

@@ -119,7 +119,7 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState<'all' | 'customer' | 'internal'>('all');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'customer' | 'proposals' | 'internal'>('all');
   const [isInternal, setIsInternal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
@@ -500,10 +500,13 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
       t.last_message_preview?.toLowerCase().includes(searchQuery.toLowerCase());
 
     if (filterCategory === 'customer') {
-      return matchesSearch && t.visibility === 'public' && t.proposal_id !== null;
+      return matchesSearch && t.visibility === 'public';
+    }
+    if (filterCategory === 'proposals') {
+      return matchesSearch && t.proposal_id !== null;
     }
     if (filterCategory === 'internal') {
-      return matchesSearch && (t.visibility === 'internal' || t.proposal_id === null);
+      return matchesSearch && (t.visibility === 'internal' || (t.proposal_id === null && t.visibility !== 'public'));
     }
     return matchesSearch;
   });
@@ -602,7 +605,15 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
                   filterCategory === 'customer' ? 'bg-green-100 text-green-700 font-medium' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Customer Q&A
+                Customer
+              </button>
+              <button
+                onClick={() => setFilterCategory('proposals')}
+                className={`flex-1 px-3 py-2 sm:py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'proposals' ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Proposals
               </button>
               <button
                 onClick={() => setFilterCategory('internal')}

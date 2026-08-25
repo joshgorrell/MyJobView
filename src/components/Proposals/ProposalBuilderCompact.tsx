@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare } from 'lucide-react';
 import {
   recordCOAction,
   recordCOModifierChange,
@@ -30,7 +30,6 @@ import ApprovalActionModal from './ApprovalActionModal';
 import { PreSendValidationModal } from './PreSendValidationModal';
 import { ReactivateProposalModal } from './ReactivateProposalModal';
 import { ProposalQA } from './ProposalQA';
-import { QaDot } from '../Shared/QaDot';
 import BulkUpdateConfirmationModal from './BulkUpdateConfirmationModal';
 import BulkUpdateProjectInfoModal from './BulkUpdateProjectInfoModal';
 import TwoPhaseLaborEditor from './TwoPhaseLaborEditor';
@@ -675,6 +674,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
   const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
   const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
+  const totalUnreadCount = Object.values(unreadByContext).reduce((sum, n) => sum + n, 0);
 
   // CO mode state
   const [coLineItems, setCoLineItems] = useState<COLineItemRecord[]>([]);
@@ -3851,6 +3851,25 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       </button>
                     )}
 
+                    {proposal && (proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'approved_pending_action' || proposal.status === 'declined' || proposal.status === 'expired') && (
+                      <button
+                        onClick={() => {
+                          setQaContext({ roomId: null, lineItemId: null, label: null });
+                          setShowQA(true);
+                          setShowMoreOptionsMenu(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Discussion</span>
+                        {totalUnreadCount > 0 && (
+                          <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
+                            {totalUnreadCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
                     <div className="border-t border-gray-200 my-1" />
 
                     {/* Settings */}
@@ -4549,13 +4568,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 >
                                   {room.name}
                                 </h3>
-                                {room.id !== '__unassigned__' && (
-                                  <QaDot
-                                    hasMessages={messagesByContext[room.id] || false}
-                                    unreadCount={unreadByContext[room.id] || 0}
-                                    onClick={() => { setQaContext({ roomId: room.id, lineItemId: null, label: room.name }); setShowQA(true); }}
-                                  />
-                                )}
+
                                 {room.id !== '__unassigned__' && room.description && room.show_scope && (
                                   <span className="text-xs text-gray-400 italic">
                                     {room.description}
@@ -4737,11 +4750,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         {isNested && !isCoRemoved && '↳ '}
                                         {item.description}
                                       </span>
-                                      <QaDot
-                                        hasMessages={messagesByContext[item.id] || false}
-                                        unreadCount={unreadByContext[item.id] || 0}
-                                        onClick={() => { setQaContext({ roomId: room.id, lineItemId: item.id, label: item.description }); setShowQA(true); }}
-                                      />
+
                                       {isCoAdded && (
                                         <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-emerald-800 text-emerald-300 shrink-0">NEW</span>
                                       )}

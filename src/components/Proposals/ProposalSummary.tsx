@@ -5,7 +5,6 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ResubmitProposalModal from './ResubmitProposalModal';
 import { ProposalQA } from './ProposalQA';
-import { QaDot } from '../Shared/QaDot';
 import { ProposalSubmissionModal } from './ProposalSubmissionModal';
 import { ReactivateProposalModal } from './ReactivateProposalModal';
 import ConfirmModal from '../ui/ConfirmModal';
