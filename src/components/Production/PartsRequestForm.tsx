@@ -455,6 +455,33 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
               </div>
             </div>
 
+            {/* Selected Source Summary */}
+            {sourceType !== 'general' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3">
+                {sourceType === 'sales_order' && <ShoppingCart className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+                {sourceType === 'work_order' && <Wrench className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+                {sourceType === 'service_request' && <ClipboardList className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-blue-900">
+                    {sourceType === 'sales_order' && (salesOrderId
+                      ? `Sales Order: ${salesOrders.find(so => so.id === salesOrderId)?.order_number || ''} - ${salesOrders.find(so => so.id === salesOrderId)?.contact ? `${salesOrders.find(so => so.id === salesOrderId)?.contact?.first_name} ${salesOrders.find(so => so.id === salesOrderId)?.contact?.last_name}` : ''}`
+                      : 'Select a sales order below')}
+                    {sourceType === 'work_order' && (workOrderId || projectId
+                      ? `${workOrderId ? `WO: ${workOrders.find(wo => wo.id === workOrderId)?.wo_number || ''}` : ''}${workOrderId && projectId ? ' - ' : ''}${projectId ? `Project: ${projects.find(p => p.id === projectId)?.project_name || ''}` : ''}`
+                      : 'Select a project or work order below')}
+                    {sourceType === 'service_request' && (serviceRequestId
+                      ? `Service Request: ${serviceRequests.find(sr => sr.id === serviceRequestId)?.customer_name || ''}`
+                      : 'Select a service request below')}
+                  </div>
+                  <div className="text-xs text-blue-700 mt-0.5">
+                    {(!salesOrderId && sourceType === 'sales_order') || (!workOrderId && !projectId && sourceType === 'work_order') || (!serviceRequestId && sourceType === 'service_request')
+                      ? 'A selection is required before submitting'
+                      : 'Source confirmed'}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Office Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Office</label>
@@ -488,6 +515,9 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                       </option>
                     ))}
                   </select>
+                  {salesOrders.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">No sales orders available. Create or approve a sales order first.</p>
+                  )}
                 </div>
 
                 {salesOrderLineItems.length > 0 && (
@@ -567,6 +597,9 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                       </option>
                     ))}
                   </select>
+                  {projects.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">No active projects available.</p>
+                  )}
                   {!projectId && !workOrderId && (
                     <p className="text-xs text-red-600 mt-1">Required: Select Project or WO</p>
                   )}
@@ -587,6 +620,9 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                       </option>
                     ))}
                   </select>
+                  {workOrders.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">No active work orders available.</p>
+                  )}
                   {!projectId && !workOrderId && (
                     <p className="text-xs text-red-600 mt-1">Required: Select Project or WO</p>
                   )}
@@ -611,6 +647,9 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
                     </option>
                   ))}
                 </select>
+                {serviceRequests.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No service requests available.</p>
+                )}
               </div>
             )}
 

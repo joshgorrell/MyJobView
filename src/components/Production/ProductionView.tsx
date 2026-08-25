@@ -6,19 +6,9 @@ import { ChangeOrdersView } from './ChangeOrdersView';
 import { TechnicianWorkCenter } from './TechnicianWorkCenter';
 import { VIPProgramView } from './VIPProgramView';
 import { ProductionManagerDashboard } from './ProductionManagerDashboard';
-import { PartsRequestQueue } from './PartsRequestQueue';
+import { PartsRequestManagement } from './PartsRequestManagement';
 import { QuickStatsBar } from './QuickStatsBar';
-import {
-  ClipboardList,
-  FileEdit,
-  Package,
-  CheckSquare,
-  Wrench,
-  Star,
-  LayoutDashboard,
-  ShoppingCart,
-  Award
-} from 'lucide-react';
+import { ClipboardList, File as FileEdit, Package, CheckSquare, Wrench, Star, LayoutDashboard, ShoppingCart, Award } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ProductionViewProps {
@@ -54,7 +44,7 @@ export function ProductionView({ initialView }: ProductionViewProps) {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'parts_requests'
+        table: 'product_requests'
       }, loadBadges)
       .on('postgres_changes', {
         event: '*',
@@ -70,13 +60,13 @@ export function ProductionView({ initialView }: ProductionViewProps) {
 
   async function loadBadges() {
     try {
-      const queries = [];
+      const queries: any[] = [];
 
       queries.push(
         supabase
-          .from('parts_requests')
+          .from('product_requests')
           .select('id')
-          .eq('status', 'pending')
+          .in('status', ['pending', 'approved'])
       );
 
       if (isTech) {
@@ -209,7 +199,7 @@ export function ProductionView({ initialView }: ProductionViewProps) {
             {activeView === 'work_orders' && (
               <WorkOrdersList onSelectWorkOrder={setSelectedWorkOrderId} />
             )}
-            {activeView === 'parts_queue' && <PartsRequestQueue />}
+            {activeView === 'parts_queue' && <PartsRequestManagement />}
             {activeView === 'change_orders' && <ChangeOrdersView />}
             {activeView === 'materials' && (
               <div className="text-center text-gray-500 py-12">
