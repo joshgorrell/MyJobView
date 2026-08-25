@@ -71,9 +71,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [salesReps, setSalesReps] = useState<{ id: string; full_name: string; first_name: string }[]>([]);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
 
-  // Load user preferences once on mount, then trigger proposal load
+  // Load user preferences once on mount (non-blocking — defaults are safe)
   useEffect(() => {
-    if (profile && !preferencesLoaded) {
+    if (profile) {
       loadPreferences().catch(err => {
         console.error('Failed to load preferences:', err);
         setPreferencesLoaded(true);
@@ -89,25 +89,25 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load proposals and pending deposits in parallel when filters or pagination changes.
-  // Wait for preferences to be loaded so we use the correct hide* values from the start.
+  // Load proposals when filters or pagination changes.
+  // Preferences load in parallel — defaults (show everything) are safe until prefs arrive.
   useEffect(() => {
-    if (authLoading || !preferencesLoaded) {
+    if (authLoading || !profile) {
+      setLoading(false);
       return;
     }
 
-    if (profile) {
-      setLoading(true);
-      Promise.all([
-        loadProposals().catch(err => console.error('Failed to load proposals:', err)),
-        loadPendingDeposits().catch(err => console.error('Failed to load pending deposits:', err))
-      ]);
-    } else {
-      setLoading(false);
-    }
-  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, preferencesLoaded, selectedRepId]);
+    setLoading(true);
+    loadProposals().catch(err => console.error('Failed to load proposals:', err));
+  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, selectedRepId]);
 
   // Reset to page 1 when filter/sort criteria change (but not when currentPage itself changes).
+  // Load pending deposits only when profile or rep filter changes (not on every page/sort change)
+  useEffect(() => {
+    if (authLoading || !profile) return;
+    loadPendingDeposits().catch(err => console.error('Failed to load pending deposits:', err));
+  }, [profile, authLoading, selectedRepId]);
+
   const skipNextLoadRef = useRef(false);
   useEffect(() => {
     if (currentPage !== 1) {
@@ -197,15 +197,27 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
-      let query = supabase
-        .from('proposals_with_revision_count')
-        .select(`
-          *,
+      // Select only the columns the list UI needs — avoids materializing 90+ columns
+      // and skips the expensive message/activity aggregate subqueries the view computes.
+      const listColumns = `
+          id, contact_id, lead_id, proposal_number, title, status, total, subtotal,
+          tax_rate, tax_amount, deposit_amount, deposit_percent,
+          created_by, created_at, sent_at, viewed_at, approved_at, declined_at,
+          expires_at, is_revision, is_active_revision, revision_number,
+          parent_proposal_id, sales_order_id, bill_to_contact_id,
+          po_pending, deposit_paid, require_deposit, deposit_request_sent,
+          unread_customer_messages_count, archived_at, auto_archived,
+          organization_id, is_locked, last_emailed_at,
+          revision_count, has_recent_activity, unread_messages_count,
           contacts:contacts!proposals_contact_id_fkey(id, full_name, email),
           profiles!created_by(id, full_name),
           leads(id, company_name, contact_name),
           bill_to_contact:contacts!proposals_bill_to_contact_id_fkey(id, full_name, company_name)
-        `, { count: 'planned' })
+        `;
+
+      let query = supabase
+        .from('proposals_with_revision_count')
+        .select(listColumns, { count: 'exact' })
         .eq('is_revision', false);
 
       // Apply user-scope filter based on proposal_visibility_scope setting
