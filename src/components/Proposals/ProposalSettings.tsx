@@ -3259,14 +3259,23 @@ Phase 3: Programming and Testing (1 week)"
                             {template.show_product_images && (
                               <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Product Images</span>
                             )}
-                            {template.show_unit_prices && (
+                            {template.show_unit_price && (
                               <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Unit Prices</span>
                             )}
-                            {template.show_total && (
-                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Totals</span>
+                            {template.show_line_item_total && (
+                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Line Totals</span>
                             )}
                             {template.show_quantity && (
                               <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Quantities</span>
+                            )}
+                            {template.show_area_subtotals && (
+                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Area Subtotals</span>
+                            )}
+                            {template.show_tax_breakdown && (
+                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Tax Breakdown</span>
+                            )}
+                            {template.show_scope_of_work && (
+                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Scope of Work</span>
                             )}
                           </div>
                         </div>

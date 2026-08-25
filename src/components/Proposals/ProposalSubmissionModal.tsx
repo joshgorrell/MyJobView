@@ -9,6 +9,7 @@ interface ProposalSubmissionModalProps {
   currentTemplateId?: string | null;
   onConfirm: (sendToPortal: boolean, expiresAt: string, templateId: string | null, setAsDefault: boolean, includeVideos: boolean) => void;
   onCancel: () => void;
+  onPreviewTemplate?: (templateId: string) => void;
 }
 
 interface RecordingSummary {
@@ -42,9 +43,13 @@ interface ReportTemplate {
   show_tax_breakdown: boolean;
   show_accepted_payment_methods: boolean;
   show_payment_instructions: boolean;
+  show_product_images: boolean;
+  show_deposit_amount: boolean;
+  show_deposit_percentage: boolean;
+  show_scope_of_work: boolean;
 }
 
-export function ProposalSubmissionModal({ proposalId, proposalNumber, currentTemplateId, onConfirm, onCancel }: ProposalSubmissionModalProps) {
+export function ProposalSubmissionModal({ proposalId, proposalNumber, currentTemplateId, onConfirm, onCancel, onPreviewTemplate }: ProposalSubmissionModalProps) {
   const { profile } = useAuth();
   const [sendToPortal, setSendToPortal] = useState(true);
   const [expirationDays, setExpirationDays] = useState(30);
@@ -160,11 +165,21 @@ export function ProposalSubmissionModal({ proposalId, proposalNumber, currentTem
     if (template.show_line_item_total) visible.push('Line Totals');
     else hidden.push('Line Totals');
 
+    if (template.show_area_subtotals) visible.push('Area Subtotals');
+    else hidden.push('Area Subtotals');
+
+    if (template.show_product_images) visible.push('Product Images');
+    else hidden.push('Product Images');
+
     if (template.show_labor_hours || template.show_labor_rate || template.show_labor_total) {
       visible.push('Labor Details');
     } else {
       hidden.push('Labor Details');
     }
+
+    if (template.show_tax_breakdown) visible.push('Tax Breakdown');
+    if (template.show_deposit_amount || template.show_deposit_percentage) visible.push('Deposit Info');
+    if (template.show_scope_of_work) visible.push('Scope of Work');
 
     const result = [];
     if (visible.length > 0) {
@@ -274,6 +289,19 @@ export function ProposalSubmissionModal({ proposalId, proposalNumber, currentTem
                             <div className="w-2 h-2 bg-white rounded-full"></div>
                           </div>
                         </div>
+                      )}
+                      {onPreviewTemplate && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPreviewTemplate(template.id);
+                          }}
+                          className="flex-shrink-0 px-2 py-1 text-xs text-blue-600 hover:bg-blue-100 rounded border border-blue-200 flex items-center gap-1"
+                          title="Preview this layout"
+                        >
+                          <Eye size={12} />
+                          Preview
+                        </button>
                       )}
                     </div>
                   </button>

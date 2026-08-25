@@ -1103,6 +1103,10 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
           currentTemplateId={proposal.report_template_id ?? null}
           onConfirm={handleSubmissionConfirm}
           onCancel={handleSubmissionCancel}
+          onPreviewTemplate={(templateId) => {
+            const portalUrl = `${window.location.origin}/portal/proposal/${proposal.id}?template=${templateId}`;
+            window.open(portalUrl, '_blank');
+          }}
         />
       )}
 

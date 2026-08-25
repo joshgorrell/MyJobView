@@ -3486,6 +3486,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 >
                   <Mail className="w-4 h-4" />
                   <span className="hidden sm:inline">Deliver</span>
+                  {selectedTemplateId && pdfTemplates.find(t => t.id === selectedTemplateId) && (
+                    <span className="hidden lg:inline text-xs text-gray-300 ml-1 pl-2 border-l border-gray-500/40 max-w-[120px] truncate">
+                      {pdfTemplates.find(t => t.id === selectedTemplateId)?.name}
+                    </span>
+                  )}
                   <ChevronDown className="w-3 h-3" />
                 </button>
 
