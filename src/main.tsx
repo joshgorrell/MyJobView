@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { PortalProposalEngagement } from './components/Portal/PortalProposalEngagement';
 import './index.css';
+import './proposal-workflow.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
