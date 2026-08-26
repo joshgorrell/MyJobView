@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Contact, Lead } from '../../lib/types';
-import { X, Search, AlertCircle, DollarSign, Sparkles, UserPlus } from 'lucide-react';
+import { X, Search, AlertCircle, DollarSign, Sparkles, UserPlus, MapPin } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { lookupTaxRateByZip, formatTaxRate } from '../../lib/taxCalculations';
 import type { ProposalPrefill } from '../AIAssistant/AIAssistant';
+import { CustomerLocationSelector, type CustomerLocation } from '../Contacts/CustomerLocationSelector';
 
 interface CreateProposalModalProps {
   onClose: () => void;
@@ -29,6 +30,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   const { profile } = useAuth();
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<CustomerLocation | null>(null);
   const [searchQuery, setSearchQuery] = useState(prefill?.contactSearchName || '');
   const [title, setTitle] = useState(prefill?.title || '');
   const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>(prefill?.taxEnvironment || 'residential');
@@ -145,11 +147,11 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   }, [searchQuery, selectedResult, runSearch]);
 
   useEffect(() => {
-    const zip = selectedResult?.zip_code || zipCode;
+    const zip = selectedLocation?.zip_code || selectedResult?.zip_code || zipCode;
     if (zip) {
       lookupTaxRate(zip);
     }
-  }, [selectedResult?.zip_code]);
+  }, [selectedResult?.zip_code, selectedLocation?.zip_code]);
 
   async function loadSalesReps() {
     try {
@@ -296,9 +298,9 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
       return;
     }
 
-    const effectiveZip = selectedResult.zip_code || zipCode;
+    const effectiveZip = selectedLocation?.zip_code || selectedResult.zip_code || zipCode;
     if (!effectiveZip || !effectiveZip.trim()) {
-      alert('ZIP code is required for sales tax calculation. Please enter a ZIP code.');
+      alert('ZIP code is required for sales tax calculation. Please enter a ZIP code on the selected location or customer.');
       return;
     }
 
@@ -396,6 +398,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
           company_id: companySettings.id,
           contact_id: resolvedContactId,
           lead_id: resolvedLeadId,
+          customer_location_id: selectedResult.source === 'contact' ? selectedLocation?.id || null : null,
           title,
           status: 'designing',
           tax_rate: finalTaxRate,
@@ -423,7 +426,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
     }
   }
 
-  const effectiveZip = selectedResult?.zip_code || zipCode;
+  const effectiveZip = selectedLocation?.zip_code || selectedResult?.zip_code || zipCode;
   const needsZip = selectedResult && !effectiveZip;
   const isLeadSelected = selectedResult?.source === 'lead';
 
@@ -540,7 +543,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                     </div>
                     {!contactId && !initialLeadId && (
                       <button
-                        onClick={() => { setSelectedResult(null); setZipCode(''); setTaxRate(null); setTaxLookupStatus('idle'); }}
+                        onClick={() => { setSelectedResult(null); setSelectedLocation(null); setZipCode(''); setTaxRate(null); setTaxLookupStatus('idle'); }}
                         className="text-gray-400 hover:text-white text-sm"
                       >
                         Change
@@ -549,11 +552,30 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                   </div>
                 </div>
 
+                {!isLeadSelected && (
+                  <div className="mt-3">
+                    <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-gray-300 sm:text-sm"><MapPin className="h-4 w-4 text-blue-400" /> Location / Department</div>
+                    <CustomerLocationSelector
+                      customerContactId={selectedResult.id}
+                      value={selectedLocation?.id || null}
+                      onChange={(location) => {
+                        setSelectedLocation(location);
+                        if (location?.zip_code) {
+                          setTaxRate(null);
+                          setTaxLookupStatus('idle');
+                          void lookupTaxRate(location.zip_code);
+                        }
+                      }}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Optional. The proposal still belongs to {selectedResult.company_name || selectedResult.contact_name}; this identifies the specific building, site, or department.</p>
+                  </div>
+                )}
+
                 {isLeadSelected && (
                   <div className="mt-2 flex items-start gap-2 px-3 py-2 bg-amber-900/20 border border-amber-600/30 rounded-lg">
                     <UserPlus className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-300">
-                      This is a lead. A contact record will be created automatically when you create this proposal, and the lead will remain in your pipeline.
+                      This is a lead. A contact record will be created automatically when you create this proposal, and the lead will remain in your pipeline. Locations can be added after the customer record exists.
                     </p>
                   </div>
                 )}
@@ -565,7 +587,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                       <div className="flex-1">
                         <div className="text-sm font-medium text-amber-500 mb-2">ZIP Code Required</div>
                         <div className="text-sm text-amber-200 mb-3">
-                          A ZIP code is required for accurate sales tax calculation.
+                          A ZIP code is required for accurate sales tax calculation. Add it to the selected location or customer.
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2">
                           <input
@@ -601,7 +623,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                     <div className="flex items-start gap-3">
                       <DollarSign className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-300 mb-2">Sales Tax Rate</div>
+                        <div className="text-sm font-medium text-gray-300 mb-2">Sales Tax Rate <span className="font-normal text-gray-500">· ZIP {effectiveZip}</span></div>
 
                         {taxLookupStatus === 'loading' && (
                           <div className="flex items-center gap-2 text-gray-400 text-sm">
@@ -670,6 +692,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                         key={`${result.source}-${result.id}`}
                         onClick={() => {
                           setSelectedResult(result);
+                          setSelectedLocation(null);
                           if (!title) setTitle(`Proposal for ${result.contact_name}`);
                           setZipCode(result.zip_code || '');
                           if (result.zip_code) lookupTaxRate(result.zip_code);
