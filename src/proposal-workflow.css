@@ -1,0 +1,5 @@
+/* Proposal delivery is now handled by the persistent ProposalWorkflowBar.
+   Keep the old compact-builder dropdown inaccessible so reps have one clear path. */
+button[title="Deliver proposal to customer"] {
+  display: none !important;
+}
