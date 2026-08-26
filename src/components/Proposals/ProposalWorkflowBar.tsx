@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, ChevronDown, Eye, FileText, Globe2, Lock, Settings, Unlock, X } from 'lucide-react';
+import { Activity, ChevronDown, Eye, FileText, Globe2, Lock, Send, Settings, Unlock, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { PortalProposalDetail } from '../Portal/PortalProposalDetail';
 import { ProposalActivityPanel } from './ProposalActivityPanel';
 import ProposalTemplateManager from './ProposalTemplateManager';
 import { UnlockProposalModal } from './UnlockProposalModal';
+import { DeliverProposalModal } from './DeliverProposalModal';
 
 interface TemplateOption {
   id: string;
@@ -34,6 +35,7 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [showDeliver, setShowDeliver] = useState(false);
   const [viewCount, setViewCount] = useState(0);
   const [questionCount, setQuestionCount] = useState(0);
   const [engagedSeconds, setEngagedSeconds] = useState(0);
@@ -178,6 +180,15 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
             )}
           </div>
 
+          <button
+            onClick={() => setShowDeliver(true)}
+            className="order-2 inline-flex h-9 flex-shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white transition-colors hover:bg-emerald-700 sm:order-none"
+            title="Email, publish to portal, create a PDF, or do any combination"
+          >
+            <Send className="h-4 w-4" />
+            <span>Deliver</span>
+          </button>
+
           <div className="hidden h-5 w-px bg-gray-700 md:block" />
 
           <div className="order-3 flex w-full flex-wrap items-center gap-2 sm:order-none sm:w-auto">
@@ -258,6 +269,15 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
             <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5"><ProposalActivityPanel proposalId={proposalId} /></div>
           </div>
         </div>
+      )}
+
+      {showDeliver && proposal && (
+        <DeliverProposalModal
+          proposalId={proposal.id}
+          templateId={proposal.report_template_id}
+          onClose={() => setShowDeliver(false)}
+          onDelivered={async () => { await load(); }}
+        />
       )}
 
       {showUnlock && proposal && (
