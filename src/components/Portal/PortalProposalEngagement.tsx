@@ -41,8 +41,8 @@ export function PortalProposalEngagement() {
         .maybeSingle();
       if (!cancelled && data?.is_portal_visible) setMessage(data.portal_customer_message?.trim() || '');
 
-      // PortalProposalDetail records the canonical `viewed` row. Give it a moment,
-      // then attach active-time heartbeats to that newest view event.
+      // PortalProposalDetail creates the canonical view event. Wait briefly so this
+      // tracker attaches duration to that event rather than creating a second view.
       await new Promise(resolve => window.setTimeout(resolve, 1200));
       const { data: view } = await supabase
         .from('proposal_activity')
@@ -73,10 +73,10 @@ export function PortalProposalEngagement() {
         activeSeconds.current += delta;
       }
       lastTick.current = now;
-      await supabase
-        .from('proposal_activity')
-        .update({ duration_seconds: activeSeconds.current })
-        .eq('id', activityId.current);
+      await supabase.rpc('update_proposal_activity_duration', {
+        p_activity_id: activityId.current,
+        p_duration_seconds: activeSeconds.current,
+      });
     };
 
     const onVisibility = () => {
