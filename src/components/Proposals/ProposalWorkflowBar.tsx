@@ -91,10 +91,7 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
   async function selectTemplate(templateId: string) {
     setWorking(true);
     try {
-      const { error } = await supabase
-        .from('proposals')
-        .update({ report_template_id: templateId })
-        .eq('id', proposalId);
+      const { error } = await supabase.from('proposals').update({ report_template_id: templateId }).eq('id', proposalId);
       if (error) throw error;
       setProposal(prev => prev ? { ...prev, report_template_id: templateId } : prev);
       setShowTemplateMenu(false);
@@ -109,11 +106,7 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
     try {
       const { error } = await supabase
         .from('proposals')
-        .update({
-          is_locked: true,
-          locked_at: new Date().toISOString(),
-          locked_by: profile?.id || null,
-        })
+        .update({ is_locked: true, locked_at: new Date().toISOString(), locked_by: profile?.id || null })
         .eq('id', proposalId);
       if (error) throw error;
       await load();
@@ -122,9 +115,7 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
     }
   }
 
-  const selectedTemplate = templates.find(t => t.id === proposal?.report_template_id)
-    || templates.find(t => t.is_default)
-    || templates[0];
+  const selectedTemplate = templates.find(t => t.id === proposal?.report_template_id) || templates.find(t => t.is_default) || templates[0];
   const live = !!proposal?.is_portal_visible;
   const locked = !!proposal?.is_locked;
   const delivered = !!proposal?.sent_at || ['sent', 'portal', 'viewed', 'approved', 'expired'].includes(proposal?.status || '');
@@ -138,140 +129,140 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
 
   return (
     <>
-      <div className="border-b border-gray-700 bg-gray-900 px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setShowPreview(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors"
-          title="Preview exactly what the customer will see without publishing"
-        >
-          <Eye className="w-4 h-4" />
-          Preview
-        </button>
-
-        <div className="relative">
+      <div className="border-b border-gray-700 bg-gray-900 px-2.5 py-2 sm:px-4">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setShowTemplateMenu(v => !v)}
-            disabled={working}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-100 px-3 py-1.5 text-xs font-medium transition-colors"
+            onClick={() => setShowPreview(true)}
+            className="inline-flex h-9 flex-shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+            title="Preview exactly what the customer will see without publishing"
           >
-            <FileText className="w-4 h-4 text-gray-400" />
-            <span className="max-w-[180px] truncate">Template: {selectedTemplate?.name || 'Default'}</span>
-            <ChevronDown className="w-3 h-3" />
+            <Eye className="h-4 w-4" />
+            <span>Preview</span>
           </button>
-          {showTemplateMenu && (
-            <>
-              <button className="fixed inset-0 z-40 cursor-default" onClick={() => setShowTemplateMenu(false)} aria-label="Close template menu" />
-              <div className="absolute left-0 top-full z-50 mt-1 min-w-[260px] rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
-                {templates.map(t => (
+
+          <div className="relative min-w-0 flex-1 sm:flex-none">
+            <button
+              onClick={() => setShowTemplateMenu(v => !v)}
+              disabled={working}
+              className="flex h-9 w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-600 bg-gray-800 px-2.5 text-xs font-medium text-gray-100 transition-colors hover:bg-gray-700 sm:w-auto sm:max-w-[260px]"
+            >
+              <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <span className="min-w-0 flex-1 truncate text-left sm:flex-none">{selectedTemplate?.name || 'Default Template'}</span>
+              <ChevronDown className="h-3 w-3 flex-shrink-0" />
+            </button>
+            {showTemplateMenu && (
+              <>
+                <button className="fixed inset-0 z-40 cursor-default" onClick={() => setShowTemplateMenu(false)} aria-label="Close template menu" />
+                <div className="fixed left-2.5 right-2.5 top-auto z-50 mt-1 max-h-[65dvh] overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-2xl sm:absolute sm:left-0 sm:right-auto sm:min-w-[300px] sm:max-w-[360px]">
+                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">Proposal Template</div>
+                  {templates.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => selectTemplate(t.id)}
+                      className={`w-full px-3 py-2.5 text-left text-sm hover:bg-blue-50 ${t.id === proposal?.report_template_id ? 'bg-blue-50/60 font-semibold text-blue-700' : 'text-gray-700'}`}
+                    >
+                      <div className="truncate">{t.name}</div>
+                      {(t.is_default || t.is_personal) && <div className="mt-0.5 text-[11px] font-normal text-gray-400">{t.is_default ? 'Company Default' : ''}{t.is_default && t.is_personal ? ' · ' : ''}{t.is_personal ? 'Personal' : ''}</div>}
+                    </button>
+                  ))}
+                  <div className="my-1 border-t border-gray-200" />
                   <button
-                    key={t.id}
-                    onClick={() => selectTemplate(t.id)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${t.id === proposal?.report_template_id ? 'text-blue-700 font-semibold bg-blue-50/60' : 'text-gray-700'}`}
+                    onClick={() => { setShowTemplateMenu(false); setShowTemplateManager(true); }}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    {t.name}{t.is_default ? ' · Company Default' : ''}{t.is_personal ? ' · Personal' : ''}
+                    <Settings className="h-4 w-4" />
+                    Customize / Manage Templates…
                   </button>
-                ))}
-                <div className="my-1 border-t border-gray-200" />
-                <button
-                  onClick={() => { setShowTemplateMenu(false); setShowTemplateManager(true); }}
-                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                >
-                  <Settings className="w-4 h-4" />
-                  Customize / Manage Templates…
-                </button>
-              </div>
-            </>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="hidden h-5 w-px bg-gray-700 md:block" />
+
+          <div className="order-3 flex w-full flex-wrap items-center gap-2 sm:order-none sm:w-auto">
+            <span className={`inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:flex-none sm:text-xs ${live ? 'border-green-500/30 bg-green-500/10 text-green-300' : delivered ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-gray-600 bg-gray-800 text-gray-400'}`}>
+              <Globe2 className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{live ? `LIVE${proposal?.current_portal_version ? ` · v${proposal.current_portal_version}` : ''}` : delivered ? 'OFFLINE / DELIVERED' : 'DRAFT / OFFLINE'}</span>
+            </span>
+
+            {locked ? (
+              <button
+                onClick={() => setShowUnlock(true)}
+                className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[11px] font-bold text-yellow-300 transition-colors hover:bg-yellow-500/20 sm:flex-none sm:text-xs"
+                title="Unlocking a live proposal automatically takes it offline first"
+              >
+                <Lock className="h-3.5 w-3.5" /> LOCKED
+              </button>
+            ) : (
+              <button
+                onClick={delivered ? lockProposal : undefined}
+                className={`inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:flex-none sm:text-xs ${delivered ? 'cursor-pointer border-gray-500 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'cursor-default border-gray-700 bg-gray-900 text-gray-500'}`}
+                title={delivered ? 'Lock this delivered proposal' : 'Draft proposals remain unlocked while you build them'}
+              >
+                <Unlock className="h-3.5 w-3.5" /> UNLOCKED
+              </button>
+            )}
+          </div>
+
+          {(live || viewCount > 0 || questionCount > 0) && (
+            <button
+              onClick={() => setShowActivity(true)}
+              className="order-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 text-xs text-gray-200 transition-colors hover:bg-gray-700 sm:order-none sm:ml-auto sm:w-auto"
+              title="Customer portal activity"
+            >
+              <Activity className="h-4 w-4 flex-shrink-0 text-blue-400" />
+              <span><strong className="text-white">{viewCount}</strong> views</span>
+              {engagedSeconds > 0 && <span>· {formatEngagement(engagedSeconds)}</span>}
+              <span>· <strong className="text-white">{questionCount}</strong> questions</span>
+            </button>
           )}
         </div>
-
-        <div className="h-5 w-px bg-gray-700 hidden sm:block" />
-
-        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${live ? 'border-green-500/30 bg-green-500/10 text-green-300' : delivered ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-gray-600 bg-gray-800 text-gray-400'}`}>
-          <Globe2 className="w-3.5 h-3.5" />
-          {live ? `LIVE ON PORTAL${proposal?.current_portal_version ? ` · v${proposal.current_portal_version}` : ''}` : delivered ? 'OFFLINE / DELIVERED' : 'DRAFT / OFFLINE'}
-        </span>
-
-        {locked ? (
-          <button
-            onClick={() => setShowUnlock(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 px-2.5 py-1 text-xs font-bold transition-colors"
-            title="Unlocking a live proposal automatically takes it offline first"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            LOCKED
-          </button>
-        ) : (
-          <button
-            onClick={delivered ? lockProposal : undefined}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${delivered ? 'border-gray-500 bg-gray-800 text-gray-300 hover:bg-gray-700 cursor-pointer' : 'border-gray-700 bg-gray-900 text-gray-500 cursor-default'}`}
-            title={delivered ? 'Lock this delivered proposal' : 'Draft proposals remain unlocked while you build them'}
-          >
-            <Unlock className="w-3.5 h-3.5" />
-            UNLOCKED
-          </button>
-        )}
-
-        {(live || viewCount > 0 || questionCount > 0) && (
-          <button
-            onClick={() => setShowActivity(true)}
-            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 px-3 py-1.5 text-xs text-gray-200 transition-colors"
-            title="Customer portal activity"
-          >
-            <Activity className="w-4 h-4 text-blue-400" />
-            <span><strong className="text-white">{viewCount}</strong> views</span>
-            {engagedSeconds > 0 && <span>· {formatEngagement(engagedSeconds)}</span>}
-            <span>· <strong className="text-white">{questionCount}</strong> questions</span>
-          </button>
-        )}
       </div>
 
       {showPreview && (
-        <div className="fixed inset-0 z-[80] bg-gray-900 flex flex-col">
-          <div className="flex items-center gap-3 border-b border-gray-700 bg-gray-900 px-4 py-2 text-white">
-            <button onClick={() => setShowPreview(false)} className="rounded-lg p-2 hover:bg-gray-800"><X className="w-5 h-5" /></button>
-            <div>
-              <div className="text-sm font-bold">Customer Preview</div>
-              <div className="text-xs text-amber-300">Not live — the customer cannot see your edits in this preview.</div>
+        <div className="fixed inset-0 z-[80] flex flex-col bg-gray-900">
+          <div className="flex flex-shrink-0 items-center gap-2 border-b border-gray-700 bg-gray-900 px-2.5 py-2 text-white sm:gap-3 sm:px-4">
+            <button onClick={() => setShowPreview(false)} className="flex-shrink-0 rounded-lg p-2 hover:bg-gray-800"><X className="h-5 w-5" /></button>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-bold">Customer Preview</div>
+              <div className="truncate text-[11px] text-amber-300 sm:text-xs">Draft preview — customer cannot see these edits.</div>
             </div>
-            <div className="ml-auto text-xs text-gray-400">Template: {selectedTemplate?.name || 'Default'}</div>
+            <div className="hidden max-w-[35vw] truncate text-xs text-gray-400 sm:block">Template: {selectedTemplate?.name || 'Default'}</div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto bg-gray-50">
-            <PortalProposalDetail
-              proposalId={proposalId}
-              onBack={() => setShowPreview(false)}
-              previewMode={true}
-              templateOverrideId={proposal?.report_template_id ?? null}
-            />
+            <PortalProposalDetail proposalId={proposalId} onBack={() => setShowPreview(false)} previewMode={true} templateOverrideId={proposal?.report_template_id ?? null} />
           </div>
         </div>
       )}
 
       {showTemplateManager && (
-        <div className="fixed inset-0 z-[85] bg-black/60 p-4 overflow-y-auto">
-          <div className="mx-auto max-w-6xl rounded-xl bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-3 rounded-t-xl">
-              <div><h2 className="font-bold text-gray-900">Proposal Templates</h2><p className="text-xs text-gray-500">Customize an existing template, duplicate it, or save a personal/company template.</p></div>
-              <button onClick={() => { setShowTemplateManager(false); load(); }} className="p-2 text-gray-500 hover:text-gray-900"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-[85] overflow-y-auto bg-black/60 p-0 sm:p-4">
+          <div className="mx-auto min-h-full w-full bg-white shadow-2xl sm:min-h-0 sm:max-w-6xl sm:rounded-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-white px-4 py-3 sm:rounded-t-xl sm:px-5">
+              <div className="min-w-0"><h2 className="truncate font-bold text-gray-900">Proposal Templates</h2><p className="hidden text-xs text-gray-500 sm:block">Customize, duplicate, or save a personal/company template.</p></div>
+              <button onClick={() => { setShowTemplateManager(false); load(); }} className="flex-shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
             </div>
-            <div className="p-5"><ProposalTemplateManager /></div>
+            <div className="p-3 sm:p-5"><ProposalTemplateManager /></div>
           </div>
         </div>
       )}
 
       {showActivity && (
-        <div className="fixed inset-0 z-[85] bg-black/60 p-4 flex items-center justify-center">
-          <div className="w-full max-w-4xl max-h-[88vh] overflow-hidden rounded-xl bg-white shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between border-b px-5 py-4">
-              <div><h2 className="font-bold text-gray-900">Customer Portal Activity</h2><p className="text-xs text-gray-500">Views, downloads, engagement and proposal-version history.</p></div>
-              <button onClick={() => setShowActivity(false)} className="p-2 text-gray-500 hover:text-gray-900"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+          <div className="flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:max-w-4xl sm:rounded-xl">
+            <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-5 sm:py-4">
+              <div className="min-w-0"><h2 className="truncate font-bold text-gray-900">Customer Portal Activity</h2><p className="truncate text-xs text-gray-500">Views, downloads, engagement and proposal versions.</p></div>
+              <button onClick={() => setShowActivity(false)} className="flex-shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
             </div>
-            <div className="overflow-y-auto p-5"><ProposalActivityPanel proposalId={proposalId} /></div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5"><ProposalActivityPanel proposalId={proposalId} /></div>
           </div>
         </div>
       )}
 
       {showUnlock && proposal && (
         <UnlockProposalModal
+          proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
           onCreateRevision={() => {}}
           onUnlockAndEdit={async () => { await load(); setShowUnlock(false); }}
