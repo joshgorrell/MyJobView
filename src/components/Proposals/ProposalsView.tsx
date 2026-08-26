@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ProposalsList from './ProposalsList';
 import ProposalBuilderCompact from './ProposalBuilderCompact';
+import ProposalWorkflowBar from './ProposalWorkflowBar';
 import CreateProposalModal from './CreateProposalModal';
 import VideoLibrary from '../Sales/VideoLibrary';
 import type { ProposalPrefill } from '../AIAssistant/AIAssistant';
@@ -20,7 +21,6 @@ interface ProposalsViewProps {
 
 export default function ProposalsView({ isStandalone = false, openProposalId, onProposalOpened, onSelectSalesOrder, aiPrefill, onAiPrefillConsumed, onNavigateToSalesOrders, onNavigateToSalesStats, autoOpenQA = false, autoThreadId = null }: ProposalsViewProps) {
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(() => {
-    // Initialize selectedProposalId from URL if in standalone mode
     if (isStandalone) {
       const urlParams = new URLSearchParams(window.location.search);
       return urlParams.get('id');
@@ -32,7 +32,6 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   const [targetRoomIds, setTargetRoomIds] = useState<Set<string>>(new Set());
   const [pendingPrefillRooms, setPendingPrefillRooms] = useState<ProposalPrefill['rooms'] | undefined>(undefined);
 
-  // Read openQA/threadId from URL params in standalone mode
   const urlOpenQA = (() => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('openQA') === 'true';
@@ -48,16 +47,13 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     if (isStandalone) {
       const handlePopState = () => {
         const urlParams = new URLSearchParams(window.location.search);
-        const proposalId = urlParams.get('id');
-        setSelectedProposalId(proposalId);
+        setSelectedProposalId(urlParams.get('id'));
       };
-
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
     }
   }, [isStandalone]);
 
-  // Auto-open proposal when openProposalId is provided
   useEffect(() => {
     if (openProposalId && !selectedProposalId) {
       setSelectedProposalId(openProposalId);
@@ -65,11 +61,8 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     }
   }, [openProposalId, selectedProposalId, onProposalOpened]);
 
-  // Auto-open create modal when AI prefill arrives
   useEffect(() => {
-    if (aiPrefill) {
-      setShowCreateModal(true);
-    }
+    if (aiPrefill) setShowCreateModal(true);
   }, [aiPrefill]);
 
   function handleProposalCreated(proposalId: string, prefillRooms?: ProposalPrefill['rooms']) {
@@ -86,49 +79,46 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
 
   if (selectedProposalId) {
     return (
-      <ProposalBuilderCompact
-        proposalId={selectedProposalId}
-        onBack={() => {
-          setSelectedProposalId(null);
-          if (isStandalone) {
-            window.close();
-          }
-        }}
-        onNavigateToSalesOrder={(salesOrderId) => {
-          setSelectedProposalId(null);
-          onSelectSalesOrder?.(salesOrderId);
-        }}
-        targetRoomIds={targetRoomIds}
-        onTargetRoomsChange={setTargetRoomIds}
-        isStandalone={isStandalone}
-        aiPrefillRooms={pendingPrefillRooms}
-        autoOpenQA={effectiveAutoOpenQA}
-        autoThreadId={effectiveAutoThreadId}
-        onProposalIdChange={(newProposalId) => {
-          setSelectedProposalId(newProposalId);
-          if (isStandalone) {
-            const newUrl = new URL(window.location.href);
-            newUrl.searchParams.set('id', newProposalId);
-            window.history.pushState({}, '', newUrl);
-          }
-        }}
-      />
+      <div className="w-full h-full flex flex-col min-h-0 bg-gray-900">
+        <ProposalWorkflowBar proposalId={selectedProposalId} />
+        <div className="min-h-0 flex-1">
+          <ProposalBuilderCompact
+            proposalId={selectedProposalId}
+            onBack={() => {
+              setSelectedProposalId(null);
+              if (isStandalone) window.close();
+            }}
+            onNavigateToSalesOrder={(salesOrderId) => {
+              setSelectedProposalId(null);
+              onSelectSalesOrder?.(salesOrderId);
+            }}
+            targetRoomIds={targetRoomIds}
+            onTargetRoomsChange={setTargetRoomIds}
+            isStandalone={isStandalone}
+            aiPrefillRooms={pendingPrefillRooms}
+            autoOpenQA={effectiveAutoOpenQA}
+            autoThreadId={effectiveAutoThreadId}
+            onProposalIdChange={(newProposalId) => {
+              setSelectedProposalId(newProposalId);
+              if (isStandalone) {
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.set('id', newProposalId);
+                window.history.pushState({}, '', newUrl);
+              }
+            }}
+          />
+        </div>
+      </div>
     );
   }
 
-  // In standalone mode without a proposal ID, show an error
   if (isStandalone) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
           <div className="text-yellow-400 text-lg mb-2">No Proposal ID</div>
           <div className="text-gray-400 text-sm mb-4">This window requires a proposal ID in the URL</div>
-          <button
-            onClick={() => window.close()}
-            className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-          >
-            Close Window
-          </button>
+          <button onClick={() => window.close()} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">Close Window</button>
         </div>
       </div>
     );
@@ -138,12 +128,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     return (
       <div className="w-full h-full">
         <div className="bg-gray-900 border-b border-gray-700 px-4 py-2">
-          <button
-            onClick={() => setShowVideoLibrary(false)}
-            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            &larr; Back to Proposals
-          </button>
+          <button onClick={() => setShowVideoLibrary(false)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">&larr; Back to Proposals</button>
         </div>
         <VideoLibrary />
       </div>
@@ -153,9 +138,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   return (
     <div className="w-full space-y-6">
       <ProposalsList
-        onSelectProposal={(proposalId) => {
-          setSelectedProposalId(proposalId);
-        }}
+        onSelectProposal={setSelectedProposalId}
         onCreateNew={() => setShowCreateModal(true)}
         onSelectSalesOrder={onSelectSalesOrder}
         onNavigateToSalesOrders={onNavigateToSalesOrders}
