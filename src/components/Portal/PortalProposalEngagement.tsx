@@ -10,6 +10,7 @@ function proposalIdFromPath(pathname: string) {
 interface PortalLocation {
   id: string;
   name: string;
+  location_type: string | null;
   department: string | null;
   building_name: string | null;
   street_address: string | null;
@@ -18,6 +19,18 @@ interface PortalLocation {
   state: string | null;
   zip_code: string | null;
 }
+
+const locationTypeLabels: Record<string, string> = {
+  residence: 'Residence',
+  vacation_home: 'Vacation Home',
+  property: 'Property',
+  building: 'Building',
+  department: 'Department',
+  branch: 'Branch',
+  office: 'Office',
+  campus: 'Campus',
+  other: 'Other',
+};
 
 export function PortalProposalEngagement() {
   const [proposalId, setProposalId] = useState<string | null>(() => proposalIdFromPath(window.location.pathname));
@@ -58,15 +71,13 @@ export function PortalProposalEngagement() {
         if (data.customer_location_id) {
           const { data: locationData } = await supabase
             .from('customer_locations')
-            .select('id,name,department,building_name,street_address,address_line_2,city,state,zip_code')
+            .select('id,name,location_type,department,building_name,street_address,address_line_2,city,state,zip_code')
             .eq('id', data.customer_location_id)
             .maybeSingle();
           if (!cancelled && locationData) setLocation(locationData as PortalLocation);
         }
       }
 
-      // PortalProposalDetail creates the canonical view event. Wait briefly so this
-      // tracker attaches duration to that event rather than creating a second view.
       await new Promise(resolve => window.setTimeout(resolve, 1200));
       const { data: view } = await supabase
         .from('proposal_activity')
@@ -131,6 +142,8 @@ export function PortalProposalEngagement() {
       ].filter(Boolean).join(' · ')
     : '';
 
+  const locationType = location?.location_type ? locationTypeLabels[location.location_type] || location.location_type : '';
+
   return (
     <div className="pointer-events-none fixed left-3 right-3 top-[72px] z-[60] flex justify-center sm:left-6 sm:right-6 sm:top-[88px]">
       <div className="pointer-events-auto w-full max-w-3xl space-y-2">
@@ -140,8 +153,11 @@ export function PortalProposalEngagement() {
               <MapPin className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Project Location / Department</div>
-              <div className="mt-0.5 text-sm font-semibold text-slate-900">{location.name}</div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Project Location / Property</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900">
+                <span>{location.name}</span>
+                {locationType && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{locationType}</span>}
+              </div>
               {(location.department || locationAddress) && (
                 <div className="mt-0.5 text-xs leading-relaxed text-slate-600">{[location.department, locationAddress].filter(Boolean).join(' · ')}</div>
               )}
