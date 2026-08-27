@@ -718,7 +718,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
       // Create work orders for each technician
       const workOrdersToCreate = selectedTechnicians.map((techId, index) => ({
-        company_id: profile.company_id,
+        company_id: profile.organization_id,
         contact_id: finalContactId,
         project_id: formData.type === 'project' ? formData.project_id : (formData.project_id || null),
         labor_phase_id: selectedPhaseId || null, // Store selected labor phase
@@ -746,7 +746,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         reminder_sms: formData.reminder_sms,
         customer_contacted: formData.customer_contacted === 'yes',
         created_by: profile.id,
-        office_id: profile.office_id,
+        office_id: profile.primary_office_id || profile.default_office_id || null,
         // Recurrence only on the first work order (when single tech, or first tech in group)
         is_recurring_parent: index === 0 && recurrenceRule !== null,
         recurrence_rule: index === 0 && recurrenceRule !== null ? recurrenceRule : null,

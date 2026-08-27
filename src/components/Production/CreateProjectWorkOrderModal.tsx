@@ -232,7 +232,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
       const groupId = selectedTechnicians.length > 1 ? crypto.randomUUID() : null;
 
       const workOrdersToCreate = selectedTechnicians.map(techId => ({
-        company_id: profile.company_id,
+        company_id: profile.organization_id,
         contact_id: contactId || null,
         project_id: projectId,
         labor_phase_id: selectedPhaseId || null,
@@ -251,7 +251,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
         notes: form.notes || null,
         internal_notes: form.internal_notes || null,
         created_by: profile.id,
-        office_id: profile.office_id,
+        office_id: profile.primary_office_id || profile.default_office_id || null,
       }));
 
       const { data: createdWOs, error } = await supabase

@@ -10,6 +10,8 @@ export interface Profile {
   avatar_url: string | null;
   email_leads: boolean;
   organization_id?: string | null;
+  primary_office_id?: string | null;
+  default_office_id?: string | null;
   can_view_team_pulse?: boolean;
   can_access_recur?: boolean;
   can_send_portal_invites?: boolean;
