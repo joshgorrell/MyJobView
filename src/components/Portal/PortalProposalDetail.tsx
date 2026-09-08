@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw, Edit3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
 import { ProposalReactivationRequest } from './ProposalReactivationRequest';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
+import AreaScopeEditor from '../Proposals/AreaScopeEditor';
 
 interface ProposalRecording {
   id: string;
@@ -235,6 +236,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const [showReactivationModal, setShowReactivationModal] = useState(false);
   const [reactivationSent, setReactivationSent] = useState(false);
+  const [editingScopeRoom, setEditingScopeRoom] = useState<ProposalRoom | null>(null);
 
   useEffect(() => {
     loadProposalDetails();
@@ -983,6 +985,16 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <Package className="w-5 h-5 text-blue-400" />
                       </div>
                       <h3 className="text-lg sm:text-xl font-bold text-white flex-1">{room.name}</h3>
+                      {previewMode && proposal?.status === 'draft' && (
+                        <button
+                          onClick={() => setEditingScopeRoom(room)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-300 hover:text-white hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-400 rounded-lg transition-all"
+                          title="Edit scope of work for this area"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">{room.description ? 'Edit Scope' : 'Add Scope'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1604,6 +1616,23 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               Close
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Scope of Work editor — only in preview/draft mode, rendered above the preview overlay */}
+      {editingScopeRoom && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+          <AreaScopeEditor
+            roomId={editingScopeRoom.id}
+            roomName={editingScopeRoom.name}
+            currentDescription={editingScopeRoom.description}
+            currentShowScope={editingScopeRoom.show_scope}
+            onClose={() => setEditingScopeRoom(null)}
+            onSave={() => {
+              setEditingScopeRoom(null);
+              loadProposalDetails();
+            }}
+          />
         </div>
       )}
 
