@@ -3,7 +3,6 @@ import ProposalsList from './ProposalsList';
 import CreateProposalModal from './CreateProposalModal';
 
 const ProposalBuilderCompact = lazy(() => import('./ProposalBuilderCompact'));
-const ProposalWorkflowBar = lazy(() => import('./ProposalWorkflowBar'));
 const VideoLibrary = lazy(() => import('../Sales/VideoLibrary'));
 import type { ProposalPrefill } from '../AIAssistant/AIAssistant';
 
@@ -69,7 +68,6 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   if (selectedProposalId) return (
     <Suspense fallback={<div className="w-full h-full min-h-[400px] flex items-center justify-center bg-gray-900 text-gray-400">Loading proposal...</div>}>
       <div className="w-full h-full flex flex-col min-h-0 bg-gray-900">
-        <ProposalWorkflowBar proposalId={selectedProposalId} />
         <div className="min-h-0 flex-1">
           <ProposalBuilderCompact proposalId={selectedProposalId}
             onBack={() => {

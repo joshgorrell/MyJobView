@@ -3691,15 +3691,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               <span className="hidden sm:inline">Add</span>
             </button>
 
-            {/* Proposal Settings */}
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-              title="Proposal Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
             {/* More Options Menu */}
             <div className="relative">
               <button
