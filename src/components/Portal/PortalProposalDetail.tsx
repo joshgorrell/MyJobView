@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
+import { ProposalReactivationRequest } from './ProposalReactivationRequest';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
 
 interface ProposalRecording {
@@ -232,6 +233,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
   const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
   const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
+  const [showReactivationModal, setShowReactivationModal] = useState(false);
+  const [reactivationSent, setReactivationSent] = useState(false);
 
   useEffect(() => {
     loadProposalDetails();
@@ -789,29 +792,72 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
         </header>
         <div className="max-w-xl mx-auto px-4 py-20 text-center">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-10">
-            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
-              <XCircle className="w-8 h-8 text-red-500" />
-            </div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold mb-4">
-              <Clock className="w-3 h-3" />
-              Expired
-            </span>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">This Proposal Has Expired</h2>
-            <p className="text-gray-500 mb-2">
-              Proposal <span className="font-semibold text-gray-700">{proposal.proposal_number}</span> expired on{' '}
-              <span className="font-semibold text-gray-700">{new Date(proposal.expires_at!).toLocaleDateString()}</span>.
-            </p>
-            <p className="text-gray-500 mb-8 text-sm">
-              Pricing and availability may have changed. Please contact your sales representative to have this proposal reviewed and reactivated.
-            </p>
-            <button
-              onClick={onBack}
-              className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
-            >
-              Back to {backLabel ?? 'Proposals'}
-            </button>
+            {reactivationSent ? (
+              <>
+                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <CheckCircle className="w-8 h-8 text-green-500" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Request Sent</h2>
+                <p className="text-gray-500 mb-2">
+                  Your request to reactivate proposal <span className="font-semibold text-gray-700">{proposal.proposal_number}</span> has been sent to your sales representative.
+                </p>
+                <p className="text-gray-500 mb-8 text-sm">
+                  They will review the proposal and get back to you shortly. You'll receive a notification once it's been reactivated.
+                </p>
+                <button
+                  onClick={onBack}
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
+                >
+                  Back to {backLabel ?? 'Proposals'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <XCircle className="w-8 h-8 text-red-500" />
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold mb-4">
+                  <Clock className="w-3 h-3" />
+                  Expired
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">This Proposal Has Expired</h2>
+                <p className="text-gray-500 mb-2">
+                  Proposal <span className="font-semibold text-gray-700">{proposal.proposal_number}</span> expired on{' '}
+                  <span className="font-semibold text-gray-700">{new Date(proposal.expires_at!).toLocaleDateString()}</span>.
+                </p>
+                <p className="text-gray-500 mb-8 text-sm">
+                  Pricing and availability may have changed. You can request to have this proposal reviewed and reactivated by your sales representative.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={onBack}
+                    className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl font-semibold transition-colors w-full sm:w-auto"
+                  >
+                    Back to {backLabel ?? 'Proposals'}
+                  </button>
+                  <button
+                    onClick={() => setShowReactivationModal(true)}
+                    className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors w-full sm:w-auto flex items-center justify-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Request Reactivation
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
+        {showReactivationModal && proposal && (
+          <ProposalReactivationRequest
+            proposalId={proposal.id}
+            proposalNumber={proposal.proposal_number}
+            onClose={() => setShowReactivationModal(false)}
+            onSuccess={() => {
+              setShowReactivationModal(false);
+              setReactivationSent(true);
+            }}
+          />
+        )}
       </div>
     );
   }
