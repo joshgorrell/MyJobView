@@ -696,7 +696,11 @@ function AppContent() {
       return <LoginForm />;
     }
 
-    // Check module access for proposals
+    // Wait for permissions to load before deciding access.
+    if (departmentsLoading) {
+      return <LoadingFallback />;
+    }
+
     if (!checkModuleAccess('proposals')) {
       return (
         <div className="h-screen bg-gray-900 flex items-center justify-center">

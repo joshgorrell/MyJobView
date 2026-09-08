@@ -1465,11 +1465,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
 
   function getStatusBadge(status: string) {
+    const isLive = proposal?.is_portal_visible && proposal?.is_active_revision;
     const statusConfig: Record<string, { label: string; bgColor: string; textColor: string; icon?: React.ReactNode }> = {
       'designing': { label: 'Designing', bgColor: 'bg-pink-600', textColor: 'text-white' },
       'ready_to_submit': { label: 'Ready', bgColor: 'bg-yellow-600', textColor: 'text-white' },
-      'sent': { label: 'Sent', bgColor: 'bg-blue-600', textColor: 'text-white' },
-      'portal': { label: 'Portal', bgColor: 'bg-cyan-600', textColor: 'text-white' },
+      'sent': { label: isLive ? 'Live' : 'Sent', bgColor: isLive ? 'bg-green-600' : 'bg-blue-600', textColor: 'text-white', icon: isLive ? <Globe className="w-3 h-3" /> : undefined },
+      'portal': { label: 'Live', bgColor: 'bg-green-600', textColor: 'text-white', icon: <Globe className="w-3 h-3" /> },
       'accepted': { label: 'Accepted', bgColor: 'bg-green-600', textColor: 'text-white', icon: <CheckCircle2 className="w-3 h-3" /> },
       'declined': { label: 'Declined', bgColor: 'bg-red-600', textColor: 'text-white' },
       'expired': { label: 'Expired', bgColor: 'bg-orange-600', textColor: 'text-white' }
@@ -3352,14 +3353,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
           {/* Right: Badges + All Actions */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-              {/* Live on Portal Badge */}
-              {proposal?.is_portal_visible && proposal?.is_active_revision && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                  <Globe className="w-3 h-3" />
-                  <span className="hidden sm:inline">Live</span>
-                </span>
-              )}
-
               {/* Portal Version Badge */}
               {(proposal?.current_portal_version ?? 0) > 0 && (
                 <button
