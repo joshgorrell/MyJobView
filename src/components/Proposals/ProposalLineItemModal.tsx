@@ -641,16 +641,13 @@ export default function ProposalLineItemModal({
                   <FinStat label="Margin" value={`${margin.toFixed(1)}%`} positive={margin >= 0} />
                 </div>
 
-                {/* Item Type + Class row */}
+                {/* Item Type (read-only, set in product catalog) + Class row */}
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Item Type">
-                    <select value={form.item_type}
-                      onChange={e => setForm(f => ({ ...f, item_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
-                      <option value="material">Material</option>
-                      <option value="labor">Labor</option>
-                      <option value="other">Other</option>
-                    </select>
+                    <div className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700/50 rounded-lg text-sm font-medium capitalize opacity-80 cursor-not-allowed"
+                      title="Item type is set in the product catalog">
+                      {form.item_type || 'material'}
+                    </div>
                   </Field>
                   <Field label="Class">
                     {!showNewClassForm ? (

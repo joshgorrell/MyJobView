@@ -106,7 +106,6 @@ export default function AddItemToAreasModal({
     is_taxable: true,
     is_hidden: false,
     is_customer_supplied: false,
-    is_labor_item: false,
     display_mode: 'itemized' as 'itemized' | 'bundle' | 'collapsed',
   });
 
@@ -196,7 +195,6 @@ export default function AddItemToAreasModal({
       is_taxable: product.is_taxable !== undefined ? product.is_taxable : true,
       is_hidden: false,
       is_customer_supplied: false,
-      is_labor_item: (product as any).item_type === 'labor',
       display_mode: 'itemized',
     });
     setPendingAccessories([]);
@@ -280,7 +278,6 @@ export default function AddItemToAreasModal({
       isTaxable: 'is_taxable',
       isHidden: 'is_hidden',
       isCustomerSupplied: 'is_customer_supplied',
-      isLaborItem: 'is_labor_item',
       description: 'description',
     };
     const formKey = fieldMap[field];
@@ -327,7 +324,7 @@ export default function AddItemToAreasModal({
           labor_hours: effLaborHrs || null,
           labor_rate: effLaborRate || null,
           labor_total: laborTotalVal || null,
-          item_type: form.is_labor_item ? 'labor' : (form.item_type || 'material'),
+          item_type: form.item_type || 'material',
           task_notes: form.task_notes || null,
           show_task_notes: form.show_task_notes,
           is_taxable: form.is_taxable,
@@ -407,7 +404,6 @@ export default function AddItemToAreasModal({
     isTaxable: form.is_taxable,
     isHidden: form.is_hidden,
     isCustomerSupplied: form.is_customer_supplied,
-    isLaborItem: form.is_labor_item,
   } : null;
 
   const modal = (

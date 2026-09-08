@@ -37,7 +37,6 @@ export interface ProductDetailPanelData {
   isTaxable: boolean;
   isHidden: boolean;
   isCustomerSupplied: boolean;
-  isLaborItem: boolean;
 }
 
 export interface LaborPhaseOption {
@@ -514,15 +513,6 @@ export default function ProductDetailPanel({
                   <Gift className="w-3 h-3 text-amber-500" />
                   Customer Supplied
                 </span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={data.isLaborItem}
-                  onChange={(e) => onChange?.('isLaborItem', e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 w-3.5 h-3.5"
-                />
-                <span className="text-xs text-gray-600">Labor Item</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none">
                 <input
