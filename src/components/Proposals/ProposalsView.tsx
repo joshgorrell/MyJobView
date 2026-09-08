@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import ProposalsList from './ProposalsList';
-import ProposalBuilderCompact from './ProposalBuilderCompact';
-import ProposalWorkflowBar from './ProposalWorkflowBar';
 import CreateProposalModal from './CreateProposalModal';
-import VideoLibrary from '../Sales/VideoLibrary';
+
+const ProposalBuilderCompact = lazy(() => import('./ProposalBuilderCompact'));
+const ProposalWorkflowBar = lazy(() => import('./ProposalWorkflowBar'));
+const VideoLibrary = lazy(() => import('../Sales/VideoLibrary'));
 import type { ProposalPrefill } from '../AIAssistant/AIAssistant';
 
 interface ProposalsViewProps {
@@ -57,23 +58,25 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   }
 
   if (selectedProposalId) return (
-    <div className="w-full h-full flex flex-col min-h-0 bg-gray-900">
-      <ProposalWorkflowBar proposalId={selectedProposalId} />
-      <div className="min-h-0 flex-1">
-        <ProposalBuilderCompact proposalId={selectedProposalId}
-          onBack={() => { setSelectedProposalId(null); if (isStandalone) window.close(); }}
-          onNavigateToSalesOrder={(salesOrderId) => { setSelectedProposalId(null); onSelectSalesOrder?.(salesOrderId); }}
-          targetRoomIds={targetRoomIds} onTargetRoomsChange={setTargetRoomIds} isStandalone={isStandalone}
-          aiPrefillRooms={pendingPrefillRooms} autoOpenQA={effectiveAutoOpenQA} autoThreadId={effectiveAutoThreadId}
-          onProposalIdChange={navigateToProposal}
-        />
+    <Suspense fallback={<div className="w-full h-full min-h-[400px] flex items-center justify-center bg-gray-900 text-gray-400">Loading proposal...</div>}>
+      <div className="w-full h-full flex flex-col min-h-0 bg-gray-900">
+        <ProposalWorkflowBar proposalId={selectedProposalId} />
+        <div className="min-h-0 flex-1">
+          <ProposalBuilderCompact proposalId={selectedProposalId}
+            onBack={() => { setSelectedProposalId(null); if (isStandalone) window.close(); }}
+            onNavigateToSalesOrder={(salesOrderId) => { setSelectedProposalId(null); onSelectSalesOrder?.(salesOrderId); }}
+            targetRoomIds={targetRoomIds} onTargetRoomsChange={setTargetRoomIds} isStandalone={isStandalone}
+            aiPrefillRooms={pendingPrefillRooms} autoOpenQA={effectiveAutoOpenQA} autoThreadId={effectiveAutoThreadId}
+            onProposalIdChange={navigateToProposal}
+          />
+        </div>
       </div>
-    </div>
+    </Suspense>
   );
 
   if (isStandalone) return <div className="h-screen flex items-center justify-center bg-gray-900"><div className="text-center"><div className="text-yellow-400 text-lg mb-2">No Proposal ID</div><div className="text-gray-400 text-sm mb-4">This window requires a proposal ID in the URL</div><button onClick={() => window.close()} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">Close Window</button></div></div>;
 
-  if (showVideoLibrary) return <div className="w-full h-full"><div className="bg-gray-900 border-b border-gray-700 px-4 py-2"><button onClick={() => setShowVideoLibrary(false)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">&larr; Back to Proposals</button></div><VideoLibrary /></div>;
+  if (showVideoLibrary) return <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">Loading video library...</div>}><div className="w-full h-full"><div className="bg-gray-900 border-b border-gray-700 px-4 py-2"><button onClick={() => setShowVideoLibrary(false)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">&larr; Back to Proposals</button></div><VideoLibrary /></div></Suspense>;
 
   return <div className="w-full space-y-6">
     <ProposalsList onSelectProposal={setSelectedProposalId} onCreateNew={() => setShowCreateModal(true)} onSelectSalesOrder={onSelectSalesOrder} onNavigateToSalesOrders={onNavigateToSalesOrders} onNavigateToSalesStats={onNavigateToSalesStats} onOpenVideoLibrary={() => setShowVideoLibrary(true)} />

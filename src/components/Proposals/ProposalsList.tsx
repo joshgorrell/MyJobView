@@ -89,17 +89,21 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load proposals when filters or pagination changes.
-  // Preferences load in parallel — defaults (show everything) are safe until prefs arrive.
+  // Load proposals after preferences are ready so the first request uses the saved filters.
   useEffect(() => {
     if (authLoading || !profile) {
       setLoading(false);
       return;
     }
 
+    if (!preferencesLoaded) {
+      setLoading(true);
+      return;
+    }
+
     setLoading(true);
     loadProposals().catch(err => console.error('Failed to load proposals:', err));
-  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, selectedRepId]);
+  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, selectedRepId, preferencesLoaded]);
 
   // Reset to page 1 when filter/sort criteria change (but not when currentPage itself changes).
   // Load pending deposits only when profile or rep filter changes (not on every page/sort change)
