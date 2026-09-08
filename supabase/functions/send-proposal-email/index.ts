@@ -43,6 +43,8 @@ Deno.serve(async (req: Request) => {
       attachments = [] as AttachmentInput[],
       // Which document types were included — for audit tracking
       sentAttachments = {} as Record<string, boolean>,
+      // When true, skip sending the email notification (rep is with the customer)
+      skipNotification = false,
     } = body;
 
     if (!proposalId) {
@@ -80,7 +82,7 @@ Deno.serve(async (req: Request) => {
 
     // Use override email if provided, otherwise fall back to contact email
     const recipientEmail = toEmail || proposal.contacts?.email;
-    if (!recipientEmail) {
+    if (!recipientEmail && !skipNotification) {
       return new Response(JSON.stringify({ error: 'Customer email not found' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -131,6 +133,48 @@ Deno.serve(async (req: Request) => {
       const placeholder = `{{${key}}}`;
       subject = subject.split(placeholder).join(value);
       emailBody = emailBody.split(placeholder).join(value);
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    async function updateProposalStatus(notificationSent: boolean) {
+      const updatePayload: Record<string, unknown> = {
+        status: 'sent',
+        sent_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+      };
+
+      if (notificationSent) {
+        updatePayload.last_emailed_at = now.toISOString();
+      }
+
+      if (Object.keys(sentAttachments).length > 0) {
+        updatePayload.sent_attachments = sentAttachments;
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from('proposals')
+        .update(updatePayload)
+        .eq('id', proposalId);
+
+      if (updateError) {
+        console.error('Error updating proposal status:', updateError);
+        throw new Error('Failed to update proposal status: ' + updateError.message);
+      }
+    }
+
+    if (skipNotification) {
+      await updateProposalStatus(false);
+      return new Response(
+        JSON.stringify({ success: true, message: 'Proposal published to portal (notification skipped)' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
@@ -213,35 +257,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const updatePayload: Record<string, unknown> = {
-      status: 'sent',
-      sent_at: now.toISOString(),
-      expires_at: expiresAt.toISOString(),
-      last_emailed_at: now.toISOString(),
-    };
-
-    // Record which attachments were sent
-    if (Object.keys(sentAttachments).length > 0) {
-      updatePayload.sent_attachments = sentAttachments;
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('proposals')
-      .update(updatePayload)
-      .eq('id', proposalId);
-
-    if (updateError) {
-      console.error('Error updating proposal status:', updateError);
-      throw new Error('Failed to update proposal status: ' + updateError.message);
-    }
+    await updateProposalStatus(true);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Proposal sent and status updated' }),

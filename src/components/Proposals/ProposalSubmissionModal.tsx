@@ -7,7 +7,7 @@ interface ProposalSubmissionModalProps {
   proposalId: string;
   proposalNumber: string;
   currentTemplateId?: string | null;
-  onConfirm: (sendToPortal: boolean, expiresAt: string, templateId: string | null, setAsDefault: boolean, includeVideos: boolean) => void;
+  onConfirm: (sendToPortal: boolean, expiresAt: string, templateId: string | null, setAsDefault: boolean, includeVideos: boolean, notifyCustomer: boolean) => void;
   onCancel: () => void;
   onPreviewTemplate?: (templateId: string) => void;
 }
@@ -62,6 +62,7 @@ export function ProposalSubmissionModal({ proposalId, proposalNumber, currentTem
   const [recordings, setRecordings] = useState<RecordingSummary[]>([]);
   const [includeVideos, setIncludeVideos] = useState(true);
   const [showVideoDetails, setShowVideoDetails] = useState(false);
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
 
   const presetOptions = [
     { days: 7, label: '7 Days' },
@@ -136,7 +137,7 @@ export function ProposalSubmissionModal({ proposalId, proposalNumber, currentTem
 
   function handleSubmit() {
     const expiresAt = calculateExpirationDate();
-    onConfirm(sendToPortal, expiresAt, selectedTemplateId, setAsDefault, includeVideos);
+    onConfirm(sendToPortal, expiresAt, selectedTemplateId, setAsDefault, includeVideos, notifyCustomer);
   }
 
   function getFormattedExpirationDate() {
@@ -386,6 +387,28 @@ export function ProposalSubmissionModal({ proposalId, proposalNumber, currentTem
               </button>
             </div>
           </div>
+
+          {/* Customer Notification Toggle — only when sending to portal */}
+          {sendToPortal && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={notifyCustomer}
+                  onChange={(e) => setNotifyCustomer(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 flex-shrink-0"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-blue-900">
+                    Send email notification to customer
+                  </div>
+                  <div className="text-xs text-blue-700 mt-0.5">
+                    Uncheck this if you're with the customer in person — the proposal will go live on the portal without sending an email.
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* Expiration Date Picker */}
           <div>

@@ -1,0 +1,2 @@
+[functions.send-proposal-email]
+verify_jwt = true

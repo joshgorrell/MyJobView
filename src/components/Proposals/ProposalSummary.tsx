@@ -60,6 +60,8 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [activityData, setActivityData] = useState<any>(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [showPortalNotificationModal, setShowPortalNotificationModal] = useState(false);
+  const [notifyCustomerOnPortal, setNotifyCustomerOnPortal] = useState(true);
   const [showReactivateModal, setShowReactivateModal] = useState(false);
   const [showExpirationEditor, setShowExpirationEditor] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
@@ -208,7 +210,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
     await updateProposal(updates);
   }
 
-  async function handleSubmissionConfirm(sendToPortal: boolean, expiresAt: string, templateId: string | null, setAsDefault: boolean, includeVideos: boolean) {
+  async function handleSubmissionConfirm(sendToPortal: boolean, expiresAt: string, templateId: string | null, setAsDefault: boolean, includeVideos: boolean, notifyCustomer: boolean) {
     // Handle video visibility based on user's choice
     if (!includeVideos) {
       await supabase
@@ -270,7 +272,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       // Send email notification
       try {
         const { data, error: emailError } = await supabase.functions.invoke('send-proposal-email', {
-          body: { proposalId: proposal.id }
+          body: { proposalId: proposal.id, skipNotification: !notifyCustomer }
         });
 
         if (emailError) {
@@ -280,7 +282,9 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
           console.error('Email API error:', data);
           alert(`Proposal submitted but email configuration error:\n\n${data.error}\n\n${data.details || ''}`);
         } else {
-          alert('Proposal submitted to customer portal and email notification sent!');
+          alert(notifyCustomer
+            ? 'Proposal submitted to customer portal and email notification sent!'
+            : 'Proposal submitted to customer portal without sending an email notification.');
         }
       } catch (error: any) {
         console.error('Error sending email:', error);
@@ -299,13 +303,19 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
   }
 
   async function handleSendToPortal() {
+    setNotifyCustomerOnPortal(true);
+    setShowPortalNotificationModal(true);
+  }
+
+  async function publishToPortal(notifyCustomer: boolean) {
+    setShowPortalNotificationModal(false);
     try {
       setSending(true);
       console.log('Sending proposal to portal:', proposal.id);
 
-      // Send email first (edge function will also update the status)
+      // Publish through the edge function so status and notification behavior stay consistent
       const { data, error: emailError } = await supabase.functions.invoke('send-proposal-email', {
-        body: { proposalId: proposal.id }
+        body: { proposalId: proposal.id, skipNotification: !notifyCustomer }
       });
 
       if (emailError) {
@@ -340,7 +350,9 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       setStatusOverride(true);
       statusOverrides.set(proposal.id, 'sent');
 
-      alert('Proposal submitted to customer portal and email notification sent!');
+      alert(notifyCustomer
+        ? 'Proposal submitted to customer portal and email notification sent!'
+        : 'Proposal submitted to customer portal without sending an email notification.');
 
       // Trigger parent refresh to update the proposal list
       if (onSave) {
@@ -1235,6 +1247,43 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
                 className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPortalNotificationModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-lg font-bold text-gray-900">Send Proposal to Customer Portal</h2>
+            <p className="text-sm text-gray-600 mt-2">
+              The proposal will be published and available to the customer through the portal.
+            </p>
+            <label className="flex items-start gap-3 mt-5 p-3 rounded-lg bg-blue-50 border border-blue-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notifyCustomerOnPortal}
+                onChange={(e) => setNotifyCustomerOnPortal(e.target.checked)}
+                className="w-4 h-4 mt-0.5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-blue-900">Send email notification to customer</span>
+                <span className="block text-xs text-blue-700 mt-0.5">Uncheck this when you are presenting the proposal in person.</span>
+              </span>
+            </label>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowPortalNotificationModal(false)}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => publishToPortal(notifyCustomerOnPortal)}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
+              >
+                Publish to Portal
               </button>
             </div>
           </div>
