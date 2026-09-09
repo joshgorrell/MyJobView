@@ -133,25 +133,37 @@ Deno.serve(async (req: Request) => {
       console.error('Failed to fetch company name:', e);
     }
 
-    return redirectToSuccess();
+    return redirectToSuccess(session.app_url);
   } catch (error: any) {
     console.error('OAuth callback error:', error);
-    return redirectToError(error.message || 'Unknown error');
+    return redirectToError(null, error.message || 'Unknown error');
   }
 });
 
-function redirectToSuccess(): Response {
-  const appUrl = Deno.env.get('APP_URL') || 'http://localhost:5173';
+function redirectToSuccess(appUrl: string | null): Response {
+  const url = appUrl || Deno.env.get('APP_URL') || '';
+  if (!url) {
+    return new Response(
+      JSON.stringify({ error: 'No application URL configured for redirect' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
   return new Response(null, {
     status: 302,
-    headers: { ...corsHeaders, Location: `${appUrl}/admin/settings?qbo=success` },
+    headers: { ...corsHeaders, Location: `${url}/admin/settings?qbo=success` },
   });
 }
 
-function redirectToError(message: string): Response {
-  const appUrl = Deno.env.get('APP_URL') || 'http://localhost:5173';
+function redirectToError(appUrl: string | null, message: string): Response {
+  const url = appUrl || Deno.env.get('APP_URL') || '';
+  if (!url) {
+    return new Response(
+      JSON.stringify({ error: message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
   return new Response(null, {
     status: 302,
-    headers: { ...corsHeaders, Location: `${appUrl}/admin/settings?qbo=error&msg=${encodeURIComponent(message)}` },
+    headers: { ...corsHeaders, Location: `${url}/admin/settings?qbo=error&msg=${encodeURIComponent(message)}` },
   });
 }

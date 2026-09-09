@@ -63,6 +63,14 @@ Deno.serve(async (req: Request) => {
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
+    const appUrl = req.headers.get('Origin') || req.headers.get('Referer');
+    if (!appUrl) {
+      return new Response(
+        JSON.stringify({ error: 'Unable to determine application URL' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const adminSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -75,6 +83,7 @@ Deno.serve(async (req: Request) => {
         organization_id: profile.organization_id,
         initiated_by: user.id,
         expires_at: expiresAt.toISOString(),
+        app_url: appUrl,
       });
 
     if (sessionError) {
