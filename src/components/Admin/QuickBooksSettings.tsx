@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, CheckCircle, XCircle, ExternalLink, Download, Users, RefreshCw, Eye, ArrowUpDown } from 'lucide-react';
+import { DollarSign, CheckCircle, XCircle, ExternalLink, Download, Users, RefreshCw, Eye, ArrowUpDown, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { QuickBooksSettings as QBSettings } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,6 +22,7 @@ export function QuickBooksSettings() {
   const { profile } = useAuth();
   const [settings, setSettings] = useState<QBSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [reconciling, setReconciling] = useState(false);
@@ -35,7 +36,9 @@ export function QuickBooksSettings() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   useEffect(() => {
-    loadSettings();
+    if (!profile?.organization_id) return;
+
+    loadSettings(profile.organization_id);
     loadSyncStats();
 
     const params = new URLSearchParams(window.location.search);
@@ -43,25 +46,28 @@ export function QuickBooksSettings() {
     if (qboStatus === 'success') {
       alert('QuickBooks connected successfully!');
       window.history.replaceState({}, '', '/admin/settings');
-      loadSettings();
+      loadSettings(profile.organization_id);
       loadSyncStats();
     } else if (qboStatus === 'error') {
       alert('Failed to connect to QuickBooks. Please try again.');
       window.history.replaceState({}, '', '/admin/settings');
     }
-  }, []);
+  }, [profile?.organization_id]);
 
-  async function loadSettings() {
+  async function loadSettings(organizationId: string) {
+    setSettingsError(false);
     try {
       const { data, error } = await supabase
         .from('quickbooks_settings')
         .select('id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
+        .eq('organization_id', organizationId)
         .maybeSingle();
 
       if (error) throw error;
       setSettings(data);
     } catch (error) {
       console.error('Error loading QuickBooks settings:', error);
+      setSettingsError(true);
     } finally {
       setLoading(false);
     }
@@ -108,7 +114,7 @@ export function QuickBooksSettings() {
     try {
       const { error } = await supabase.functions.invoke('quickbooks-disconnect', { body: {} });
       if (error) throw error;
-      await loadSettings();
+      await loadSettings(profile?.organization_id ?? '');
     } catch (error) {
       console.error('Error disconnecting QuickBooks:', error);
       alert('Failed to disconnect QuickBooks');
@@ -125,7 +131,7 @@ export function QuickBooksSettings() {
         .update({ auto_import_complete_data: newValue })
         .eq('id', settings.id);
 
-      await loadSettings();
+      await loadSettings(profile?.organization_id ?? '');
       alert(`Auto-import of complete customers ${newValue ? 'enabled' : 'disabled'} successfully`);
     } catch (error) {
       console.error('Error toggling auto-import:', error);
@@ -143,7 +149,7 @@ export function QuickBooksSettings() {
         .update({ auto_sync_enabled: newValue })
         .eq('id', settings.id);
 
-      await loadSettings();
+      await loadSettings(profile?.organization_id ?? '');
       alert(`Auto-sync to QuickBooks ${newValue ? 'enabled' : 'disabled'} successfully`);
     } catch (error) {
       console.error('Error toggling auto-sync:', error);
@@ -160,7 +166,7 @@ export function QuickBooksSettings() {
         if (error || !result?.success) throw new Error(`The ${functionName.replace('quickbooks-sync-', '')} sync failed`);
       }
       alert('Customer, invoice, and payment synchronization completed.');
-      await loadSettings();
+      await loadSettings(profile?.organization_id ?? '');
       await loadSyncStats();
     } catch (error) {
       console.error('Error syncing QuickBooks:', error);
@@ -176,7 +182,7 @@ export function QuickBooksSettings() {
       const { data: result, error } = await supabase.functions.invoke('quickbooks-reconcile', { body: {} });
       if (error || !result?.success) throw new Error('Reconciliation failed');
       alert(`Read-only reconciliation completed with ${result.counts?.discrepancies || 0} discrepancies for review.`);
-      await loadSettings();
+      await loadSettings(profile?.organization_id ?? '');
     } catch (error) {
       console.error('Error reconciling QuickBooks:', error);
       alert('Read-only reconciliation could not be completed.');
@@ -197,6 +203,15 @@ export function QuickBooksSettings() {
 
   return (
     <div className="space-y-6">
+      {settingsError && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-medium">QuickBooks status could not be loaded</p>
+            <p className="mt-1 text-sm">Refresh the page and try again. Your connection has not been changed.</p>
+          </div>
+        </div>
+      )}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-1">QuickBooks Online Integration</h3>
         <p className="text-sm text-gray-600">
@@ -425,7 +440,7 @@ export function QuickBooksSettings() {
         <QuickBooksCustomerBrowser
           onClose={() => setShowCustomerBrowser(false)}
           onImportComplete={() => {
-            loadSettings();
+            loadSettings(profile?.organization_id ?? '');
             loadSyncStats();
           }}
         />
