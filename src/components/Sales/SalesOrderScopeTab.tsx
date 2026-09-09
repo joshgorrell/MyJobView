@@ -1556,29 +1556,29 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                   ) : (
                     <>
                       {/* Desktop table — compact flat rows matching ProposalBuilderCompact */}
-                      <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full min-w-[900px] text-xs">
+                      <div className="hidden md:block w-full overflow-x-hidden">
+                        <table className="w-full table-fixed text-xs">
                           <thead className="bg-gray-800/80 text-gray-400 border-b border-gray-700">
                             <tr>
                               {/* Lock / drag handle — always visible, read-only indicator */}
                               <th className="py-2 px-2 w-7 text-center">
                                 <Lock className="w-3 h-3 text-gray-600 mx-auto" title="Scope locked — edit via change order" />
                               </th>
-                              {visibleColumns.has('manufacturer') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium">Manufacturer</th>}
-                              {visibleColumns.has('sku') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium">SKU</th>}
-                              {visibleColumns.has('description') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium w-[28%]">Description</th>}
-                              {visibleColumns.has('qty') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium">Qty</th>}
-                              {visibleColumns.has('cost') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-gray-500">Cost</th>}
-                              {visibleColumns.has('price') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium border-r border-gray-700/60">Price</th>}
-                              {visibleColumns.has('laborPhase') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80">Phase</th>}
+                              {visibleColumns.has('manufacturer') && <th className="text-left py-2 px-2 truncate font-medium">Manufacturer</th>}
+                              {visibleColumns.has('sku') && <th className="text-left py-2 px-2 truncate font-medium">SKU</th>}
+                              {visibleColumns.has('description') && <th className="text-left py-2 px-3 font-medium">Description</th>}
+                              {visibleColumns.has('qty') && <th className="text-right py-2 px-2 truncate font-medium">Qty</th>}
+                              {visibleColumns.has('cost') && <th className="text-right py-2 px-2 truncate font-medium text-gray-500">Cost</th>}
+                              {visibleColumns.has('price') && <th className="text-right py-2 px-2 truncate font-medium border-r border-gray-700/60">Price</th>}
+                              {visibleColumns.has('laborPhase') && <th className="text-left py-2 px-2 truncate font-medium text-cyan-500/80">Phase</th>}
                               {visibleColumns.has('laborHrs') && (
-                                <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80">
+                                <th className="text-right py-2 px-2 truncate font-medium text-cyan-500/80">
                                   <span className="flex items-center justify-end gap-1"><Wrench className="w-3 h-3" />Hrs</span>
                                 </th>
                               )}
-                              {visibleColumns.has('laborRate') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80">Labor Rate</th>}
-                              {visibleColumns.has('laborTotal') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-cyan-500/80 border-r border-gray-700/60">Labor Total</th>}
-                              {visibleColumns.has('lineTotal') && <th className="text-right py-2 px-3 whitespace-nowrap font-semibold text-white">Line Total</th>}
+                              {visibleColumns.has('laborRate') && <th className="text-right py-2 px-2 truncate font-medium text-cyan-500/80">Labor Rate</th>}
+                              {visibleColumns.has('laborTotal') && <th className="text-right py-2 px-2 truncate font-medium text-cyan-500/80 border-r border-gray-700/60">Labor Total</th>}
+                              {visibleColumns.has('lineTotal') && <th className="text-right py-2 px-2 truncate font-semibold text-white">Line Total</th>}
                               <th className="py-2 px-2 w-8" />
                             </tr>
                           </thead>
@@ -1621,8 +1621,8 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                           </tbody>
                           <tfoot>
                             <tr className="border-t-2 border-gray-600/60 bg-gray-800/40">
-                              <td colSpan={visibleCount + 2} className="px-3 py-2.5 text-right">
-                                <div className="flex items-center justify-end gap-4">
+                              <td colSpan={visibleCount + 3} className="px-3 py-2.5 text-right">
+                                <div className="flex items-center justify-end gap-4 flex-wrap">
                                   {gridPartsTotal > 0 && (
                                     <span className="text-xs text-gray-500 tabular-nums flex items-center gap-1">
                                       <Package className="w-3 h-3 opacity-50" />Parts: {formatCurrency(gridPartsTotal)}
@@ -1643,13 +1643,10 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                                       +{formatCurrency(gridTax)} tax
                                     </span>
                                   )}
-                                  <span className="text-xs text-gray-400">Section subtotal</span>
+                                  <span className="text-xs text-gray-400">Area subtotal</span>
+                                  <span className="text-sm font-semibold text-white tabular-nums">{formatCurrency(gridRoomTotal)}</span>
                                 </div>
                               </td>
-                              <td className="px-3 py-2.5 text-sm font-semibold text-white text-right tabular-nums whitespace-nowrap">
-                                {formatCurrency(gridRoomTotal)}
-                              </td>
-                              <td />
                             </tr>
                           </tfoot>
                         </table>
@@ -1819,14 +1816,14 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
               </div>
               <div>
                 {/* Desktop table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="hidden md:block w-full overflow-x-hidden">
+                  <table className="w-full table-fixed text-sm">
                     <thead className="bg-gray-800/80 text-gray-400 border-b border-gray-700">
                       <tr>
                         <th className="py-2 px-2 w-7 text-center" />
                         {visibleColumns.has('manufacturer') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium">Manufacturer</th>}
                         {visibleColumns.has('sku') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium">SKU</th>}
-                        {visibleColumns.has('description') && <th className="text-left py-2 px-3 whitespace-nowrap font-medium w-[28%]">Description</th>}
+                        {visibleColumns.has('description') && <th className="text-left py-2 px-3 font-medium">Description</th>}
                         {visibleColumns.has('qty') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium">Qty</th>}
                         {visibleColumns.has('cost') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium text-gray-500">Cost</th>}
                         {visibleColumns.has('price') && <th className="text-right py-2 px-3 whitespace-nowrap font-medium border-r border-gray-700/60">Price</th>}
