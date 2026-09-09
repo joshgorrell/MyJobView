@@ -1465,12 +1465,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
 
   function getStatusBadge(status: string) {
-    const isLive = proposal?.is_portal_visible && proposal?.is_active_revision;
     const statusConfig: Record<string, { label: string; bgColor: string; textColor: string; icon?: React.ReactNode }> = {
       'designing': { label: 'Designing', bgColor: 'bg-pink-600', textColor: 'text-white' },
       'ready_to_submit': { label: 'Ready', bgColor: 'bg-yellow-600', textColor: 'text-white' },
-      'sent': { label: isLive ? 'Live' : 'Sent', bgColor: isLive ? 'bg-green-600' : 'bg-blue-600', textColor: 'text-white', icon: isLive ? <Globe className="w-3 h-3" /> : undefined },
-      'portal': { label: 'Live', bgColor: 'bg-green-600', textColor: 'text-white', icon: <Globe className="w-3 h-3" /> },
+      'sent': { label: 'Sent', bgColor: 'bg-blue-600', textColor: 'text-white' },
+      'portal': { label: 'Portal', bgColor: 'bg-blue-600', textColor: 'text-white' },
       'accepted': { label: 'Accepted', bgColor: 'bg-green-600', textColor: 'text-white', icon: <CheckCircle2 className="w-3 h-3" /> },
       'declined': { label: 'Declined', bgColor: 'bg-red-600', textColor: 'text-white' },
       'expired': { label: 'Expired', bgColor: 'bg-orange-600', textColor: 'text-white' }
@@ -1483,6 +1482,46 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         {config.icon}
         <span>{config.label}</span>
       </span>
+    );
+  }
+
+  function getCombinedStatusBadge() {
+    const isLive = proposal?.is_portal_visible && proposal?.is_active_revision;
+    const isLocked = proposal?.is_locked;
+
+    if (!isLive && !isLocked) return null;
+
+    if (isLive && isLocked) {
+      return (
+        <button
+          onClick={() => setShowUnlockWarningModal(true)}
+          className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+          title="Proposal is locked and live — click to unlock"
+        >
+          <Lock className="w-3 h-3" />
+          <span>Locked / Live</span>
+        </button>
+      );
+    }
+
+    if (isLive && !isLocked) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium bg-green-600 text-white">
+          <Globe className="w-3 h-3" />
+          <span>Live</span>
+        </span>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => setShowUnlockWarningModal(true)}
+        className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+        title="Proposal is locked — click to unlock"
+      >
+        <Lock className="w-3 h-3" />
+        <span>Locked</span>
+      </button>
     );
   }
 
@@ -3340,7 +3379,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   <h1 className="text-base font-semibold text-white truncate">
                     {proposal?.title || proposal?.proposal_number || 'Proposal Builder'}
                   </h1>
-                  {proposal?.status && getStatusBadge(proposal.status)}
+                  {(() => {
+                    const combined = getCombinedStatusBadge();
+                    return combined || (proposal?.status && getStatusBadge(proposal.status));
+                  })()}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
                   <User className="w-3 h-3 flex-shrink-0" />
@@ -3362,18 +3404,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span className="hidden sm:inline">v{proposal.current_portal_version}</span>
-                </button>
-              )}
-
-              {/* Locked Badge — click to open unlock modal */}
-              {proposal?.is_locked && (
-                <button
-                  onClick={() => setShowUnlockWarningModal(true)}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors"
-                  title="Proposal is locked — click to unlock"
-                >
-                  <Lock className="w-3 h-3" />
-                  <span className="hidden sm:inline">Locked</span>
                 </button>
               )}
 
