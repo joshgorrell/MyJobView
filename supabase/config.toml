@@ -13,6 +13,12 @@ verify_jwt = true
 [functions.quickbooks-payment-webhook]
 verify_jwt = false
 
+[functions.quickbooks-webhook]
+verify_jwt = false
+
+[functions.quickbooks-reconcile]
+verify_jwt = true
+
 [functions.quickbooks-sync-customer]
 verify_jwt = true
 

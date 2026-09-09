@@ -24,6 +24,7 @@ export function QuickBooksSettings() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [syncStats, setSyncStats] = useState<{
     complete: number;
     partial: number;
@@ -54,7 +55,7 @@ export function QuickBooksSettings() {
     try {
       const { data, error } = await supabase
         .from('quickbooks_settings')
-        .select('id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, sync_health, last_error, organization_id, created_at, updated_at')
+        .select('id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
         .maybeSingle();
 
       if (error) throw error;
@@ -153,22 +154,34 @@ export function QuickBooksSettings() {
   async function handleSyncNow() {
     setSyncing(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke('quickbooks-sync-customer', {
-        body: { runType: 'manual' },
-      });
-
-      if (error || !result?.success) {
-        throw new Error('Failed to sync customers');
+      const syncFunctions = ['quickbooks-sync-customer', 'quickbooks-sync-invoices', 'quickbooks-sync-payments'];
+      for (const functionName of syncFunctions) {
+        const { data: result, error } = await supabase.functions.invoke(functionName, { body: { runType: 'manual' } });
+        if (error || !result?.success) throw new Error(`The ${functionName.replace('quickbooks-sync-', '')} sync failed`);
       }
-
-      alert(`Customer sync complete: ${result.synced || 0} synced`);
+      alert('Customer, invoice, and payment synchronization completed.');
       await loadSettings();
       await loadSyncStats();
     } catch (error) {
-      console.error('Error syncing customers:', error);
-      alert('Failed to sync customers: ' + (error as Error).message);
+      console.error('Error syncing QuickBooks:', error);
+      alert('QuickBooks synchronization could not be completed.');
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleReconcile() {
+    setReconciling(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('quickbooks-reconcile', { body: {} });
+      if (error || !result?.success) throw new Error('Reconciliation failed');
+      alert(`Read-only reconciliation completed with ${result.counts?.discrepancies || 0} discrepancies for review.`);
+      await loadSettings();
+    } catch (error) {
+      console.error('Error reconciling QuickBooks:', error);
+      alert('Read-only reconciliation could not be completed.');
+    } finally {
+      setReconciling(false);
     }
   }
 
@@ -205,9 +218,9 @@ export function QuickBooksSettings() {
               <div className="flex items-center gap-2 mb-1">
                 <h4 className="font-semibold text-gray-900">QuickBooks Online</h4>
                 {isConnected ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                    <CheckCircle className="w-3 h-3" />
-                    Connected
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded ${settings?.sync_health === 'error' ? 'bg-red-100 text-red-700' : settings?.sync_health === 'degraded' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700'}`}>
+                    {settings?.sync_health === 'error' ? <XCircle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+                    {settings?.sync_health === 'error' ? 'Needs Attention' : settings?.sync_health === 'degraded' ? 'Degraded' : 'Connected'}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded">
@@ -223,9 +236,10 @@ export function QuickBooksSettings() {
                 }
               </p>
               {isConnected && settings?.realm_id && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Company ID: {settings.realm_id}
-                </p>
+                <div className="mt-1 space-y-1">
+                  <p className="text-xs text-gray-500">{settings.company_name || 'Connected company'} · {settings.environment === 'production' ? 'Production' : 'Sandbox'}</p>
+                  <p className="text-xs text-gray-500">Realm ID: {settings.realm_id}</p>
+                </div>
               )}
             </div>
           </div>
@@ -347,6 +361,24 @@ export function QuickBooksSettings() {
                   No pending customers. All QuickBooks customers are synced.
                 </p>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-900">Connection Health</h4>
+              <div className="flex gap-2">
+                <button onClick={handleReconcile} disabled={reconciling} className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">{reconciling ? 'Reconciling...' : 'Read-only Reconcile'}</button>
+                <button onClick={handleSyncNow} disabled={syncing} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{syncing ? 'Syncing...' : 'Sync Now'}</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+              <p>Last successful sync: {settings?.last_synced_at ? new Date(settings.last_synced_at).toLocaleString() : 'Not yet recorded'}</p>
+              <p>Last QBO webhook: {settings?.last_webhook_at ? new Date(settings.last_webhook_at).toLocaleString() : 'Not yet received'}</p>
+              <p>Last reconciliation: {settings?.last_reconciliation_at ? new Date(settings.last_reconciliation_at).toLocaleString() : 'Not yet run'}</p>
+              <p>Customer sync: {settings?.customer_sync_status || 'Idle'}</p>
+              <p>Invoice sync: {settings?.invoice_sync_status || 'Idle'}</p>
+              <p>Payment sync: {settings?.payment_sync_status || 'Idle'}</p>
             </div>
           </div>
 

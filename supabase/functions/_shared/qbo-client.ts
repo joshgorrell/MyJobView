@@ -19,6 +19,7 @@ export interface QBOConnection {
   last_synced_at: string | null;
   sync_health: string;
   last_error: Record<string, unknown> | null;
+  token_version: number;
 }
 
 export function getSupabaseAdmin() {
@@ -71,6 +72,14 @@ export async function getConnectionByRealm(supabase: ReturnType<typeof createCli
   return data as QBOConnection;
 }
 
+/**
+ * Concurrency-safe token refresh using optimistic locking via token_version.
+ *
+ * The UPDATE's WHERE clause includes token_version = <version at read time>.
+ * If another request already refreshed and rotated the token, this update
+ * affects zero rows. We detect that, re-read the current connection, and
+ * return the already-rotated access token instead of overwriting it.
+ */
 export async function refreshAccessToken(
   supabase: ReturnType<typeof createClient>,
   connection: QBOConnection
@@ -104,7 +113,7 @@ export async function refreshAccessToken(
       .from('quickbooks_settings')
       .update({
         sync_health: 'error',
-        last_error: { type: 'token_refresh', message: errorText, at: new Date().toISOString() },
+        last_error: { type: 'token_refresh', message: 'Token refresh failed', at: new Date().toISOString() },
       })
       .eq('id', connection.id);
 
@@ -115,7 +124,7 @@ export async function refreshAccessToken(
   const expiresAt = new Date();
   expiresAt.setSeconds(expiresAt.getSeconds() + tokens.expires_in);
 
-  await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('quickbooks_settings')
     .update({
       access_token: tokens.access_token,
@@ -123,10 +132,34 @@ export async function refreshAccessToken(
       token_expires_at: expiresAt.toISOString(),
       sync_health: 'healthy',
       last_error: null,
+      token_version: connection.token_version + 1,
     })
-    .eq('id', connection.id);
+    .eq('id', connection.id)
+    .eq('token_version', connection.token_version)
+    .select('access_token')
+    .maybeSingle();
 
-  return tokens.access_token;
+  if (updateError || !updated) {
+    // Another request already refreshed the token (token_version mismatch).
+    // Re-read the current connection to get the already-rotated access token.
+    const { data: current } = await supabase
+      .from('quickbooks_settings')
+      .select('access_token, token_expires_at')
+      .eq('id', connection.id)
+      .maybeSingle();
+
+    if (current?.access_token) {
+      const currentExpiry = new Date(current.token_expires_at);
+      if (currentExpiry > new Date()) {
+        return current.access_token;
+      }
+    }
+
+    console.error('Token refresh conflict and re-read failed');
+    return null;
+  }
+
+  return updated.access_token;
 }
 
 export async function getValidAccessToken(
@@ -136,7 +169,10 @@ export async function getValidAccessToken(
   const expiresAt = new Date(connection.token_expires_at);
   const now = new Date();
 
-  if (expiresAt > now) {
+  // Refresh 60 seconds early to avoid edge-case expiry
+  const buffer = new Date(now.getTime() + 60_000);
+
+  if (expiresAt > buffer) {
     return connection.access_token;
   }
 
@@ -306,7 +342,7 @@ export async function getLocalIdByQboId(
 ): Promise<string | null> {
   const { data } = await supabase
     .from('qbo_entity_mappings')
-    .select('local_id')
+    .select('local_id, qbo_sync_token')
     .eq('organization_id', organizationId)
     .eq('entity_type', entityType)
     .eq('qbo_id', qboId)
@@ -323,13 +359,30 @@ export async function getQboIdByLocalId(
 ): Promise<string | null> {
   const { data } = await supabase
     .from('qbo_entity_mappings')
-    .select('qbo_id')
+    .select('qbo_id, qbo_sync_token')
     .eq('organization_id', organizationId)
     .eq('entity_type', entityType)
     .eq('local_id', localId)
     .maybeSingle();
 
   return data?.qbo_id ?? null;
+}
+
+export async function getEntityMapping(
+  supabase: ReturnType<typeof createClient>,
+  organizationId: string,
+  entityType: string,
+  localId: string
+): Promise<{ qbo_id: string; qbo_sync_token: string | null } | null> {
+  const { data } = await supabase
+    .from('qbo_entity_mappings')
+    .select('qbo_id, qbo_sync_token')
+    .eq('organization_id', organizationId)
+    .eq('entity_type', entityType)
+    .eq('local_id', localId)
+    .maybeSingle();
+
+  return data ?? null;
 }
 
 export function jsonParseSafe(text: string): any {

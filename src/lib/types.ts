@@ -285,8 +285,23 @@ export interface QuickBooksSettings {
   realm_id: string | null;
   token_expires_at: string | null;
   is_connected: boolean;
+  environment: string | null;
+  company_name: string | null;
   auto_import_customers: boolean;
+  auto_import_complete_data: boolean;
+  auto_sync_enabled: boolean;
   last_customer_sync_at: string | null;
+  last_invoice_sync_at: string | null;
+  last_payment_sync_at: string | null;
+  last_reconciliation_at: string | null;
+  last_fetch_count: number | null;
+  last_fetch_completed_at: string | null;
+  last_webhook_at: string | null;
+  sync_health: string | null;
+  invoice_sync_status: string | null;
+  payment_sync_status: string | null;
+  customer_sync_status: string | null;
+  last_error: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

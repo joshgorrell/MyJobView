@@ -8,6 +8,7 @@ import {
   completeSyncRun,
   logSyncOperation,
   upsertEntityMapping,
+  getEntityMapping,
 } from '../_shared/qbo-client.ts';
 
 Deno.serve(async (req: Request) => {
@@ -72,6 +73,16 @@ Deno.serve(async (req: Request) => {
       else failed++;
     }
 
+    await supabase
+      .from('quickbooks_settings')
+      .update({
+        last_synced_at: new Date().toISOString(),
+        last_invoice_sync_at: new Date().toISOString(),
+        sync_health: failed > 0 ? 'degraded' : 'healthy',
+        invoice_sync_status: failed > 0 ? 'error' : 'idle',
+      })
+      .eq('id', connection.id);
+
     if (runId) {
       await completeSyncRun(
         supabase,
@@ -82,11 +93,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    await supabase
-      .from('quickbooks_settings')
-      .update({ last_synced_at: new Date().toISOString(), sync_health: failed > 0 ? 'degraded' : 'healthy' })
-      .eq('id', connection.id);
-
     return jsonResponse({ success: true, total: invoices.length, synced, failed });
   } catch (error: any) {
     console.error('Invoice sync error:', error);
@@ -94,6 +100,11 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+/**
+ * Inbound sync: QBO → MJV
+ * QBO owns accounting totals, balance, payment status. These always win on inbound.
+ * MJV owns workflow fields (descriptions, job references, internal status) — not overwritten.
+ */
 async function syncInvoice(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   organizationId: string,
@@ -103,7 +114,7 @@ async function syncInvoice(
     const qboId = String(qboInvoice.Id);
     const { data: localInvoice } = await supabase
       .from('invoices')
-      .select('id')
+      .select('id, total, amount_paid, amount_due, status')
       .eq('organization_id', organizationId)
       .eq('qbo_invoice_id', qboId)
       .maybeSingle();
@@ -113,6 +124,7 @@ async function syncInvoice(
       return { success: true };
     }
 
+    // QBO owns these fields — always authoritative
     const total = Number(qboInvoice.TotalAmt || 0);
     const amountDue = Number(qboInvoice.Balance || 0);
     const amountPaid = Math.max(0, total - amountDue);
@@ -135,6 +147,16 @@ async function syncInvoice(
   }
 }
 
+/**
+ * Outbound push: MJV → QBO
+ * If the invoice already has a QBO mapping, UPDATE the existing QBO invoice
+ * using its stored SyncToken (not create a new one).
+ * If no mapping exists, CREATE a new QBO invoice.
+ *
+ * Field ownership:
+ * - MJV sends: CustomerRef, TxnDate, DueDate, Line items (descriptions, amounts)
+ * - QBO owns: TotalAmt, Balance, payment status — we never send these
+ */
 async function pushInvoice(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   connection: any,
@@ -151,17 +173,81 @@ async function pushInvoice(
   if (!invoice) return { success: false, error: 'Invoice not found' };
   if (!invoice.contacts?.qbo_customer_id) return { success: false, error: 'Contact is not linked to QuickBooks' };
 
+  const lineItems = (invoice.invoice_line_items || []).map((item: any, index: number) => ({
+    DetailType: 'SalesItemLineDetail',
+    Description: item.description,
+    Amount: item.amount,
+    SalesItemLineDetail: { Qty: item.quantity, UnitPrice: item.unit_price },
+    LineNum: index + 1,
+  }));
+
+  // Check if this invoice is already mapped to a QBO invoice
+  const existingMapping = await getEntityMapping(supabase, organizationId, 'invoice', invoiceId);
+
+  if (existingMapping) {
+    // UPDATE existing QBO invoice — include SyncToken for optimistic concurrency
+    const payload = {
+      Id: existingMapping.qbo_id,
+      SyncToken: existingMapping.qbo_sync_token,
+      CustomerRef: { value: invoice.contacts.qbo_customer_id },
+      TxnDate: invoice.invoice_date,
+      DueDate: invoice.due_date,
+      Line: lineItems,
+      sparse: true,
+    };
+
+    const result = await qboRequest(supabase, connection, 'POST', 'invoice', payload);
+    if (!result.ok || !result.data?.Invoice?.Id) {
+      // SyncToken mismatch — re-fetch and retry once
+      if (result.status === 400 && result.data?.Fault?.Error?.[0]?.code === '3200') {
+        const fetchResult = await qboRequest(supabase, connection, 'GET', `invoice/${existingMapping.qbo_id}?minorversion=40`);
+        if (fetchResult.ok && fetchResult.data?.Invoice) {
+          const currentSyncToken = fetchResult.data.Invoice.SyncToken;
+          const retryPayload = { ...payload, SyncToken: currentSyncToken };
+          const retryResult = await qboRequest(supabase, connection, 'POST', 'invoice', retryPayload);
+          if (retryResult.ok && retryResult.data?.Invoice?.Id) {
+            const qboId = String(retryResult.data.Invoice.Id);
+            await supabase
+              .from('invoices')
+              .update({ qbo_invoice_id: qboId, synced_at: new Date().toISOString() })
+              .eq('id', invoiceId)
+              .eq('organization_id', organizationId);
+
+            await upsertEntityMapping(supabase, organizationId, 'invoice', invoiceId, qboId, retryResult.data.Invoice.SyncToken);
+            await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'update', 'invoice', invoiceId, qboId, 'success');
+            return { success: true, qbo_invoice_id: qboId };
+          }
+        }
+      }
+
+      await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'update', 'invoice', invoiceId, existingMapping.qbo_id, 'failed', 'QBO invoice update failed');
+      return { success: false, error: 'Failed to update invoice in QuickBooks' };
+    }
+
+    const qboId = String(result.data.Invoice.Id);
+    // QBO owns totals/balance — read them back from the response
+    const total = Number(result.data.Invoice.TotalAmt || 0);
+    const amountDue = Number(result.data.Invoice.Balance || 0);
+    const amountPaid = Math.max(0, total - amountDue);
+    const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
+
+    await supabase
+      .from('invoices')
+      .update({ qbo_invoice_id: qboId, synced_at: new Date().toISOString(), total, amount_paid: amountPaid, amount_due: amountDue, status })
+      .eq('id', invoiceId)
+      .eq('organization_id', organizationId);
+
+    await upsertEntityMapping(supabase, organizationId, 'invoice', invoiceId, qboId, result.data.Invoice.SyncToken);
+    await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'update', 'invoice', invoiceId, qboId, 'success');
+    return { success: true, qbo_invoice_id: qboId };
+  }
+
+  // CREATE new QBO invoice
   const payload = {
     CustomerRef: { value: invoice.contacts.qbo_customer_id },
     TxnDate: invoice.invoice_date,
     DueDate: invoice.due_date,
-    Line: (invoice.invoice_line_items || []).map((item: any, index: number) => ({
-      DetailType: 'SalesItemLineDetail',
-      Description: item.description,
-      Amount: item.amount,
-      SalesItemLineDetail: { Qty: item.quantity, UnitPrice: item.unit_price },
-      LineNum: index + 1,
-    })),
+    Line: lineItems,
   };
 
   const result = await qboRequest(supabase, connection, 'POST', 'invoice', payload);
@@ -170,9 +256,14 @@ async function pushInvoice(
   }
 
   const qboId = String(result.data.Invoice.Id);
+  const total = Number(result.data.Invoice.TotalAmt || 0);
+  const amountDue = Number(result.data.Invoice.Balance || 0);
+  const amountPaid = Math.max(0, total - amountDue);
+  const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
+
   await supabase
     .from('invoices')
-    .update({ qbo_invoice_id: qboId, synced_at: new Date().toISOString(), status: 'sent' })
+    .update({ qbo_invoice_id: qboId, synced_at: new Date().toISOString(), total, amount_paid: amountPaid, amount_due: amountDue, status })
     .eq('id', invoiceId)
     .eq('organization_id', organizationId);
 

@@ -68,7 +68,19 @@ Deno.serve(async (req: Request) => {
       else failed++;
     }
 
-    if (runId) await completeSyncRun(supabase, runId, failed > 0 ? 'failed' : 'completed', synced, failed > 0 ? `${failed} payment records failed` : null);
+    await supabase
+      .from('quickbooks_settings')
+      .update({
+        last_synced_at: new Date().toISOString(),
+        last_payment_sync_at: new Date().toISOString(),
+        payment_sync_status: failed > 0 ? 'error' : 'idle',
+        sync_health: failed > 0 ? 'degraded' : 'healthy',
+      })
+      .eq('id', connection.id);
+
+    if (runId) {
+      await completeSyncRun(supabase, runId, failed > 0 ? 'failed' : 'completed', synced, failed > 0 ? `${failed} payment records failed` : null);
+    }
     return jsonResponse({ success: true, total: payments.length, synced, failed });
   } catch (error: any) {
     console.error('Payment sync error:', error);
@@ -95,16 +107,6 @@ async function syncPaymentData(
 ): Promise<{ success: boolean; error?: string }> {
   const qboPaymentId = String(payment.Id);
   try {
-    const { data: existingMapping } = await supabase
-      .from('qbo_entity_mappings')
-      .select('local_id')
-      .eq('organization_id', organizationId)
-      .eq('entity_type', 'payment')
-      .eq('qbo_id', qboPaymentId)
-      .maybeSingle();
-
-    if (existingMapping) return { success: true };
-
     const customerId = payment.CustomerRef?.value;
     const { data: contact } = await supabase
       .from('contacts')
@@ -113,18 +115,25 @@ async function syncPaymentData(
       .eq('qbo_customer_id', customerId)
       .maybeSingle();
 
-    if (!contact) return { success: true };
+    if (!contact) {
+      await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'sync', 'payment', null, qboPaymentId, 'success', null, { reason: 'Contact not found' });
+      return { success: true };
+    }
 
     let linked = 0;
     for (const line of payment.Line || []) {
       for (const transaction of line.LinkedTxn || []) {
         if (transaction.TxnType !== 'Invoice') continue;
+        const qboInvoiceId = String(transaction.TxnId);
+        const amount = Number(line.Amount || 0);
+
         const { data: invoice } = await supabase
           .from('invoices')
           .select('id')
           .eq('organization_id', organizationId)
-          .eq('qbo_invoice_id', transaction.TxnId)
+          .eq('qbo_invoice_id', qboInvoiceId)
           .maybeSingle();
+
         if (!invoice) continue;
 
         const { data: existingPayment } = await supabase
@@ -133,38 +142,134 @@ async function syncPaymentData(
           .eq('invoice_id', invoice.id)
           .eq('qbo_payment_id', qboPaymentId)
           .maybeSingle();
-        if (existingPayment) continue;
 
-        await supabase.from('payments').insert({
-          invoice_id: invoice.id,
-          contact_id: contact.id,
-          amount: Number(line.Amount || 0),
-          payment_date: payment.TxnDate,
-          payment_method: payment.PaymentMethodRef?.name || 'QuickBooks',
-          qbo_payment_id: qboPaymentId,
-          reference_number: payment.PaymentRefNum,
-        });
+        if (existingPayment) {
+          await supabase
+            .from('payments')
+            .update({
+              amount,
+              payment_date: payment.TxnDate,
+              payment_method: payment.PaymentMethodRef?.name || 'QuickBooks',
+              reference_number: payment.PaymentRefNum,
+            })
+            .eq('id', existingPayment.id)
+            .eq('invoice_id', invoice.id);
+        } else {
+          const { data: insertedPayment, error: paymentError } = await supabase
+            .from('payments')
+            .insert({
+              invoice_id: invoice.id,
+              contact_id: contact.id,
+              amount,
+              payment_date: payment.TxnDate,
+              payment_method: payment.PaymentMethodRef?.name || 'QuickBooks',
+              qbo_payment_id: qboPaymentId,
+              reference_number: payment.PaymentRefNum,
+            })
+            .select('id')
+            .maybeSingle();
 
-        const invoiceResult = await qboRequest(supabase, connection, 'GET', `invoice/${transaction.TxnId}?minorversion=40`);
-        if (invoiceResult.ok && invoiceResult.data?.Invoice) {
-          const qboInvoice = invoiceResult.data.Invoice;
-          const total = Number(qboInvoice.TotalAmt || 0);
-          const amountDue = Number(qboInvoice.Balance || 0);
-          const amountPaid = Math.max(0, total - amountDue);
-          const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
-          await supabase.from('invoices').update({ total, amount_paid: amountPaid, amount_due: amountDue, status }).eq('id', invoice.id);
+          if (paymentError) throw paymentError;
+          if (insertedPayment) {
+            await upsertEntityMapping(supabase, organizationId, 'payment', insertedPayment.id, qboPaymentId, payment.SyncToken);
+          }
         }
+
+        await reconcileInvoiceBalance(supabase, connection, organizationId, invoice.id, qboInvoiceId);
+        await processPendingPayment(supabase, organizationId, contact.id, qboInvoiceId, payment, amount);
         linked++;
       }
     }
 
-    await upsertEntityMapping(supabase, organizationId, 'payment', qboPaymentId, qboPaymentId);
     await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'sync', 'payment', null, qboPaymentId, 'success', null, { linkedInvoices: linked });
     return { success: true };
   } catch (error: any) {
     await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'sync', 'payment', null, qboPaymentId, 'failed', error.message);
     return { success: false, error: error.message };
   }
+}
+
+async function reconcileInvoiceBalance(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  connection: any,
+  organizationId: string,
+  invoiceId: string,
+  qboInvoiceId: string
+): Promise<void> {
+  const invoiceResult = await qboRequest(supabase, connection, 'GET', `invoice/${qboInvoiceId}?minorversion=40`);
+  if (!invoiceResult.ok || !invoiceResult.data?.Invoice) return;
+
+  const qboInvoice = invoiceResult.data.Invoice;
+  const total = Number(qboInvoice.TotalAmt || 0);
+  const amountDue = Number(qboInvoice.Balance || 0);
+  const amountPaid = Math.max(0, total - amountDue);
+  const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
+
+  await supabase
+    .from('invoices')
+    .update({ total, amount_paid: amountPaid, amount_due: amountDue, status })
+    .eq('id', invoiceId)
+    .eq('organization_id', organizationId);
+}
+
+async function processPendingPayment(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  organizationId: string,
+  contactId: string,
+  qboInvoiceId: string,
+  payment: any,
+  amount: number
+): Promise<void> {
+  const { data: pendingPayment } = await supabase
+    .from('pending_payments')
+    .select('*')
+    .eq('qbo_invoice_id', qboInvoiceId)
+    .eq('status', 'awaiting_payment')
+    .maybeSingle();
+
+  if (!pendingPayment) return;
+
+  if (pendingPayment.payment_type === 'vip_subscription') {
+    const { data: existing } = await supabase
+      .from('subscription_payments')
+      .select('id')
+      .eq('qbo_payment_id', payment.Id)
+      .maybeSingle();
+
+    if (!existing) {
+      await supabase.from('subscription_payments').insert({
+        subscription_id: pendingPayment.related_id,
+        contact_id: contactId,
+        amount,
+        payment_date: payment.TxnDate,
+        payment_type: 'vip_subscription',
+        qbo_payment_id: payment.Id,
+        qbo_invoice_id: qboInvoiceId,
+        status: 'completed',
+      });
+    }
+
+    await supabase
+      .from('recurring_subscriptions')
+      .update({ status: 'active' })
+      .eq('id', pendingPayment.related_id)
+      .eq('organization_id', organizationId)
+      .eq('status', 'pending_payment');
+  } else if (pendingPayment.payment_type === 'security_contract') {
+    await supabase
+      .from('security_contracts')
+      .update({ status: 'active', activated_at: new Date().toISOString() })
+      .eq('id', pendingPayment.related_id)
+      .eq('organization_id', organizationId)
+      .eq('status', 'pending_payment');
+  }
+
+  await supabase
+    .from('pending_payments')
+    .update({ status: 'paid', completed_at: new Date().toISOString() })
+    .eq('id', pendingPayment.id)
+    .eq('organization_id', organizationId)
+    .eq('status', 'awaiting_payment');
 }
 
 function jsonResponse(data: any, status = 200): Response {

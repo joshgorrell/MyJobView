@@ -4,11 +4,13 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface FinancialMetrics {
-  totalRevenue: number;
-  monthlyRevenue: number;
-  outstandingInvoices: number;
+  salesInvoiced: number;
+  monthlySalesInvoiced: number;
+  cashCollected: number;
+  accountsReceivable: number;
   paidInvoices: number;
-  recentPayments: number;
+  partialInvoices: number;
+  overdueInvoices: number;
   totalCommissions: number;
   recurringRevenue: number;
   activeSubscriptions: number;
@@ -26,11 +28,13 @@ interface RecentInvoice {
 export function FinanceDashboard() {
   const { profile } = useAuth();
   const [metrics, setMetrics] = useState<FinancialMetrics>({
-    totalRevenue: 0,
-    monthlyRevenue: 0,
-    outstandingInvoices: 0,
+    salesInvoiced: 0,
+    monthlySalesInvoiced: 0,
+    cashCollected: 0,
+    accountsReceivable: 0,
     paidInvoices: 0,
-    recentPayments: 0,
+    partialInvoices: 0,
+    overdueInvoices: 0,
     totalCommissions: 0,
     recurringRevenue: 0,
     activeSubscriptions: 0
@@ -52,37 +56,43 @@ export function FinanceDashboard() {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+      const monthStartDate = monthStart.slice(0, 10);
+      const monthEndDate = monthEnd.slice(0, 10);
 
       // Get invoices data
       const { data: invoices } = await supabase
         .from('invoices')
-        .select('id, invoice_number, total, status, due_date, created_at, contact:contacts(full_name)')
+        .select('id, invoice_number, total, amount_due, status, due_date, invoice_date, created_at, contact:contacts(full_name)')
         .order('created_at', { ascending: false });
 
-      // Calculate metrics
-      const totalRevenue = invoices?.filter(inv => inv.status === 'paid')
+      // Sales invoiced and accounts receivable come from invoice accounting fields.
+      const salesInvoiced = invoices?.filter(inv => inv.status !== 'draft' && inv.status !== 'void')
         .reduce((sum, inv) => sum + Number(inv.total || 0), 0) || 0;
 
-      const monthlyRevenue = invoices?.filter(inv =>
-        inv.status === 'paid' &&
-        inv.created_at >= monthStart &&
-        inv.created_at <= monthEnd
+      const monthlySalesInvoiced = invoices?.filter(inv =>
+        inv.status !== 'draft' &&
+        inv.status !== 'void' &&
+        inv.invoice_date >= monthStartDate &&
+        inv.invoice_date <= monthEndDate
       ).reduce((sum, inv) => sum + Number(inv.total || 0), 0) || 0;
 
-      const outstandingInvoices = invoices?.filter(inv =>
-        inv.status === 'sent' || inv.status === 'overdue'
-      ).reduce((sum, inv) => sum + Number(inv.total || 0), 0) || 0;
+      const accountsReceivable = invoices?.filter(inv => inv.status !== 'draft' && inv.status !== 'void')
+        .reduce((sum, inv) => sum + Number(inv.amount_due || 0), 0) || 0;
 
       const paidInvoices = invoices?.filter(inv => inv.status === 'paid').length || 0;
+      const partialInvoices = invoices?.filter(inv => inv.status === 'partial').length || 0;
+      const overdueInvoices = invoices?.filter(inv => inv.status === 'overdue' || (
+        Number(inv.amount_due || 0) > 0 && inv.due_date && inv.due_date < monthStartDate
+      )).length || 0;
 
-      // Get payments data
+      // Cash collected is based on payment date, not invoice creation date.
       const { data: payments } = await supabase
         .from('payments')
-        .select('amount')
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd);
+        .select('amount, payment_date')
+        .gte('payment_date', monthStartDate)
+        .lte('payment_date', monthEndDate);
 
-      const recentPayments = payments?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+      const cashCollected = payments?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
 
       // Get commissions data
       const { data: commissions } = await supabase
@@ -105,11 +115,13 @@ export function FinanceDashboard() {
       const activeSubscriptions = subscriptions?.length || 0;
 
       setMetrics({
-        totalRevenue,
-        monthlyRevenue,
-        outstandingInvoices,
+        salesInvoiced,
+        monthlySalesInvoiced,
+        cashCollected,
+        accountsReceivable,
         paidInvoices,
-        recentPayments,
+        partialInvoices,
+        overdueInvoices,
         totalCommissions,
         recurringRevenue,
         activeSubscriptions
@@ -197,8 +209,8 @@ export function FinanceDashboard() {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">Monthly Revenue</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.monthlyRevenue)}</p>
+            <p className="text-sm text-gray-500">Sales Invoiced This Month</p>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.monthlySalesInvoiced)}</p>
           </div>
         </div>
 
@@ -210,8 +222,8 @@ export function FinanceDashboard() {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">Outstanding</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.outstandingInvoices)}</p>
+            <p className="text-sm text-gray-500">Accounts Receivable</p>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.accountsReceivable)}</p>
           </div>
         </div>
 
@@ -223,8 +235,8 @@ export function FinanceDashboard() {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">This Month's Payments</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.recentPayments)}</p>
+            <p className="text-sm text-gray-500">Cash Collected This Month</p>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.cashCollected)}</p>
           </div>
         </div>
 
@@ -236,7 +248,7 @@ export function FinanceDashboard() {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">Monthly Recurring</p>
+            <p className="text-sm text-gray-500">Recurring Subscription Value</p>
             <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.recurringRevenue)}</p>
             <p className="text-xs text-gray-400">{metrics.activeSubscriptions} active subscriptions</p>
           </div>
@@ -248,9 +260,9 @@ export function FinanceDashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-2">
             <DollarSign className="w-5 h-5 text-gray-600" />
-            <p className="text-sm font-medium text-gray-700">Total Revenue (All Time)</p>
+            <p className="text-sm font-medium text-gray-700">Sales Invoiced (All Time)</p>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatCurrency(metrics.totalRevenue)}</p>
+          <p className="text-xl font-bold text-gray-900">{formatCurrency(metrics.salesInvoiced)}</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
