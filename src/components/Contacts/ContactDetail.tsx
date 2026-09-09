@@ -513,13 +513,55 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
     }
   }
 
+  async function handleStartEdit() {
+    try {
+      const { data: fullContact, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('id', contact.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (fullContact) {
+        setEditData({
+          contact_type: fullContact.contact_type || 'person',
+          company_name: fullContact.company_name || '',
+          first_name: fullContact.first_name || '',
+          last_name: fullContact.last_name || '',
+          title: fullContact.title || '',
+          email: fullContact.email || '',
+          phone: fullContact.phone || '',
+          business_phone: fullContact.business_phone || '',
+          notes: fullContact.notes || '',
+          office_id: fullContact.office_id || '',
+          assigned_to: fullContact.assigned_to || '',
+          street_address: fullContact.street_address || '',
+          city: fullContact.city || '',
+          state: fullContact.state || '',
+          zip_code: fullContact.zip_code || '',
+          country: fullContact.country || 'USA',
+          is_tax_exempt: fullContact.is_tax_exempt || false,
+          tax_exemption_reason: fullContact.tax_exemption_reason || '',
+          tax_rate: fullContact.tax_rate != null ? fullContact.tax_rate.toString() : '',
+          tax_jurisdiction_id: fullContact.tax_jurisdiction_id || '',
+          default_payment_terms: fullContact.default_payment_terms || '',
+          is_prospect: fullContact.is_prospect || false,
+          electrician_name: fullContact.electrician_name || '',
+          electrician_notes: fullContact.electrician_notes || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching full contact for edit:', error);
+    }
+    setEditing(true);
+  }
+
   async function handleUpdate() {
     if (!editData.office_id) {
       alert('Office Location is required. Please select an office.');
       return;
     }
     if (!editData.is_tax_exempt && (!editData.tax_jurisdiction_id || editData.tax_jurisdiction_id === '')) {
-      alert('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically.');
+      alert('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically, or check the Tax Exempt box if this contact is exempt.');
       return;
     }
     try {
@@ -1177,7 +1219,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
               ) : canEdit ? (
                 <>
                   <button
-                    onClick={() => setEditing(true)}
+                    onClick={handleStartEdit}
                     className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors touch-manipulation"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -1591,7 +1633,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                       )}
 
                       <button
-                        onClick={() => setEditing(true)}
+                        onClick={handleStartEdit}
                         className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-orange-700 hover:text-orange-800 hover:bg-orange-100 rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -1620,7 +1662,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                         <p className="text-xs text-gray-500 mb-3">No electrician tracked yet.</p>
                       )}
                       <button
-                        onClick={() => setEditing(true)}
+                        onClick={handleStartEdit}
                         className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-sky-800 hover:bg-sky-100 rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
