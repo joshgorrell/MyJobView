@@ -433,7 +433,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] flex flex-col">
-        <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 border-b border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-700 flex-shrink-0">
           <h2 className="text-lg sm:text-xl font-bold text-white">Create New Proposal</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white flex-shrink-0">
             <X size={20} className="sm:hidden" />
@@ -441,7 +441,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
           {prefill && (
             <div className="flex items-center gap-2 px-3 py-2 bg-blue-900/40 border border-blue-700/50 rounded-lg">
               <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0" />
@@ -458,7 +458,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter proposal title"
-              className="w-full px-3 py-2 sm:px-4 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -470,7 +470,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
               <select
                 value={selectedSalesRep}
                 onChange={(e) => setSelectedSalesRep(e.target.value)}
-                className="w-full px-3 py-2 sm:px-4 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {salesReps.map(rep => (
                   <option key={rep.id} value={rep.id}>
@@ -478,7 +478,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-400 mt-1">Select which sales rep this proposal should be assigned to</p>
+              <p className="text-xs text-gray-400 mt-0.5">Select which sales rep this proposal should be assigned to</p>
             </div>
           )}
 
@@ -490,7 +490,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
               <select
                 value={taxEnvironment}
                 onChange={(e) => setTaxEnvironment(e.target.value as 'residential' | 'commercial')}
-                className="w-full px-3 py-2 sm:px-4 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="residential">Residential</option>
                 <option value="commercial">Commercial</option>
@@ -504,7 +504,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
               <select
                 value={taxProjectType}
                 onChange={(e) => setTaxProjectType(e.target.value)}
-                className="w-full px-3 py-2 sm:px-4 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {projectTypes.map(type => (
                   <option key={type.value} value={type.value}>
@@ -522,7 +522,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
 
             {selectedResult ? (
               <>
-                <div className={`p-4 rounded-lg border ${isLeadSelected ? 'bg-amber-900/20 border-amber-600/50' : 'bg-gray-900 border-gray-700'}`}>
+                <div className={`p-3 rounded-lg border ${isLeadSelected ? 'bg-amber-900/20 border-amber-600/50' : 'bg-gray-900 border-gray-700'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {isLeadSelected && (
@@ -553,8 +553,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                 </div>
 
                 {!isLeadSelected && (
-                  <div className="mt-3">
-                    <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-gray-300 sm:text-sm"><MapPin className="h-4 w-4 text-blue-400" /> Location / Department</div>
+                  <div className="mt-2">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-300 sm:text-sm"><MapPin className="h-4 w-4 text-blue-400" /> Location / Department</div>
                     <CustomerLocationSelector
                       customerContactId={selectedResult.id}
                       value={selectedLocation?.id || null}
@@ -567,7 +567,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                         }
                       }}
                     />
-                    <p className="mt-1 text-xs text-gray-500">Optional. The proposal still belongs to {selectedResult.company_name || selectedResult.contact_name}; this identifies the specific building, site, or department.</p>
+                    <p className="mt-0.5 text-xs text-gray-500">Optional. Identifies the specific building, site, or department.</p>
                   </div>
                 )}
 
@@ -581,7 +581,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                 )}
 
                 {needsZip && (
-                  <div className="mt-3 p-4 bg-amber-900/30 border border-amber-600 rounded-lg">
+                  <div className="mt-2 p-3 bg-amber-900/30 border border-amber-600 rounded-lg">
                     <div className="flex items-start gap-3">
                       <AlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
                       <div className="flex-1">
@@ -619,11 +619,11 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                 )}
 
                 {effectiveZip && (
-                  <div className="mt-3 p-4 bg-gray-900 border border-gray-700 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <DollarSign className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
+                  <div className="mt-2 p-3 bg-gray-900 border border-gray-700 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <DollarSign className="text-green-500 flex-shrink-0 mt-0.5" size={18} />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-300 mb-2">Sales Tax Rate <span className="font-normal text-gray-500">· ZIP {effectiveZip}</span></div>
+                        <div className="text-sm font-medium text-gray-300 mb-1">Sales Tax Rate <span className="font-normal text-gray-500">· ZIP {effectiveZip}</span></div>
 
                         {taxLookupStatus === 'loading' && (
                           <div className="flex items-center gap-2 text-gray-400 text-sm">
@@ -633,7 +633,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                         )}
 
                         {taxLookupStatus === 'success' && taxRate !== null && (
-                          <div className="text-green-400 font-semibold text-lg">
+                          <div className="text-green-400 font-semibold text-base">
                             {formatTaxRate(taxRate)}
                           </div>
                         )}
@@ -678,7 +678,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                   />
                 </div>
 
-                <div className="max-h-64 overflow-y-auto space-y-1 border border-gray-700 rounded-lg p-2">
+                <div className="max-h-48 overflow-y-auto space-y-1 border border-gray-700 rounded-lg p-2">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-gray-400 py-4 text-sm">
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-white"></div>
@@ -725,7 +725,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 md:p-6 border-t border-gray-700 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 flex-shrink-0">
+        <div className="p-3 sm:p-4 border-t border-gray-700 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 flex-shrink-0">
           <button
             onClick={onClose}
             className="w-full sm:w-auto px-4 sm:px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium text-sm"
