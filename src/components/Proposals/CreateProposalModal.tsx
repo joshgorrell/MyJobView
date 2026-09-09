@@ -26,27 +26,69 @@ type SearchResult = {
   raw: Contact | Lead;
 };
 
+type ProposalDraft = {
+  searchQuery: string;
+  title: string;
+  taxEnvironment: 'residential' | 'commercial';
+  taxProjectType: string;
+  zipCode: string;
+  manualTaxRate: string;
+  selectedSalesRep: string;
+  selectedResult: SearchResult | null;
+  selectedLocation: CustomerLocation | null;
+};
+
+const PROPOSAL_DRAFT_KEY = 'myjobview:create-proposal-draft';
+
+function readProposalDraft(): ProposalDraft | null {
+  const saved = sessionStorage.getItem(PROPOSAL_DRAFT_KEY);
+  if (!saved) return null;
+
+  try {
+    return JSON.parse(saved) as ProposalDraft;
+  } catch {
+    sessionStorage.removeItem(PROPOSAL_DRAFT_KEY);
+    return null;
+  }
+}
+
 export default function CreateProposalModal({ onClose, onCreated, contactId, leadId: initialLeadId, prefill }: CreateProposalModalProps) {
   const { profile } = useAuth();
+  const savedDraft = prefill ? null : readProposalDraft();
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<CustomerLocation | null>(null);
-  const [searchQuery, setSearchQuery] = useState(prefill?.contactSearchName || '');
-  const [title, setTitle] = useState(prefill?.title || '');
-  const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>(prefill?.taxEnvironment || 'residential');
-  const [taxProjectType, setTaxProjectType] = useState<string>(prefill?.taxProjectType || 'general_installation_repair');
+  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(savedDraft?.selectedResult || null);
+  const [selectedLocation, setSelectedLocation] = useState<CustomerLocation | null>(savedDraft?.selectedLocation || null);
+  const [searchQuery, setSearchQuery] = useState(prefill?.contactSearchName || savedDraft?.searchQuery || '');
+  const [title, setTitle] = useState(prefill?.title || savedDraft?.title || '');
+  const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>(prefill?.taxEnvironment || savedDraft?.taxEnvironment || 'residential');
+  const [taxProjectType, setTaxProjectType] = useState<string>(prefill?.taxProjectType || savedDraft?.taxProjectType || 'general_installation_repair');
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [zipCode, setZipCode] = useState('');
   const [updatingZip, setUpdatingZip] = useState(false);
   const [taxRate, setTaxRate] = useState<number | null>(null);
   const [taxLookupStatus, setTaxLookupStatus] = useState<'idle' | 'loading' | 'success' | 'failed'>('idle');
   const [taxLookupError, setTaxLookupError] = useState<string>('');
-  const [manualTaxRate, setManualTaxRate] = useState('');
+  const [manualTaxRate, setManualTaxRate] = useState(savedDraft?.manualTaxRate || '');
   const [salesReps, setSalesReps] = useState<any[]>([]);
-  const [selectedSalesRep, setSelectedSalesRep] = useState<string>(profile?.id || '');
+  const [selectedSalesRep, setSelectedSalesRep] = useState<string>(savedDraft?.selectedSalesRep || profile?.id || '');
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [zipCode, setZipCode] = useState(savedDraft?.zipCode || '');
+
+  useEffect(() => {
+    const draft: ProposalDraft = {
+      searchQuery,
+      title,
+      taxEnvironment,
+      taxProjectType,
+      zipCode,
+      manualTaxRate,
+      selectedSalesRep,
+      selectedResult,
+      selectedLocation,
+    };
+    sessionStorage.setItem(PROPOSAL_DRAFT_KEY, JSON.stringify(draft));
+  }, [searchQuery, title, taxEnvironment, taxProjectType, zipCode, manualTaxRate, selectedSalesRep, selectedResult, selectedLocation]);
 
   const projectTypes = [
     { value: 'original_construction', label: 'Original Construction' },

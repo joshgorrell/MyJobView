@@ -6,6 +6,8 @@ const ProposalBuilderCompact = lazy(() => import('./ProposalBuilderCompact'));
 const VideoLibrary = lazy(() => import('../Sales/VideoLibrary'));
 import type { ProposalPrefill } from '../AIAssistant/AIAssistant';
 
+const CREATE_PROPOSAL_DRAFT_KEY = 'myjobview:create-proposal-draft';
+
 interface ProposalsViewProps {
   isStandalone?: boolean; openProposalId?: string | null; onProposalOpened?: () => void; onSelectSalesOrder?: (salesOrderId: string) => void;
   aiPrefill?: ProposalPrefill | null; onAiPrefillConsumed?: () => void; onNavigateToSalesOrders?: () => void; onNavigateToSalesStats?: () => void;
@@ -17,7 +19,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     if (isStandalone) return new URLSearchParams(window.location.search).get('id');
     return localStorage.getItem('openProposalId');
   });
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(() => sessionStorage.getItem(CREATE_PROPOSAL_DRAFT_KEY) === 'open');
   const [showVideoLibrary, setShowVideoLibrary] = useState(false);
   const [targetRoomIds, setTargetRoomIds] = useState<Set<string>>(new Set());
   const [pendingPrefillRooms, setPendingPrefillRooms] = useState<ProposalPrefill['rooms'] | undefined>(undefined);
@@ -59,9 +61,26 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
       onProposalOpened?.();
     }
   }, [openProposalId, selectedProposalId, onProposalOpened]);
-  useEffect(() => { if (aiPrefill) setShowCreateModal(true); }, [aiPrefill]);
+  useEffect(() => {
+    if (aiPrefill) {
+      sessionStorage.setItem(CREATE_PROPOSAL_DRAFT_KEY, 'open');
+      setShowCreateModal(true);
+    }
+  }, [aiPrefill]);
+
+  function openCreateModal() {
+    sessionStorage.setItem(CREATE_PROPOSAL_DRAFT_KEY, 'open');
+    setShowCreateModal(true);
+  }
+
+  function closeCreateModal() {
+    sessionStorage.removeItem(CREATE_PROPOSAL_DRAFT_KEY);
+    setShowCreateModal(false);
+    onAiPrefillConsumed?.();
+  }
 
   function handleProposalCreated(proposalId: string, prefillRooms?: ProposalPrefill['rooms']) {
+    sessionStorage.removeItem(CREATE_PROPOSAL_DRAFT_KEY);
     setShowCreateModal(false); setPendingPrefillRooms(prefillRooms); onAiPrefillConsumed?.(); navigateToProposal(proposalId);
   }
 
@@ -90,7 +109,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   if (showVideoLibrary) return <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">Loading video library...</div>}><div className="w-full h-full"><div className="bg-gray-900 border-b border-gray-700 px-4 py-2"><button onClick={() => setShowVideoLibrary(false)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">&larr; Back to Proposals</button></div><VideoLibrary /></div></Suspense>;
 
   return <div className="w-full space-y-6">
-    <ProposalsList onSelectProposal={navigateToProposal} onCreateNew={() => setShowCreateModal(true)} onSelectSalesOrder={onSelectSalesOrder} onNavigateToSalesOrders={onNavigateToSalesOrders} onNavigateToSalesStats={onNavigateToSalesStats} onOpenVideoLibrary={() => setShowVideoLibrary(true)} />
-    {showCreateModal && <CreateProposalModal onClose={() => { setShowCreateModal(false); onAiPrefillConsumed?.(); }} onCreated={handleProposalCreated} prefill={aiPrefill ?? undefined} contactId={aiPrefill?.contactId} leadId={aiPrefill?.leadId} />}
+    <ProposalsList onSelectProposal={navigateToProposal} onCreateNew={openCreateModal} onSelectSalesOrder={onSelectSalesOrder} onNavigateToSalesOrders={onNavigateToSalesOrders} onNavigateToSalesStats={onNavigateToSalesStats} onOpenVideoLibrary={() => setShowVideoLibrary(true)} />
+    {showCreateModal && <CreateProposalModal onClose={closeCreateModal} onCreated={handleProposalCreated} prefill={aiPrefill ?? undefined} contactId={aiPrefill?.contactId} leadId={aiPrefill?.leadId} />}
   </div>;
 }
