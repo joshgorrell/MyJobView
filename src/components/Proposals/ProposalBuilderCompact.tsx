@@ -3379,10 +3379,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   <h1 className="text-base font-semibold text-white truncate">
                     {proposal?.title || proposal?.proposal_number || 'Proposal Builder'}
                   </h1>
-                  {(() => {
-                    const combined = getCombinedStatusBadge();
-                    return combined || (proposal?.status && getStatusBadge(proposal.status));
-                  })()}
+                  {proposal?.status && getStatusBadge(proposal.status)}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
                   <User className="w-3 h-3 flex-shrink-0" />
@@ -3395,6 +3392,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
           {/* Right: Badges + All Actions */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Combined Locked/Live Badge */}
+              {getCombinedStatusBadge()}
+
               {/* Portal Version Badge */}
               {(proposal?.current_portal_version ?? 0) > 0 && (
                 <button
