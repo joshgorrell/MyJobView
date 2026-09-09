@@ -1,2 +1,74 @@
 [functions.send-proposal-email]
 verify_jwt = true
+
+[functions.quickbooks-oauth-initiate]
+verify_jwt = true
+
+[functions.quickbooks-oauth-callback]
+verify_jwt = false
+
+[functions.quickbooks-disconnect]
+verify_jwt = true
+
+[functions.quickbooks-payment-webhook]
+verify_jwt = false
+
+[functions.quickbooks-sync-customer]
+verify_jwt = true
+
+[functions.quickbooks-sync-invoices]
+verify_jwt = true
+
+[functions.quickbooks-sync-payments]
+verify_jwt = true
+
+[functions.send-invoice-email]
+verify_jwt = true
+
+[functions.send-job-completion-survey]
+verify_jwt = true
+
+[functions.send-lead-notification]
+verify_jwt = true
+
+[functions.send-payment-receipt]
+verify_jwt = true
+
+[functions.send-punchlist-invite]
+verify_jwt = true
+
+[functions.send-review-followup-job]
+verify_jwt = false
+
+[functions.send-review-request]
+verify_jwt = true
+
+[functions.send-satisfaction-alert]
+verify_jwt = true
+
+[functions.send-satisfaction-email]
+verify_jwt = true
+
+[functions.send-work-order-feedback]
+verify_jwt = true
+
+[functions.send-work-order-reminder]
+verify_jwt = true
+
+[functions.quickbooks-fetch-customers]
+verify_jwt = true
+
+[functions.quickbooks-create-invoice]
+verify_jwt = true
+
+[functions.quickbooks-sync-contact]
+verify_jwt = true
+
+[functions.process-quickbooks-payment]
+verify_jwt = true
+
+[functions.initiate-quickbooks-payment]
+verify_jwt = true
+
+[functions.quickbooks-oauth-complete]
+verify_jwt = false

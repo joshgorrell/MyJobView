@@ -54,7 +54,7 @@ export function QuickBooksSettings() {
     try {
       const { data, error } = await supabase
         .from('quickbooks_settings')
-        .select('*')
+        .select('id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, sync_health, last_error, organization_id, created_at, updated_at')
         .maybeSingle();
 
       if (error) throw error;
@@ -91,22 +91,11 @@ export function QuickBooksSettings() {
   async function handleConnect() {
     setConnecting(true);
     try {
-      const clientId = import.meta.env.VITE_QUICKBOOKS_CLIENT_ID;
-      const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quickbooks-oauth-callback`;
-
-      if (!clientId) {
-        alert('QuickBooks is not configured. Please contact your administrator.');
-        return;
+      const { data, error } = await supabase.functions.invoke('quickbooks-oauth-initiate');
+      if (error || !data?.authorizationUrl) {
+        throw new Error('Unable to start QuickBooks connection');
       }
-
-      const authUrl = new URL('https://appcenter.intuit.com/connect/oauth2');
-      authUrl.searchParams.set('client_id', clientId);
-      authUrl.searchParams.set('redirect_uri', redirectUri);
-      authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('scope', 'com.intuit.quickbooks.accounting');
-      authUrl.searchParams.set('state', Math.random().toString(36).substring(7));
-
-      window.location.href = authUrl.toString();
+      window.location.assign(data.authorizationUrl);
     } catch (error) {
       console.error('Error connecting to QuickBooks:', error);
       alert('Failed to initiate QuickBooks connection');
@@ -116,13 +105,8 @@ export function QuickBooksSettings() {
 
   async function handleDisconnect() {
     try {
-      if (settings?.id) {
-        await supabase
-          .from('quickbooks_settings')
-          .update({ is_connected: false })
-          .eq('id', settings.id);
-      }
-
+      const { error } = await supabase.functions.invoke('quickbooks-disconnect', { body: {} });
+      if (error) throw error;
       await loadSettings();
     } catch (error) {
       console.error('Error disconnecting QuickBooks:', error);
@@ -169,26 +153,17 @@ export function QuickBooksSettings() {
   async function handleSyncNow() {
     setSyncing(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quickbooks-fetch-customers`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { data: result, error } = await supabase.functions.invoke('quickbooks-sync-customer', {
+        body: { runType: 'manual' },
+      });
 
-      const result = await response.json();
-
-      if (result.success) {
-        alert(result.message || 'Customer sync complete');
-        await loadSettings();
-        await loadSyncStats();
-      } else {
-        throw new Error(result.error || 'Failed to sync customers');
+      if (error || !result?.success) {
+        throw new Error('Failed to sync customers');
       }
+
+      alert(`Customer sync complete: ${result.synced || 0} synced`);
+      await loadSettings();
+      await loadSyncStats();
     } catch (error) {
       console.error('Error syncing customers:', error);
       alert('Failed to sync customers: ' + (error as Error).message);

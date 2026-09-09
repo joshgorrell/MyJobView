@@ -1,10 +1,14 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
-};
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import {
+  corsHeaders,
+  getSupabaseAdmin,
+  getConnection,
+  qboRequest,
+  createSyncRun,
+  completeSyncRun,
+  logSyncOperation,
+  upsertEntityMapping,
+} from '../_shared/qbo-client.ts';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -13,247 +17,173 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!authHeader) return jsonResponse({ error: 'Unauthorized' }, 401);
 
-    const supabaseClient = createClient(
+    const authClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    const { data: { user }, error: userError } = await authClient.auth.getUser();
+    if (userError || !user) return jsonResponse({ error: 'Unauthorized' }, 401);
 
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { action, invoiceId } = await req.json();
-
-    // Get company settings
-    const { data: settings, error: settingsError } = await supabaseClient
-      .from('company_settings')
-      .select('*')
+    const { data: profile } = await authClient
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', user.id)
       .maybeSingle();
 
-    if (settingsError || !settings || !settings.qbo_connected) {
-      return new Response(
-        JSON.stringify({ error: 'QuickBooks not connected' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!profile?.organization_id) return jsonResponse({ error: 'No organization found' }, 403);
+
+    const supabase = getSupabaseAdmin();
+    const connection = await getConnection(supabase, profile.organization_id);
+    if (!connection) return jsonResponse({ error: 'QuickBooks not connected' }, 400);
+
+    const body = await req.json().catch(() => ({}));
+    const invoiceId = body.invoiceId as string | undefined;
+    const runId = await createSyncRun(supabase, profile.organization_id, body.runType === 'manual' ? 'manual' : 'scheduled', 'invoice');
+
+    if (body.action === 'push' && invoiceId) {
+      const result = await pushInvoice(supabase, connection, profile.organization_id, invoiceId);
+      if (runId) await completeSyncRun(supabase, runId, result.success ? 'completed' : 'failed', result.success ? 1 : 0, result.error);
+      return jsonResponse(result, result.success ? 200 : 500);
     }
 
-    // Check if token needs refresh
-    const expiresAt = new Date(settings.qbo_token_expires_at);
-    if (expiresAt < new Date()) {
-      // Token expired, refresh it
-      const refreshed = await refreshQBOToken(settings);
-      if (!refreshed) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to refresh QuickBooks token' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      // Reload settings
-      const { data: newSettings } = await supabaseClient
-        .from('company_settings')
-        .select('*')
-        .maybeSingle();
-      if (newSettings) {
-        settings.qbo_access_token = newSettings.qbo_access_token;
-      }
-    }
-
-    const environment = Deno.env.get('QUICKBOOKS_ENVIRONMENT') || 'sandbox';
-    const baseUrl = environment === 'production'
-      ? 'https://quickbooks.api.intuit.com'
-      : 'https://sandbox-quickbooks.api.intuit.com';
-
-    if (action === 'push') {
-      // Push invoice to QuickBooks
-      const { data: invoice, error: invoiceError } = await supabaseClient
-        .from('invoices')
-        .select(`
-          *,
-          contacts(*),
-          invoice_line_items(*)
-        `)
-        .eq('id', invoiceId)
-        .maybeSingle();
-
-      if (invoiceError || !invoice) {
-        return new Response(
-          JSON.stringify({ error: 'Invoice not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Check if contact has QBO customer ID
-      let qboCustomerId = invoice.contacts.qbo_customer_id;
-      if (!qboCustomerId) {
-        // Create customer in QBO first
-        const customerData = {
-          DisplayName: invoice.contacts.contact_name,
-          PrimaryEmailAddr: invoice.contacts.email ? { Address: invoice.contacts.email } : undefined,
-          PrimaryPhone: invoice.contacts.phone ? { FreeFormNumber: invoice.contacts.phone } : undefined,
-        };
-
-        const customerResponse = await fetch(
-          `${baseUrl}/v3/company/${settings.qbo_realm_id}/customer`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${settings.qbo_access_token}`,
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(customerData),
-          }
-        );
-
-        if (!customerResponse.ok) {
-          const errorText = await customerResponse.text();
-          console.error('Failed to create QBO customer:', errorText);
-          return new Response(
-            JSON.stringify({ error: 'Failed to create customer in QuickBooks' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        const customerResult = await customerResponse.json();
-        qboCustomerId = customerResult.Customer.Id;
-
-        // Update contact with QBO customer ID
-        await supabaseClient
-          .from('contacts')
-          .update({ qbo_customer_id: qboCustomerId })
-          .eq('id', invoice.contact_id);
-      }
-
-      // Create invoice in QBO
-      const qboInvoice = {
-        CustomerRef: { value: qboCustomerId },
-        TxnDate: invoice.invoice_date,
-        DueDate: invoice.due_date,
-        Line: invoice.invoice_line_items.map((item: any, index: number) => ({
-          DetailType: 'SalesItemLineDetail',
-          Description: item.description,
-          Amount: item.amount,
-          SalesItemLineDetail: {
-            Qty: item.quantity,
-            UnitPrice: item.unit_price,
-          },
-          LineNum: index + 1,
-        })),
-      };
-
-      const invoiceResponse = await fetch(
-        `${baseUrl}/v3/company/${settings.qbo_realm_id}/invoice`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${settings.qbo_access_token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(qboInvoice),
-        }
-      );
-
-      if (!invoiceResponse.ok) {
-        const errorText = await invoiceResponse.text();
-        console.error('Failed to create QBO invoice:', errorText);
-        return new Response(
-          JSON.stringify({ error: 'Failed to create invoice in QuickBooks', details: errorText }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const invoiceResult = await invoiceResponse.json();
-
-      // Update local invoice with QBO ID
-      await supabaseClient
-        .from('invoices')
-        .update({
-          qbo_invoice_id: invoiceResult.Invoice.Id,
-          synced_at: new Date().toISOString(),
-          status: 'sent',
-        })
-        .eq('id', invoiceId);
-
-      return new Response(
-        JSON.stringify({ success: true, qbo_invoice_id: invoiceResult.Invoice.Id }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ error: 'Invalid action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    const result = await qboRequest(
+      supabase,
+      connection,
+      'GET',
+      'query?query=select%20*%20from%20Invoice%20STARTPOSITION%201%20MAXRESULTS%201000'
     );
 
-  } catch (error) {
-    console.error('Sync error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    if (!result.ok) {
+      if (runId) await completeSyncRun(supabase, runId, 'failed', 0, 'Failed to fetch invoices');
+      return jsonResponse({ error: 'Failed to fetch invoices from QuickBooks' }, 500);
+    }
+
+    const invoices = result.data?.QueryResponse?.Invoice || [];
+    let synced = 0;
+    let failed = 0;
+
+    for (const invoice of invoices) {
+      const syncResult = await syncInvoice(supabase, profile.organization_id, invoice);
+      if (syncResult.success) synced++;
+      else failed++;
+    }
+
+    if (runId) {
+      await completeSyncRun(
+        supabase,
+        runId,
+        failed > 0 ? 'failed' : 'completed',
+        synced,
+        failed > 0 ? `${failed} invoice records failed` : null
+      );
+    }
+
+    await supabase
+      .from('quickbooks_settings')
+      .update({ last_synced_at: new Date().toISOString(), sync_health: failed > 0 ? 'degraded' : 'healthy' })
+      .eq('id', connection.id);
+
+    return jsonResponse({ success: true, total: invoices.length, synced, failed });
+  } catch (error: any) {
+    console.error('Invoice sync error:', error);
+    return jsonResponse({ error: 'Invoice sync failed' }, 500);
   }
 });
 
-async function refreshQBOToken(settings: any): Promise<boolean> {
+async function syncInvoice(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  organizationId: string,
+  qboInvoice: any
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const clientId = Deno.env.get('QUICKBOOKS_CLIENT_ID');
-    const clientSecret = Deno.env.get('QUICKBOOKS_CLIENT_SECRET');
-    const environment = Deno.env.get('QUICKBOOKS_ENVIRONMENT') || 'sandbox';
+    const qboId = String(qboInvoice.Id);
+    const { data: localInvoice } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('qbo_invoice_id', qboId)
+      .maybeSingle();
 
-    const tokenUrl = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
-    const authString = btoa(`${clientId}:${clientSecret}`);
+    if (!localInvoice) {
+      await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'stage', 'invoice', null, qboId, 'success', null, { reason: 'No local invoice match' });
+      return { success: true };
+    }
 
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${authString}`,
-      },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: settings.qbo_refresh_token,
-      }),
-    });
+    const total = Number(qboInvoice.TotalAmt || 0);
+    const amountDue = Number(qboInvoice.Balance || 0);
+    const amountPaid = Math.max(0, total - amountDue);
+    const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
 
-    if (!response.ok) return false;
+    const { error } = await supabase
+      .from('invoices')
+      .update({ total, amount_paid: amountPaid, amount_due: amountDue, status })
+      .eq('id', localInvoice.id)
+      .eq('organization_id', organizationId);
 
-    const tokens = await response.json();
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + tokens.expires_in);
+    if (error) throw error;
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    await supabaseClient
-      .from('company_settings')
-      .update({
-        qbo_access_token: tokens.access_token,
-        qbo_refresh_token: tokens.refresh_token,
-        qbo_token_expires_at: expiresAt.toISOString(),
-      })
-      .eq('id', settings.id);
-
-    return true;
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    return false;
+    await upsertEntityMapping(supabase, organizationId, 'invoice', localInvoice.id, qboId, qboInvoice.SyncToken);
+    await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'update', 'invoice', localInvoice.id, qboId, 'success');
+    return { success: true };
+  } catch (error: any) {
+    await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'update', 'invoice', null, String(qboInvoice.Id), 'failed', error.message);
+    return { success: false, error: error.message };
   }
+}
+
+async function pushInvoice(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  connection: any,
+  organizationId: string,
+  invoiceId: string
+): Promise<{ success: boolean; qbo_invoice_id?: string; error?: string }> {
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('*, contacts(*), invoice_line_items(*)')
+    .eq('id', invoiceId)
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+
+  if (!invoice) return { success: false, error: 'Invoice not found' };
+  if (!invoice.contacts?.qbo_customer_id) return { success: false, error: 'Contact is not linked to QuickBooks' };
+
+  const payload = {
+    CustomerRef: { value: invoice.contacts.qbo_customer_id },
+    TxnDate: invoice.invoice_date,
+    DueDate: invoice.due_date,
+    Line: (invoice.invoice_line_items || []).map((item: any, index: number) => ({
+      DetailType: 'SalesItemLineDetail',
+      Description: item.description,
+      Amount: item.amount,
+      SalesItemLineDetail: { Qty: item.quantity, UnitPrice: item.unit_price },
+      LineNum: index + 1,
+    })),
+  };
+
+  const result = await qboRequest(supabase, connection, 'POST', 'invoice', payload);
+  if (!result.ok || !result.data?.Invoice?.Id) {
+    return { success: false, error: 'Failed to create invoice in QuickBooks' };
+  }
+
+  const qboId = String(result.data.Invoice.Id);
+  await supabase
+    .from('invoices')
+    .update({ qbo_invoice_id: qboId, synced_at: new Date().toISOString(), status: 'sent' })
+    .eq('id', invoiceId)
+    .eq('organization_id', organizationId);
+
+  await upsertEntityMapping(supabase, organizationId, 'invoice', invoiceId, qboId, result.data.Invoice.SyncToken);
+  await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'create', 'invoice', invoiceId, qboId, 'success');
+  return { success: true, qbo_invoice_id: qboId };
+}
+
+function jsonResponse(data: any, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }

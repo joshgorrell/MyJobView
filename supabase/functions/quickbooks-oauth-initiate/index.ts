@@ -1,10 +1,5 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
-};
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import { corsHeaders, getOAuthBaseUrl } from '../_shared/qbo-client.ts';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -12,7 +7,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Get the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -21,14 +15,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Verify user is authenticated
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -36,30 +29,61 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // QuickBooks OAuth configuration
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organization_id, role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.organization_id) {
+      return new Response(
+        JSON.stringify({ error: 'No organization found for user' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (profile.role !== 'admin') {
+      return new Response(
+        JSON.stringify({ error: 'Only administrators can connect QuickBooks' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const clientId = Deno.env.get('QUICKBOOKS_CLIENT_ID');
     const redirectUri = Deno.env.get('QUICKBOOKS_REDIRECT_URI');
-    const environment = Deno.env.get('QUICKBOOKS_ENVIRONMENT') || 'sandbox';
 
     if (!clientId || !redirectUri) {
       return new Response(
-        JSON.stringify({ error: 'QuickBooks OAuth not configured. Please set QUICKBOOKS_CLIENT_ID and QUICKBOOKS_REDIRECT_URI environment variables.' }),
+        JSON.stringify({ error: 'QuickBooks OAuth not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Generate state parameter for CSRF protection
     const state = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
-    // Store state in database for verification
-    await supabaseClient.from('company_settings').update({
-      qbo_oauth_state: state,
-    }).eq('id', user.id);
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    // Build authorization URL
-    const authUrl = environment === 'production'
-      ? 'https://appcenter.intuit.com/connect/oauth2'
-      : 'https://appcenter.intuit.com/connect/oauth2';
+    const { error: sessionError } = await adminSupabase
+      .from('qbo_oauth_sessions')
+      .insert({
+        id: state,
+        organization_id: profile.organization_id,
+        initiated_by: user.id,
+        expires_at: expiresAt.toISOString(),
+      });
+
+    if (sessionError) {
+      console.error('Failed to create OAuth session:', sessionError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to initiate OAuth' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -69,19 +93,16 @@ Deno.serve(async (req: Request) => {
       state: state,
     });
 
-    const authorizationUrl = `${authUrl}?${params.toString()}`;
+    const authorizationUrl = `${getOAuthBaseUrl()}?${params.toString()}`;
 
     return new Response(
-      JSON.stringify({
-        authorizationUrl,
-        state,
-      }),
+      JSON.stringify({ authorizationUrl }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
-    console.error('Error initiating QuickBooks OAuth:', error);
+  } catch (error: any) {
+    console.error('OAuth initiate error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Failed to initiate OAuth' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
