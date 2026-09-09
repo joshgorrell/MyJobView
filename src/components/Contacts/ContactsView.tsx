@@ -146,45 +146,44 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
     }, LOAD_TIMEOUT_MS);
 
     try {
-      const [countsResult, contactsResult] = await Promise.all([
-        supabase.rpc('get_contact_counts', {
-          p_view_filter: viewFilter,
-          p_user_id: viewFilter === 'my' ? profile.id : null,
-        }),
-        supabase.rpc('get_contacts_with_balance', {
-          p_limit: limit,
-          p_search: search.trim(),
-          p_type_filter: typeFilter,
-          p_temperature_filter: temperatureFilter,
-          p_view_filter: viewFilter,
-          p_user_id: viewFilter === 'my' ? profile.id : null,
-        }),
-      ]);
+      const countsPromise = supabase.rpc('get_contact_counts', {
+        p_view_filter: viewFilter,
+        p_user_id: viewFilter === 'my' ? profile.id : null,
+      });
+      const contactsResult = await supabase.rpc('get_contacts_with_balance', {
+        p_limit: limit,
+        p_search: search.trim(),
+        p_type_filter: typeFilter,
+        p_temperature_filter: temperatureFilter,
+        p_view_filter: viewFilter,
+        p_user_id: viewFilter === 'my' ? profile.id : null,
+      });
 
       if (requestId !== currentRequestId.current) return;
-
-      if (countsResult.error) throw countsResult.error;
       if (contactsResult.error) throw contactsResult.error;
-
-      const counts = countsResult.data as Record<string, number> | null;
-      if (counts) {
-        setTypeCounts({
-          all: counts.total ?? 0,
-          customer: counts.customers ?? 0,
-          prospect: counts.prospects ?? 0,
-          lead: counts.leads ?? 0,
-        });
-        setTemperatureCounts({
-          on_fire: counts.on_fire ?? 0,
-          hot: counts.hot ?? 0,
-          warm: counts.warm ?? 0,
-          cold: counts.cold ?? 0,
-        });
-      }
 
       const data = contactsResult.data as { contacts: ContactRow[]; total: number } | null;
       setContacts(data?.contacts ?? []);
       setTotalCount(data?.total ?? 0);
+
+      void countsPromise.then(({ data: counts, error }) => {
+        if (error || requestId !== currentRequestId.current || !counts) return;
+        const typedCounts = counts as Record<string, number>;
+        setTypeCounts({
+          all: typedCounts.total ?? 0,
+          customer: typedCounts.customers ?? 0,
+          prospect: typedCounts.prospects ?? 0,
+          lead: typedCounts.leads ?? 0,
+        });
+        setTemperatureCounts({
+          on_fire: typedCounts.on_fire ?? 0,
+          hot: typedCounts.hot ?? 0,
+          warm: typedCounts.warm ?? 0,
+          cold: typedCounts.cold ?? 0,
+        });
+      }).catch((error: unknown) => {
+        console.error('Error loading contact counts:', error);
+      });
 
       localStorage.setItem('contactTypeFilter', typeFilter);
       hasLoadedOnce.current = true;
