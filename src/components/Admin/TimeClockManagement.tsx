@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
+import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { TimeClockCSVImport } from './TimeClockCSVImport';
 import { formatTimeInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import ConfirmModal from '../ui/ConfirmModal';
+import PayrollPeriodSummary from './Payroll/PayrollPeriodSummary';
+import PayrollEmployeeHoursSummary from './Payroll/PayrollEmployeeHoursSummary';
+import JurisdictionReviewPanel from './Payroll/JurisdictionReviewPanel';
+import PayrollApprovalPanel from './Payroll/PayrollApprovalPanel';
+import PayrollCorrectionsPanel from './Payroll/PayrollCorrectionsPanel';
 
 interface PendingAutoClockOut {
   id: string;
@@ -120,6 +125,8 @@ export function TimeClockManagement() {
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
   const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [confirmRunAutoClockOut, setConfirmRunAutoClockOut] = useState(false);
+  const [activeTab, setActiveTab] = useState<'settings' | 'payroll'>('settings');
+  const [selectedPayPeriodId, setSelectedPayPeriodId] = useState<string | null>(null);
 
   // Inline pending time requests state
   const [pendingTimeRequests, setPendingTimeRequests] = useState<PendingTimeRequest[]>([]);
@@ -511,28 +518,57 @@ export function TimeClockManagement() {
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-600" />
-            Time Clock Settings
+            Time Clock Command Center
           </h3>
           <p className="text-sm text-gray-600">
-            Configure automatic clock-out system for employees who forget to clock out
+            Manage time clock settings, payroll periods, and jurisdiction review
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowCSVTutorial(true)}
-            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            title="CSV Import Tutorial"
-          >
-            <HelpCircle className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setShowCSVImport(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Import CSV
-          </button>
-        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'settings'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Clock className="w-4 h-4 inline mr-1.5" />
+          Settings & Review
+        </button>
+        <button
+          onClick={() => setActiveTab('payroll')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'payroll'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <DollarSign className="w-4 h-4 inline mr-1.5" />
+          Payroll & Jurisdiction
+        </button>
+      </div>
+
+      {activeTab === 'settings' && (
+      <>
+      <div className="flex items-center gap-2 justify-end">
+        <button
+          onClick={() => setShowCSVTutorial(true)}
+          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          title="CSV Import Tutorial"
+        >
+          <HelpCircle className="w-5 h-5" />
+        </button>
+        <button
+          onClick={() => setShowCSVImport(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+        >
+          <Upload className="w-4 h-4" />
+          Import CSV
+        </button>
       </div>
 
       {/* Auto Clock-Out Settings */}
@@ -1790,6 +1826,18 @@ export function TimeClockManagement() {
         }}
         onCancel={() => setConfirmRunAutoClockOut(false)}
       />
+      </>
+      )}
+
+      {activeTab === 'payroll' && (
+        <div className="space-y-6">
+          <PayrollPeriodSummary onPeriodSelect={setSelectedPayPeriodId} />
+          <PayrollEmployeeHoursSummary payPeriodId={selectedPayPeriodId} />
+          <JurisdictionReviewPanel payPeriodId={selectedPayPeriodId} />
+          <PayrollApprovalPanel payPeriodId={selectedPayPeriodId} />
+          <PayrollCorrectionsPanel payPeriodId={selectedPayPeriodId} />
+        </div>
+      )}
     </div>
   );
 }
