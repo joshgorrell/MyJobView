@@ -134,17 +134,23 @@ export default function PayrollPeriodSummary({
 
     setAdvancing(true);
     try {
-      const updates: Record<string, any> = { status: nextStatus };
+      const { data: userData } = await supabase.auth.getUser();
+      const actorId = userData.user?.id;
+      if (!actorId) throw new Error('Not authenticated');
+
       if (nextStatus === 'payroll_approved') {
-        const { data: userData } = await supabase.auth.getUser();
-        updates.payroll_approved_at = new Date().toISOString();
-        updates.payroll_approved_by = userData.data.user?.id;
+        const { error } = await supabase.rpc('approve_payroll_period', {
+          p_pay_period_id: selectedPeriodId,
+          p_approved_by: actorId,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('pay_periods')
+          .update({ status: nextStatus })
+          .eq('id', selectedPeriodId);
+        if (error) throw error;
       }
-      const { error } = await supabase
-        .from('pay_periods')
-        .update(updates)
-        .eq('id', selectedPeriodId);
-      if (error) throw error;
       await loadPeriods();
       await loadReadiness();
     } catch (err: any) {

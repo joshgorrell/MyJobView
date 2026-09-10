@@ -97,6 +97,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [currentConfig, setCurrentConfig] = useState<EmployeePayrollConfig | null>(null);
   const [isEmployee, setIsEmployee] = useState(false);
   const [showEmployeeSetup, setShowEmployeeSetup] = useState(false);
+  const [classification, setClassification] = useState<string>('unreviewed');
+  const [showNonEmployeeConfirm, setShowNonEmployeeConfirm] = useState(false);
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [showEffectiveDatePrompt, setShowEffectiveDatePrompt] = useState(false);
   const [pendingConfigChange, setPendingConfigChange] = useState<any>(null);
@@ -206,6 +208,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (empData) {
         setIsEmployee(true);
         setEmployeeRecord(empData);
+        setClassification('employee');
         setEmployeeForm(prev => ({
           ...prev,
           hire_date: empData.hire_date,
@@ -239,6 +242,18 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
             pto_eligible: configData.pto_eligible,
             pay_schedule_id: configData.pay_schedule_id || '',
           }));
+        }
+      } else {
+        const { data: profData } = await supabase
+          .from('profiles')
+          .select('employment_classification')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (profData?.employment_classification) {
+          setClassification(profData.employment_classification);
+          if (profData.employment_classification === 'non_employee') {
+            setIsEmployee(false);
+          }
         }
       }
     } catch (error) {
@@ -437,110 +452,60 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         console.log('Office assignments updated successfully');
       }
 
-      // Save employee data if applicable
+      // Save employee/classification data via atomic RPC functions
+      const { data: { user: currentUser2 } } = await supabase.auth.getUser();
+
       if (isEmployee && employeeRecord) {
-        // Update employee record
-        const { error: empUpdateError } = await supabase
-          .from('employees')
-          .update({
-            employment_status: employeeForm.employment_status,
-            hire_date: employeeForm.hire_date,
-            termination_date: employeeForm.termination_date || null,
-            employee_number: employeeForm.employee_number || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', employeeRecord.id);
-
-        if (empUpdateError) throw new Error(`Employee update failed: ${empUpdateError.message}`);
-
-        // Check if config changed and create new effective-dated config
-        const newConfigValues = {
-          compensation_type: employeeForm.compensation_type,
-          requires_daily_clock: employeeForm.requires_daily_clock,
-          requires_time_allocation: employeeForm.requires_time_allocation,
-          payroll_time_basis: employeeForm.payroll_time_basis,
-          expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
-          standard_start_time: employeeForm.requires_daily_clock ? employeeForm.standard_start_time : null,
-          standard_end_time: employeeForm.requires_daily_clock ? employeeForm.standard_end_time : null,
-          work_days: employeeForm.work_days.length > 0 ? employeeForm.work_days : null,
-          overtime_eligible: employeeForm.overtime_eligible,
-          pto_eligible: employeeForm.pto_eligible,
-          pay_schedule_id: employeeForm.pay_schedule_id || null,
-        };
-
-        if (checkConfigChanged(newConfigValues)) {
-          const effDate = new Date(effectiveDate);
-          const dayBefore = new Date(effDate);
-          dayBefore.setDate(dayBefore.getDate() - 1);
-
-          // Close current config
-          if (currentConfig) {
-            const { error: closeError } = await supabase
-              .from('employee_payroll_configs')
-              .update({ effective_to: dayBefore.toISOString().split('T')[0] })
-              .eq('id', currentConfig.id);
-            if (closeError) throw new Error(`Failed to close prior config: ${closeError.message}`);
-          }
-
-          // Create new config
-          const { data: { user: currentUser2 } } = await supabase.auth.getUser();
-          const { error: configInsertError } = await supabase
-            .from('employee_payroll_configs')
-            .insert({
-              organization_id: (user as any).organization_id || (currentConfig as any)?.organization_id,
-              employee_id: employeeRecord.id,
-              effective_from: effectiveDate,
-              effective_to: null,
-              ...newConfigValues,
-              reviewed_at: new Date().toISOString(),
-              reviewed_by: currentUser2?.id,
-            });
-
-          if (configInsertError) throw new Error(`Config creation failed: ${configInsertError.message}`);
-        }
+        // Update existing employee + config via RPC
+        const { error: rpcError } = await supabase.rpc('update_employee_and_config', {
+          p_user_id: user.id,
+          p_hire_date: employeeForm.hire_date,
+          p_employee_number: employeeForm.employee_number || null,
+          p_employment_status: employeeForm.employment_status,
+          p_termination_date: employeeForm.termination_date || null,
+          p_compensation_type: employeeForm.compensation_type,
+          p_requires_daily_clock: employeeForm.requires_daily_clock,
+          p_requires_time_allocation: employeeForm.requires_time_allocation,
+          p_payroll_time_basis: employeeForm.payroll_time_basis,
+          p_expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+          p_standard_start_time: employeeForm.standard_start_time,
+          p_standard_end_time: employeeForm.standard_end_time,
+          p_work_days: employeeForm.work_days,
+          p_overtime_eligible: employeeForm.overtime_eligible,
+          p_pto_eligible: employeeForm.pto_eligible,
+          p_pay_schedule_id: employeeForm.pay_schedule_id || null,
+          p_effective_date: showEffectiveDatePrompt ? effectiveDate : null,
+          p_reviewed_by: currentUser2?.id,
+        });
+        if (rpcError) throw new Error(`Employee update failed: ${rpcError.message}`);
       } else if (showEmployeeSetup && isEmployee && !employeeRecord) {
-        // Create new employee + initial config
-        const { data: { user: currentUser2 } } = await supabase.auth.getUser();
-        const orgId = (user as any).organization_id;
-
-        const { data: newEmp, error: empInsertError } = await supabase
-          .from('employees')
-          .insert({
-            organization_id: orgId,
-            user_id: user.id,
-            employment_status: employeeForm.employment_status,
-            hire_date: employeeForm.hire_date,
-            termination_date: employeeForm.termination_date || null,
-            employee_number: employeeForm.employee_number || null,
-          })
-          .select('id')
-          .single();
-
-        if (empInsertError) throw new Error(`Employee creation failed: ${empInsertError.message}`);
-
-        const { error: configInsertError } = await supabase
-          .from('employee_payroll_configs')
-          .insert({
-            organization_id: orgId,
-            employee_id: newEmp.id,
-            effective_from: employeeForm.hire_date,
-            effective_to: null,
-            compensation_type: employeeForm.compensation_type,
-            requires_daily_clock: employeeForm.requires_daily_clock,
-            requires_time_allocation: employeeForm.requires_time_allocation,
-            payroll_time_basis: employeeForm.payroll_time_basis,
-            expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
-            standard_start_time: employeeForm.requires_daily_clock ? employeeForm.standard_start_time : null,
-            standard_end_time: employeeForm.requires_daily_clock ? employeeForm.standard_end_time : null,
-            work_days: employeeForm.work_days.length > 0 ? employeeForm.work_days : null,
-            overtime_eligible: employeeForm.overtime_eligible,
-            pto_eligible: employeeForm.pto_eligible,
-            pay_schedule_id: employeeForm.pay_schedule_id || null,
-            reviewed_at: new Date().toISOString(),
-            reviewed_by: currentUser2?.id,
-          });
-
-        if (configInsertError) throw new Error(`Config creation failed: ${configInsertError.message}`);
+        // Create new employee + initial config + classification via RPC
+        const { error: rpcError } = await supabase.rpc('classify_as_employee', {
+          p_user_id: user.id,
+          p_hire_date: employeeForm.hire_date,
+          p_employee_number: employeeForm.employee_number || null,
+          p_employment_status: employeeForm.employment_status,
+          p_compensation_type: employeeForm.compensation_type,
+          p_requires_daily_clock: employeeForm.requires_daily_clock,
+          p_requires_time_allocation: employeeForm.requires_time_allocation,
+          p_payroll_time_basis: employeeForm.payroll_time_basis,
+          p_expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+          p_standard_start_time: employeeForm.standard_start_time,
+          p_standard_end_time: employeeForm.standard_end_time,
+          p_work_days: employeeForm.work_days,
+          p_overtime_eligible: employeeForm.overtime_eligible,
+          p_pto_eligible: employeeForm.pto_eligible,
+          p_pay_schedule_id: employeeForm.pay_schedule_id || null,
+          p_reviewed_by: currentUser2?.id,
+        });
+        if (rpcError) throw new Error(`Employee creation failed: ${rpcError.message}`);
+      } else if (showNonEmployeeConfirm) {
+        // Confirm as Non-Employee via RPC
+        const { error: rpcError } = await supabase.rpc('classify_as_non_employee', {
+          p_user_id: user.id,
+          p_reviewed_by: currentUser2?.id,
+        });
+        if (rpcError) throw new Error(`Non-employee classification failed: ${rpcError.message}`);
       }
 
       console.log('=== ALL UPDATES COMPLETE ===');
@@ -1126,9 +1091,21 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
               </h3>
 
               {!isEmployee ? (
-                <div>
-                  <p className="text-xs text-gray-400 mb-3">
-                    This person is currently a site user only. Designate them as an Employee to enable payroll and timekeeping.
+                <div className="space-y-3">
+                  {classification === 'unreviewed' && (
+                    <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>This user has not been classified yet. Review and confirm their employment status.</span>
+                    </div>
+                  )}
+                  {classification === 'non_employee' && (
+                    <div className="flex items-center gap-2 p-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-xs">
+                      <UserCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>Confirmed as Non-Employee User. Payroll and timekeeping are not enabled.</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400">
+                    Designate this person as an Employee to enable payroll and timekeeping, or confirm them as a Non-Employee User.
                   </p>
                   <button
                     type="button"
@@ -1136,6 +1113,13 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                   >
                     Make this person an Employee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowNonEmployeeConfirm(true)}
+                    className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
+                  >
+                    Confirm as Non-Employee User
                   </button>
                 </div>
               ) : (

@@ -211,52 +211,30 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
 
       console.log('User created successfully:', result);
 
-      // If employee, create employee record + initial config
+      // If employee, create employee record + initial config + classification atomically via RPC
       if (isEmployee && result.userId) {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
-        const orgId = (await supabase.from('profiles').select('organization_id').eq('id', result.userId).maybeSingle()).data?.organization_id;
-
-        if (orgId) {
-          const { data: newEmp, error: empError } = await supabase
-            .from('employees')
-            .insert({
-              organization_id: orgId,
-              user_id: result.userId,
-              employment_status: employeeForm.employment_status,
-              hire_date: employeeForm.hire_date,
-              termination_date: employeeForm.termination_date || null,
-              employee_number: employeeForm.employee_number || null,
-            })
-            .select('id')
-            .single();
-
-          if (empError) {
-            console.error('Employee creation error:', empError);
-          } else if (newEmp) {
-            const { error: configError } = await supabase
-              .from('employee_payroll_configs')
-              .insert({
-                organization_id: orgId,
-                employee_id: newEmp.id,
-                effective_from: employeeForm.hire_date,
-                effective_to: null,
-                compensation_type: employeeForm.compensation_type,
-                requires_daily_clock: employeeForm.requires_daily_clock,
-                requires_time_allocation: employeeForm.requires_time_allocation,
-                payroll_time_basis: employeeForm.payroll_time_basis,
-                expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
-                standard_start_time: employeeForm.requires_daily_clock ? employeeForm.standard_start_time : null,
-                standard_end_time: employeeForm.requires_daily_clock ? employeeForm.standard_end_time : null,
-                work_days: employeeForm.work_days.length > 0 ? employeeForm.work_days : null,
-                overtime_eligible: employeeForm.overtime_eligible,
-                pto_eligible: employeeForm.pto_eligible,
-                pay_schedule_id: employeeForm.pay_schedule_id || null,
-                reviewed_at: new Date().toISOString(),
-                reviewed_by: currentUser?.id,
-              });
-
-            if (configError) console.error('Config creation error:', configError);
-          }
+        const { error: rpcError } = await supabase.rpc('classify_as_employee', {
+          p_user_id: result.userId,
+          p_hire_date: employeeForm.hire_date,
+          p_employee_number: employeeForm.employee_number || null,
+          p_employment_status: employeeForm.employment_status,
+          p_compensation_type: employeeForm.compensation_type,
+          p_requires_daily_clock: employeeForm.requires_daily_clock,
+          p_requires_time_allocation: employeeForm.requires_time_allocation,
+          p_payroll_time_basis: employeeForm.payroll_time_basis,
+          p_expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+          p_standard_start_time: employeeForm.standard_start_time,
+          p_standard_end_time: employeeForm.standard_end_time,
+          p_work_days: employeeForm.work_days,
+          p_overtime_eligible: employeeForm.overtime_eligible,
+          p_pto_eligible: employeeForm.pto_eligible,
+          p_pay_schedule_id: employeeForm.pay_schedule_id || null,
+          p_reviewed_by: currentUser?.id,
+        });
+        if (rpcError) {
+          console.error('Employee creation error:', rpcError);
+          throw new Error(`Employee setup failed: ${rpcError.message}`);
         }
       }
 

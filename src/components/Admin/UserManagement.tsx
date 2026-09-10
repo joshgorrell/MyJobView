@@ -16,20 +16,6 @@ interface EmployeeInfo {
   hire_date: string;
 }
 
-interface ProfileActivity {
-  id: string;
-  full_name: string;
-  role: string;
-  email: string;
-  employment_type: string | null;
-  is_active: boolean;
-  clock_count: number;
-  time_count: number;
-  is_employee: boolean;
-  employee_status: string | null;
-  config_reviewed: boolean;
-}
-
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
   const [users, setUsers] = useState<Profile[]>([]);
@@ -39,7 +25,6 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
   const [managingDepartmentUser, setManagingDepartmentUser] = useState<Profile | null>(null);
   const [managingModuleUser, setManagingModuleUser] = useState<Profile | null>(null);
   const [employeeMap, setEmployeeMap] = useState<Map<string, EmployeeInfo>>(new Map());
-  const [activityMap, setActivityMap] = useState<Map<string, { clock_count: number; time_count: number }>>(new Map());
   const [configReviewMap, setConfigReviewMap] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
@@ -96,22 +81,6 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         setConfigReviewMap(reviewMap);
       }
 
-      // Load activity counts for migration hints
-      const userIds = (data || []).map(p => p.id);
-      if (userIds.length > 0) {
-        const { count: clockCount } = await supabase
-          .from('daily_clock_entries')
-          .select('id', { count: 'exact', head: true })
-          .in('technician_id', userIds);
-        const { count: timeCount } = await supabase
-          .from('time_entries')
-          .select('id', { count: 'exact', head: true })
-          .in('technician_id', userIds);
-        // We can't get per-user counts from aggregate queries easily, so just set placeholders
-        const actMap = new Map<string, { clock_count: number; time_count: number }>();
-        (data || []).forEach(p => actMap.set(p.id, { clock_count: 0, time_count: 0 }));
-        setActivityMap(actMap);
-      }
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
@@ -232,10 +201,10 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
 
       {/* Employee Setup Required Section */}
       {(() => {
-        const unclassified = users.filter(u => !employeeMap.has(u.id));
+        const unclassified = users.filter(u => (u as any).employment_classification === 'unreviewed' || !(u as any).employment_classification);
         const unreviewed = users.filter(u => {
           const emp = employeeMap.get(u.id);
-          return emp && !configReviewMap.get(emp.id);
+          return (u as any).employment_classification === 'employee' && emp && !configReviewMap.get(emp.id);
         });
         if (unclassified.length === 0 && unreviewed.length === 0) return null;
         return (
@@ -254,7 +223,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                     <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">User</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Role</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Legacy Type</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Employee?</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Classification</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Configuration</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-amber-800 uppercase">Action</th>
                   </tr>
@@ -266,7 +235,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
                       <td className="px-3 py-2 text-gray-500">{(u as any).employment_type || '-'}</td>
                       <td className="px-3 py-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Not classified</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Unreviewed</span>
                       </td>
                       <td className="px-3 py-2 text-gray-400 text-xs">No employee record</td>
                       <td className="px-3 py-2 text-right">
@@ -372,15 +341,20 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       }`}>
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
-                      {employeeMap.has(user.id) && (
+                      {(user as any).employment_classification === 'employee' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <UserCircle className="w-3 h-3" />
                           Employee
                         </span>
                       )}
+                      {(user as any).employment_classification === 'non_employee' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                          Non-Employee
+                        </span>
+                      )}
                       {(() => {
                         const emp = employeeMap.get(user.id);
-                        if (emp && !configReviewMap.get(emp.id)) {
+                        if ((user as any).employment_classification === 'employee' && emp && !configReviewMap.get(emp.id)) {
                           return (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
                               <AlertCircle className="w-3 h-3" />
