@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Users, MapPin, AlertTriangle } from 'lucide-react';
+import { Users, MapPin, AlertTriangle, Scale } from 'lucide-react';
 
 interface EmployeeSummary {
   employee_id: string;
@@ -14,6 +14,7 @@ interface EmployeeSummary {
   gps_mismatches: number;
   pending_adjustments: number;
   payroll_approval_status: string;
+  has_reconciliation_flags: boolean;
 }
 
 export default function PayrollEmployeeHoursSummary({ payPeriodId }: { payPeriodId: string | null }) {
@@ -58,6 +59,7 @@ export default function PayrollEmployeeHoursSummary({ payPeriodId }: { payPeriod
             gps_mismatches: 0,
             pending_adjustments: 0,
             payroll_approval_status: seg.payroll_approval_status || 'pending',
+            has_reconciliation_flags: false,
           });
         }
         const s = byEmployee.get(empId)!;
@@ -109,6 +111,21 @@ export default function PayrollEmployeeHoursSummary({ payPeriodId }: { payPeriod
         for (const ap of approvals) {
           const s = byEmployee.get(ap.employee_id);
           if (s) s.payroll_approval_status = ap.approval_status;
+        }
+      }
+
+      // Load reconciliation flags
+      const { data: reconFlags } = await supabase
+        .from('payroll_reconciliation_flags')
+        .select('employee_id, needs_review, resolution_status')
+        .eq('pay_period_id', payPeriodId)
+        .eq('needs_review', true)
+        .eq('resolution_status', 'unresolved');
+
+      if (reconFlags) {
+        const flaggedEmps = new Set(reconFlags.map((f: any) => f.employee_id));
+        for (const s of byEmployee.values()) {
+          s.has_reconciliation_flags = flaggedEmps.has(s.employee_id);
         }
       }
 
@@ -166,6 +183,7 @@ export default function PayrollEmployeeHoursSummary({ payPeriodId }: { payPeriod
               <th className="px-3 py-2 text-right">Unassigned</th>
               <th className="px-3 py-2 text-right">GPS Mismatch</th>
               <th className="px-3 py-2 text-right">Adj Pending</th>
+              <th className="px-3 py-2 text-center">Recon</th>
               <th className="px-3 py-2 text-center">Readiness</th>
             </tr>
           </thead>
@@ -207,6 +225,15 @@ export default function PayrollEmployeeHoursSummary({ payPeriodId }: { payPeriod
                 <td className="px-3 py-2 text-right">
                   {s.pending_adjustments > 0 ? (
                     <span className="text-amber-600 font-medium">{s.pending_adjustments}</span>
+                  ) : (
+                    <span className="text-slate-300">-</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {s.has_reconciliation_flags ? (
+                    <span className="inline-flex items-center gap-0.5 text-amber-600 font-medium" title="Has unresolved reconciliation variance">
+                      <Scale className="w-3 h-3" />
+                    </span>
                   ) : (
                     <span className="text-slate-300">-</span>
                   )}

@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Calendar, Lock, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
+import { Calendar, Lock, CheckCircle, AlertCircle, Clock, FileText, RefreshCw } from 'lucide-react';
 
 interface PayPeriod {
   id: string;
@@ -10,6 +10,8 @@ interface PayPeriod {
   period_type: string;
   status: string;
   notes: string | null;
+  last_refresh_at: string | null;
+  last_segment_count: number | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -21,14 +23,30 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
   locked: { label: 'Locked', color: 'text-slate-700 bg-slate-200', icon: Lock },
 };
 
-const STATUS_FLOW = ['draft', 'needs_review', 'payroll_approved', 'submitted', 'processed', 'locked'];
+// States visible in the progress bar. Submitted/Processed/Locked are shown as
+// grayed-out future states — they require a payroll provider integration.
+const VISIBLE_FLOW = ['draft', 'needs_review', 'payroll_approved'];
+const FUTURE_STATES = ['submitted', 'processed', 'locked'];
 
-export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelect?: (id: string | null) => void }) {
+// The admin can advance up to payroll_approved. Beyond that requires a provider.
+const MAX_ADVANCEABLE_IDX = VISIBLE_FLOW.indexOf('payroll_approved');
+
+export default function PayrollPeriodSummary({
+  onPeriodSelect,
+  onRefresh
+}: {
+  onPeriodSelect?: (id: string | null) => void;
+  onRefresh?: () => void;
+}) {
   const [periods, setPeriods] = useState<PayPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<any>(null);
   const [advancing, setAdvancing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<any>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const refreshKeyRef = useRef(0);
 
   const loadPeriods = useCallback(async () => {
     setLoading(true);
@@ -72,15 +90,37 @@ export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelec
     loadReadiness();
   }, [loadReadiness]);
 
+  const handleRefresh = async () => {
+    if (!selectedPeriodId) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const { data, error } = await supabase.rpc('refresh_payroll_time', {
+        p_pay_period_id: selectedPeriodId,
+      });
+      if (error) throw error;
+      setRefreshResult(data);
+      refreshKeyRef.current++;
+      await loadPeriods();
+      await loadReadiness();
+      onRefresh?.();
+    } catch (err: any) {
+      console.error('Error refreshing payroll time:', err);
+      setRefreshError(err.message || 'Failed to refresh payroll time');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const advanceStatus = async () => {
     if (!selectedPeriodId) return;
     const period = periods.find((p) => p.id === selectedPeriodId);
     if (!period) return;
 
-    const currentIdx = STATUS_FLOW.indexOf(period.status);
-    if (currentIdx < 0 || currentIdx >= STATUS_FLOW.length - 1) return;
+    const currentIdx = VISIBLE_FLOW.indexOf(period.status);
+    if (currentIdx < 0 || currentIdx >= MAX_ADVANCEABLE_IDX) return;
 
-    const nextStatus = STATUS_FLOW[currentIdx + 1];
+    const nextStatus = VISIBLE_FLOW[currentIdx + 1];
 
     if (nextStatus === 'payroll_approved' && readiness && !readiness.ready_for_submission) {
       alert(
@@ -92,20 +132,16 @@ export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelec
     setAdvancing(true);
     try {
       const updates: Record<string, any> = { status: nextStatus };
-      if (nextStatus === 'locked') {
+      if (nextStatus === 'payroll_approved') {
         const { data: userData } = await supabase.auth.getUser();
-        const result = await supabase.rpc('lock_pay_period', {
-          p_pay_period_id: selectedPeriodId,
-          p_locked_by: userData.data.user?.id,
-        });
-        if (result.error) throw result.error;
-      } else {
-        const { error } = await supabase
-          .from('pay_periods')
-          .update(updates)
-          .eq('id', selectedPeriodId);
-        if (error) throw error;
+        updates.payroll_approved_at = new Date().toISOString();
+        updates.payroll_approved_by = userData.data.user?.id;
       }
+      const { error } = await supabase
+        .from('pay_periods')
+        .update(updates)
+        .eq('id', selectedPeriodId);
+      if (error) throw error;
       await loadPeriods();
       await loadReadiness();
     } catch (err: any) {
@@ -153,8 +189,10 @@ export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelec
   }
 
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId);
-  const currentIdx = selectedPeriod ? STATUS_FLOW.indexOf(selectedPeriod.status) : -1;
-  const canAdvance = currentIdx >= 0 && currentIdx < STATUS_FLOW.length - 1;
+  const currentIdx = selectedPeriod ? VISIBLE_FLOW.indexOf(selectedPeriod.status) : -1;
+  const isAdvanceableState = currentIdx >= 0 && currentIdx < MAX_ADVANCEABLE_IDX;
+  const isPayrollApproved = selectedPeriod?.status === 'payroll_approved';
+  const canRefresh = selectedPeriod && !['locked', 'submitted', 'processed'].includes(selectedPeriod.status);
 
   return (
     <div className="space-y-4">
@@ -213,8 +251,9 @@ export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelec
                 })()}
               </div>
 
+              {/* Progress bar: visible advanceable states + grayed-out future states */}
               <div className="flex items-center gap-1">
-                {STATUS_FLOW.map((s, i) => (
+                {VISIBLE_FLOW.map((s, i) => (
                   <div key={s} className="flex items-center">
                     <div
                       className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
@@ -225,14 +264,77 @@ export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelec
                     >
                       {i + 1}
                     </div>
-                    {i < STATUS_FLOW.length - 1 && (
-                      <div
-                        className={`w-8 h-0.5 ${i < currentIdx ? 'bg-blue-600' : 'bg-slate-200'}`}
-                      />
+                    {i < VISIBLE_FLOW.length - 1 && (
+                      <div className={`w-8 h-0.5 ${i < currentIdx ? 'bg-blue-600' : 'bg-slate-200'}`} />
                     )}
                   </div>
                 ))}
+                {/* Future states shown as locked/disabled */}
+                {FUTURE_STATES.map((s, i) => (
+                  <div key={s} className="flex items-center">
+                    <div
+                      className="w-8 h-0.5 bg-slate-200"
+                    />
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium bg-slate-100 text-slate-300 border border-slate-200"
+                      title={`${STATUS_CONFIG[s].label} — requires payroll provider integration`}
+                    >
+                      <Lock className="w-3 h-3" />
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {/* Refresh Payroll Time button */}
+              {canRefresh && (
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Refreshing...' : 'Refresh Payroll Time'}
+                </button>
+              )}
+
+              {/* Last refresh info */}
+              {selectedPeriod.last_refresh_at && (
+                <div className="flex items-center gap-4 text-xs text-slate-500">
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Last refreshed: {new Date(selectedPeriod.last_refresh_at).toLocaleString()}
+                  </span>
+                  {selectedPeriod.last_segment_count != null && (
+                    <span>
+                      Segments created/updated: {selectedPeriod.last_segment_count}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Refresh result summary */}
+              {refreshResult && !refreshError && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 space-y-1">
+                  <div className="font-medium">Refresh complete</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                    <span>Segments: {refreshResult.segments_created_or_updated}</span>
+                    <span>Assigned: {refreshResult.segments_assigned}</span>
+                    <span>Approvals created: {refreshResult.approvals_created}</span>
+                    <span>Jurisdiction — High: {refreshResult.jurisdiction_high} / Medium: {refreshResult.jurisdiction_medium} / Low: {refreshResult.jurisdiction_low} / Unassigned: {refreshResult.jurisdiction_unassigned}</span>
+                    {Number(refreshResult.reconciliation_flags) > 0 && (
+                      <span className="text-amber-600 font-medium">
+                        Reconciliation flags: {refreshResult.reconciliation_flags} (variance: {Number(refreshResult.reconciliation_total_variance || 0).toFixed(2)}h)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {refreshError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                  {refreshError}
+                </div>
+              )}
 
               {readiness && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
@@ -263,14 +365,22 @@ export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelec
                 </div>
               )}
 
-              {canAdvance && (
+              {isAdvanceableState && (
                 <button
                   onClick={advanceStatus}
                   disabled={advancing}
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
-                  {advancing ? 'Processing...' : `Advance to ${STATUS_CONFIG[STATUS_FLOW[currentIdx + 1]].label}`}
+                  {advancing ? 'Processing...' : `Advance to ${STATUS_CONFIG[VISIBLE_FLOW[currentIdx + 1]].label}`}
                 </button>
+              )}
+
+              {isPayrollApproved && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 text-center">
+                  <CheckCircle className="w-4 h-4 inline mr-1" />
+                  Payroll Approved. This is the final available state until a payroll provider is connected.
+                  Submitted, Processed, and Locked states will be controlled by the payroll integration.
+                </div>
               )}
             </div>
           )}
@@ -278,4 +388,6 @@ export default function PayrollPeriodSummary({ onPeriodSelect }: { onPeriodSelec
       )}
     </div>
   );
+
 }
+

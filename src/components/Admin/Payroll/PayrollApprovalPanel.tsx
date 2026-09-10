@@ -160,7 +160,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
           <h3 className="text-lg font-semibold text-slate-800">Payroll Approval</h3>
         </div>
         <div className="p-6 text-center text-sm text-slate-500 bg-slate-50 rounded-lg">
-          No payroll approval records yet. Approvals are separate from job/time approvals.
+          No payroll approval records yet. Click "Refresh Payroll Time" in the Pay Period Summary above to generate segments and auto-create approval rows for each employee.
         </div>
       </div>
     );

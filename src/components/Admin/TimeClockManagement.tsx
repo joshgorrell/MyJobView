@@ -10,6 +10,7 @@ import PayrollEmployeeHoursSummary from './Payroll/PayrollEmployeeHoursSummary';
 import JurisdictionReviewPanel from './Payroll/JurisdictionReviewPanel';
 import PayrollApprovalPanel from './Payroll/PayrollApprovalPanel';
 import PayrollCorrectionsPanel from './Payroll/PayrollCorrectionsPanel';
+import PayrollReconciliationPanel from './Payroll/PayrollReconciliationPanel';
 
 interface PendingAutoClockOut {
   id: string;
@@ -127,6 +128,7 @@ export function TimeClockManagement() {
   const [confirmRunAutoClockOut, setConfirmRunAutoClockOut] = useState(false);
   const [activeTab, setActiveTab] = useState<'settings' | 'payroll'>('settings');
   const [selectedPayPeriodId, setSelectedPayPeriodId] = useState<string | null>(null);
+  const [payrollRefreshKey, setPayrollRefreshKey] = useState(0);
 
   // Inline pending time requests state
   const [pendingTimeRequests, setPendingTimeRequests] = useState<PendingTimeRequest[]>([]);
@@ -1831,11 +1833,15 @@ export function TimeClockManagement() {
 
       {activeTab === 'payroll' && (
         <div className="space-y-6">
-          <PayrollPeriodSummary onPeriodSelect={setSelectedPayPeriodId} />
-          <PayrollEmployeeHoursSummary payPeriodId={selectedPayPeriodId} />
-          <JurisdictionReviewPanel payPeriodId={selectedPayPeriodId} />
-          <PayrollApprovalPanel payPeriodId={selectedPayPeriodId} />
-          <PayrollCorrectionsPanel payPeriodId={selectedPayPeriodId} />
+          <PayrollPeriodSummary 
+            onPeriodSelect={setSelectedPayPeriodId}
+            onRefresh={() => setPayrollRefreshKey(k => k + 1)}
+          />
+          <PayrollEmployeeHoursSummary key={`hours-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
+          <JurisdictionReviewPanel key={`juris-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
+          <PayrollReconciliationPanel key={`recon-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
+          <PayrollApprovalPanel key={`approvals-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
+          <PayrollCorrectionsPanel key={`corrections-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
         </div>
       )}
     </div>
