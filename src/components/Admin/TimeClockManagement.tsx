@@ -11,6 +11,7 @@ import JurisdictionReviewPanel from './Payroll/JurisdictionReviewPanel';
 import PayrollApprovalPanel from './Payroll/PayrollApprovalPanel';
 import PayrollCorrectionsPanel from './Payroll/PayrollCorrectionsPanel';
 import PayrollReconciliationPanel from './Payroll/PayrollReconciliationPanel';
+import { AttendanceAllocationSummary } from './Payroll/AttendanceAllocationSummary';
 
 interface PendingAutoClockOut {
   id: string;
@@ -1838,6 +1839,7 @@ export function TimeClockManagement() {
             onRefresh={() => setPayrollRefreshKey(k => k + 1)}
           />
           <PayrollEmployeeHoursSummary key={`hours-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
+          <AttendanceAllocationSummary payPeriodId={selectedPayPeriodId} />
           <JurisdictionReviewPanel key={`juris-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
           <PayrollReconciliationPanel key={`recon-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />
           <PayrollApprovalPanel key={`approvals-${payrollRefreshKey}`} payPeriodId={selectedPayPeriodId} />

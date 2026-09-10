@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Calendar, Lock, CheckCircle, AlertCircle, Clock, FileText, RefreshCw } from 'lucide-react';
+import { Calendar, Lock, CheckCircle, AlertCircle, Clock, FileText, RefreshCw, RotateCcw } from 'lucide-react';
 
 interface PayPeriod {
   id: string;
@@ -46,6 +46,9 @@ export default function PayrollPeriodSummary({
   const [refreshing, setRefreshing] = useState(false);
   const [refreshResult, setRefreshResult] = useState<any>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [showReopenModal, setShowReopenModal] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+  const [reopening, setReopening] = useState(false);
   const refreshKeyRef = useRef(0);
 
   const loadPeriods = useCallback(async () => {
@@ -184,6 +187,30 @@ export default function PayrollPeriodSummary({
     }
   };
 
+  const handleReopen = async () => {
+    if (!selectedPeriodId || !reopenReason.trim()) return;
+    setReopening(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase.rpc('reopen_pay_period', {
+        p_pay_period_id: selectedPeriodId,
+        p_reopened_by: userData.data.user?.id,
+        p_reopen_reason: reopenReason.trim(),
+      });
+      if (error) throw error;
+      setShowReopenModal(false);
+      setReopenReason('');
+      await loadPeriods();
+      await loadReadiness();
+      onRefresh?.();
+    } catch (err: any) {
+      console.error('Error reopening pay period:', err);
+      alert(err.message || 'Failed to reopen pay period');
+    } finally {
+      setReopening(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-4 text-sm text-slate-500">Loading pay periods...</div>;
   }
@@ -192,7 +219,7 @@ export default function PayrollPeriodSummary({
   const currentIdx = selectedPeriod ? VISIBLE_FLOW.indexOf(selectedPeriod.status) : -1;
   const isAdvanceableState = currentIdx >= 0 && currentIdx < MAX_ADVANCEABLE_IDX;
   const isPayrollApproved = selectedPeriod?.status === 'payroll_approved';
-  const canRefresh = selectedPeriod && !['locked', 'submitted', 'processed'].includes(selectedPeriod.status);
+  const canRefresh = selectedPeriod && !['locked', 'submitted', 'processed', 'payroll_approved'].includes(selectedPeriod.status);
 
   return (
     <div className="space-y-4">
@@ -365,6 +392,20 @@ export default function PayrollPeriodSummary({
                 </div>
               )}
 
+              {readiness && Number(readiness.unreviewed_timekeeping_configs) > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{readiness.unreviewed_timekeeping_configs} employee(s) need Timekeeping Configuration Review. Payroll cannot be approved until reviewed.</span>
+                </div>
+              )}
+
+              {readiness && Number(readiness.unresolved_payroll_flags) > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{readiness.unresolved_payroll_flags} unresolved payroll reconciliation flag(s) must be resolved before approval.</span>
+                </div>
+              )}
+
               {isAdvanceableState && (
                 <button
                   onClick={advanceStatus}
@@ -376,10 +417,50 @@ export default function PayrollPeriodSummary({
               )}
 
               {isPayrollApproved && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 text-center">
-                  <CheckCircle className="w-4 h-4 inline mr-1" />
-                  Payroll Approved. This is the final available state until a payroll provider is connected.
-                  Submitted, Processed, and Locked states will be controlled by the payroll integration.
+                <div className="space-y-3">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 text-center">
+                    <CheckCircle className="w-4 h-4 inline mr-1" />
+                    Payroll Approved. This is the final available state until a payroll provider is connected.
+                    Submitted, Processed, and Locked states will be controlled by the payroll integration.
+                  </div>
+                  <button
+                    onClick={() => setShowReopenModal(true)}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reopen to Needs Review
+                  </button>
+                </div>
+              )}
+
+              {showReopenModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                    <h3 className="text-lg font-semibold text-slate-800">Reopen Pay Period</h3>
+                    <p className="text-sm text-slate-600">This will unlock all segments and set the period back to Needs Review. A reason is required for audit purposes.</p>
+                    <textarea
+                      value={reopenReason}
+                      onChange={(e) => setReopenReason(e.target.value)}
+                      placeholder="Reason for reopening..."
+                      rows={3}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    />
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => { setShowReopenModal(false); setReopenReason(''); }}
+                        className="flex-1 px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleReopen}
+                        disabled={reopening || !reopenReason.trim()}
+                        className="flex-1 px-4 py-2 text-sm text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {reopening ? 'Reopening...' : 'Reopen Period'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

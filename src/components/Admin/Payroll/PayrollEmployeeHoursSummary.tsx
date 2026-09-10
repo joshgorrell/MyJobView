@@ -120,7 +120,8 @@ export default function PayrollEmployeeHoursSummary({ payPeriodId }: { payPeriod
         .select('employee_id, needs_review, resolution_status')
         .eq('pay_period_id', payPeriodId)
         .eq('needs_review', true)
-        .eq('resolution_status', 'unresolved');
+        .eq('resolution_status', 'unresolved')
+        .eq('reconciliation_type', 'payroll');
 
       if (reconFlags) {
         const flaggedEmps = new Set(reconFlags.map((f: any) => f.employee_id));

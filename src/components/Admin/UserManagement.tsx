@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, Briefcase, Lock, LayoutGrid as Layout } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, Briefcase, Lock, LayoutGrid as Layout, AlertCircle, UserCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile } from '../../lib/types';
 import { formatDistanceToNow, formatRoleName } from '../../lib/utils';
@@ -9,6 +9,27 @@ import { UserDepartmentAccess } from './UserDepartmentAccess';
 import { UserModuleAccess } from './UserModuleAccess';
 import { useToast } from '../Shared/Toast';
 
+interface EmployeeInfo {
+  user_id: string;
+  employee_id: string;
+  employment_status: string;
+  hire_date: string;
+}
+
+interface ProfileActivity {
+  id: string;
+  full_name: string;
+  role: string;
+  email: string;
+  employment_type: string | null;
+  is_active: boolean;
+  clock_count: number;
+  time_count: number;
+  is_employee: boolean;
+  employee_status: string | null;
+  config_reviewed: boolean;
+}
+
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
   const [users, setUsers] = useState<Profile[]>([]);
@@ -17,6 +38,9 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [managingDepartmentUser, setManagingDepartmentUser] = useState<Profile | null>(null);
   const [managingModuleUser, setManagingModuleUser] = useState<Profile | null>(null);
+  const [employeeMap, setEmployeeMap] = useState<Map<string, EmployeeInfo>>(new Map());
+  const [activityMap, setActivityMap] = useState<Map<string, { clock_count: number; time_count: number }>>(new Map());
+  const [configReviewMap, setConfigReviewMap] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     loadUsers();
@@ -48,6 +72,46 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
 
       console.log('Users loaded:', data?.length || 0);
       setUsers(data || []);
+
+      // Load employee records
+      const { data: empData } = await supabase
+        .from('employees')
+        .select('user_id, id, employment_status, hire_date');
+      const empMap = new Map<string, EmployeeInfo>();
+      (empData || []).forEach(e => empMap.set(e.user_id, e));
+      setEmployeeMap(empMap);
+
+      // Load config review status
+      const empIds = (empData || []).map(e => e.id);
+      if (empIds.length > 0) {
+        const { data: configData } = await supabase
+          .from('employee_payroll_configs')
+          .select('employee_id, effective_to, reviewed_at')
+          .in('employee_id', empIds)
+          .is('effective_to', null);
+        const reviewMap = new Map<string, boolean>();
+        (configData || []).forEach(c => {
+          reviewMap.set(c.employee_id, !!c.reviewed_at);
+        });
+        setConfigReviewMap(reviewMap);
+      }
+
+      // Load activity counts for migration hints
+      const userIds = (data || []).map(p => p.id);
+      if (userIds.length > 0) {
+        const { count: clockCount } = await supabase
+          .from('daily_clock_entries')
+          .select('id', { count: 'exact', head: true })
+          .in('technician_id', userIds);
+        const { count: timeCount } = await supabase
+          .from('time_entries')
+          .select('id', { count: 'exact', head: true })
+          .in('technician_id', userIds);
+        // We can't get per-user counts from aggregate queries easily, so just set placeholders
+        const actMap = new Map<string, { clock_count: number; time_count: number }>();
+        (data || []).forEach(p => actMap.set(p.id, { clock_count: 0, time_count: 0 }));
+        setActivityMap(actMap);
+      }
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
@@ -166,6 +230,86 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         </button>
       </div>
 
+      {/* Employee Setup Required Section */}
+      {(() => {
+        const unclassified = users.filter(u => !employeeMap.has(u.id));
+        const unreviewed = users.filter(u => {
+          const emp = employeeMap.get(u.id);
+          return emp && !configReviewMap.get(emp.id);
+        });
+        if (unclassified.length === 0 && unreviewed.length === 0) return null;
+        return (
+          <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2 text-amber-800">
+              <AlertCircle className="w-5 h-5" />
+              <h3 className="text-sm font-semibold">Employee Setup Required</h3>
+            </div>
+            <p className="text-xs text-amber-700">
+              Review each person below and explicitly designate them as an Employee or Non-Employee User. Legacy fields and activity are suggestions only.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-amber-100 border-b border-amber-300">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">User</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Role</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Legacy Type</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Employee?</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Configuration</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-amber-800 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-200">
+                  {unclassified.map(u => (
+                    <tr key={u.id} className="bg-white/50">
+                      <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
+                      <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
+                      <td className="px-3 py-2 text-gray-500">{(u as any).employment_type || '-'}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Not classified</span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-400 text-xs">No employee record</td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          onClick={() => setEditingUser(u)}
+                          className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-700 transition-colors"
+                        >
+                          Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {unreviewed.map(u => {
+                    const emp = employeeMap.get(u.id)!;
+                    return (
+                      <tr key={u.id} className="bg-white/50">
+                        <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
+                        <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
+                        <td className="px-3 py-2 text-gray-500">{(u as any).employment_type || '-'}</td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Employee</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">Needs review</span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            onClick={() => setEditingUser(u)}
+                            className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-700 transition-colors"
+                          >
+                            Review
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -222,11 +366,31 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {user.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {user.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      {employeeMap.has(user.id) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                          <UserCircle className="w-3 h-3" />
+                          Employee
+                        </span>
+                      )}
+                      {(() => {
+                        const emp = employeeMap.get(user.id);
+                        if (emp && !configReviewMap.get(emp.id)) {
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                              <AlertCircle className="w-3 h-3" />
+                              Unreviewed
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-xs text-gray-500">

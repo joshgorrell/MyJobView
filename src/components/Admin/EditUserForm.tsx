@@ -1,7 +1,41 @@
 import { useState, useEffect } from 'react';
-import { X, Key, AtSign, Mail, Briefcase, Shield, Calendar as CalendarIcon, Target } from 'lucide-react';
+import { X, Key, AtSign, Mail, Briefcase, Shield, Calendar as CalendarIcon, Target, UserCircle, Clock, DollarSign, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
+
+interface PaySchedule {
+  id: string;
+  name: string;
+  frequency: string;
+  is_active: boolean;
+}
+
+interface EmployeeRecord {
+  id: string;
+  employment_status: string;
+  hire_date: string;
+  termination_date: string | null;
+  employee_number: string | null;
+}
+
+interface EmployeePayrollConfig {
+  id: string;
+  effective_from: string;
+  effective_to: string | null;
+  compensation_type: 'salary' | 'hourly';
+  requires_daily_clock: boolean;
+  requires_time_allocation: boolean;
+  payroll_time_basis: 'salary' | 'daily_clock' | 'work_allocation';
+  expected_weekly_hours: number | null;
+  standard_start_time: string | null;
+  standard_end_time: string | null;
+  work_days: string[] | null;
+  overtime_eligible: boolean;
+  pto_eligible: boolean;
+  pay_schedule_id: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
 
 interface EditUserFormProps {
   user: Profile;
@@ -58,11 +92,38 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
+  const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
+  const [employeeRecord, setEmployeeRecord] = useState<EmployeeRecord | null>(null);
+  const [currentConfig, setCurrentConfig] = useState<EmployeePayrollConfig | null>(null);
+  const [isEmployee, setIsEmployee] = useState(false);
+  const [showEmployeeSetup, setShowEmployeeSetup] = useState(false);
+  const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showEffectiveDatePrompt, setShowEffectiveDatePrompt] = useState(false);
+  const [pendingConfigChange, setPendingConfigChange] = useState<any>(null);
+  const [employeeForm, setEmployeeForm] = useState({
+    hire_date: new Date().toISOString().split('T')[0],
+    employment_status: 'active' as 'active' | 'inactive' | 'terminated',
+    termination_date: '',
+    employee_number: '',
+    compensation_type: 'hourly' as 'salary' | 'hourly',
+    requires_daily_clock: true,
+    requires_time_allocation: false,
+    payroll_time_basis: 'daily_clock' as 'salary' | 'daily_clock' | 'work_allocation',
+    expected_weekly_hours: '40',
+    standard_start_time: '08:00',
+    standard_end_time: '17:00',
+    work_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as string[],
+    overtime_eligible: false,
+    pto_eligible: false,
+    pay_schedule_id: '' as string,
+  });
 
   useEffect(() => {
     loadRoles();
     loadOffices();
     loadUserOffices();
+    loadPaySchedules();
+    loadEmployeeData();
   }, []);
 
   // When roles are loaded, set the role_id if it's not already set
@@ -116,6 +177,93 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     } catch (error) {
       console.error('Error loading user offices:', error);
     }
+  }
+
+  async function loadPaySchedules() {
+    try {
+      const { data, error } = await supabase
+        .from('pay_schedules')
+        .select('id, name, frequency, is_active')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      setPaySchedules(data || []);
+    } catch (error) {
+      console.error('Error loading pay schedules:', error);
+    }
+  }
+
+  async function loadEmployeeData() {
+    try {
+      const { data: empData, error: empError } = await supabase
+        .from('employees')
+        .select('id, employment_status, hire_date, termination_date, employee_number')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (empError) throw empError;
+
+      if (empData) {
+        setIsEmployee(true);
+        setEmployeeRecord(empData);
+        setEmployeeForm(prev => ({
+          ...prev,
+          hire_date: empData.hire_date,
+          employment_status: empData.employment_status as any,
+          termination_date: empData.termination_date || '',
+          employee_number: empData.employee_number || '',
+        }));
+
+        const { data: configData, error: configError } = await supabase
+          .from('employee_payroll_configs')
+          .select('*')
+          .eq('employee_id', empData.id)
+          .is('effective_to', null)
+          .maybeSingle();
+
+        if (configError) throw configError;
+
+        if (configData) {
+          setCurrentConfig(configData);
+          setEmployeeForm(prev => ({
+            ...prev,
+            compensation_type: configData.compensation_type,
+            requires_daily_clock: configData.requires_daily_clock,
+            requires_time_allocation: configData.requires_time_allocation,
+            payroll_time_basis: configData.payroll_time_basis,
+            expected_weekly_hours: configData.expected_weekly_hours?.toString() || '40',
+            standard_start_time: configData.standard_start_time || '08:00',
+            standard_end_time: configData.standard_end_time || '17:00',
+            work_days: configData.work_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+            overtime_eligible: configData.overtime_eligible,
+            pto_eligible: configData.pto_eligible,
+            pay_schedule_id: configData.pay_schedule_id || '',
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading employee data:', error);
+    }
+  }
+
+  function checkConfigChanged(newValues: any): boolean {
+    if (!currentConfig) return true;
+    const fields = ['compensation_type', 'requires_daily_clock', 'requires_time_allocation',
+      'payroll_time_basis', 'expected_weekly_hours', 'standard_start_time', 'standard_end_time',
+      'work_days', 'overtime_eligible', 'pto_eligible', 'pay_schedule_id'];
+    return fields.some(f => {
+      const oldVal = (currentConfig as any)[f];
+      const newVal = newValues[f];
+      if (f === 'work_days') {
+        const oldArr = (oldVal || []).sort().join(',');
+        const newArr = (newVal || []).sort().join(',');
+        return oldArr !== newArr;
+      }
+      if (f === 'expected_weekly_hours') {
+        return (oldVal?.toString() || '') !== (newVal?.toString() || '');
+      }
+      return oldVal !== newVal;
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -203,10 +351,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         has_calendar_access: formData.has_calendar_access,
         proposal_visibility_scope: formData.proposal_visibility_scope,
         discussion_visibility_scope: formData.discussion_visibility_scope,
-        employment_type: formData.employment_type,
-        requires_daily_clock: formData.employment_type === 'hourly' || formData.employment_type === 'job_time' || formData.employment_type === 'salary',
-        standard_start_time: (formData.employment_type !== 'job_time' && formData.employment_type !== 'salary_no_clock') ? formData.standard_start_time : null,
-        standard_end_time: (formData.employment_type !== 'job_time' && formData.employment_type !== 'salary_no_clock') ? formData.standard_end_time : null,
         travel_bonus_enabled: formData.travel_bonus_enabled,
         travel_bonus_rate: formData.travel_bonus_enabled ? parseFloat(formData.travel_bonus_rate as string) : null,
         travel_bonus_method: formData.travel_bonus_enabled ? formData.travel_bonus_method : null,
@@ -291,6 +435,112 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           throw new Error(`Office assignment failed: ${officeError.message}`);
         }
         console.log('Office assignments updated successfully');
+      }
+
+      // Save employee data if applicable
+      if (isEmployee && employeeRecord) {
+        // Update employee record
+        const { error: empUpdateError } = await supabase
+          .from('employees')
+          .update({
+            employment_status: employeeForm.employment_status,
+            hire_date: employeeForm.hire_date,
+            termination_date: employeeForm.termination_date || null,
+            employee_number: employeeForm.employee_number || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', employeeRecord.id);
+
+        if (empUpdateError) throw new Error(`Employee update failed: ${empUpdateError.message}`);
+
+        // Check if config changed and create new effective-dated config
+        const newConfigValues = {
+          compensation_type: employeeForm.compensation_type,
+          requires_daily_clock: employeeForm.requires_daily_clock,
+          requires_time_allocation: employeeForm.requires_time_allocation,
+          payroll_time_basis: employeeForm.payroll_time_basis,
+          expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+          standard_start_time: employeeForm.requires_daily_clock ? employeeForm.standard_start_time : null,
+          standard_end_time: employeeForm.requires_daily_clock ? employeeForm.standard_end_time : null,
+          work_days: employeeForm.work_days.length > 0 ? employeeForm.work_days : null,
+          overtime_eligible: employeeForm.overtime_eligible,
+          pto_eligible: employeeForm.pto_eligible,
+          pay_schedule_id: employeeForm.pay_schedule_id || null,
+        };
+
+        if (checkConfigChanged(newConfigValues)) {
+          const effDate = new Date(effectiveDate);
+          const dayBefore = new Date(effDate);
+          dayBefore.setDate(dayBefore.getDate() - 1);
+
+          // Close current config
+          if (currentConfig) {
+            const { error: closeError } = await supabase
+              .from('employee_payroll_configs')
+              .update({ effective_to: dayBefore.toISOString().split('T')[0] })
+              .eq('id', currentConfig.id);
+            if (closeError) throw new Error(`Failed to close prior config: ${closeError.message}`);
+          }
+
+          // Create new config
+          const { data: { user: currentUser2 } } = await supabase.auth.getUser();
+          const { error: configInsertError } = await supabase
+            .from('employee_payroll_configs')
+            .insert({
+              organization_id: (user as any).organization_id || (currentConfig as any)?.organization_id,
+              employee_id: employeeRecord.id,
+              effective_from: effectiveDate,
+              effective_to: null,
+              ...newConfigValues,
+              reviewed_at: new Date().toISOString(),
+              reviewed_by: currentUser2?.id,
+            });
+
+          if (configInsertError) throw new Error(`Config creation failed: ${configInsertError.message}`);
+        }
+      } else if (showEmployeeSetup && isEmployee && !employeeRecord) {
+        // Create new employee + initial config
+        const { data: { user: currentUser2 } } = await supabase.auth.getUser();
+        const orgId = (user as any).organization_id;
+
+        const { data: newEmp, error: empInsertError } = await supabase
+          .from('employees')
+          .insert({
+            organization_id: orgId,
+            user_id: user.id,
+            employment_status: employeeForm.employment_status,
+            hire_date: employeeForm.hire_date,
+            termination_date: employeeForm.termination_date || null,
+            employee_number: employeeForm.employee_number || null,
+          })
+          .select('id')
+          .single();
+
+        if (empInsertError) throw new Error(`Employee creation failed: ${empInsertError.message}`);
+
+        const { error: configInsertError } = await supabase
+          .from('employee_payroll_configs')
+          .insert({
+            organization_id: orgId,
+            employee_id: newEmp.id,
+            effective_from: employeeForm.hire_date,
+            effective_to: null,
+            compensation_type: employeeForm.compensation_type,
+            requires_daily_clock: employeeForm.requires_daily_clock,
+            requires_time_allocation: employeeForm.requires_time_allocation,
+            payroll_time_basis: employeeForm.payroll_time_basis,
+            expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+            standard_start_time: employeeForm.requires_daily_clock ? employeeForm.standard_start_time : null,
+            standard_end_time: employeeForm.requires_daily_clock ? employeeForm.standard_end_time : null,
+            work_days: employeeForm.work_days.length > 0 ? employeeForm.work_days : null,
+            overtime_eligible: employeeForm.overtime_eligible,
+            pto_eligible: employeeForm.pto_eligible,
+            pay_schedule_id: employeeForm.pay_schedule_id || null,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: currentUser2?.id,
+          });
+
+        if (configInsertError) throw new Error(`Config creation failed: ${configInsertError.message}`);
       }
 
       console.log('=== ALL UPDATES COMPLETE ===');
@@ -815,100 +1065,350 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
               </div>
             </div>
 
+            {/* Travel Bonus Settings */}
             <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
-              <h3 className="text-sm font-semibold text-white">Time & Pay Settings</h3>
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-cyan-400" />
+                Travel Bonus
+              </h3>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.travel_bonus_enabled}
+                  onChange={(e) => setFormData({ ...formData, travel_bonus_enabled: e.target.checked })}
+                  className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-white">Enable Travel Bonus</span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    GPS tracking with automatic travel bonus calculation
+                  </p>
+                </div>
+              </label>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Employment Type *
-                </label>
-                <select
-                  value={formData.employment_type}
-                  onChange={(e) => setFormData({ ...formData, employment_type: e.target.value as any })}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                >
-                  <option value="hourly">Hourly - Daily clock required, paid by hours</option>
-                  <option value="job_time">Job Time - No daily clock, paid per job</option>
-                  <option value="salary">Salary - Daily clock for tracking only</option>
-                  <option value="salary_no_clock">Salary - No time clock needed</option>
-                </select>
-              </div>
-
-              {formData.employment_type !== 'job_time' && formData.employment_type !== 'salary_no_clock' && (
+              {formData.travel_bonus_enabled && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">
-                      Start Time
+                      Rate per Mile
                     </label>
                     <input
-                      type="time"
-                      value={formData.standard_start_time}
-                      onChange={(e) => setFormData({ ...formData, standard_start_time: e.target.value })}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.travel_bonus_rate}
+                      onChange={(e) => setFormData({ ...formData, travel_bonus_rate: e.target.value })}
                       className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">
-                      End Time
+                      Method
                     </label>
-                    <input
-                      type="time"
-                      value={formData.standard_end_time}
-                      onChange={(e) => setFormData({ ...formData, standard_end_time: e.target.value })}
+                    <select
+                      value={formData.travel_bonus_method}
+                      onChange={(e) => setFormData({ ...formData, travel_bonus_method: e.target.value as any })}
                       className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    />
+                    >
+                      <option value="round_trip">Round Trip</option>
+                      <option value="one_way">One Way</option>
+                    </select>
                   </div>
                 </div>
               )}
+            </div>
 
-              <div className="border-t border-gray-700 pt-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.travel_bonus_enabled}
-                    onChange={(e) => setFormData({ ...formData, travel_bonus_enabled: e.target.checked })}
-                    className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-white">Enable Travel Bonus</span>
-                    <p className="text-xs text-gray-400 mt-1">
-                      GPS tracking with automatic travel bonus calculation
-                    </p>
-                  </div>
-                </label>
+            {/* Employee Section */}
+            <div className="bg-gray-800 border border-blue-500/30 rounded-lg p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <UserCircle className="w-4 h-4 text-blue-400" />
+                Employee
+              </h3>
 
-                {formData.travel_bonus_enabled && (
-                  <div className="grid grid-cols-2 gap-3 mt-3">
+              {!isEmployee ? (
+                <div>
+                  <p className="text-xs text-gray-400 mb-3">
+                    This person is currently a site user only. Designate them as an Employee to enable payroll and timekeeping.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setIsEmployee(true); setShowEmployeeSetup(true); }}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                  >
+                    Make this person an Employee
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {currentConfig && !currentConfig.reviewed_at && (
+                    <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>Timekeeping configuration needs review. Payroll will be blocked until reviewed.</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Rate per Mile
-                      </label>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Hire Date *</label>
                       <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.travel_bonus_rate}
-                        onChange={(e) => setFormData({ ...formData, travel_bonus_rate: e.target.value })}
+                        type="date"
+                        required={isEmployee}
+                        value={employeeForm.hire_date}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, hire_date: e.target.value })}
                         className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Method
-                      </label>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Employee #</label>
+                      <input
+                        type="text"
+                        value={employeeForm.employee_number}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, employee_number: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Employment Status</label>
                       <select
-                        value={formData.travel_bonus_method}
-                        onChange={(e) => setFormData({ ...formData, travel_bonus_method: e.target.value as any })}
+                        value={employeeForm.employment_status}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, employment_status: e.target.value as any })}
                         className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       >
-                        <option value="round_trip">Round Trip</option>
-                        <option value="one_way">One Way</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="terminated">Terminated</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Termination Date</label>
+                      <input
+                        type="date"
+                        value={employeeForm.termination_date}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, termination_date: e.target.value })}
+                        disabled={employeeForm.employment_status !== 'terminated'}
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Timekeeping & Payroll Configuration - only show if employee */}
+            {isEmployee && (
+              <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-cyan-400" />
+                  Timekeeping & Payroll
+                </h3>
+
+                {showEffectiveDatePrompt && (
+                  <div className="p-3 bg-blue-500/20 border border-blue-500/50 rounded-lg space-y-2">
+                    <p className="text-sm text-blue-300 font-medium">When should this change take effect?</p>
+                    <input
+                      type="date"
+                      value={effectiveDate}
+                      onChange={(e) => setEffectiveDate(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <p className="text-xs text-gray-400">The prior configuration will be preserved through the day before this date.</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Compensation Type</label>
+                  <select
+                    value={employeeForm.compensation_type}
+                    onChange={(e) => {
+                      const val = e.target.value as 'salary' | 'hourly';
+                      const newBasis = val === 'salary' ? 'salary' : 'daily_clock';
+                      setEmployeeForm({ ...employeeForm, compensation_type: val, payroll_time_basis: newBasis as any });
+                      setShowEffectiveDatePrompt(true);
+                    }}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    <option value="hourly">Hourly</option>
+                    <option value="salary">Salary</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Payroll Time Basis</label>
+                  <select
+                    value={employeeForm.payroll_time_basis}
+                    onChange={(e) => {
+                      setEmployeeForm({ ...employeeForm, payroll_time_basis: e.target.value as any });
+                      setShowEffectiveDatePrompt(true);
+                    }}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    <option value="salary">Salary (no hourly segments)</option>
+                    <option value="daily_clock">Daily Clock (one segment per clock entry)</option>
+                    <option value="work_allocation">Work Allocation (segments from job time)</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Controls how payroll segments are generated for this employee.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Pay Schedule</label>
+                  <select
+                    value={employeeForm.pay_schedule_id}
+                    onChange={(e) => {
+                      setEmployeeForm({ ...employeeForm, pay_schedule_id: e.target.value });
+                      setShowEffectiveDatePrompt(true);
+                    }}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    <option value="">No pay schedule assigned</option>
+                    {paySchedules.map(ps => (
+                      <option key={ps.id} value={ps.id}>{ps.name} ({ps.frequency})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Expected Weekly Hours</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={employeeForm.expected_weekly_hours}
+                      onChange={(e) => {
+                        setEmployeeForm({ ...employeeForm, expected_weekly_hours: e.target.value });
+                        setShowEffectiveDatePrompt(true);
+                      }}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t border-gray-700 pt-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={employeeForm.requires_daily_clock}
+                      onChange={(e) => {
+                        setEmployeeForm({ ...employeeForm, requires_daily_clock: e.target.checked });
+                        setShowEffectiveDatePrompt(true);
+                      }}
+                      className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-white">Requires Daily Clock</span>
+                      <p className="text-xs text-gray-400 mt-1">Employee must clock in/out each work day</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={employeeForm.requires_time_allocation}
+                      onChange={(e) => {
+                        setEmployeeForm({ ...employeeForm, requires_time_allocation: e.target.checked });
+                        setShowEffectiveDatePrompt(true);
+                      }}
+                      className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-white">Requires Time Allocation</span>
+                      <p className="text-xs text-gray-400 mt-1">Employee must allocate time to specific jobs/projects</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={employeeForm.overtime_eligible}
+                      onChange={(e) => {
+                        setEmployeeForm({ ...employeeForm, overtime_eligible: e.target.checked });
+                        setShowEffectiveDatePrompt(true);
+                      }}
+                      className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-white">Overtime Eligible</span>
+                      <p className="text-xs text-gray-400 mt-1">Overtime rules may apply to this employee</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={employeeForm.pto_eligible}
+                      onChange={(e) => {
+                        setEmployeeForm({ ...employeeForm, pto_eligible: e.target.checked });
+                        setShowEffectiveDatePrompt(true);
+                      }}
+                      className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-white">PTO Eligible</span>
+                      <p className="text-xs text-gray-400 mt-1">PTO functionality applies (does not by itself generate payable hours)</p>
+                    </div>
+                  </label>
+                </div>
+
+                {employeeForm.requires_daily_clock && (
+                  <div className="border-t border-gray-700 pt-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Standard Start Time</label>
+                        <input
+                          type="time"
+                          value={employeeForm.standard_start_time}
+                          onChange={(e) => {
+                            setEmployeeForm({ ...employeeForm, standard_start_time: e.target.value });
+                            setShowEffectiveDatePrompt(true);
+                          }}
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Standard End Time</label>
+                        <input
+                          type="time"
+                          value={employeeForm.standard_end_time}
+                          onChange={(e) => {
+                            setEmployeeForm({ ...employeeForm, standard_end_time: e.target.value });
+                            setShowEffectiveDatePrompt(true);
+                          }}
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Work Days</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                          <label key={day} className="flex items-center gap-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={employeeForm.work_days.includes(day)}
+                              onChange={(e) => {
+                                const newDays = e.target.checked
+                                  ? [...employeeForm.work_days, day]
+                                  : employeeForm.work_days.filter(d => d !== day);
+                                setEmployeeForm({ ...employeeForm, work_days: newDays });
+                                setShowEffectiveDatePrompt(true);
+                              }}
+                              className="w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+                            />
+                            <span className="text-xs text-white capitalize">{day.slice(0, 3)}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
-            </div>
+            )}
 
             {/* Sales Target Settings - Only show for sales roles */}
             {(formData.role === 'sales' || formData.role === 'admin' || formData.role === 'manager') && (

@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, AtSign, Shield, Briefcase, Eye, EyeOff } from 'lucide-react';
+import { X, Mail, AtSign, Shield, Briefcase, Eye, EyeOff, UserCircle, Clock, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { generateUsername } from '../../lib/username';
 import { CompanyOffice } from '../../lib/types';
+
+interface PaySchedule {
+  id: string;
+  name: string;
+  frequency: string;
+  is_active: boolean;
+}
 
 interface AddUserFormProps {
   onClose: () => void;
@@ -50,10 +57,30 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
+  const [isEmployee, setIsEmployee] = useState(false);
+  const [employeeForm, setEmployeeForm] = useState({
+    hire_date: new Date().toISOString().split('T')[0],
+    employment_status: 'active' as 'active' | 'inactive' | 'terminated',
+    termination_date: '',
+    employee_number: '',
+    compensation_type: 'hourly' as 'salary' | 'hourly',
+    requires_daily_clock: true,
+    requires_time_allocation: false,
+    payroll_time_basis: 'daily_clock' as 'salary' | 'daily_clock' | 'work_allocation',
+    expected_weekly_hours: '40',
+    standard_start_time: '08:00',
+    standard_end_time: '17:00',
+    work_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as string[],
+    overtime_eligible: false,
+    pto_eligible: false,
+    pay_schedule_id: '' as string,
+  });
 
   useEffect(() => {
     loadRoles();
     loadOffices();
+    loadPaySchedules();
   }, []);
 
   async function loadRoles() {
@@ -88,6 +115,20 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
       setOffices(data || []);
     } catch (error) {
       console.error('Error loading offices:', error);
+    }
+  }
+
+  async function loadPaySchedules() {
+    try {
+      const { data, error } = await supabase
+        .from('pay_schedules')
+        .select('id, name, frequency, is_active')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      setPaySchedules(data || []);
+    } catch (error) {
+      console.error('Error loading pay schedules:', error);
     }
   }
 
@@ -169,6 +210,56 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
       }
 
       console.log('User created successfully:', result);
+
+      // If employee, create employee record + initial config
+      if (isEmployee && result.userId) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const orgId = (await supabase.from('profiles').select('organization_id').eq('id', result.userId).maybeSingle()).data?.organization_id;
+
+        if (orgId) {
+          const { data: newEmp, error: empError } = await supabase
+            .from('employees')
+            .insert({
+              organization_id: orgId,
+              user_id: result.userId,
+              employment_status: employeeForm.employment_status,
+              hire_date: employeeForm.hire_date,
+              termination_date: employeeForm.termination_date || null,
+              employee_number: employeeForm.employee_number || null,
+            })
+            .select('id')
+            .single();
+
+          if (empError) {
+            console.error('Employee creation error:', empError);
+          } else if (newEmp) {
+            const { error: configError } = await supabase
+              .from('employee_payroll_configs')
+              .insert({
+                organization_id: orgId,
+                employee_id: newEmp.id,
+                effective_from: employeeForm.hire_date,
+                effective_to: null,
+                compensation_type: employeeForm.compensation_type,
+                requires_daily_clock: employeeForm.requires_daily_clock,
+                requires_time_allocation: employeeForm.requires_time_allocation,
+                payroll_time_basis: employeeForm.payroll_time_basis,
+                expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+                standard_start_time: employeeForm.requires_daily_clock ? employeeForm.standard_start_time : null,
+                standard_end_time: employeeForm.requires_daily_clock ? employeeForm.standard_end_time : null,
+                work_days: employeeForm.work_days.length > 0 ? employeeForm.work_days : null,
+                overtime_eligible: employeeForm.overtime_eligible,
+                pto_eligible: employeeForm.pto_eligible,
+                pay_schedule_id: employeeForm.pay_schedule_id || null,
+                reviewed_at: new Date().toISOString(),
+                reviewed_by: currentUser?.id,
+              });
+
+            if (configError) console.error('Config creation error:', configError);
+          }
+        }
+      }
+
       onSuccess();
     } catch (err: any) {
       console.error('Error creating user:', err);
@@ -600,53 +691,156 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
             </div>
           </div>
 
-          <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-white">Time & Pay Settings</h3>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                Employment Type *
-              </label>
-              <select
-                value={formData.employment_type}
-                onChange={(e) => setFormData({ ...formData, employment_type: e.target.value as any })}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              >
-                <option value="hourly">Hourly - Daily clock required, paid by hours</option>
-                <option value="job_time">Job Time - No daily clock, paid per job</option>
-                <option value="salary">Salary - Daily clock for tracking only</option>
-                <option value="salary_no_clock">Salary - No time clock needed</option>
-              </select>
-            </div>
-
-            {formData.employment_type !== 'job_time' && formData.employment_type !== 'salary_no_clock' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Start Time
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.standard_start_time}
-                    onChange={(e) => setFormData({ ...formData, standard_start_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  />
+          <div className="bg-gray-800 border border-blue-500/30 rounded-lg p-4 space-y-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isEmployee}
+                onChange={(e) => setIsEmployee(e.target.checked)}
+                className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium text-white">Is this person an Employee?</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    End Time
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.standard_end_time}
-                    onChange={(e) => setFormData({ ...formData, standard_end_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  />
-                </div>
+                <p className="text-xs text-gray-400 mt-1">Check to enable payroll, timekeeping, and pay schedule assignment.</p>
               </div>
-            )}
+            </label>
 
-            <div className="border-t border-gray-700 pt-4">
+            {isEmployee && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Hire Date *</label>
+                    <input
+                      type="date"
+                      required={isEmployee}
+                      value={employeeForm.hire_date}
+                      onChange={(e) => setEmployeeForm({ ...employeeForm, hire_date: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Employee #</label>
+                    <input
+                      type="text"
+                      value={employeeForm.employee_number}
+                      onChange={(e) => setEmployeeForm({ ...employeeForm, employee_number: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Compensation Type</label>
+                  <select
+                    value={employeeForm.compensation_type}
+                    onChange={(e) => {
+                      const val = e.target.value as 'salary' | 'hourly';
+                      setEmployeeForm({ ...employeeForm, compensation_type: val, payroll_time_basis: (val === 'salary' ? 'salary' : 'daily_clock') as any });
+                    }}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    <option value="hourly">Hourly</option>
+                    <option value="salary">Salary</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Payroll Time Basis</label>
+                  <select
+                    value={employeeForm.payroll_time_basis}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, payroll_time_basis: e.target.value as any })}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    <option value="salary">Salary (no hourly segments)</option>
+                    <option value="daily_clock">Daily Clock (one segment per clock entry)</option>
+                    <option value="work_allocation">Work Allocation (segments from job time)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Pay Schedule</label>
+                  <select
+                    value={employeeForm.pay_schedule_id}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, pay_schedule_id: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    <option value="">No pay schedule assigned</option>
+                    {paySchedules.map(ps => (
+                      <option key={ps.id} value={ps.id}>{ps.name} ({ps.frequency})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Expected Weekly Hours</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={employeeForm.expected_weekly_hours}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, expected_weekly_hours: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="space-y-2 border-t border-gray-700 pt-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={employeeForm.requires_daily_clock} onChange={(e) => setEmployeeForm({ ...employeeForm, requires_daily_clock: e.target.checked })} className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500" />
+                    <span className="text-sm font-medium text-white">Requires Daily Clock</span>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={employeeForm.requires_time_allocation} onChange={(e) => setEmployeeForm({ ...employeeForm, requires_time_allocation: e.target.checked })} className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500" />
+                    <span className="text-sm font-medium text-white">Requires Time Allocation</span>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={employeeForm.overtime_eligible} onChange={(e) => setEmployeeForm({ ...employeeForm, overtime_eligible: e.target.checked })} className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500" />
+                    <span className="text-sm font-medium text-white">Overtime Eligible</span>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={employeeForm.pto_eligible} onChange={(e) => setEmployeeForm({ ...employeeForm, pto_eligible: e.target.checked })} className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500" />
+                    <span className="text-sm font-medium text-white">PTO Eligible</span>
+                    <p className="text-xs text-gray-400 mt-1">Does not by itself generate payable hours</p>
+                  </label>
+                </div>
+
+                {employeeForm.requires_daily_clock && (
+                  <div className="border-t border-gray-700 pt-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Standard Start Time</label>
+                        <input type="time" value={employeeForm.standard_start_time} onChange={(e) => setEmployeeForm({ ...employeeForm, standard_start_time: e.target.value })} className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Standard End Time</label>
+                        <input type="time" value={employeeForm.standard_end_time} onChange={(e) => setEmployeeForm({ ...employeeForm, standard_end_time: e.target.value })} className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Work Days</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                          <label key={day} className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" checked={employeeForm.work_days.includes(day)} onChange={(e) => { const newDays = e.target.checked ? [...employeeForm.work_days, day] : employeeForm.work_days.filter(d => d !== day); setEmployeeForm({ ...employeeForm, work_days: newDays }); }} className="w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500" />
+                            <span className="text-xs text-white capitalize">{day.slice(0, 3)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-cyan-400" />
+              Travel Bonus
+            </h3>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -693,7 +887,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                 </div>
               )}
             </div>
-          </div>
 
           <div className="flex gap-3 pt-4">
             <button

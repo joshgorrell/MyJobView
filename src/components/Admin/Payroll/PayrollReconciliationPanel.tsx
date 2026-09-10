@@ -13,6 +13,9 @@ interface ReconciliationFlag {
   needs_review: boolean;
   resolution_status: string;
   resolution_note: string | null;
+  excluded_hours: number;
+  exclusion_reason: string | null;
+  reconciliation_type: string;
 }
 
 export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodId: string | null }) {
@@ -31,6 +34,7 @@ export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodI
         .select(`
           id, employee_id, segment_date, daily_clock_hours, segment_hours,
           variance_hours, needs_review, resolution_status, resolution_note,
+          excluded_hours, exclusion_reason, reconciliation_type,
           employee:profiles!employee_id(full_name)
         `)
         .eq('pay_period_id', payPeriodId)
@@ -49,6 +53,9 @@ export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodI
         needs_review: f.needs_review,
         resolution_status: f.resolution_status,
         resolution_note: f.resolution_note,
+        excluded_hours: Number(f.excluded_hours) || 0,
+        exclusion_reason: f.exclusion_reason,
+        reconciliation_type: f.reconciliation_type || 'payroll',
       }));
 
       setFlags(mapped);
@@ -96,9 +103,11 @@ export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodI
     return <div className="p-4 text-sm text-slate-500">Select a pay period to view reconciliation.</div>;
   }
 
-  const needsReviewFlags = flags.filter((f) => f.needs_review && f.resolution_status === 'unresolved');
-  const resolvedFlags = flags.filter((f) => f.resolution_status !== 'unresolved');
-  const allClearFlags = flags.filter((f) => !f.needs_review);
+  const needsReviewFlags = flags.filter((f) => f.needs_review && f.resolution_status === 'unresolved' && f.reconciliation_type === 'payroll');
+  const resolvedFlags = flags.filter((f) => f.resolution_status !== 'unresolved' && f.reconciliation_type === 'payroll');
+  const allClearFlags = flags.filter((f) => !f.needs_review && f.reconciliation_type === 'payroll');
+  const attendanceFlags = flags.filter((f) => f.reconciliation_type === 'attendance');
+  const allocationFlags = flags.filter((f) => f.reconciliation_type === 'allocation');
 
   return (
     <div className="space-y-3">
@@ -143,6 +152,12 @@ export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodI
                       <span className={f.variance_hours > 0 ? 'text-red-600' : 'text-amber-600'}>
                         Variance: <strong>{f.variance_hours > 0 ? '+' : ''}{f.variance_hours.toFixed(2)}h</strong>
                       </span>
+                      {f.excluded_hours > 0 && (
+                        <span className="text-red-600">
+                          Excluded: <strong>{f.excluded_hours.toFixed(2)}h</strong>
+                          {f.exclusion_reason && ` (${f.exclusion_reason})`}
+                        </span>
+                      )}
                     </div>
                     {f.variance_hours > 0 && (
                       <div className="text-xs text-red-600">
@@ -209,7 +224,34 @@ export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodI
                 <div key={f.id} className="p-2 border border-slate-100 bg-slate-50 rounded text-xs text-slate-500">
                   {f.employee_name} - {new Date(f.segment_date).toLocaleDateString()}
                   {' | '}Variance: {f.variance_hours.toFixed(2)}h
+                  {f.excluded_hours > 0 && ` | Excluded: ${f.excluded_hours.toFixed(2)}h`}
                   {' | '}{f.resolution_status}
+                  {f.resolution_note && ` | ${f.resolution_note}`}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {attendanceFlags.length > 0 && (
+            <div className="space-y-1 pt-2">
+              <div className="text-xs text-blue-500 font-medium">Attendance Flags ({attendanceFlags.length}) - Informational only, does not block approval</div>
+              {attendanceFlags.slice(0, 10).map((f) => (
+                <div key={f.id} className="p-2 border border-blue-100 bg-blue-50 rounded text-xs text-blue-600">
+                  {f.employee_name} - {new Date(f.segment_date).toLocaleDateString()}
+                  {' | '}Expected: {f.variance_hours.toFixed(2)}h
+                  {f.resolution_note && ` | ${f.resolution_note}`}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {allocationFlags.length > 0 && (
+            <div className="space-y-1 pt-2">
+              <div className="text-xs text-cyan-500 font-medium">Allocation Flags ({allocationFlags.length}) - Informational only, does not block approval</div>
+              {allocationFlags.slice(0, 10).map((f) => (
+                <div key={f.id} className="p-2 border border-cyan-100 bg-cyan-50 rounded text-xs text-cyan-600">
+                  {f.employee_name} - {new Date(f.segment_date).toLocaleDateString()}
+                  {' | '}Variance: {f.variance_hours.toFixed(2)}h
                   {f.resolution_note && ` | ${f.resolution_note}`}
                 </div>
               ))}
