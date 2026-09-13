@@ -94,7 +94,7 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
       {/* Tab Content */}
       <Suspense fallback={<TabFallback />}>
         {activeTab === 'overview' && <DispatchDashboard onNavigate={onNavigate} />}
-        {activeTab === 'schedule' && <ResourceDayView />}
+        {activeTab === 'schedule' && <ResourceDayView onNavigate={onNavigate} />}
         {activeTab === 'map' && <TechMap />}
         {activeTab === 'tech_status' && <TechStatusDashboard />}
         {activeTab === 'job_status' && <JobStatusPanel />}

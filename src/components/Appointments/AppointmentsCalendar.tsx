@@ -6,6 +6,7 @@ import { CalendarManagementModal } from './CalendarManagementModal';
 import { RecurringEditScopeModal, RecurringEditScope } from '../Shared/RecurringEditScopeModal';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
+import { rescheduleWorkOrder, rescheduleAppointment } from '../../lib/scheduling';
 
 interface Appointment {
   id: string;
@@ -455,35 +456,22 @@ export function AppointmentsCalendar() {
 
     const doTimeDropForce = async () => {
       try {
+        const dateStr = appointment.appointment_date.split('T')[0];
+
         if (appointment.isWorkOrder) {
-          // Update work order
-          const { error } = await supabase
-            .from('work_orders')
-            .update({
-              scheduled_start_time: newTime,
-              scheduled_end_time: newEndTime,
-              ...(newTechId && { assigned_to: newTechId })
-            })
-            .eq('id', appointment.id);
-
-          if (error) throw error;
+          const result = await rescheduleWorkOrder(
+            appointment.id, dateStr, newTime, newEndTime,
+            newTechId || undefined,
+            { force: true }
+          );
+          if (!result.success) throw new Error(result.error || 'Failed to reschedule');
         } else {
-          // Update appointment
-          const updateData: any = {
-            start_time: newTime,
-            end_time: newEndTime
-          };
-
-          if (newTechId) {
-            updateData.assigned_technician = newTechId;
-          }
-
-          const { error } = await supabase
-            .from('appointments')
-            .update(updateData)
-            .eq('id', appointment.id);
-
-          if (error) throw error;
+          const result = await rescheduleAppointment(
+            appointment.id, dateStr, newTime, newEndTime,
+            newTechId || undefined,
+            { force: true }
+          );
+          if (!result.success) throw new Error(result.error || 'Failed to reschedule');
         }
 
         await loadAppointments();

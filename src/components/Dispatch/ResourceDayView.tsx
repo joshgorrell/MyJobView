@@ -1,12 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { getTechColor } from '../../lib/techColors';
-import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { CreateAppointmentModal } from '../Appointments/CreateAppointmentModal';
+import {
+  rescheduleWorkOrder,
+  rescheduleAppointment,
+  scheduleUnscheduledWorkOrder,
+  checkPtoConflict,
+  formatTime12,
+  toMinutes,
+  type ConflictInfo,
+} from '../../lib/scheduling';
 import {
   ChevronLeft,
   ChevronRight,
-  Clock,
   User,
   Wrench,
   AlertTriangle,
@@ -16,6 +23,7 @@ import {
   GripVertical,
   CheckCircle2,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 
 interface ScheduleEvent {
@@ -56,23 +64,21 @@ interface TimeOffEntry {
   end_date: string;
 }
 
+interface ConfirmState {
+  message: string;
+  onConfirm: () => void;
+}
+
+interface EventPopover {
+  event: ScheduleEvent;
+  x: number;
+  y: number;
+}
+
 const HOUR_START = 6;
 const HOUR_END = 21;
 const TOTAL_HOURS = HOUR_END - HOUR_START;
 const SLOT_HEIGHT = 56;
-const MIN_SLOT_HEIGHT = 44;
-
-function formatTime12(time: string): string {
-  const [h, m] = time.split(':').map(Number);
-  const period = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${m.toString().padStart(2, '0')} ${period}`;
-}
-
-function toMinutes(time: string): number {
-  const [h, m] = time.split(':').map(Number);
-  return h * 60 + m;
-}
 
 function dateStr(d: Date): string {
   return d.toISOString().split('T')[0];
@@ -100,7 +106,11 @@ function getPriorityBadge(priority: string): string {
   }
 }
 
-export function ResourceDayView() {
+function padTime(h: number, m: number): string {
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, params?: Record<string, string>) => void }) {
   const [anchor, setAnchor] = useState<Date>(new Date());
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [unscheduled, setUnscheduled] = useState<UnscheduledWorkOrder[]>([]);
@@ -114,13 +124,19 @@ export function ResourceDayView() {
   const [draggedUnscheduled, setDraggedUnscheduled] = useState<UnscheduledWorkOrder | null>(null);
   const [dropTarget, setDropTarget] = useState<{ techId: string; minutes: number } | null>(null);
   const [conflictAtTarget, setConflictAtTarget] = useState(false);
+  const [ptoConflictAtTarget, setPtoConflictAtTarget] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalProps, setCreateModalProps] = useState<{ date?: string; time?: string; techId?: string }>({});
-  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmState | null>(null);
   const [schedulingId, setSchedulingId] = useState<string | null>(null);
+  const [savingEventId, setSavingEventId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [eventPopover, setEventPopover] = useState<EventPopover | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceUnschedRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const today = new Date();
   const ds = dateStr(anchor);
@@ -153,16 +169,30 @@ export function ResourceDayView() {
     scrollToCurrentTime();
   }, [scrollToCurrentTime]);
 
-  // Real-time subscription
   useEffect(() => {
     const channel = supabase
       .channel('resource-day-view')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, () => { loadData(); loadUnscheduled(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pto_requests' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => loadData(), 500);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => loadData(), 500);
+        if (debounceUnschedRef.current) clearTimeout(debounceUnschedRef.current);
+        debounceUnschedRef.current = setTimeout(() => loadUnscheduled(), 500);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pto_requests' }, () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => loadData(), 500);
+      })
       .subscribe();
 
-    return () => { channel.unsubscribe(); };
+    return () => {
+      channel.unsubscribe();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceUnschedRef.current) clearTimeout(debounceUnschedRef.current);
+    };
   }, [anchor, techs]);
 
   async function loadTechnicians() {
@@ -216,9 +246,7 @@ export function ResourceDayView() {
         if (!endT) {
           const hours = wo.estimated_hours || 2;
           const endMin = toMinutes(startT) + hours * 60;
-          const eh = Math.floor(endMin / 60);
-          const em = endMin % 60;
-          endT = `${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}`;
+          endT = padTime(Math.floor(endMin / 60), endMin % 60);
         }
         return {
           id: wo.id,
@@ -339,9 +367,18 @@ export function ResourceDayView() {
   }
 
   function handleSlotClick(techId: string, hour: number) {
-    const time = `${hour.toString().padStart(2, '0')}:00`;
+    const time = padTime(hour, 0);
     setCreateModalProps({ date: ds, time, techId });
     setShowCreateModal(true);
+  }
+
+  function handleEventClick(e: React.MouseEvent, event: ScheduleEvent) {
+    e.stopPropagation();
+    if (event.type === 'work_order' && onNavigate) {
+      onNavigate('work_orders', { workOrderId: event.id });
+    } else {
+      setEventPopover({ event, x: e.clientX, y: e.clientY });
+    }
   }
 
   function getMinutesFromY(clientY: number, rect: DOMRect): number {
@@ -361,8 +398,10 @@ export function ResourceDayView() {
     const endMin = Math.min(startMin + duration, HOUR_END * 60);
 
     const hasConflict = checkConflict(techId, startMin, endMin, draggedEvent?.id);
+    const hasPto = isTechOnTimeOff(techId);
     setDropTarget({ techId, minutes: startMin });
     setConflictAtTarget(hasConflict);
+    setPtoConflictAtTarget(hasPto);
   }
 
   async function handleGridDrop(e: React.DragEvent, techId: string) {
@@ -370,24 +409,30 @@ export function ResourceDayView() {
     if (!dropTarget || dropTarget.techId !== techId) return;
 
     const startMin = dropTarget.minutes;
-    const startH = Math.floor(startMin / 60);
-    const startM = startMin % 60;
-    const newStart = `${startH.toString().padStart(2, '0')}:${startM.toString().padStart(2, '0')}`;
+    const newStart = padTime(Math.floor(startMin / 60), startMin % 60);
+    const techName = techs.find(t => t.id === techId)?.full_name || 'Unknown';
+
+    const buildConflictMessage = (): string => {
+      const parts: string[] = [];
+      if (conflictAtTarget) {
+        parts.push(`Scheduling conflict at ${formatTime12(newStart)}. ${techName} already has something scheduled at this time.`);
+      }
+      if (ptoConflictAtTarget) {
+        parts.push(`${techName} has approved PTO on this date.`);
+      }
+      return parts.join(' ') + ' Do you want to proceed?';
+    };
 
     if (draggedEvent) {
       const duration = toMinutes(draggedEvent.end_time) - toMinutes(draggedEvent.start_time);
       const endMin = Math.min(startMin + duration, HOUR_END * 60);
-      const endH = Math.floor(endMin / 60);
-      const endM = endMin % 60;
-      const newEnd = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
-
+      const newEnd = padTime(Math.floor(endMin / 60), endMin % 60);
       const isReassign = draggedEvent.technician_id !== techId;
-      const techName = techs.find(t => t.id === techId)?.full_name || 'Unknown';
 
       const doMove = async () => {
-        if (conflictAtTarget) {
+        if (conflictAtTarget || ptoConflictAtTarget) {
           setConfirmAction({
-            message: `Scheduling conflict at ${formatTime12(newStart)}. ${techName} already has something scheduled at this time. Do you want to proceed?`,
+            message: buildConflictMessage(),
             onConfirm: () => doMoveForce(),
           });
           return;
@@ -396,38 +441,33 @@ export function ResourceDayView() {
       };
 
       const doMoveForce = async () => {
+        setSavingEventId(draggedEvent.id);
         try {
-          if (draggedEvent.type === 'work_order') {
-            const { error } = await supabase
-              .from('work_orders')
-              .update({
-                scheduled_date: ds,
-                scheduled_start_time: newStart,
-                scheduled_end_time: newEnd,
-                ...(isReassign && { assigned_to: techId }),
-              })
-              .eq('id', draggedEvent.id);
-            if (error) throw error;
-          } else {
-            const { error } = await supabase
-              .from('appointments')
-              .update({
-                appointment_date: ds,
-                start_time: newStart,
-                end_time: newEnd,
-                ...(isReassign && { assigned_technician: techId }),
-              })
-              .eq('id', draggedEvent.id);
-            if (error) throw error;
+          const result = draggedEvent.type === 'work_order'
+            ? await rescheduleWorkOrder(
+                draggedEvent.id, ds, newStart, newEnd,
+                isReassign ? techId : undefined,
+                { force: true }
+              )
+            : await rescheduleAppointment(
+                draggedEvent.id, ds, newStart, newEnd,
+                isReassign ? techId : undefined,
+                { force: true }
+              );
+
+          if (!result.success) {
+            setErrorMessage(result.error || 'Failed to reschedule. Please try again.');
           }
           await loadData();
         } catch (err) {
           console.error('Error moving event:', err);
-          alert('Failed to reschedule. Please try again.');
+          setErrorMessage('Failed to reschedule. Please try again.');
         } finally {
+          setSavingEventId(null);
           setDraggedEvent(null);
           setDropTarget(null);
           setConflictAtTarget(false);
+          setPtoConflictAtTarget(false);
           setConfirmAction(null);
         }
       };
@@ -436,17 +476,13 @@ export function ResourceDayView() {
     } else if (draggedUnscheduled) {
       const duration = (draggedUnscheduled.estimated_hours || 2) * 60;
       const endMin = Math.min(startMin + duration, HOUR_END * 60);
-      const endH = Math.floor(endMin / 60);
-      const endM = endMin % 60;
-      const newEnd = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
-
+      const newEnd = padTime(Math.floor(endMin / 60), endMin % 60);
       const isReassign = draggedUnscheduled.assigned_to !== techId;
-      const techName = techs.find(t => t.id === techId)?.full_name || 'Unknown';
 
       const doSchedule = async () => {
-        if (conflictAtTarget) {
+        if (conflictAtTarget || ptoConflictAtTarget) {
           setConfirmAction({
-            message: `Scheduling conflict at ${formatTime12(newStart)}. ${techName} already has something scheduled at this time. Do you want to proceed?`,
+            message: buildConflictMessage(),
             onConfirm: () => doScheduleForce(),
           });
           return;
@@ -457,38 +493,30 @@ export function ResourceDayView() {
       const doScheduleForce = async () => {
         setSchedulingId(draggedUnscheduled.id);
         try {
-          const { error } = await supabase
-            .from('work_orders')
-            .update({
-              scheduled_date: ds,
-              scheduled_start_time: newStart,
-              scheduled_end_time: newEnd,
-              status: 'scheduled',
-              ...(isReassign && { assigned_to: techId }),
-            })
-            .eq('id', draggedUnscheduled.id);
+          const result = await scheduleUnscheduledWorkOrder(
+            draggedUnscheduled.id,
+            draggedUnscheduled.work_order_number,
+            draggedUnscheduled.title,
+            ds, newStart, newEnd, techId,
+            draggedUnscheduled.customer_name || undefined,
+            { force: true }
+          );
 
-          if (error) throw error;
-
-          if (isReassign || !draggedUnscheduled.assigned_to) {
-            await notifyTechJobAssigned(techId, {
-              work_order_number: draggedUnscheduled.work_order_number,
-              title: draggedUnscheduled.title,
-              customer_name: draggedUnscheduled.customer_name || undefined,
-              scheduled_date: ds,
-            });
+          if (!result.success) {
+            setErrorMessage(result.error || 'Failed to schedule work order. Please try again.');
           }
 
           await loadData();
           await loadUnscheduled();
         } catch (err) {
           console.error('Error scheduling work order:', err);
-          alert('Failed to schedule work order. Please try again.');
+          setErrorMessage('Failed to schedule work order. Please try again.');
         } finally {
           setSchedulingId(null);
           setDraggedUnscheduled(null);
           setDropTarget(null);
           setConflictAtTarget(false);
+          setPtoConflictAtTarget(false);
           setConfirmAction(null);
         }
       };
@@ -519,7 +547,7 @@ export function ResourceDayView() {
   const isToday = isSameDay(anchor, today);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onClick={() => setEventPopover(null)}>
       {/* Toolbar */}
       <div className="flex items-center justify-between px-1 pb-3 shrink-0">
         <div className="flex items-center gap-2">
@@ -705,7 +733,7 @@ export function ResourceDayView() {
                           style={{ top: `${i * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}
                         >
                           <span className="text-[10px] text-gray-500 font-medium -mt-2 whitespace-nowrap">
-                            {formatTime12(`${(HOUR_START + i).toString().padStart(2, '0')}:00`)}
+                            {formatTime12(padTime(HOUR_START + i, 0))}
                           </span>
                         </div>
                       ))}
@@ -723,7 +751,7 @@ export function ResourceDayView() {
                           className={`relative border-r border-gray-700/50 ${onPto ? 'bg-red-500/5' : ''}`}
                           style={{ height: `${totalHeight}px` }}
                           onDragOver={(e) => handleGridDragOver(e, tech.id)}
-                          onDragLeave={() => { setDropTarget(null); setConflictAtTarget(false); }}
+                          onDragLeave={() => { setDropTarget(null); setConflictAtTarget(false); setPtoConflictAtTarget(false); }}
                           onDrop={(e) => handleGridDrop(e, tech.id)}
                         >
                           {/* Hour grid lines */}
@@ -768,7 +796,7 @@ export function ResourceDayView() {
                           {dropTarget && dropTarget.techId === tech.id && (
                             <div
                               className={`absolute left-0.5 right-0.5 rounded border-2 z-15 pointer-events-none ${
-                                conflictAtTarget
+                                conflictAtTarget || ptoConflictAtTarget
                                   ? 'bg-red-500/20 border-red-400'
                                   : 'bg-blue-500/20 border-blue-400'
                               }`}
@@ -780,15 +808,15 @@ export function ResourceDayView() {
                               }}
                             >
                               <div className={`text-[10px] font-medium px-1.5 py-0.5 ${
-                                conflictAtTarget ? 'text-red-300' : 'text-blue-300'
+                                conflictAtTarget || ptoConflictAtTarget ? 'text-red-300' : 'text-blue-300'
                               }`}>
-                                {conflictAtTarget ? (
+                                {conflictAtTarget || ptoConflictAtTarget ? (
                                   <span className="flex items-center gap-1">
                                     <AlertTriangle className="w-2.5 h-2.5" />
-                                    Conflict
+                                    {conflictAtTarget ? 'Conflict' : 'PTO'}
                                   </span>
                                 ) : (
-                                  formatTime12(`${Math.floor(dropTarget.minutes / 60).toString().padStart(2, '0')}:${(dropTarget.minutes % 60).toString().padStart(2, '0')}`)
+                                  formatTime12(padTime(Math.floor(dropTarget.minutes / 60), dropTarget.minutes % 60))
                                 )}
                               </div>
                             </div>
@@ -800,23 +828,31 @@ export function ResourceDayView() {
                             const height = eventHeightPx(event);
                             const isWO = event.type === 'work_order';
                             const eventColor = isWO ? color : { ...color, light: 'bg-gray-100', border: 'border-gray-400', text: 'text-gray-700' };
+                            const isSaving = savingEventId === event.id;
 
                             return (
                               <div
                                 key={event.id}
-                                draggable={event.status !== 'completed'}
+                                draggable={event.status !== 'completed' && !isSaving}
                                 onDragStart={(e) => handleEventDragStart(e, event)}
                                 onDragEnd={() => { setDraggedEvent(null); setDropTarget(null); setConflictAtTarget(false); }}
-                                className={`absolute left-0.5 right-0.5 rounded overflow-hidden cursor-move transition-opacity hover:opacity-90 z-10 ${eventColor.light} border-l-2 ${eventColor.border} ${getPriorityColor(event.priority || '')}`}
+                                onClick={(e) => handleEventClick(e, event)}
+                                className={`absolute left-0.5 right-0.5 rounded overflow-hidden cursor-move transition-opacity hover:opacity-90 z-10 ${eventColor.light} border-l-2 ${eventColor.border} ${getPriorityColor(event.priority || '')} ${isSaving ? 'opacity-50' : ''}`}
                                 style={{ top: `${top}px`, height: `${height}px` }}
-                                title={`${event.title}\n${event.customer_name || ''}\n${formatTime12(event.start_time)} - ${formatTime12(event.end_time)}\nStatus: ${event.status}\nDrag to reschedule or reassign`}
+                                title={`${event.title}\n${event.customer_name || ''}\n${formatTime12(event.start_time)} - ${formatTime12(event.end_time)}\nStatus: ${event.status}\nClick to open, drag to reschedule`}
                               >
+                                {isSaving && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                    <Loader2 className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  </div>
+                                )}
                                 <div className="px-1.5 py-1 h-full overflow-hidden">
                                   <div className="flex items-center gap-1">
                                     {isWO && <Wrench className="w-2.5 h-2.5 flex-shrink-0 text-gray-600" />}
                                     <span className={`text-[10px] font-semibold truncate leading-tight ${eventColor.text}`}>
                                       {event.title}
                                     </span>
+                                    {isWO && <ExternalLink className="w-2 h-2 flex-shrink-0 text-gray-500" />}
                                   </div>
                                   {height > 36 && event.customer_name && (
                                     <div className={`text-[9px] truncate ${eventColor.text} opacity-80 mt-0.5`}>
@@ -891,6 +927,57 @@ export function ResourceDayView() {
         />
       )}
 
+      {/* Appointment popover */}
+      {eventPopover && (
+        <div
+          className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl p-4 max-w-xs"
+          style={{
+            left: Math.min(eventPopover.x + 8, window.innerWidth - 280),
+            top: Math.min(eventPopover.y + 8, window.innerHeight - 160),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5">
+              {eventPopover.event.type === 'work_order'
+                ? <Wrench className="w-3.5 h-3.5 text-gray-400" />
+                : <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              }
+              <span className="text-sm font-semibold text-white">{eventPopover.event.title}</span>
+            </div>
+            <button
+              onClick={() => setEventPopover(null)}
+              className="text-gray-500 hover:text-gray-300"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {eventPopover.event.customer_name && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
+              <User className="w-3 h-3" />
+              {eventPopover.event.customer_name}
+            </div>
+          )}
+          <div className="text-xs text-gray-400 mb-2">
+            {formatTime12(eventPopover.event.start_time)} - {formatTime12(eventPopover.event.end_time)}
+          </div>
+          <div className="text-[10px] text-gray-500 capitalize">
+            Status: {eventPopover.event.status}
+          </div>
+        </div>
+      )}
+
+      {/* Error toast */}
+      {errorMessage && (
+        <div className="fixed bottom-4 right-4 z-50 bg-red-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2 max-w-sm">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span className="text-sm">{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="ml-auto text-white/80 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Confirm dialog */}
       {confirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -901,7 +988,7 @@ export function ResourceDayView() {
             </div>
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => { setConfirmAction(null); setDraggedEvent(null); setDraggedUnscheduled(null); setDropTarget(null); setConflictAtTarget(false); }}
+                onClick={() => { setConfirmAction(null); setDraggedEvent(null); setDraggedUnscheduled(null); setDropTarget(null); setConflictAtTarget(false); setPtoConflictAtTarget(false); }}
                 className="px-4 py-2 text-sm bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors"
               >
                 Cancel
