@@ -158,6 +158,32 @@ export function AppointmentsCalendar() {
     }
   }, [appointments, calendarView]);
 
+  // Real-time subscription for appointments and work orders
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedReload = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (viewMode === 'agenda') {
+          loadAgendaAppointments();
+        } else {
+          loadAppointments();
+        }
+      }, 500);
+    };
+
+    const channel = supabase
+      .channel('appointments-calendar-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, debouncedReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, debouncedReload)
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      channel.unsubscribe();
+    };
+  }, [viewMode, currentDate, calendarView, selectedCalendarId]);
+
   async function loadSharedCalendarMembers(calendarId: string) {
     try {
       const { data: members } = await supabase
@@ -480,31 +506,55 @@ export function AppointmentsCalendar() {
 
   async function checkForConflicts(date: string, startTime: string, endTime: string, technicianId: string, excludeId?: string): Promise<boolean> {
     try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .select('id, title, start_time, end_time')
-        .eq('appointment_date', date)
-        .eq('assigned_technician', technicianId)
-        .neq('status', 'cancelled');
+      const [aptRes, woRes] = await Promise.all([
+        supabase
+          .from('appointments')
+          .select('id, title, start_time, end_time')
+          .eq('appointment_date', date)
+          .eq('assigned_technician', technicianId)
+          .neq('status', 'cancelled'),
+        supabase
+          .from('work_orders')
+          .select('id, title, work_order_number, scheduled_start_time, scheduled_end_time, estimated_hours')
+          .eq('scheduled_date', date)
+          .eq('assigned_to', technicianId)
+          .not('status', 'in', '("completed","cancelled","archived")'),
+      ]);
 
-      if (error) throw error;
+      if (aptRes.error) throw aptRes.error;
+      if (woRes.error) throw woRes.error;
 
-      const conflicts = (data || []).filter(apt => {
+      const timesOverlap = (s: string, e: string, existingStart: string, existingEnd: string) =>
+        (s >= existingStart && s < existingEnd) ||
+        (e > existingStart && e <= existingEnd) ||
+        (s <= existingStart && e >= existingEnd);
+
+      const aptConflicts = (aptRes.data || []).filter(apt => {
         if (excludeId && apt.id === excludeId) return false;
-
-        const aptStart = apt.start_time;
-        const aptEnd = apt.end_time;
-
-        // Check if times overlap
-        return (
-          (startTime >= aptStart && startTime < aptEnd) ||
-          (endTime > aptStart && endTime <= aptEnd) ||
-          (startTime <= aptStart && endTime >= aptEnd)
-        );
+        return timesOverlap(startTime, endTime, apt.start_time, apt.end_time);
       });
 
-      if (conflicts.length > 0) {
-        setConflictWarning(`Technician already has ${conflicts.length} appointment(s) at this time`);
+      const woConflicts = (woRes.data || []).filter(wo => {
+        if (excludeId && wo.id === excludeId) return false;
+        const woStart = wo.scheduled_start_time || '08:00';
+        let woEnd = wo.scheduled_end_time;
+        if (!woEnd) {
+          const hours = wo.estimated_hours || 2;
+          const endMin = woStart.split(':').map(Number).reduce((h, m) => h * 60 + m, 0) + hours * 60;
+          const eh = Math.floor(endMin / 60);
+          const em = endMin % 60;
+          woEnd = `${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}`;
+        }
+        return timesOverlap(startTime, endTime, woStart, woEnd);
+      });
+
+      const totalConflicts = aptConflicts.length + woConflicts.length;
+
+      if (totalConflicts > 0) {
+        const parts: string[] = [];
+        if (aptConflicts.length > 0) parts.push(`${aptConflicts.length} appointment(s)`);
+        if (woConflicts.length > 0) parts.push(`${woConflicts.length} work order(s)`);
+        setConflictWarning(`Technician already has ${parts.join(' and ')} at this time`);
         return true;
       }
 
@@ -1772,7 +1822,7 @@ export function AppointmentsCalendar() {
                                         ? 'bg-blue-100 text-blue-800 border border-blue-300'
                                         : appointment.isReminder
                                         ? 'bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed'
-                                        : 'bg-purple-100 text-purple-800 border border-purple-300'
+                                        : 'bg-teal-100 text-teal-800 border border-teal-300'
                                     }`}
                                     title={`${appointment.title}\n${appointment.customer_name}\n${appointment.start_time.slice(0, 5)} - ${appointment.end_time.slice(0, 5)}\nStatus: ${appointment.status}\n${appointment.isReminder ? 'Cannot drag reminders' : appointment.status === 'completed' ? 'Cannot drag completed items' : 'Drag to reschedule'}`}
                                   >

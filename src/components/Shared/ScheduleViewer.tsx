@@ -53,12 +53,12 @@ const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const TECH_COLORS = [
   { bg: 'bg-blue-100', border: 'border-blue-400', text: 'text-blue-800', ring: 'ring-blue-300', name: 'blue' },
   { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', ring: 'ring-green-300', name: 'green' },
-  { bg: 'bg-purple-100', border: 'border-purple-400', text: 'text-purple-800', ring: 'ring-purple-300', name: 'purple' },
+  { bg: 'bg-cyan-100', border: 'border-cyan-400', text: 'text-cyan-800', ring: 'ring-cyan-300', name: 'cyan' },
   { bg: 'bg-orange-100', border: 'border-orange-400', text: 'text-orange-800', ring: 'ring-orange-300', name: 'orange' },
   { bg: 'bg-pink-100', border: 'border-pink-400', text: 'text-pink-800', ring: 'ring-pink-300', name: 'pink' },
   { bg: 'bg-teal-100', border: 'border-teal-400', text: 'text-teal-800', ring: 'ring-teal-300', name: 'teal' },
   { bg: 'bg-red-100', border: 'border-red-400', text: 'text-red-800', ring: 'ring-red-300', name: 'red' },
-  { bg: 'bg-indigo-100', border: 'border-indigo-400', text: 'text-indigo-800', ring: 'ring-indigo-300', name: 'indigo' },
+  { bg: 'bg-lime-100', border: 'border-lime-400', text: 'text-lime-800', ring: 'ring-lime-300', name: 'lime' },
 ];
 
 export function ScheduleViewer({ selectedTechnicianIds, selectedDate, onDateChange, onTimeSlotClick, browseMode = false, onTechnicianClick, fullScreenMode = false }: ScheduleViewerProps) {
@@ -1226,7 +1226,7 @@ export function ScheduleViewer({ selectedTechnicianIds, selectedDate, onDateChan
                   </>
                 )}
                 <li className="text-green-700 font-semibold">Just like Google Calendar - hover and click!</li>
-                {browseMode && <li className="text-purple-700 font-medium">Click a technician to assign them</li>}
+                {browseMode && <li className="text-teal-700 font-medium">Click a technician to assign them</li>}
               </ul>
               <p className="text-[10px] text-gray-500 mt-2 italic">
                 Keyboard shortcuts: <kbd className="px-1 py-0.5 bg-gray-200 rounded text-gray-700 font-mono">D</kbd> Day,

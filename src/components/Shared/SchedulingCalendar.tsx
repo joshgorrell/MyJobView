@@ -44,7 +44,7 @@ const TECH_COLORS = [
   { bg: 'bg-emerald-500', light: 'bg-emerald-100', border: 'border-emerald-400', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   { bg: 'bg-amber-500', light: 'bg-amber-100', border: 'border-amber-400', text: 'text-amber-700', dot: 'bg-amber-500' },
   { bg: 'bg-rose-500', light: 'bg-rose-100', border: 'border-rose-400', text: 'text-rose-700', dot: 'bg-rose-500' },
-  { bg: 'bg-violet-500', light: 'bg-violet-100', border: 'border-violet-400', text: 'text-violet-700', dot: 'bg-violet-500' },
+  { bg: 'bg-cyan-500', light: 'bg-cyan-100', border: 'border-cyan-400', text: 'text-cyan-700', dot: 'bg-cyan-500' },
   { bg: 'bg-teal-500', light: 'bg-teal-100', border: 'border-teal-400', text: 'text-teal-700', dot: 'bg-teal-500' },
 ];
 

@@ -9,6 +9,7 @@ import {
   BarChart3,
   Briefcase,
   TrendingUp,
+  CalendarDays,
 } from 'lucide-react';
 
 const DispatchDashboard = lazy(() => import('./DispatchDashboard').then(m => ({ default: m.DispatchDashboard })));
@@ -18,8 +19,9 @@ const JobStatusPanel = lazy(() => import('./JobStatusPanel').then(m => ({ defaul
 const JobAcceptanceQueue = lazy(() => import('./JobAcceptanceQueue').then(m => ({ default: m.JobAcceptanceQueue })));
 const TechSkillsFilter = lazy(() => import('./TechSkillsFilter').then(m => ({ default: m.TechSkillsFilter })));
 const TechStats = lazy(() => import('../Production/TechStats').then(m => ({ default: m.TechStats })));
+const ResourceDayView = lazy(() => import('./ResourceDayView').then(m => ({ default: m.ResourceDayView })));
 
-type TabKey = 'overview' | 'map' | 'tech_status' | 'job_status' | 'job_acceptance' | 'tech_skills' | 'tech_stats';
+type TabKey = 'overview' | 'schedule' | 'map' | 'tech_status' | 'job_status' | 'job_acceptance' | 'tech_skills' | 'tech_stats';
 
 interface TabDef {
   key: TabKey;
@@ -29,6 +31,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'schedule', label: 'Schedule', icon: CalendarDays },
   { key: 'map', label: 'Live Map', icon: MapPin },
   { key: 'tech_status', label: 'Tech Status', icon: Users },
   { key: 'job_status', label: 'Job Status', icon: ClipboardList },
@@ -91,6 +94,7 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
       {/* Tab Content */}
       <Suspense fallback={<TabFallback />}>
         {activeTab === 'overview' && <DispatchDashboard onNavigate={onNavigate} />}
+        {activeTab === 'schedule' && <ResourceDayView />}
         {activeTab === 'map' && <TechMap />}
         {activeTab === 'tech_status' && <TechStatusDashboard />}
         {activeTab === 'job_status' && <JobStatusPanel />}
