@@ -24,7 +24,9 @@ import {
   CheckCircle2,
   Loader2,
   ExternalLink,
+  Clock,
 } from 'lucide-react';
+import { resolveWorkOrderDurationMinutes } from '../../lib/scheduling';
 
 interface ScheduleEvent {
   id: string;
@@ -132,6 +134,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
   const [savingEventId, setSavingEventId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [eventPopover, setEventPopover] = useState<EventPopover | null>(null);
+  const [rescheduleModal, setRescheduleModal] = useState<{ event: ScheduleEvent } | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -429,15 +432,43 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
       const newEnd = padTime(Math.floor(endMin / 60), endMin % 60);
       const isReassign = draggedEvent.technician_id !== techId;
 
-      const doMove = async () => {
-        if (conflictAtTarget || ptoConflictAtTarget) {
-          setConfirmAction({
-            message: buildConflictMessage(),
-            onConfirm: () => doMoveForce(),
-          });
-          return;
+      const doMoveNormal = async () => {
+        setSavingEventId(draggedEvent.id);
+        try {
+          const result = draggedEvent.type === 'work_order'
+            ? await rescheduleWorkOrder(
+                draggedEvent.id, ds, newStart, newEnd,
+                isReassign ? techId : undefined
+              )
+            : await rescheduleAppointment(
+                draggedEvent.id, ds, newStart, newEnd,
+                isReassign ? techId : undefined
+              );
+
+          if (!result.success && result.conflict) {
+            setSavingEventId(null);
+            setConfirmAction({
+              message: buildConflictMessage(),
+              onConfirm: () => doMoveForce(),
+            });
+            return;
+          }
+          if (!result.success) {
+            setErrorMessage(result.error || 'Failed to reschedule. Please try again.');
+          }
+          await loadData();
+        } catch (err) {
+          console.error('Error moving event:', err);
+          setErrorMessage('Failed to reschedule. Please try again.');
+        } finally {
+          setSavingEventId(null);
+          if (!confirmAction) {
+            setDraggedEvent(null);
+            setDropTarget(null);
+            setConflictAtTarget(false);
+            setPtoConflictAtTarget(false);
+          }
         }
-        await doMoveForce();
       };
 
       const doMoveForce = async () => {
@@ -472,22 +503,57 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         }
       };
 
-      await doMove();
+      if (conflictAtTarget || ptoConflictAtTarget) {
+        setConfirmAction({
+          message: buildConflictMessage(),
+          onConfirm: () => doMoveForce(),
+        });
+      } else {
+        await doMoveNormal();
+      }
     } else if (draggedUnscheduled) {
       const duration = (draggedUnscheduled.estimated_hours || 2) * 60;
       const endMin = Math.min(startMin + duration, HOUR_END * 60);
       const newEnd = padTime(Math.floor(endMin / 60), endMin % 60);
       const isReassign = draggedUnscheduled.assigned_to !== techId;
 
-      const doSchedule = async () => {
-        if (conflictAtTarget || ptoConflictAtTarget) {
-          setConfirmAction({
-            message: buildConflictMessage(),
-            onConfirm: () => doScheduleForce(),
-          });
-          return;
+      const doScheduleNormal = async () => {
+        setSchedulingId(draggedUnscheduled.id);
+        try {
+          const result = await scheduleUnscheduledWorkOrder(
+            draggedUnscheduled.id,
+            draggedUnscheduled.work_order_number,
+            draggedUnscheduled.title,
+            ds, newStart, newEnd, techId,
+            draggedUnscheduled.customer_name || undefined
+          );
+
+          if (!result.success && result.conflict) {
+            setSchedulingId(null);
+            setConfirmAction({
+              message: buildConflictMessage(),
+              onConfirm: () => doScheduleForce(),
+            });
+            return;
+          }
+          if (!result.success) {
+            setErrorMessage(result.error || 'Failed to schedule work order. Please try again.');
+          }
+
+          await loadData();
+          await loadUnscheduled();
+        } catch (err) {
+          console.error('Error scheduling work order:', err);
+          setErrorMessage('Failed to schedule work order. Please try again.');
+        } finally {
+          setSchedulingId(null);
+          if (!confirmAction) {
+            setDraggedUnscheduled(null);
+            setDropTarget(null);
+            setConflictAtTarget(false);
+            setPtoConflictAtTarget(false);
+          }
         }
-        await doScheduleForce();
       };
 
       const doScheduleForce = async () => {
@@ -521,7 +587,14 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         }
       };
 
-      await doSchedule();
+      if (conflictAtTarget || ptoConflictAtTarget) {
+        setConfirmAction({
+          message: buildConflictMessage(),
+          onConfirm: () => doScheduleForce(),
+        });
+      } else {
+        await doScheduleNormal();
+      }
     }
   }
 
@@ -673,10 +746,13 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
             </div>
           ) : (
             <>
+              {/* Tech column headers + time grid in single scroll container */}
+              <div className="flex-1 overflow-x-auto min-h-0">
+              <div className="min-w-0">
               {/* Tech column headers */}
               <div
-                className="grid shrink-0 bg-gray-800 border-b border-gray-700"
-                style={{ gridTemplateColumns: `52px repeat(${visibleTechs.length}, 1fr)` }}
+                className="grid shrink-0 bg-gray-800 border-b border-gray-700 sticky top-0 z-30"
+                style={{ gridTemplateColumns: `52px repeat(${visibleTechs.length}, minmax(140px, 1fr))` }}
               >
                 <div className="border-r border-gray-700" />
                 {visibleTechs.map(tech => {
@@ -710,7 +786,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
               </div>
 
               {/* Scrollable time grid */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-auto">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center h-48">
                     <Loader2 className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -720,7 +796,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
                     ref={gridRef}
                     className="relative grid"
                     style={{
-                      gridTemplateColumns: `52px repeat(${visibleTechs.length}, 1fr)`,
+                      gridTemplateColumns: `52px repeat(${visibleTechs.length}, minmax(140px, 1fr))`,
                       height: `${totalHeight}px`,
                     }}
                   >
@@ -887,6 +963,8 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
                   </div>
                 )}
               </div>
+              </div>
+              </div>
             </>
           )}
         </div>
@@ -961,9 +1039,22 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           <div className="text-xs text-gray-400 mb-2">
             {formatTime12(eventPopover.event.start_time)} - {formatTime12(eventPopover.event.end_time)}
           </div>
-          <div className="text-[10px] text-gray-500 capitalize">
+          <div className="text-[10px] text-gray-500 capitalize mb-3">
             Status: {eventPopover.event.status}
           </div>
+          {eventPopover.event.status !== 'completed' && (
+            <button
+              onClick={() => {
+                const ev = eventPopover.event;
+                setEventPopover(null);
+                setDraggedEvent(ev);
+                setRescheduleModal({ event: ev });
+              }}
+              className="w-full px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+            >
+              Reschedule / Reassign
+            </button>
+          )}
         </div>
       )}
 
@@ -1003,6 +1094,157 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           </div>
         </div>
       )}
+
+      {/* Reschedule modal (tablet/touch fallback) */}
+      {rescheduleModal && (
+        <RescheduleModal
+          event={rescheduleModal.event}
+          techs={techs}
+          onClose={() => { setRescheduleModal(null); setDraggedEvent(null); }}
+          onSuccess={async () => {
+            setRescheduleModal(null);
+            setDraggedEvent(null);
+            await loadData();
+            await loadUnscheduled();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RescheduleModal({
+  event,
+  techs,
+  onClose,
+  onSuccess,
+}: {
+  event: ScheduleEvent;
+  techs: Technician[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [techId, setTechId] = useState(event.technician_id || '');
+  const [date, setDate] = useState(event.date);
+  const [startTime, setStartTime] = useState(event.start_time);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
+
+  const duration = toMinutes(event.end_time) - toMinutes(event.start_time);
+
+  async function handleSubmit(force: boolean = false) {
+    setSaving(true);
+    setError(null);
+    setConflict(false);
+
+    const endMin = toMinutes(startTime) + duration;
+    const newEnd = padTime(Math.floor(endMin / 60), endMin % 60);
+
+    const isReassign = techId !== event.technician_id;
+    const result = event.type === 'work_order'
+      ? await rescheduleWorkOrder(event.id, date, startTime, newEnd, isReassign ? techId : undefined, { force })
+      : await rescheduleAppointment(event.id, date, startTime, newEnd, isReassign ? techId : undefined, { force });
+
+    if (!result.success && result.conflict && !force) {
+      setConflict(true);
+      setSaving(false);
+      return;
+    }
+    if (!result.success) {
+      setError(result.error || 'Failed to reschedule');
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    onSuccess();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div className="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-white">Reschedule / Reassign</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-300">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Technician</label>
+            <select
+              value={techId}
+              onChange={(e) => setTechId(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm"
+            >
+              <option value="">Unassigned</option>
+              {techs.map(t => (
+                <option key={t.id} value={t.id}>{t.full_name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Start Time</label>
+            <input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm"
+            />
+          </div>
+          <div className="text-xs text-gray-500 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Duration: {Math.floor(duration / 60)}h {duration % 60}m
+          </div>
+        </div>
+
+        {conflict && (
+          <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <div className="flex items-center gap-2 text-xs text-red-300 mb-2">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Scheduling conflict detected. Proceed anyway?
+            </div>
+            <button
+              onClick={() => handleSubmit(true)}
+              disabled={saving}
+              className="w-full px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
+            >
+              {saving ? 'Saving...' : 'Override and Proceed'}
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 text-xs text-red-400">{error}</div>
+        )}
+
+        <div className="flex justify-end gap-2 mt-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleSubmit(false)}
+            disabled={saving}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   Zap
 } from 'lucide-react';
 import { CreateWorkOrderModal } from '../Production/CreateWorkOrderModal';
+import { rescheduleWorkOrder, resolveWorkOrderDurationMinutes, toMinutes } from '../../lib/scheduling';
 
 type ViewMode = 'day' | 'week' | 'work-week' | 'multi-week' | 'month' | 'timeline' | 'list';
 
@@ -29,7 +30,7 @@ interface WorkOrder {
   scheduled_end_time: string | null;
   status: string;
   priority: string;
-  estimated_duration: number;
+  estimated_hours: number;
   project: {
     project_name: string;
     contacts: {
@@ -127,7 +128,7 @@ export function DispatchScheduler() {
             scheduled_end_time,
             status,
             priority,
-            estimated_duration,
+            estimated_hours,
             project:projects (
               project_name,
               contacts (
@@ -212,7 +213,7 @@ export function DispatchScheduler() {
         );
 
         const scheduledMinutes = dayJobs.reduce((sum, wo) => {
-          return sum + (wo.estimated_duration || 60);
+          return sum + resolveWorkOrderDurationMinutes(wo);
         }, 0);
 
         const totalMinutes = (settings.endHour - settings.startHour) * 60;
@@ -307,29 +308,30 @@ export function DispatchScheduler() {
     if (!draggedWorkOrder) return;
 
     try {
-      const updates: any = {
-        assigned_to: technicianId || null,
-        scheduled_date: date.toISOString().split('T')[0],
-        status: technicianId ? 'assigned' : 'pending'
-      };
+      const wo = workOrders.find(w => w.id === draggedWorkOrder);
+      const newDate = date.toISOString().split('T')[0];
+      const newStart = startTime || '08:00';
+      const durationMin = resolveWorkOrderDurationMinutes(wo || { estimated_hours: 2 });
+      const endMin = toMinutes(newStart) + durationMin;
+      const newEnd = `${Math.floor(endMin / 60).toString().padStart(2, '0')}:${(endMin % 60).toString().padStart(2, '0')}`;
 
-      if (startTime) {
-        updates.scheduled_start_time = startTime;
-        const wo = workOrders.find(w => w.id === draggedWorkOrder);
-        if (wo && wo.estimated_duration) {
-          const [hours, minutes] = startTime.split(':');
-          const endDate = new Date();
-          endDate.setHours(parseInt(hours), parseInt(minutes) + wo.estimated_duration);
-          updates.scheduled_end_time = endDate.toTimeString().slice(0, 5);
+      const result = await rescheduleWorkOrder(
+        draggedWorkOrder,
+        newDate,
+        newStart,
+        newEnd,
+        technicianId || undefined
+      );
+
+      if (!result.success && result.conflict) {
+        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+          return;
         }
+        await rescheduleWorkOrder(draggedWorkOrder, newDate, newStart, newEnd, technicianId || undefined, { force: true });
+      } else if (!result.success) {
+        console.error('Error rescheduling:', result.error);
       }
 
-      const { error } = await supabase
-        .from('work_orders')
-        .update(updates)
-        .eq('id', draggedWorkOrder);
-
-      if (error) throw error;
       await loadScheduleData();
     } catch (error) {
       console.error('Error updating work order:', error);

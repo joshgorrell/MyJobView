@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, User, MapPin, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { CreateAppointmentModal } from '../Appointments/CreateAppointmentModal';
+import { rescheduleAppointment } from '../../lib/scheduling';
 
 interface Appointment {
   id: string;
@@ -132,16 +133,29 @@ export function ScheduleBoard() {
   async function handleDrop(technicianId: string, date: Date) {
     if (!draggedAppointment) return;
 
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({
-          assigned_technician: technicianId,
-          appointment_date: date.toISOString().split('T')[0]
-        })
-        .eq('id', draggedAppointment);
+    const apt = appointments.find(a => a.id === draggedAppointment);
+    if (!apt) return;
 
-      if (error) throw error;
+    try {
+      const newDate = date.toISOString().split('T')[0];
+      const newTech = technicianId || undefined;
+      const result = await rescheduleAppointment(
+        draggedAppointment,
+        newDate,
+        apt.start_time,
+        apt.end_time,
+        newTech
+      );
+
+      if (!result.success && result.conflict) {
+        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+          return;
+        }
+        await rescheduleAppointment(draggedAppointment, newDate, apt.start_time, apt.end_time, newTech, { force: true });
+      } else if (!result.success) {
+        console.error('Error rescheduling:', result.error);
+      }
+
       loadScheduleData();
     } catch (error) {
       console.error('Error updating appointment:', error);

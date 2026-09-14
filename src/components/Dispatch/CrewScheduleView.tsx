@@ -13,6 +13,7 @@ import {
   User,
   AlertCircle
 } from 'lucide-react';
+import { rescheduleWorkOrder, resolveWorkOrderDurationMinutes } from '../../lib/scheduling';
 
 interface CrewMember {
   id: string;
@@ -41,7 +42,7 @@ interface CrewJob {
   project_name: string;
   customer_name: string;
   location: string;
-  estimated_duration: number;
+  estimated_hours: number;
   required_techs: number;
 }
 
@@ -144,7 +145,7 @@ export function CrewScheduleView() {
         scheduled_end_time,
         status,
         priority,
-        estimated_duration,
+        estimated_hours,
         required_technicians,
         project:projects (
           project_name,
@@ -178,7 +179,7 @@ export function CrewScheduleView() {
       location: wo.project?.contacts?.city && wo.project?.contacts?.state
         ? `${wo.project.contacts.city}, ${wo.project.contacts.state}`
         : 'Unknown',
-      estimated_duration: wo.estimated_duration || 60,
+      estimated_duration: resolveWorkOrderDurationMinutes(wo),
       required_techs: wo.required_technicians || 1
     }));
 
@@ -250,12 +251,25 @@ export function CrewScheduleView() {
     if (!draggedJob) return;
 
     try {
+      const job = jobs.find(j => j.id === draggedJob);
+      const newDate = date.toISOString().split('T')[0];
+      const newStart = job?.scheduled_start_time || '08:00';
+      const newEnd = job?.scheduled_end_time || '17:00';
+
+      const result = await rescheduleWorkOrder(draggedJob, newDate, newStart, newEnd, undefined);
+      if (!result.success && result.conflict) {
+        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+          return;
+        }
+        await rescheduleWorkOrder(draggedJob, newDate, newStart, newEnd, undefined, { force: true });
+      } else if (!result.success) {
+        console.error('Error rescheduling:', result.error);
+        return;
+      }
+
       const { error } = await supabase
         .from('work_orders')
-        .update({
-          work_order_group_id: crewId,
-          scheduled_date: date.toISOString().split('T')[0]
-        })
+        .update({ work_order_group_id: crewId })
         .eq('id', draggedJob);
 
       if (error) throw error;

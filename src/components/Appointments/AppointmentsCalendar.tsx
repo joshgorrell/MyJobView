@@ -1277,12 +1277,18 @@ export function AppointmentsCalendar() {
 
     const doDropForce = async () => {
       try {
-        const { error } = await supabase
-          .from('appointments')
-          .update({ appointment_date: newDateStr })
-          .eq('id', draggedAppointment.id);
+        const result = await rescheduleAppointment(
+          draggedAppointment.id,
+          newDateStr,
+          draggedAppointment.start_time.slice(0, 5),
+          draggedAppointment.end_time.slice(0, 5),
+          draggedAppointment.technician_id || undefined,
+          { force: true }
+        );
 
-        if (error) throw error;
+        if (!result.success) {
+          alert(result.error || 'Failed to reschedule appointment');
+        }
 
         await loadAppointments();
       } catch (error) {

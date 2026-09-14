@@ -10,6 +10,7 @@ export interface RescheduleResult {
   success: boolean;
   error?: string;
   conflict?: ConflictInfo;
+  newStatus?: string;
 }
 
 function toMinutes(time: string): number {
@@ -22,6 +23,23 @@ function formatTime12(time: string): string {
   const period = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
   return `${h12}:${m.toString().padStart(2, '0')} ${period}`;
+}
+
+export interface WorkOrderDurationInfo {
+  scheduled_start_time?: string | null;
+  scheduled_end_time?: string | null;
+  estimated_hours?: number | null;
+}
+
+export function resolveWorkOrderDurationMinutes(wo: WorkOrderDurationInfo): number {
+  if (wo.scheduled_start_time && wo.scheduled_end_time) {
+    const diff = toMinutes(wo.scheduled_end_time) - toMinutes(wo.scheduled_start_time);
+    if (diff > 0) return diff;
+  }
+  if (wo.estimated_hours && wo.estimated_hours > 0) {
+    return wo.estimated_hours * 60;
+  }
+  return 120;
 }
 
 export async function checkSchedulingConflicts(
@@ -114,21 +132,25 @@ export async function rescheduleWorkOrder(
       }
     }
 
-    const updateData: Record<string, string> = {
-      scheduled_date: newDate,
-      scheduled_start_time: newStartTime,
-      scheduled_end_time: newEndTime,
-    };
-    if (newTechId) {
-      updateData.assigned_to = newTechId;
-    }
-
-    const { error } = await supabase
-      .from('work_orders')
-      .update(updateData)
-      .eq('id', workOrderId);
+    const { data, error } = await supabase
+      .rpc('reschedule_work_order_secure', {
+        p_work_order_id: workOrderId,
+        p_new_date: newDate,
+        p_new_start_time: newStartTime,
+        p_new_end_time: newEndTime,
+        p_new_tech_id: newTechId || null,
+        p_force: options?.force || false,
+      });
 
     if (error) throw new Error(error.message);
+
+    const result = data as any;
+    if (!result?.success) {
+      if (result?.conflict) {
+        return { success: false, conflict: { hasConflict: true, conflictingEvents: [] } };
+      }
+      return { success: false, error: result?.error || 'Failed to reschedule work order' };
+    }
 
     if (newTechId) {
       const { data: wo } = await supabase
@@ -146,7 +168,7 @@ export async function rescheduleWorkOrder(
       }
     }
 
-    return { success: true };
+    return { success: true, newStatus: result?.new_status };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to reschedule work order' };
   }
@@ -168,21 +190,25 @@ export async function rescheduleAppointment(
       }
     }
 
-    const updateData: Record<string, string> = {
-      appointment_date: newDate,
-      start_time: newStartTime,
-      end_time: newEndTime,
-    };
-    if (newTechId) {
-      updateData.assigned_technician = newTechId;
-    }
-
-    const { error } = await supabase
-      .from('appointments')
-      .update(updateData)
-      .eq('id', appointmentId);
+    const { data, error } = await supabase
+      .rpc('reschedule_appointment_secure', {
+        p_appointment_id: appointmentId,
+        p_new_date: newDate,
+        p_new_start_time: newStartTime,
+        p_new_end_time: newEndTime,
+        p_new_tech_id: newTechId || null,
+        p_force: options?.force || false,
+      });
 
     if (error) throw new Error(error.message);
+
+    const result = data as any;
+    if (!result?.success) {
+      if (result?.conflict) {
+        return { success: false, conflict: { hasConflict: true, conflictingEvents: [] } };
+      }
+      return { success: false, error: result?.error || 'Failed to reschedule appointment' };
+    }
 
     return { success: true };
   } catch (err: any) {
@@ -209,18 +235,25 @@ export async function scheduleUnscheduledWorkOrder(
       }
     }
 
-    const { error } = await supabase
-      .from('work_orders')
-      .update({
-        scheduled_date: newDate,
-        scheduled_start_time: newStartTime,
-        scheduled_end_time: newEndTime,
-        status: 'scheduled',
-        assigned_to: newTechId,
-      })
-      .eq('id', workOrderId);
+    const { data, error } = await supabase
+      .rpc('reschedule_work_order_secure', {
+        p_work_order_id: workOrderId,
+        p_new_date: newDate,
+        p_new_start_time: newStartTime,
+        p_new_end_time: newEndTime,
+        p_new_tech_id: newTechId,
+        p_force: options?.force || false,
+      });
 
     if (error) throw new Error(error.message);
+
+    const result = data as any;
+    if (!result?.success) {
+      if (result?.conflict) {
+        return { success: false, conflict: { hasConflict: true, conflictingEvents: [] } };
+      }
+      return { success: false, error: result?.error || 'Failed to schedule work order' };
+    }
 
     await notifyTechJobAssigned(newTechId, {
       work_order_number: workOrderNumber,
@@ -229,7 +262,7 @@ export async function scheduleUnscheduledWorkOrder(
       scheduled_date: newDate,
     });
 
-    return { success: true };
+    return { success: true, newStatus: result?.new_status };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to schedule work order' };
   }

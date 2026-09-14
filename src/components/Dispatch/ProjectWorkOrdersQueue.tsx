@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { notifyTechJobAssigned, notifyTechJobReassigned } from '../../lib/dispatchNotifications';
+import { rescheduleWorkOrder } from '../../lib/scheduling';
 import { WorkOrderDetail } from '../Production/WorkOrderDetail';
 import {
   Briefcase,
@@ -165,16 +166,22 @@ export function ProjectWorkOrdersQueue() {
       const wo = workOrders.find(w => w.id === woId);
       if (!wo) return;
 
-      const { error } = await supabase
-        .from('work_orders')
-        .update({
-          assigned_to: selectedTech,
-          status: 'assigned',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', woId);
+      const date = wo.start_date || new Date().toISOString().split('T')[0];
+      const startTime = '08:00';
+      const endMin = 8 * 60 + (wo.estimated_hours || 2) * 60;
+      const endTime = `${Math.floor(endMin / 60).toString().padStart(2, '0')}:${(endMin % 60).toString().padStart(2, '0')}`;
 
-      if (error) throw error;
+      const result = await rescheduleWorkOrder(woId, date, startTime, endTime, selectedTech);
+
+      if (!result.success && result.conflict) {
+        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+          return;
+        }
+        await rescheduleWorkOrder(woId, date, startTime, endTime, selectedTech, { force: true });
+      } else if (!result.success) {
+        alert(result.error || 'Failed to assign technician');
+        return;
+      }
 
       if (previousTechId && previousTechId !== selectedTech) {
         await notifyTechJobReassigned(selectedTech, {
