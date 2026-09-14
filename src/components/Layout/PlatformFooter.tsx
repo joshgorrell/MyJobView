@@ -5,18 +5,28 @@ export function PlatformFooter() {
       className="w-full"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
-        <div className="flex items-center justify-center gap-2">
-          <img
-            src="/chatgpt_image_jan_16,_2026,_05_20_58_pm.png"
-            alt="MyJobView"
-            className="h-5 w-auto object-contain"
-          />
-          <span className="text-[11px] font-medium tracking-wide text-gray-400 whitespace-nowrap">
-            Powered by
-          </span>
-          <span className="text-[11px] font-semibold tracking-wide text-gray-200 whitespace-nowrap">
-            MyJobView
-          </span>
+        <div className="flex items-center justify-center gap-2.5">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <rect x="2" y="2" width="9" height="9" rx="1.5" fill="#f9fafb" />
+            <rect x="13" y="2" width="9" height="9" rx="1.5" fill="#9ca3af" />
+            <rect x="2" y="13" width="9" height="9" rx="1.5" fill="#9ca3af" />
+            <rect x="13" y="13" width="9" height="9" rx="1.5" fill="#f9fafb" />
+          </svg>
+          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-xs font-medium tracking-wide text-gray-400">
+              Powered by
+            </span>
+            <span className="text-sm font-semibold tracking-wide text-gray-100">
+              MyJobView
+            </span>
+          </div>
         </div>
       </div>
     </div>
