@@ -1,16 +1,19 @@
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { getTaxApplicability, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
 
 interface TaxRulesBadgeProps {
   taxEnvironment: string;
   taxProjectType: string;
   darkMode?: boolean;
+  state?: string;
+  reviewRequired?: boolean;
 }
 
-export function TaxRulesBadge({ taxEnvironment, taxProjectType, darkMode = false }: TaxRulesBadgeProps) {
+export function TaxRulesBadge({ taxEnvironment, taxProjectType, darkMode = false, state = 'KS', reviewRequired = false }: TaxRulesBadgeProps) {
   const taxInfo = getTaxApplicability(
     taxEnvironment as TaxEnvironment,
-    taxProjectType as TaxProjectType
+    taxProjectType as TaxProjectType,
+    state
   );
 
   const containerCls = darkMode
@@ -46,6 +49,12 @@ export function TaxRulesBadge({ taxEnvironment, taxProjectType, darkMode = false
           </span>
         </div>
       </div>
+      {reviewRequired && (
+        <div className="flex items-center gap-2 mt-2 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-md">
+          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <span className="text-xs font-medium text-amber-800">Tax Review Required</span>
+        </div>
+      )}
       <p className={explainCls}>{taxInfo.explanation}</p>
     </div>
   );

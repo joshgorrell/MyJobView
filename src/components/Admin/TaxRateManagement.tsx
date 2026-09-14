@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Search, CreditCard as Edit2, Trash2, Star, MapPin, Key, Save, ExternalLink, Hash, Globe, Info, CheckCircle, AlertTriangle, BookOpen } from 'lucide-react';
+import { Plus, Search, CreditCard as Edit2, Trash2, Star, MapPin, Key, Save, ExternalLink, Hash, Globe, Info, CheckCircle, AlertTriangle, BookOpen, Building2 } from 'lucide-react';
 import {
   TaxJurisdiction,
   lookupTaxRateByZip,
@@ -40,6 +40,8 @@ export default function TaxRateManagement() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [activeRulesState, setActiveRulesState] = useState<string | null>(null);
   const [activeRulesEnv, setActiveRulesEnv] = useState<'residential' | 'commercial'>('residential');
+  const [taxOriginMethod, setTaxOriginMethod] = useState<'corporate' | 'assigned_office'>('corporate');
+  const [savingTaxOrigin, setSavingTaxOrigin] = useState(false);
 
   useEffect(() => {
     loadJurisdictions();
@@ -90,6 +92,7 @@ export default function TaxRateManagement() {
       setTaxjarApiKey(data?.taxjar_api_key || '');
       setApiKeyUpdatedAt(data?.taxjar_api_key_updated_at || null);
       if (data?.nexus_states?.length) setNexusStates(data.nexus_states);
+      if (data?.tax_origin_method) setTaxOriginMethod(data.tax_origin_method);
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -353,6 +356,99 @@ export default function TaxRateManagement() {
           </div>
         </div>
       )}
+
+      {/* Tax Origin Method */}
+      <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-600" />
+              Tax Origin
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Choose which seller address is used for sales-tax sourcing on all transactions.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label
+            className={`flex flex-col gap-1 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+              taxOriginMethod === 'corporate'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="taxOriginMethod"
+                value="corporate"
+                checked={taxOriginMethod === 'corporate'}
+                onChange={() => setTaxOriginMethod('corporate')}
+                className="text-blue-600"
+              />
+              <span className="font-semibold text-gray-900">Corporate Address</span>
+            </div>
+            <p className="text-xs text-gray-500 ml-6">
+              Use your main business address (headquarters office) for sales-tax sourcing on all transactions.
+            </p>
+          </label>
+
+          <label
+            className={`flex flex-col gap-1 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+              taxOriginMethod === 'assigned_office'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="taxOriginMethod"
+                value="assigned_office"
+                checked={taxOriginMethod === 'assigned_office'}
+                onChange={() => setTaxOriginMethod('assigned_office')}
+                className="text-blue-600"
+              />
+              <span className="font-semibold text-gray-900">Assigned Office Address</span>
+            </div>
+            <p className="text-xs text-gray-500 ml-6">
+              Use the address of the office assigned to each transaction for sales-tax sourcing.
+            </p>
+          </label>
+        </div>
+
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={async () => {
+              setSavingTaxOrigin(true);
+              try {
+                const { data: settingsData } = await supabase
+                  .from('company_settings')
+                  .select('id')
+                  .maybeSingle();
+                if (!settingsData) throw new Error('Company settings not found');
+                const { error } = await supabase
+                  .from('company_settings')
+                  .update({ tax_origin_method: taxOriginMethod })
+                  .eq('id', settingsData.id);
+                if (error) throw error;
+              } catch (error) {
+                console.error('Error saving tax origin method:', error);
+                alert('Failed to save tax origin setting');
+              } finally {
+                setSavingTaxOrigin(false);
+              }
+            }}
+            disabled={savingTaxOrigin}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            {savingTaxOrigin ? 'Saving...' : 'Save Tax Origin'}
+          </button>
+        </div>
+      </div>
 
       {/* State Tax Rules Reference */}
       <div className="bg-white rounded-lg shadow border border-gray-200">

@@ -624,6 +624,10 @@ export function computeInvoiceTax(params: {
 /**
  * Get tax applicability information for display.
  * Pass `state` (two-letter code) to use that state's rules; defaults to 'KS'.
+ *
+ * This synchronous function reads from the TypeScript STATE_TAX_RULES registry.
+ * It remains as a fallback for instant display. For authoritative taxability,
+ * use `resolveTaxRuleFromDB` which calls the database resolver.
  */
 export function getTaxApplicability(
   environment: TaxEnvironment,
@@ -632,4 +636,161 @@ export function getTaxApplicability(
 ): { partsTaxable: boolean; laborTaxable: boolean; explanation: string } {
   const rules = STATE_TAX_RULES[state] || STATE_TAX_RULES['KS'];
   return rules.getApplicability(environment, projectType);
+}
+
+export type TaxabilityStatus = 'taxable' | 'non_taxable' | 'needs_review';
+
+export interface ResolveTaxRuleResult {
+  taxabilityStatus: TaxabilityStatus;
+  explanation: string;
+  ruleId: string | null;
+  ruleVersion: number | null;
+  source: 'master' | 'dealer_override' | null;
+}
+
+/**
+ * Authoritative database-backed taxability resolver.
+ * Calls the `resolve_tax_rule` RPC to get the definitive taxability decision
+ * from master_state_tax_rules (or state_tax_rules_matrix for dealer overrides).
+ *
+ * Unlike the synchronous `getTaxApplicability`, this function reflects the
+ * actual database rules engine and can return 'needs_review' when no rule
+ * matches.
+ */
+export async function resolveTaxRuleFromDB(
+  state: string,
+  organizationId: string,
+  environment: TaxEnvironment | null,
+  projectType: TaxProjectType | null,
+  classificationCode: 'material' | 'labor' | 'design_fee' | 'project_management' | 'freight_delivery' | 'credit_card_fee'
+): Promise<ResolveTaxRuleResult> {
+  try {
+    const { data, error } = await supabase.rpc('resolve_tax_rule', {
+      p_state: state,
+      p_organization_id: organizationId,
+      p_environment: environment,
+      p_project_type: projectType,
+      p_classification_code: classificationCode,
+    });
+
+    if (error) throw error;
+
+    return {
+      taxabilityStatus: data.taxability_status,
+      explanation: data.explanation,
+      ruleId: data.rule_id,
+      ruleVersion: data.rule_version,
+      source: data.source,
+    };
+  } catch (error) {
+    console.error('Error calling resolve_tax_rule RPC:', error);
+    // Fall back to the synchronous registry on error
+    const fallback = getTaxApplicability(environment ?? 'residential', projectType ?? 'general_installation_repair', state);
+    const isLabor = classificationCode === 'labor';
+    return {
+      taxabilityStatus: (isLabor ? fallback.laborTaxable : fallback.partsTaxable) ? 'taxable' : 'non_taxable',
+      explanation: fallback.explanation,
+      ruleId: null,
+      ruleVersion: null,
+      source: null,
+    };
+  }
+}
+
+export type TaxCalculationStatus = 'ready' | 'review_required' | 'not_collecting' | 'exempt';
+
+export interface CalculateTaxResult {
+  taxCalculationStatus: TaxCalculationStatus;
+  taxabilityResults: {
+    material: ResolveTaxRuleResult;
+    labor: ResolveTaxRuleResult;
+  };
+  originResult: {
+    originMethod: string;
+    officeId: string | null;
+    street: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    reviewRequired: boolean;
+    reviewReason: string | null;
+  };
+  collectionStatus: string;
+  destinationResult: {
+    street: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    reviewRequired: boolean;
+    reviewReason: string | null;
+  };
+  taxAmount: number;
+  taxableSubtotal: number;
+  reviewReasons: Array<{ layer: string; reason: string }>;
+  exemptionReference: string | null;
+}
+
+/**
+ * Calls the `calculate_tax` orchestrator RPC to get the full tax calculation
+ * including taxability, origin, nexus/collection, destination, and readiness.
+ */
+export async function calculateTaxFromDB(
+  transactionType: 'proposal' | 'change_order' | 'invoice',
+  transactionId: string
+): Promise<CalculateTaxResult | null> {
+  try {
+    const { data, error } = await supabase.rpc('calculate_tax', {
+      p_transaction_type: transactionType,
+      p_transaction_id: transactionId,
+    });
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      taxCalculationStatus: data.tax_calculation_status,
+      taxabilityResults: {
+        material: {
+          taxabilityStatus: data.taxability_results?.material?.taxability_status ?? 'needs_review',
+          explanation: data.taxability_results?.material?.explanation ?? '',
+          ruleId: data.taxability_results?.material?.rule_id ?? null,
+          ruleVersion: data.taxability_results?.material?.rule_version ?? null,
+          source: data.taxability_results?.material?.source ?? null,
+        },
+        labor: {
+          taxabilityStatus: data.taxability_results?.labor?.taxability_status ?? 'needs_review',
+          explanation: data.taxability_results?.labor?.explanation ?? '',
+          ruleId: data.taxability_results?.labor?.rule_id ?? null,
+          ruleVersion: data.taxability_results?.labor?.rule_version ?? null,
+          source: data.taxability_results?.labor?.source ?? null,
+        },
+      },
+      originResult: {
+        originMethod: data.origin_result?.origin_method ?? 'corporate',
+        officeId: data.origin_result?.office_id ?? null,
+        street: data.origin_result?.street ?? null,
+        city: data.origin_result?.city ?? null,
+        state: data.origin_result?.state ?? null,
+        zip: data.origin_result?.zip ?? null,
+        reviewRequired: data.origin_result?.review_required ?? false,
+        reviewReason: data.origin_result?.review_reason ?? null,
+      },
+      collectionStatus: data.collection_status ?? 'review_required',
+      destinationResult: {
+        street: data.destination_result?.street ?? null,
+        city: data.destination_result?.city ?? null,
+        state: data.destination_result?.state ?? null,
+        zip: data.destination_result?.zip ?? null,
+        reviewRequired: data.destination_result?.review_required ?? false,
+        reviewReason: data.destination_result?.review_reason ?? null,
+      },
+      taxAmount: data.tax_amount ?? 0,
+      taxableSubtotal: data.taxable_subtotal ?? 0,
+      reviewReasons: data.review_reasons ?? [],
+      exemptionReference: data.exemption_reference ?? null,
+    };
+  } catch (error) {
+    console.error('Error calling calculate_tax RPC:', error);
+    return null;
+  }
 }
