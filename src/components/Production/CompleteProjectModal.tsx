@@ -63,6 +63,18 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
   const [checkingAccess, setCheckingAccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [ttDays, setTtDays] = useState(90);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('test_tune_settings')
+        .select('test_tune_period_days')
+        .limit(1)
+        .maybeSingle();
+      if (data?.test_tune_period_days) setTtDays(data.test_tune_period_days);
+    })();
+  }, []);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -133,7 +145,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
     try {
       const today = new Date();
       const endDate = new Date(today);
-      endDate.setDate(endDate.getDate() + 90);
+      endDate.setDate(endDate.getDate() + ttDays);
 
       // 1. Mark project substantially complete
       const { error: projectError } = await supabase
@@ -366,11 +378,11 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                         <Award className="w-3.5 h-3.5 text-cyan-400" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-white">90-Day Test &amp; Tune starts today</p>
+                        <p className="text-xs font-semibold text-white">{ttDays}-Day Test &amp; Tune starts today</p>
                         <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
                           The T&amp;T period runs from today through{' '}
                           <span className="text-white font-semibold">
-                            {new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {new Date(Date.now() + ttDays * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>.
                           Post-install service hours count toward performance bonuses.
                         </p>
@@ -489,7 +501,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                             : ''}.
                         </p>
                         <p className="text-xs text-amber-300/80 leading-relaxed bg-amber-900/20 border border-amber-700/40 rounded-xl px-3 py-2">
-                          Completing this project will <span className="font-semibold text-amber-300">reset their 90-day clock</span> — their existing access will be extended from today.
+                          Completing this project will <span className="font-semibold text-amber-300">reset their {ttDays}-day clock</span> — their existing access will be extended from today.
                           Confirm below if that is intended.
                         </p>
                       </div>
@@ -501,10 +513,10 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                         <div className="bg-green-900/15 border border-green-700/60 rounded-2xl p-4 space-y-3">
                           <div className="flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
-                            <span className="text-sm font-semibold text-green-300">Grant 90-Day T&T Access</span>
+                            <span className="text-sm font-semibold text-green-300">Grant {ttDays}-Day T&T Access</span>
                           </div>
                           <p className="text-xs text-gray-400 leading-relaxed">
-                            A new 90-day Test &amp; Tune access grant will be created for this customer,
+                            A new {ttDays}-day Test &amp; Tune access grant will be created for this customer,
                             letting them submit punchlist items and service requests through the portal.
                           </p>
                         </div>
