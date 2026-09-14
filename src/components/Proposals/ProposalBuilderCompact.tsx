@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare, Monitor } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare, Monitor, ListChecks } from 'lucide-react';
 import {
   recordCOAction,
   recordCOModifierChange,
@@ -33,6 +33,7 @@ import { ProposalQA } from './ProposalQA';
 import BulkUpdateConfirmationModal from './BulkUpdateConfirmationModal';
 import BulkUpdateProjectInfoModal from './BulkUpdateProjectInfoModal';
 import TwoPhaseLaborEditor from './TwoPhaseLaborEditor';
+import ProposalTasksPanel from './ProposalTasksPanel';
 import { UnlockProposalModal } from './UnlockProposalModal';
 import { PromoteRevisionModal } from './PromoteRevisionModal';
 import { PortalVersionHistoryModal } from './PortalVersionHistoryModal';
@@ -672,6 +673,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
   const [coverPageImage, setCoverPageImage] = useState<string | null>(null);
   const [showQA, setShowQA] = useState(false);
+  const [showTasksPanel, setShowTasksPanel] = useState(false);
   const [autoQaThreadId, setAutoQaThreadId] = useState<string | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
   const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
@@ -3562,6 +3564,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         )}
                       </button>
 
+                      {/* Tasks */}
+                      <button
+                        onClick={() => setShowTasksPanel(true)}
+                        className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
+                        title="View and edit proposal tasks"
+                      >
+                        <ListChecks className="w-4 h-4" />
+                        Tasks
+                      </button>
+
                       {/* Download PDF */}
                       <button
                         onClick={() => {
@@ -5645,6 +5657,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             await loadData();
             setEditingScopeRoom(null);
           }}
+        />
+      )}
+
+      {showTasksPanel && (
+        <ProposalTasksPanel
+          proposalId={proposalId}
+          lineItems={rooms.flatMap(r => r.line_items.map(li => ({ id: li.id, description: li.description })))}
+          onClose={() => setShowTasksPanel(false)}
         />
       )}
 

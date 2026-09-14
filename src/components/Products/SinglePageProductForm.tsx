@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2 } from 'lucide-react';
+import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Category {
@@ -106,6 +106,18 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   // Track if there's saved draft data
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
 
+  // Default Tasks for this product (catalog_item_default_tasks)
+  const [defaultTasks, setDefaultTasks] = useState<Array<{
+    id: string | null;
+    title: string;
+    description: string;
+    labor_phase_id: string | null;
+    sort_order: number;
+  }>>([]);
+  const [showAddDefaultTask, setShowAddDefaultTask] = useState(false);
+  const [newDefaultTaskTitle, setNewDefaultTaskTitle] = useState('');
+  const [newDefaultTaskDesc, setNewDefaultTaskDesc] = useState('');
+  const [newDefaultTaskPhase, setNewDefaultTaskPhase] = useState('');
 
   const [formData, setFormData] = useState({
     // Basic Info
@@ -436,6 +448,22 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     if (!productId) return;
 
     try {
+      // Load default tasks for this product
+      const { data: tasksData } = await supabase
+        .from('catalog_item_default_tasks')
+        .select('*')
+        .eq('product_id', productId)
+        .order('sort_order');
+      if (tasksData) {
+        setDefaultTasks(tasksData.map(t => ({
+          id: t.id,
+          title: t.title,
+          description: t.description || '',
+          labor_phase_id: t.labor_phase_id || null,
+          sort_order: t.sort_order ?? 0,
+        })));
+      }
+
       const { data, error } = await supabase.from('products').select(`
         id,
         manufacturer_id,
@@ -942,6 +970,58 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       clearSavedData(); // Clear auto-saved data on successful save
       setHasSavedDraft(false); // Clear draft indicator
       localStorage.removeItem(scrollPositionKey); // Clear scroll position on successful save
+
+      // Save default tasks for this product
+      if (savedProductId) {
+        await saveDefaultTasks(savedProductId);
+      }
+
+      async function saveDefaultTasks(prodId: string) {
+        try {
+          // Delete tasks that were removed
+          const existingIds = defaultTasks.filter(t => t.id).map(t => t.id);
+          if (existingIds.length > 0) {
+            await supabase
+              .from('catalog_item_default_tasks')
+              .delete()
+              .eq('product_id', prodId)
+              .not('id', 'in', `(${existingIds.map(id => `'${id}'`).join(',')})`);
+          } else {
+            // All were deleted
+            await supabase
+              .from('catalog_item_default_tasks')
+              .delete()
+              .eq('product_id', prodId);
+          }
+
+          // Upsert remaining tasks
+          for (const task of defaultTasks) {
+            if (task.id) {
+              await supabase
+                .from('catalog_item_default_tasks')
+                .update({
+                  title: task.title,
+                  description: task.description || null,
+                  labor_phase_id: task.labor_phase_id || null,
+                  sort_order: task.sort_order,
+                })
+                .eq('id', task.id);
+            } else {
+              await supabase
+                .from('catalog_item_default_tasks')
+                .insert({
+                  product_id: prodId,
+                  title: task.title,
+                  description: task.description || null,
+                  labor_phase_id: task.labor_phase_id || null,
+                  sort_order: task.sort_order,
+                });
+            }
+          }
+        } catch (error) {
+          console.error('Error saving default tasks:', error);
+        }
+      }
 
       // Show success message
       setSaveSuccess(true);
@@ -1897,6 +1977,23 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 placeholder="Auto-filled with 'Install {model}'"
               />
             </div>
+
+            {/* Default Tasks */}
+            <DefaultTasksSection
+              productId={productId}
+              readOnly={readOnly}
+              defaultTasks={defaultTasks}
+              setDefaultTasks={setDefaultTasks}
+              laborPhases={laborPhases}
+              showAddDefaultTask={showAddDefaultTask}
+              setShowAddDefaultTask={setShowAddDefaultTask}
+              newDefaultTaskTitle={newDefaultTaskTitle}
+              setNewDefaultTaskTitle={setNewDefaultTaskTitle}
+              newDefaultTaskDesc={newDefaultTaskDesc}
+              setNewDefaultTaskDesc={setNewDefaultTaskDesc}
+              newDefaultTaskPhase={newDefaultTaskPhase}
+              setNewDefaultTaskPhase={setNewDefaultTaskPhase}
+            />
           </div>
 
           {/* RESOURCES */}
@@ -2294,6 +2391,260 @@ function AccessoriesSection({ productId }: { productId: string }) {
         onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
         onCancel={() => setConfirmModal(null)}
       />
+    </div>
+  );
+}
+
+interface DefaultTasksSectionProps {
+  productId?: string;
+  readOnly: boolean;
+  defaultTasks: Array<{
+    id: string | null;
+    title: string;
+    description: string;
+    labor_phase_id: string | null;
+    sort_order: number;
+  }>;
+  setDefaultTasks: React.Dispatch<React.SetStateAction<Array<{
+    id: string | null;
+    title: string;
+    description: string;
+    labor_phase_id: string | null;
+    sort_order: number;
+  }>>;
+  laborPhases: LaborPhase[];
+  showAddDefaultTask: boolean;
+  setShowAddDefaultTask: (v: boolean) => void;
+  newDefaultTaskTitle: string;
+  setNewDefaultTaskTitle: (v: string) => void;
+  newDefaultTaskDesc: string;
+  setNewDefaultTaskDesc: (v: string) => void;
+  newDefaultTaskPhase: string;
+  setNewDefaultTaskPhase: (v: string) => void;
+}
+
+function DefaultTasksSection({
+  productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
+  showAddDefaultTask, setShowAddDefaultTask,
+  newDefaultTaskTitle, setNewDefaultTaskTitle,
+  newDefaultTaskDesc, setNewDefaultTaskDesc,
+  newDefaultTaskPhase, setNewDefaultTaskPhase,
+}: DefaultTasksSectionProps) {
+  if (readOnly && defaultTasks.length === 0) return null;
+
+  const handleAddTask = () => {
+    if (!newDefaultTaskTitle.trim()) return;
+    setDefaultTasks(prev => [...prev, {
+      id: null,
+      title: newDefaultTaskTitle.trim(),
+      description: newDefaultTaskDesc.trim(),
+      labor_phase_id: newDefaultTaskPhase || null,
+      sort_order: prev.length,
+    }]);
+    setNewDefaultTaskTitle('');
+    setNewDefaultTaskDesc('');
+    setNewDefaultTaskPhase('');
+    setShowAddDefaultTask(false);
+  };
+
+  const handleDeleteTask = (index: number) => {
+    setDefaultTasks(prev => prev.filter((_, i) => i !== index).map((t, i) => ({ ...t, sort_order: i })));
+  };
+
+  const handleEditTitle = (index: number, title: string) => {
+    setDefaultTasks(prev => prev.map((t, i) => i === index ? { ...t, title } : t));
+  };
+
+  const handleEditDescription = (index: number, description: string) => {
+    setDefaultTasks(prev => prev.map((t, i) => i === index ? { ...t, description } : t));
+  };
+
+  const handleEditPhase = (index: number, phaseId: string) => {
+    setDefaultTasks(prev => prev.map((t, i) => i === index ? { ...t, labor_phase_id: phaseId || null } : t));
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    setDefaultTasks(prev => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next.map((t, i) => ({ ...t, sort_order: i }));
+    });
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === defaultTasks.length - 1) return;
+    setDefaultTasks(prev => {
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next.map((t, i) => ({ ...t, sort_order: i }));
+    });
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ListChecks className="w-4 h-4 text-blue-600" />
+          <label className="text-sm font-medium text-gray-700">Default Tasks</label>
+          {defaultTasks.length > 0 && (
+            <span className="text-xs text-gray-500">({defaultTasks.length})</span>
+          )}
+        </div>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => setShowAddDefaultTask(!showAddDefaultTask)}
+            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" />
+            Add Task
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-500 mb-3">
+        These tasks are automatically copied to proposals when this product is added.
+        If no default tasks are configured, a single task is generated from the item description when labor is present.
+      </p>
+
+      {showAddDefaultTask && (
+        <div className="bg-white border border-gray-300 rounded-lg p-3 mb-3 space-y-2">
+          <input
+            type="text"
+            value={newDefaultTaskTitle}
+            onChange={e => setNewDefaultTaskTitle(e.target.value)}
+            placeholder="Task title (e.g., 'Install TV', 'Program TV')"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            autoFocus
+          />
+          <textarea
+            value={newDefaultTaskDesc}
+            onChange={e => setNewDefaultTaskDesc(e.target.value)}
+            placeholder="Description (optional)"
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="flex gap-2">
+            <select
+              value={newDefaultTaskPhase}
+              onChange={e => setNewDefaultTaskPhase(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No labor phase</option>
+              {laborPhases.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAddTask}
+              disabled={!newDefaultTaskTitle.trim()}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:bg-gray-300"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddDefaultTask(false);
+                setNewDefaultTaskTitle('');
+                setNewDefaultTaskDesc('');
+                setNewDefaultTaskPhase('');
+              }}
+              className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {defaultTasks.length === 0 && !showAddDefaultTask ? (
+        <p className="text-xs text-gray-400 text-center py-2">
+          No default tasks configured. A generic task will be generated from the item description when labor is present.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {defaultTasks.map((task, index) => (
+            <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 group">
+              <div className="flex items-start gap-2">
+                <GripVertical className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  {readOnly ? (
+                    <span className="text-sm text-gray-900 font-medium">{task.title}</span>
+                  ) : (
+                    <input
+                      type="text"
+                      value={task.title}
+                      onChange={e => handleEditTitle(index, e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                    />
+                  )}
+                  {!readOnly && (
+                    <>
+                      <textarea
+                        value={task.description}
+                        onChange={e => handleEditDescription(index, e.target.value)}
+                        placeholder="Description (optional)"
+                        rows={1}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                      />
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={task.labor_phase_id || ''}
+                          onChange={e => handleEditPhase(index, e.target.value)}
+                          className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">No labor phase</option>
+                          {laborPhases.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                        {task.labor_phase_id && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
+                            {laborPhases.find(p => p.id === task.labor_phase_id)?.name}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {readOnly && task.description && (
+                    <p className="text-xs text-gray-500">{task.description}</p>
+                  )}
+                </div>
+                {!readOnly && (
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                      className="text-gray-400 hover:text-gray-600 p-1 disabled:opacity-30"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === defaultTasks.length - 1}
+                      className="text-gray-400 hover:text-gray-600 p-1 disabled:opacity-30"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(index)}
+                      className="text-gray-400 hover:text-red-600 p-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
