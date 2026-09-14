@@ -2405,13 +2405,13 @@ interface DefaultTasksSectionProps {
     labor_phase_id: string | null;
     sort_order: number;
   }>;
-  setDefaultTasks: React.Dispatch<React.SetStateAction<Array<{
+  setDefaultTasks: (tasks: Array<{
     id: string | null;
     title: string;
     description: string;
     labor_phase_id: string | null;
     sort_order: number;
-  }>>;
+  }>) => void;
   laborPhases: LaborPhase[];
   showAddDefaultTask: boolean;
   setShowAddDefaultTask: (v: boolean) => void;
