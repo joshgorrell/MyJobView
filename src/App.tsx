@@ -6,6 +6,7 @@ import { Header } from './components/Layout/Header';
 import { MessageTicker } from './components/Layout/MessageTicker';
 import { DepartmentSidebar } from './components/Layout/DepartmentSidebar';
 import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
+import { PlatformFooter } from './components/Layout/PlatformFooter';
 import { OfflineIndicator } from './components/Offline/OfflineIndicator';
 import BugReportModal from './components/Shared/BugReportModal';
 import { ToastProvider } from './components/Shared/Toast';
@@ -1218,6 +1219,10 @@ function AppContent() {
           </div>
         </div>
       </footer>
+      )}
+
+      {!isStandalone && (
+        <PlatformFooter />
       )}
 
       {showAddProjectTime && (
