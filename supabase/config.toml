@@ -78,3 +78,6 @@ verify_jwt = true
 
 [functions.quickbooks-oauth-complete]
 verify_jwt = false
+
+[functions.taxjar-lookup]
+verify_jwt = true

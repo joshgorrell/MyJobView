@@ -11,6 +11,7 @@ import { RecordPaymentModal } from './RecordPaymentModal';
 import ConfirmModal from '../ui/ConfirmModal';
 import {
   getTaxApplicability, getProjectTypeDisplayName, getEnvironmentDisplayName,
+  checkTaxFinalizationGuard,
   type TaxEnvironment, type TaxProjectType
 } from '../../lib/taxCalculations';
 
@@ -62,6 +63,7 @@ interface InvoiceDetail {
   tax_override: boolean | null;
   tax_override_reason: string | null;
   tax_jurisdiction_id: string | null;
+  tax_calculation_status: string | null;
   bill_to_contact_id: string | null;
   bill_to_contact?: {
     id: string;
@@ -268,6 +270,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
         notes, payment_terms, contact_id, sales_order_id, source_type,
         billing_name, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip,
         tax_environment, tax_project_type, tax_override, tax_override_reason, tax_jurisdiction_id,
+        tax_calculation_status,
         bill_to_contact_id,
         contacts:contact_id (
           contact_name, first_name, last_name, full_name, email, phone,
@@ -342,6 +345,9 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   }
 
   async function handleSendEmail() {
+    if (!invoice) return;
+    const taxBlock = checkTaxFinalizationGuard(invoice.tax_calculation_status);
+    if (taxBlock) { alert(taxBlock); return; }
     setSendingEmail(true);
     setConfirmEmail(false);
     try {

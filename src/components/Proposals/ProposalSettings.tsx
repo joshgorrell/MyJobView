@@ -8,7 +8,7 @@ import DepositConfiguration, { BillingPhase } from './DepositConfiguration';
 import ProgressBillingManager from './ProgressBillingManager';
 import CreateProgressInvoiceModal from './CreateProgressInvoiceModal';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
-import { getTaxApplicability, getApplicableTaxRate, TaxEnvironment, TaxProjectType } from '../../lib/taxCalculations';
+import { getTaxApplicability, getApplicableTaxRate, calculateTaxJarTax, TaxEnvironment, TaxProjectType, TaxJarTaxResult } from '../../lib/taxCalculations';
 import EditCustomerModal from './EditCustomerModal';
 import { checkProposalReadiness, markSectionReviewed, type ValidationSection } from '../../lib/proposalValidation';
 import ProposalRecordingsPanel from './ProposalRecordingsPanel';
@@ -133,6 +133,8 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [billingPhases, setBillingPhases] = useState<BillingPhase[]>([]);
   const billingPhasesTimer = useRef<NodeJS.Timeout | null>(null);
+  const [calculatingTaxJar, setCalculatingTaxJar] = useState(false);
+  const [taxJarResult, setTaxJarResult] = useState<TaxJarTaxResult | null>(null);
 
   const availableColumns = [
     { id: 'description', label: 'Description', alwaysVisible: true },
@@ -762,6 +764,37 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
     } catch (error) {
       console.error('Error updating line item tax settings:', error);
+    }
+  }
+
+  async function handleCalculateTaxJarTax() {
+    if (!proposalId) return;
+    setCalculatingTaxJar(true);
+    setTaxJarResult(null);
+    try {
+      const result = await calculateTaxJarTax('proposal', proposalId);
+      setTaxJarResult(result);
+      if (result.tax_calculation_status === 'ready' && result.tax_amount !== undefined) {
+        setProposal((prev: any) => prev ? {
+          ...prev,
+          tax_amount: result.tax_amount,
+          tax_rate: result.tax_rate ?? prev.tax_rate,
+          tax_calculation_status: 'ready',
+          tax_review_required: false,
+        } : prev);
+      } else if (result.tax_calculation_status === 'review_required') {
+        setProposal((prev: any) => prev ? {
+          ...prev,
+          tax_calculation_status: 'review_required',
+          tax_review_required: true,
+          tax_amount: 0,
+        } : prev);
+      }
+    } catch (error) {
+      console.error('TaxJar calculation error:', error);
+      setTaxJarResult({ tax_calculation_status: 'review_required', tax_amount: 0, taxjar_error: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setCalculatingTaxJar(false);
     }
   }
 
@@ -1733,6 +1766,109 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
                 </select>
               )}
             </div>
+          </div>
+
+          {/* TaxJar Authoritative Calculation */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-medium text-blue-900 mb-1">Authoritative Tax Calculation</p>
+                <p className="text-xs text-blue-700">Run the server-side TaxJar calculation to get the authoritative tax amount for this proposal.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCalculateTaxJarTax}
+                disabled={calculatingTaxJar}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm font-medium whitespace-nowrap"
+              >
+                {calculatingTaxJar ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="w-4 h-4" />
+                    Calculate Tax
+                  </>
+                )}
+              </button>
+            </div>
+            {taxJarResult && (
+              <div className="bg-white rounded-lg p-3 space-y-2">
+                {taxJarResult.taxjar_skipped && (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Info className="w-4 h-4 text-gray-500" />
+                    <span>Skipped: {taxJarResult.taxjar_skip_reason}</span>
+                  </div>
+                )}
+                {taxJarResult.tax_calculation_status === 'ready' && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium text-gray-900">TaxJar Verified</span>
+                      {taxJarResult.taxjar_verified_at && (
+                        <span className="text-xs text-gray-500">
+                          {new Date(taxJarResult.taxjar_verified_at).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600">Taxable Subtotal:</span>{' '}
+                        <span className="font-medium text-gray-900">${(taxJarResult.taxable_subtotal || 0).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Tax Amount:</span>{' '}
+                        <span className="font-medium text-green-700">${(taxJarResult.tax_amount || 0).toFixed(2)}</span>
+                      </div>
+                      {taxJarResult.tax_rate !== undefined && (
+                        <div>
+                          <span className="text-gray-600">Rate:</span>{' '}
+                          <span className="font-medium text-gray-900">{(taxJarResult.tax_rate * 100).toFixed(4)}%</span>
+                        </div>
+                      )}
+                      {taxJarResult.tax_source && (
+                        <div>
+                          <span className="text-gray-600">Sourcing:</span>{' '}
+                          <span className="font-medium text-gray-900 capitalize">{taxJarResult.tax_source}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+                {taxJarResult.tax_calculation_status === 'review_required' && (
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-medium">Review Required</p>
+                      {taxJarResult.taxjar_error && (
+                        <p className="text-xs mt-1">{taxJarResult.taxjar_error}</p>
+                      )}
+                      {taxJarResult.review_reasons && Array.isArray(taxJarResult.review_reasons) && (
+                        <ul className="text-xs mt-1 space-y-0.5">
+                          {taxJarResult.review_reasons.map((r: any, i: number) => (
+                            <li key={i}>{r.reason || JSON.stringify(r)}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {taxJarResult.tax_calculation_status === 'exempt' && (
+                  <div className="flex items-center gap-2 text-sm text-green-700">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Transaction is exempt. Tax = $0.00</span>
+                  </div>
+                )}
+                {taxJarResult.tax_calculation_status === 'not_collecting' && (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Info className="w-4 h-4" />
+                    <span>Dealer is not collecting in this state. Tax = $0.00</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tax Matrix Reference */}

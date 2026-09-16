@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, CheckSquare, ChevronDown, ChevronUp, Download, Globe2, Loader2, Mail, Send, Square, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { checkTaxFinalizationGuard } from '../../lib/taxCalculations';
 
 interface DeliverProposalModalProps {
   proposalId: string;
@@ -17,6 +18,7 @@ interface ProposalInfo {
   sent_at: string | null;
   report_template_id: string | null;
   portal_customer_message?: string | null;
+  tax_calculation_status: string | null;
   contacts: { full_name: string | null; email: string | null } | null;
 }
 
@@ -75,7 +77,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
       try {
         setLoading(true);
         const [{ data: p, error: pError }, { data: settings }] = await Promise.all([
-          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,portal_customer_message,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
+          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
           supabase.from('company_settings').select('company_name').maybeSingle(),
         ]);
         if (pError) throw pError;
@@ -167,6 +169,8 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
   async function deliver() {
     if (!proposal || working || !anySelected) return;
     if (email && !toEmail.trim()) { setError('Enter an email address before sending.'); return; }
+    const taxBlock = checkTaxFinalizationGuard(proposal.tax_calculation_status);
+    if (taxBlock) { setError(taxBlock); return; }
     setWorking(true); setError(''); setResult([]);
     const completed: string[] = [];
     try {

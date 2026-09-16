@@ -245,6 +245,83 @@ export async function lookupTaxRateByZip(zipCode: string): Promise<TaxJurisdicti
 }
 
 /**
+ * Authoritative TaxJar transaction calculation.
+ *
+ * Calls the taxjar-lookup edge function with action='taxes', which runs the
+ * full server-side flow: calculate_tax (MJV decision engine) → TaxJar /v2/taxes
+ * → persist_taxjar_result. The frontend sends ONLY transaction_type and
+ * transaction_id — everything else is derived server-side.
+ *
+ * Returns the authoritative result with tax_amount, tax_rate, jurisdiction
+ * breakdown, and tax_calculation_status.
+ */
+export interface TaxJarTaxResult {
+  tax_calculation_status: string;
+  tax_amount: number;
+  taxable_subtotal: number;
+  tax_rate?: number;
+  tax_source?: string;
+  freight_taxable?: boolean;
+  jurisdiction_breakdown?: Record<string, unknown>;
+  taxability_results?: Record<string, unknown>;
+  origin_result?: Record<string, unknown>;
+  destination_result?: Record<string, unknown>;
+  collection_status?: string;
+  exemption_reference?: string;
+  review_reasons?: unknown[];
+  taxjar_verified_at?: string;
+  source?: string;
+  taxjar_skipped?: boolean;
+  taxjar_skip_reason?: string;
+  taxjar_error?: string;
+  error?: string;
+}
+
+export async function calculateTaxJarTax(
+  transactionType: string,
+  transactionId: string
+): Promise<TaxJarTaxResult> {
+  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/taxjar-lookup`;
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'taxes',
+      transaction_type: transactionType,
+      transaction_id: transactionId,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || `TaxJar calculation failed (${response.status})`);
+  }
+
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return data as TaxJarTaxResult;
+}
+
+/**
+ * Check if a transaction is blocked from finalization due to tax review.
+ * Returns an error message if blocked, null if allowed.
+ * Allows: 'ready', 'exempt', 'not_collecting', null (not yet calculated)
+ * Blocks: 'review_required'
+ */
+export function checkTaxFinalizationGuard(taxCalculationStatus: string | null | undefined): string | null {
+  if (taxCalculationStatus === 'review_required') {
+    return 'Tax calculation review required before finalizing. Run the TaxJar calculation or resolve review issues in Proposal Settings > Tax.';
+  }
+  return null;
+}
+
+/**
  * Get applicable tax rate for a contact and zip code
  */
 export async function getApplicableTaxRate(

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, DollarSign, FileText, CheckCircle, Mail, Copy, AlertCircle, Clock, ChevronDown, ChevronUp, Save, Check, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
+import { checkTaxFinalizationGuard } from '../../lib/taxCalculations';
 import BillingConfigSummary from './BillingConfigSummary';
 
 interface ApprovalActionModalProps {
@@ -233,7 +234,8 @@ export default function ApprovalActionModal({ proposal, contact, onClose, onComp
       setError('Please select an action');
       return;
     }
-
+    const taxBlock = checkTaxFinalizationGuard(proposal.tax_calculation_status);
+    if (taxBlock) { setError(taxBlock); return; }
     setProcessing(true);
     setError(null);
 
