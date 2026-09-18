@@ -147,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         supabase
           .from('company_settings')
           .select('*')
+          .eq('organization_id', data.organization_id)
           .maybeSingle()
           .then(({ data: settings, error: settingsError }) => {
             if (!settingsError && settings) {

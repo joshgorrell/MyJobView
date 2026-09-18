@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Mail, Phone, Linkedin, Globe, Send, User, Building2, Check, MapPin, Edit3, Download, QrCode, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { BusinessCard, CompanySettings, CompanyOffice } from '../../lib/types';
 import { UserBusinessCardEditor } from './UserBusinessCardEditor';
 
@@ -11,6 +12,7 @@ interface BusinessCardPageProps {
 }
 
 export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: BusinessCardPageProps) {
+  const { profile } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
@@ -59,7 +61,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   async function loadCompanyInfo() {
     try {
       const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('*').maybeSingle(),
+        supabase.from('company_settings').select('*').eq('organization_id', profile?.organization_id).maybeSingle(),
         supabase.from('company_offices').select('*').order('display_order', { ascending: true })
       ]);
 

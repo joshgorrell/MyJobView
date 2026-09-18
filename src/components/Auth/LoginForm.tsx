@@ -59,15 +59,15 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-900 via-purple-900 to-fuchsia-900 flex items-center justify-center p-4">
-      <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
         <div className="text-center mb-8">
           <img
-            src="/el_logo_color_(2).png"
+            src="/MJV_icon.PNG"
             alt="MyJobView"
-            className="h-24 mx-auto mb-6"
+            className="h-20 w-20 mx-auto mb-4 object-contain rounded-xl"
           />
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">MyJobView</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">MyJobView</h1>
           <p className="text-gray-300">
             {isForgotPassword ? 'Reset your password' : isSignUp ? 'Create your account' : 'Sign in to your account'}
           </p>
@@ -83,7 +83,7 @@ export function LoginForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
               placeholder="you@company.com"
               disabled={loading}
             />
@@ -99,7 +99,7 @@ export function LoginForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
                 placeholder="••••••••"
                 disabled={loading}
                 minLength={6}
@@ -142,7 +142,7 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>Processing...</>
@@ -160,7 +160,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors block w-full"
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors block w-full"
             >
               {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
             </button>

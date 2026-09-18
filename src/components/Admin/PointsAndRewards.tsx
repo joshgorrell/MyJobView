@@ -87,7 +87,7 @@ export function PointsAndRewards() {
             rewards_catalog(name)
           `)
           .order('created_at', { ascending: false }),
-        supabase.from('company_settings').select('id, photo_upload_points').maybeSingle(),
+        supabase.from('company_settings').select('id, photo_upload_points').eq('organization_id', profile?.organization_id).maybeSingle(),
       ]);
 
       if (configResult.data) {
@@ -135,6 +135,7 @@ export function PointsAndRewards() {
       const { data: settings } = await supabase
         .from('company_settings')
         .select('id')
+        .eq('organization_id', profile?.organization_id)
         .maybeSingle();
 
       if (settings?.id) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Printer, FileText, List } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import type { ChangeOrderSummary, SalesOrderFull } from './SalesOrderDetail';
 
 interface OrgBranding {
@@ -56,6 +57,7 @@ interface Props {
 type ReportMode = 'detailed' | 'summary';
 
 export function ChangeOrderReportModal({ co, order, onClose }: Props) {
+  const { profile } = useAuth();
   const [mode, setMode] = useState<ReportMode>('detailed');
   const [lineItems, setLineItems] = useState<COLineItem[]>([]);
   const [org, setOrg] = useState<OrgBranding | null>(null);
@@ -73,8 +75,8 @@ export function ChangeOrderReportModal({ co, order, onClose }: Props) {
             .select('id, action_type, product_name, product_description, room_name, original_quantity, original_unit_price, original_total, original_labor_total, new_quantity, new_unit_price, new_total, new_labor_total, change_amount, item_type, labor_hours, labor_rate, remove_scope, modifier_adjustments, sort_order')
             .eq('change_order_id', co.id)
             .order('sort_order'),
-          supabase.from('organizations').select('name, logo_url, header_logo_url').limit(1).maybeSingle(),
-          supabase.from('company_settings').select('company_name, from_email').limit(1).maybeSingle(),
+          supabase.from('organizations').select('name, logo_url, header_logo_url').eq('id', profile?.organization_id).maybeSingle(),
+          supabase.from('company_settings').select('company_name, from_email').eq('organization_id', profile?.organization_id).maybeSingle(),
           supabase.from('company_offices').select('office_name, phone, address_line1, address_line2, city, state, zip').order('display_order').limit(1).maybeSingle(),
         ]);
         setLineItems((lineItemsRes.data || []) as COLineItem[]);

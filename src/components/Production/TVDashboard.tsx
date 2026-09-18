@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { AlertTriangle, CheckCircle2, Clock3, ListTodo, Users, Wifi, WifiOff, Wrench } from 'lucide-react';
 
 type TechStatus = 'available' | 'on_job' | 'traveling';
@@ -20,11 +21,12 @@ const age=(s:string)=>{const m=Math.max(0,Math.floor((Date.now()-new Date(s).get
 const clock=(s:string)=>new Date(s).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 
 export default function TVDashboard(){
+ const { profile } = useAuth();
  const [techs,setTechs]=useState<Tech[]>([]); const [today,setToday]=useState<WorkOrder[]>([]); const [yesterday,setYesterday]=useState<WorkOrder[]>([]);
  const [service,setService]=useState<ServiceRequest[]>([]); const [punch,setPunch]=useState<PunchItem[]>([]); const [projects,setProjects]=useState<Project[]>([]);
  const [orgName,setOrgName]=useState(''); const [orgLogo,setOrgLogo]=useState(''); const [connected,setConnected]=useState(true); const [lastUpdate,setLastUpdate]=useState(new Date()); const [now,setNow]=useState(new Date());
  useEffect(()=>{const t=window.setInterval(()=>setNow(new Date()),1000);return()=>window.clearInterval(t)},[]);
- const loadOrg=useCallback(async()=>{const {data,error}=await supabase.from('organizations').select('name,logo_url').limit(1).maybeSingle();if(error)throw error;if(data){setOrgName(data.name||'');setOrgLogo(data.logo_url||'')}},[]);
+ const loadOrg=useCallback(async()=>{if(!profile?.organization_id)return;const {data,error}=await supabase.from('organizations').select('name,logo_url').eq('id',profile.organization_id).maybeSingle();if(error)throw error;if(data){setOrgName(data.name||'');setOrgLogo(data.logo_url||'')}},[profile?.organization_id]);
  const loadTechs=useCallback(async()=>{const [{data:clocks,error:ce},{data:wos,error:we}]=await Promise.all([supabase.from('daily_clock_entries').select('technician_id,clock_in,profiles:technician_id(id,first_name,last_name)').is('clock_out',null).order('clock_in',{ascending:true}),supabase.from('work_orders').select('work_order_number,title,assigned_to,status').in('status',['in_progress','traveling','on_site'])]);if(ce)throw ce;if(we)throw we;const map=new Map<string,Tech>();(clocks||[]).forEach((e:any)=>{if(!e.profiles||map.has(e.technician_id))return;const wo=wos?.find((w:any)=>w.assigned_to===e.technician_id);map.set(e.technician_id,{id:e.technician_id,name:`${e.profiles.first_name||''} ${e.profiles.last_name||''}`.trim(),clockInTime:e.clock_in,status:!wo?'available':norm(wo.status)==='traveling'?'traveling':'on_job',currentJob:wo?.work_order_number||null,jobTitle:wo?.title||null})});setTechs([...map.values()])},[]);
  const loadWorkOrders=useCallback(async()=>{const [t,y]=await Promise.all([supabase.from('work_orders').select('id,work_order_number,title,status,assigned_to_name,start_date,needs_info,blocked_reason').eq('start_date',dateKey()).not('status','in',CLOSED_WO).order('work_order_number'),supabase.from('work_orders').select('id,work_order_number,title,status,assigned_to_name,start_date,needs_info,blocked_reason').eq('start_date',yesterdayKey()).not('status','in',CLOSED_WO).order('work_order_number')]);if(t.error)throw t.error;if(y.error)throw y.error;setToday((t.data||[]) as WorkOrder[]);setYesterday((y.data||[]) as WorkOrder[])},[]);
  const loadService=useCallback(async()=>{const {data,error}=await supabase.from('service_requests').select('id,job_description,status,created_at,customer_name,contacts(full_name)').in('status',SERVICE_STATUSES).order('created_at',{ascending:true}).limit(40);if(error)throw error;setService((data||[]).map((x:any)=>({...x,contact_name:x.contacts?.full_name||x.customer_name||null})))},[]);

@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
 
 export function MyCardView() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
@@ -67,7 +67,7 @@ export function MyCardView() {
   async function loadCompanyInfo() {
     try {
       const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('*').maybeSingle(),
+        supabase.from('company_settings').select('*').eq('organization_id', profile?.organization_id).maybeSingle(),
         supabase.from('company_offices').select('*').order('display_order', { ascending: true })
       ]);
 

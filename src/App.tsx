@@ -143,13 +143,16 @@ function LoadingFallback() {
 
 // Portal module guard: checks if a module is enabled before rendering
 function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; children: React.ReactNode }) {
+  const { profile } = useAuth();
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (!profile?.organization_id) return;
     supabase
       .from('company_settings')
       .select(`${moduleKey}`)
+      .eq('organization_id', profile.organization_id)
       .maybeSingle()
       .then(({ data }) => {
         if (cancelled) return;
@@ -159,7 +162,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
         if (!cancelled) setAllowed(false);
       });
     return () => { cancelled = true; };
-  }, [moduleKey]);
+  }, [moduleKey, profile?.organization_id]);
 
   if (allowed === null) return <LoadingFallback />;
   if (!allowed) {
@@ -229,11 +232,12 @@ function AppContent() {
 
   useEffect(() => {
     async function loadFooterLogo() {
+      if (!profile?.organization_id) return;
       try {
         const { data } = await supabase
           .from('organizations')
           .select('footer_logo_url')
-          .limit(1)
+          .eq('id', profile.organization_id)
           .maybeSingle();
         if (data?.footer_logo_url) {
           setFooterLogoUrl(data.footer_logo_url);
@@ -243,7 +247,7 @@ function AppContent() {
       }
     }
     if (user) loadFooterLogo();
-  }, [user]);
+  }, [user, profile?.organization_id]);
 
   const toggleSidebar = () => {
     if (sidebarPinned) return;
@@ -730,8 +734,8 @@ function AppContent() {
   if (!user || !profile) {
     if (isPasswordRecovery) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-          <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-8 max-w-md w-full">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+          <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
             <h2 className="text-2xl font-bold text-white mb-6">Reset Your Password</h2>
 
             {resetSuccess ? (
@@ -744,7 +748,7 @@ function AppContent() {
                   onClick={() => {
                     window.location.href = '/';
                   }}
-                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-lg font-semibold hover:from-cyan-600 hover:to-purple-700 transition-all"
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
                 >
                   Go to Sign In
                 </button>
@@ -776,7 +780,7 @@ function AppContent() {
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter new password"
                     minLength={6}
                   />
@@ -784,7 +788,7 @@ function AppContent() {
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-lg font-semibold hover:from-cyan-600 hover:to-purple-700 transition-all"
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
                 >
                   Update Password
                 </button>
@@ -811,7 +815,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>
@@ -874,7 +878,7 @@ function AppContent() {
         >
           {!isStandalone && (
             <div className="hidden sm:block mb-6">
-              <div className="border-b border-purple-500/30 pb-3">
+              <div className="border-b border-slate-600/40 pb-3">
                 <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
               </div>
             </div>

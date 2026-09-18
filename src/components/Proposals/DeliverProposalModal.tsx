@@ -78,7 +78,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
         setLoading(true);
         const [{ data: p, error: pError }, { data: settings }] = await Promise.all([
           supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
-          supabase.from('company_settings').select('company_name').maybeSingle(),
+          supabase.from('company_settings').select('company_name').eq('organization_id', profile?.organization_id).maybeSingle(),
         ]);
         if (pError) throw pError;
         if (!p || !alive) return;
