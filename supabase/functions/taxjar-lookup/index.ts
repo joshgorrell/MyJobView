@@ -60,17 +60,35 @@ Deno.serve(async (req: Request) => {
     const payload = await req.json().catch(() => ({}));
     const action: string = payload.action || "rates";
 
-    const supabaseClient = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { data: settings } = await supabaseClient
-      .from("company_settings")
-      .select("taxjar_api_key, organization_id")
-      .maybeSingle();
+    // ── Authenticate the caller for privileged actions ────────────────────
+    // The 'taxes' action performs authoritative tax mutations and must be
+    // org-scoped. The 'rates' and 'test' actions are read-only lookups that
+    // still need the org's TaxJar API key, so they also require auth.
+    const authHeader = req.headers.get("Authorization");
+    let userOrgId: string | null = null;
 
-    const apiKey = settings?.taxjar_api_key;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const supabaseAuth = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: `Bearer ${token}` } } }
+      );
+      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+      if (!userError && user) {
+        const { data: profile } = await supabaseAuth
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        userOrgId = profile?.organization_id ?? null;
+      }
+    }
 
     // ── TAXES (authoritative transaction calculation) ─────────────────────────
     // This action accepts ONLY transaction_type and transaction_id from the
@@ -87,8 +105,57 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // ── Authenticate: require a valid signed-in user ─────────────────────
+      if (!userOrgId) {
+        return jsonResponse(
+          { error: "Authentication required for tax calculation" },
+          401
+        );
+      }
+
+      // ── Load the transaction to get its organization_id ──────────────────
+      let transactionOrgId: string | null = null;
+      const validTypes = ["proposal", "change_order", "invoice"];
+      if (!validTypes.includes(transactionType)) {
+        return jsonResponse({ error: "Invalid transaction_type" }, 400);
+      }
+
+      const tableMap: Record<string, string> = {
+        proposal: "proposals",
+        change_order: "change_orders",
+        invoice: "invoices",
+      };
+
+      const { data: txnRow, error: txnError } = await supabaseAdmin
+        .from(tableMap[transactionType])
+        .select("organization_id")
+        .eq("id", transactionId)
+        .maybeSingle();
+
+      if (txnError || !txnRow) {
+        return jsonResponse({ error: "Transaction not found" }, 404);
+      }
+      transactionOrgId = txnRow.organization_id;
+
+      // ── Verify the user belongs to the transaction's organization ────────
+      if (userOrgId !== transactionOrgId) {
+        return jsonResponse(
+          { error: "You do not have access to this transaction" },
+          403
+        );
+      }
+
+      // ── Load org-scoped company_settings for TaxJar credentials ──────────
+      const { data: settings } = await supabaseAdmin
+        .from("company_settings")
+        .select("taxjar_api_key, organization_id")
+        .eq("organization_id", transactionOrgId)
+        .maybeSingle();
+
+      const apiKey = settings?.taxjar_api_key;
+
       // Step 1: Call the MJV calculation engine to get the full decision context
-      const { data: calcResult, error: calcError } = await supabaseClient.rpc(
+      const { data: calcResult, error: calcError } = await supabaseAdmin.rpc(
         "calculate_tax",
         {
           p_transaction_type: transactionType,
@@ -141,7 +208,7 @@ Deno.serve(async (req: Request) => {
 
       // Step 3: Status is "ready" -- proceed to call TaxJar /v2/taxes
       if (!apiKey) {
-        const { data: failResult } = await supabaseClient.rpc(
+        const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
             p_transaction_type: transactionType,
@@ -195,7 +262,7 @@ Deno.serve(async (req: Request) => {
         const reason = fetchError instanceof Error
           ? `TaxJar request failed: ${fetchError.message}`
           : "TaxJar request failed: network error";
-        const { data: failResult } = await supabaseClient.rpc(
+        const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
             p_transaction_type: transactionType,
@@ -223,7 +290,7 @@ Deno.serve(async (req: Request) => {
         }
 
         console.error(`TaxJar /v2/taxes error ${statusCode}: ${errorText}`);
-        const { data: failResult } = await supabaseClient.rpc(
+        const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
             p_transaction_type: transactionType,
@@ -234,13 +301,36 @@ Deno.serve(async (req: Request) => {
         return jsonResponse(failResult ?? { error: reason });
       }
 
-      // Step 7: Validate the TaxJar response
+      // Step 7: Validate the TaxJar response — require amount, rate, AND breakdown
       const taxjarData = (await taxjarResponse.json()) as TaxJarTaxesResponse;
       const tax = taxjarData?.tax;
 
-      if (!tax || tax.amount_to_collect === undefined || tax.rate === undefined) {
-        const reason = "TaxJar returned incomplete response";
-        const { data: failResult } = await supabaseClient.rpc(
+      if (
+        !tax ||
+        tax.amount_to_collect === undefined ||
+        tax.rate === undefined
+      ) {
+        const reason = "TaxJar returned incomplete response (missing amount_to_collect or rate)";
+        const { data: failResult } = await supabaseAdmin.rpc(
+          "mark_tax_review_required",
+          {
+            p_transaction_type: transactionType,
+            p_transaction_id: transactionId,
+            p_failure_reason: reason,
+          }
+        );
+        return jsonResponse(failResult ?? { error: reason });
+      }
+
+      // Validate breakdown / jurisdiction data required by our snapshot architecture
+      if (
+        !tax.breakdown ||
+        typeof tax.breakdown !== "object" ||
+        !tax.breakdown.state ||
+        !(tax.breakdown.state as Record<string, unknown>).state_rate
+      ) {
+        const reason = "TaxJar returned incomplete response (missing jurisdiction breakdown)";
+        const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
             p_transaction_type: transactionType,
@@ -252,7 +342,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // Step 8: Persist the authoritative TaxJar result
-      const { data: persistResult, error: persistError } = await supabaseClient.rpc(
+      const { data: persistResult, error: persistError } = await supabaseAdmin.rpc(
         "persist_taxjar_result",
         {
           p_transaction_type: transactionType,
@@ -264,7 +354,7 @@ Deno.serve(async (req: Request) => {
       if (persistError) {
         console.error("persist_taxjar_result RPC error:", persistError.message);
         const reason = "Failed to persist TaxJar result: " + persistError.message;
-        const { data: failResult } = await supabaseClient.rpc(
+        const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
             p_transaction_type: transactionType,
@@ -278,7 +368,22 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(persistResult ?? { error: "No result from persist_taxjar_result" });
     }
 
-    // ── For test and rates actions, API key is required upfront ──────────────
+    // ── For test and rates actions, require auth and org-scoped settings ────
+    if (!userOrgId) {
+      return jsonResponse(
+        { error: "Authentication required" },
+        401
+      );
+    }
+
+    const { data: settings } = await supabaseAdmin
+      .from("company_settings")
+      .select("taxjar_api_key, organization_id")
+      .eq("organization_id", userOrgId)
+      .maybeSingle();
+
+    const apiKey = settings?.taxjar_api_key;
+
     if (!apiKey) {
       return jsonResponse(
         { error: "TaxJar API key is not configured. Add your TaxJar live token in Admin > Tax Rate Management." },
@@ -378,7 +483,7 @@ Deno.serve(async (req: Request) => {
 
       // Auto-save: upsert into tax_jurisdictions as a TaxJar-sourced cached entry
       if (autoSave) {
-        const orgId = organizationId || settings?.organization_id;
+        const orgId = organizationId || userOrgId;
         if (orgId) {
           const upsertData: Record<string, unknown> = {
             organization_id: orgId,
@@ -398,7 +503,7 @@ Deno.serve(async (req: Request) => {
           };
 
           // Upsert by (organization_id, zip_code) — update rates if zip already exists
-          const { error: upsertError } = await supabaseClient
+          const { error: upsertError } = await supabaseAdmin
             .from("tax_jurisdictions")
             .upsert(upsertData, {
               onConflict: "organization_id,zip_code",
