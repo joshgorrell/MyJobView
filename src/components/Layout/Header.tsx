@@ -94,7 +94,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
   if (loading) {
     return (
-      <header className="bg-gray-900 border-b border-slate-600/40 shadow-lg">
+      <header className="bg-gray-900 border-b border-purple-500/30 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="text-gray-400">Loading...</div>
@@ -105,7 +105,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   }
 
   return (
-    <header className="bg-gray-900 border-b border-slate-600/40 shadow-lg">
+    <header className="bg-gray-900 border-b border-purple-500/30 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Menu Button and Logo - Left Side */}
@@ -124,7 +124,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity"
             >
               <img
-                src={headerLogoUrl || '/MJV_icon.PNG'}
+                src={headerLogoUrl || '/el_logo_color_(2).png'}
                 alt="Logo"
                 className="h-8 sm:h-10 flex-shrink-0 object-contain"
               />
@@ -134,7 +134,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
           {/* User Info - Center (Desktop/iPad only) */}
           {profile && (
             <div className="hidden md:flex items-center gap-2 flex-1 justify-center">
-              <div className="px-4 py-2 bg-gray-800/50 rounded-lg border border-slate-600/30 flex items-center gap-2">
+              <div className="px-4 py-2 bg-gray-800/50 rounded-lg border border-purple-500/20 flex items-center gap-2">
                 <p className="text-sm font-medium text-cyan-400">
                   Welcome!
                 </p>
@@ -156,7 +156,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
             <div className="relative" ref={createMenuRef}>
               <button
                 onClick={() => setShowCreateMenu(!showCreateMenu)}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/50 transition-all font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all font-medium flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Create
@@ -164,7 +164,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               </button>
 
               {showCreateMenu && (
-                <div className="absolute top-full right-0 mt-2 w-56 bg-gray-900 border border-slate-600/40 rounded-lg shadow-xl overflow-hidden z-50">
+                <div className="absolute top-full right-0 mt-2 w-56 bg-gray-900 border border-purple-500/30 rounded-lg shadow-xl overflow-hidden z-50">
                   <button
                     onClick={() => {
                       onCreateContact();

@@ -815,7 +815,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>
@@ -878,7 +878,7 @@ function AppContent() {
         >
           {!isStandalone && (
             <div className="hidden sm:block mb-6">
-              <div className="border-b border-slate-600/40 pb-3">
+              <div className="border-b border-purple-500/30 pb-3">
                 <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
               </div>
             </div>
