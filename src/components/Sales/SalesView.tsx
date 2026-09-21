@@ -5,7 +5,6 @@ import { PipelineBoard } from './PipelineBoard';
 import { ContactsView } from '../Contacts/ContactsView';
 import ProposalsView from '../Proposals/ProposalsView';
 import ProjectsView from '../Projects/ProjectsView';
-import { SalesBillingDashboard } from './SalesBillingDashboard';
 import { SalesServiceRequestsView } from './SalesServiceRequestsView';
 import { StaffSalesComparison } from './StaffSalesComparison';
 import { CommissionDashboard } from '../Commissions/CommissionDashboard';
@@ -17,7 +16,6 @@ import {
   Users,
   FileText,
   FolderOpen,
-  Receipt,
   PhoneCall,
   LineChart,
   Film,
@@ -175,13 +173,6 @@ export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
       name: 'Projects',
       icon: FolderOpen,
       component: ProjectsView,
-      badge: 0
-    },
-    {
-      id: 'billing',
-      name: 'Billing',
-      icon: Receipt,
-      component: SalesBillingDashboard,
       badge: 0
     },
     {

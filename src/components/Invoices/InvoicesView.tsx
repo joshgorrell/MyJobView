@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, Plus, Search, CheckCircle, AlertCircle, Clock, Download, RefreshCw, Mail, Wrench, X, Send, Loader2, Eye, BarChart2, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { CreateInvoiceFromWorkOrderModal } from './CreateInvoiceFromWorkOrderModal';
 import ConvertToRecurringModal from './ConvertToRecurringModal';
@@ -41,6 +42,7 @@ interface InvoicesViewProps {
 }
 
 export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearContactFilter }: InvoicesViewProps = {}) {
+  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [openStats, setOpenStats] = useState<Record<string, InvoiceOpenStats>>({});
@@ -67,7 +69,9 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
 
   async function loadInvoices() {
     try {
-      const { data, error } = await supabase
+      const isManager = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'finance';
+
+      let query = supabase
         .from('invoices')
         .select(`
           id,
@@ -80,6 +84,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           amount_due,
           contact_id,
           project_id,
+          created_by,
           contacts:contact_id (
             id,
             first_name,
@@ -93,6 +98,12 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           )
         `)
         .order('invoice_date', { ascending: false });
+
+      if (!isManager && profile?.id) {
+        query = query.eq('created_by', profile.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

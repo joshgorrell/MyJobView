@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check } from 'lucide-react';
+import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -506,7 +506,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent, sendAfterSave = false) {
     e.preventDefault();
 
     if (!selectedContactId) {
@@ -537,7 +537,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           sales_order_id: salesOrderId || null,
           invoice_date: invoiceDate,
           due_date: dueDate || null,
-          status: 'draft',
+          status: sendAfterSave ? 'sent' : 'draft',
           subtotal,
           tax_amount: tax,
           total,
@@ -585,6 +585,14 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
         .insert(lineItemsData);
 
       if (itemsError) throw itemsError;
+
+      if (sendAfterSave && invoiceData.id) {
+        try {
+          await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoiceData.id } });
+        } catch (sendErr) {
+          console.error('Invoice created but email send failed:', sendErr);
+        }
+      }
 
       onSuccess(invoiceData.id);
       onClose();
@@ -1234,10 +1242,20 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               <button
                 type="submit"
                 disabled={submitting}
+                onClick={(e) => { e.preventDefault(); handleSubmit(e as any, false); }}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {submitting ? 'Creating...' : 'Create Invoice'}
+                {submitting ? 'Creating...' : 'Save Draft'}
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={(e) => { e.preventDefault(); handleSubmit(e as any, true); }}
+                className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                {submitting ? 'Creating...' : 'Save & Send'}
               </button>
             </div>
           </form>

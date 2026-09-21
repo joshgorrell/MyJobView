@@ -81,7 +81,6 @@ const SalesOrdersView = lazy(() => import('./components/Sales/SalesOrdersView').
 const SalesOrderDetail = lazy(() => import('./components/Sales/SalesOrderDetail').then(m => ({ default: m.SalesOrderDetail })));
 const ReviewsView = lazy(() => import('./components/Sales/ReviewsView'));
 const SalesServiceRequestsView = lazy(() => import('./components/Sales/SalesServiceRequestsView').then(m => ({ default: m.SalesServiceRequestsView })));
-const SalesBillingDashboard = lazy(() => import('./components/Sales/SalesBillingDashboard').then(m => ({ default: m.SalesBillingDashboard })));
 const IndividualDashboard = lazy(() => import('./components/Dashboard/IndividualDashboard').then(m => ({ default: m.IndividualDashboard })));
 const TeamLeaderboard = lazy(() => import('./components/Dashboard/TeamLeaderboard').then(m => ({ default: m.TeamLeaderboard })));
 const ProjectsView = lazy(() => import('./components/Projects/ProjectsView'));
@@ -1029,7 +1028,6 @@ function AppContent() {
           {activeTab === 'prospects' && checkModuleAccess('prospects') && <ProspectsPage key={activeTab} />}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}
           {activeTab === 'sales_service_requests' && checkModuleAccess('service_requests') && <SalesServiceRequestsView key={activeTab} />}
-          {activeTab === 'sales_billing' && checkModuleAccess('sales_billing') && <SalesBillingDashboard key={activeTab} />}
           {activeTab === 'sticky-notes' && checkModuleAccess('sticky-notes') && <StickyNotes key={activeTab} />}
           {activeTab === 'design_queue' && checkModuleAccess('design_queue') && (
             <DesignQueue
