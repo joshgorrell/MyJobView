@@ -31,10 +31,20 @@ All tax rules live here. Key exports:
 
 1. Add a `StateTaxRule` object to `STATE_TAX_RULES` in `src/lib/taxCalculations.ts`.
 2. Add the state's exemption form to `STATE_EXEMPTION_FORMS`.
-3. Update the state's `library_status` to `'verified'` in the `state_library_index` table (via migration). The nexus state checkbox list in `TaxRateManagement.tsx` now reads dynamically from `state_library_index` — all 50 states are automatically available for dealer collection configuration.
+3. Update the state's `library_status` to `'verified'` in the `state_library_index` table (via migration). When `library_status` is `'verified'`, the state displays as "MJV Default: Available" to dealers. Both `'needs_review'` and `'not_researched'` display as "MJV Default: Not Available". The internal three-status model (`verified` / `needs_review` / `not_researched`) is for MJV administration only and is not exposed as customer-facing terminology in dealer UI. The nexus state checkbox list in `TaxRateManagement.tsx` reads dynamically from `state_library_index` — all 50 states are automatically available for dealer collection configuration.
 4. If the state has a distinct monthly worksheet, add a new report tab in `src/components/Finance/SalesTaxReports.tsx` (follow the KS/MO pattern).
 5. Add step-by-step DOR filing instructions to `STATE_DOR_INSTRUCTIONS` in `src/components/Finance/SalesTaxInstructions.tsx`.
 6. **The Tax Filing Guide page (`src/components/Finance/SalesTaxInstructions.tsx`) will automatically render the new state's tax matrix, exemption forms, and quick-reference card** — no other changes needed.
+
+### Customer-Facing Tax Terminology
+
+The internal `library_status` values (`verified`, `needs_review`, `not_researched`) are MJV development lifecycle statuses and must NOT appear as dealer-facing labels. The customer-facing model uses three independent concepts:
+
+- **Collection Status**: Collecting / Not Collecting / Not Configured (from `dealer_nexus_states`)
+- **MJV Default**: Available (only `verified`) / Not Available (`needs_review` and `not_researched`)
+- **Company Tax Setup**: "Company Rules Added" (at least one active rule in `state_tax_rules_matrix`) / "No Company Rules" / "Sales Tax Setup Required" (collecting with no verified MJV Default and zero company rules)
+
+The authoritative completeness check remains transaction-level rule resolution: if a positive-dollar classification cannot resolve to a rule, the transaction becomes `review_required`. A $0 unresolved classification does not block. No combined-rate fallback is used.
 
 ### How the Tax Filing Guide Stays Up-to-Date
 

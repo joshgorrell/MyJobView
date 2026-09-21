@@ -416,7 +416,7 @@ export default function TaxRateManagement() {
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex gap-2">
             <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-amber-800">
-              States marked with <strong>Rules</strong> have verified MJV tax rules (parts vs. labor, exemption handling). Other states will use combined rate only until rules are researched and added.
+              States with an <strong>MJV Default</strong> include prebuilt tax treatment. For other states, configure your company's tax treatment based on guidance from your tax professional.
             </p>
           </div>
 

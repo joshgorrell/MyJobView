@@ -245,6 +245,36 @@ export default function StateDetailPanel({ stateCode, stateName, libraryStatus, 
         </div>
       </div>
 
+      {/* Sales Tax Setup Required Alert */}
+      {nexusStatus === 'yes' && libraryStatus !== 'verified' && activeDealerRules.length === 0 && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-900">Sales Tax Setup Required</p>
+            <p className="text-sm text-amber-800 mt-1">
+              This company collects sales tax in {stateName}, but tax treatment has not been configured. Review the state's Sales Tax settings with your tax professional.
+            </p>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="mt-2 flex items-center gap-2 px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Configure Tax Treatment
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Company Rules Added Badge */}
+      {nexusStatus === 'yes' && libraryStatus !== 'verified' && activeDealerRules.length > 0 && (
+        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <Settings className="w-4 h-4 text-blue-600" />
+          <p className="text-sm text-blue-800">
+            <strong>Company Rules Added</strong> — Tax treatment has been configured for this state. Additional rules may be needed based on your transaction types.
+          </p>
+        </div>
+      )}
+
       {/* MJV Rule Library Section */}
       <div className="bg-white rounded-lg shadow border border-gray-200">
         <div className="p-5 border-b border-gray-200">
@@ -253,18 +283,17 @@ export default function StateDetailPanel({ stateCode, stateName, libraryStatus, 
             MJV Rule Library
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            Master tax rules published and maintained by MJV
+            Prebuilt tax rules published by MJV as a starting point
           </p>
         </div>
         <div className="p-5">
-          {libraryStatus === 'not_researched' ? (
+          {libraryStatus !== 'verified' ? (
             <div className="flex items-center gap-3 text-gray-500 py-4">
               <Circle className="w-5 h-5 text-gray-400" />
               <div>
-                <p className="font-medium text-gray-700">Not Researched</p>
+                <p className="font-medium text-gray-700">MJV Default: Not Available</p>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  MJV has not yet published tax rules for {stateName}. No master rules are available.
-                  You can still configure dealer-specific overrides below based on your tax professional's guidance.
+                  MJV has not published prebuilt rules for {stateName}. Configure your company's tax treatment below based on your tax professional's guidance.
                 </p>
               </div>
             </div>
@@ -283,14 +312,6 @@ export default function StateDetailPanel({ stateCode, stateName, libraryStatus, 
               showProj={showProjDimension}
             />
           )}
-          {libraryStatus === 'needs_review' && masterRules.length > 0 && (
-            <div className="mt-4 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800">
-                These rules exist but have not been fully reviewed. Verify with your tax advisor before relying on them.
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -303,7 +324,7 @@ export default function StateDetailPanel({ stateCode, stateName, libraryStatus, 
               Dealer Settings
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Organization-specific overrides. A true override differs from the MJV default or covers a case where no MJV rule exists.
+              Company-specific tax treatment. A true override differs from the MJV default or covers a case where no MJV rule exists.
             </p>
           </div>
           <button
@@ -393,38 +414,34 @@ export default function StateDetailPanel({ stateCode, stateName, libraryStatus, 
             <div className="flex items-center gap-3 text-gray-500 py-4">
               <Settings className="w-5 h-5 text-gray-400" />
               <p className="text-sm">
-                No dealer overrides configured. This organization uses the MJV master rules
-                {libraryStatus === 'not_researched' ? ' or no rules (not researched).' : '.'}
+                No company rules added for this state.
               </p>
             </div>
           )}
         </div>
       </div>
+
+      {/* Disclaimer */}
+      <p className="text-xs text-gray-400 px-1">
+        Tax treatment is based on your company's configuration. MJV defaults are a starting point, not tax advice. Consult your tax professional for guidance specific to your business.
+      </p>
     </div>
   );
 }
 
 function LibraryBadge({ status }: { status: string }) {
-  switch (status) {
-    case 'verified':
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          <CheckCircle className="w-3 h-3" /> Verified
-        </span>
-      );
-    case 'needs_review':
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-          <AlertTriangle className="w-3 h-3" /> Needs Review
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-          <Circle className="w-3 h-3" /> Not Researched
-        </span>
-      );
+  if (status === 'verified') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <CheckCircle className="w-3 h-3" /> MJV Default: Available
+      </span>
+    );
   }
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+      <Circle className="w-3 h-3" /> MJV Default: Not Available
+    </span>
+  );
 }
 
 function CollectionBadge({ status }: { status?: string }) {

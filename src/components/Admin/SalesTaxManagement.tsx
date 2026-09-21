@@ -46,6 +46,9 @@ export default function SalesTaxManagement() {
         <p className="text-gray-600 mt-1">
           Manage tax rates, state rules, exemptions, and calculation history
         </p>
+        <p className="text-xs text-gray-400 mt-2">
+          MJV automates sales-tax calculations using the rules configured for your company. Tax requirements vary by jurisdiction and business activity. Review your settings with your tax professional.
+        </p>
       </div>
 
       <div className="border-b border-gray-200 no-print">

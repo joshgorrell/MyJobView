@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CheckCircle, AlertTriangle, Circle, Map, Shield, Clock, TrendingUp, ArrowRight } from 'lucide-react';
+import { CheckCircle, Circle, Map, Shield, Clock, TrendingUp, ArrowRight, Settings } from 'lucide-react';
 
 interface StateIndexRow {
   state_code: string;
@@ -16,6 +16,7 @@ interface NexusRow {
 export default function SalesTaxOverview({ onNavigate }: { onNavigate: (tab: 'overview' | 'states' | 'exemptions' | 'history') => void }) {
   const [states, setStates] = useState<StateIndexRow[]>([]);
   const [nexusStates, setNexusStates] = useState<NexusRow[]>([]);
+  const [companyRuleStates, setCompanyRuleStates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,16 +25,19 @@ export default function SalesTaxOverview({ onNavigate }: { onNavigate: (tab: 'ov
 
   async function loadData() {
     try {
-      const [statesRes, nexusRes] = await Promise.all([
+      const [statesRes, nexusRes, rulesRes] = await Promise.all([
         supabase.from('state_library_index').select('state_code, state_name, library_status').order('state_code'),
         supabase.from('dealer_nexus_states').select('state, nexus_status').eq('is_current', true),
+        supabase.from('state_tax_rules_matrix').select('state').eq('is_active', true),
       ]);
 
       if (statesRes.error) throw statesRes.error;
       if (nexusRes.error) throw nexusRes.error;
+      if (rulesRes.error) throw rulesRes.error;
 
       setStates(statesRes.data || []);
       setNexusStates(nexusRes.data || []);
+      setCompanyRuleStates([...new Set((rulesRes.data || []).map((r: any) => r.state))] as string[]);
     } catch (error) {
       console.error('Error loading overview data:', error);
     } finally {
@@ -49,32 +53,24 @@ export default function SalesTaxOverview({ onNavigate }: { onNavigate: (tab: 'ov
     );
   }
 
-  const verified = states.filter(s => s.library_status === 'verified');
-  const needsReview = states.filter(s => s.library_status === 'needs_review');
-  const notResearched = states.filter(s => s.library_status === 'not_researched');
+  const mjsAvailable = states.filter(s => s.library_status === 'verified');
+  const mjsNotAvailable = states.filter(s => s.library_status !== 'verified');
   const collecting = nexusStates.filter(n => n.nexus_status === 'yes');
 
   const stats = [
     {
-      label: 'Verified States',
-      value: verified.length,
+      label: 'MJV Default Available',
+      value: mjsAvailable.length,
       icon: CheckCircle,
       color: 'green',
-      description: 'MJV rules published and reviewed',
+      description: 'Prebuilt tax rules published by MJV',
     },
     {
-      label: 'Needs Review',
-      value: needsReview.length,
-      icon: AlertTriangle,
-      color: 'amber',
-      description: 'Rules exist but require review',
-    },
-    {
-      label: 'Not Researched',
-      value: notResearched.length,
+      label: 'MJV Default Not Available',
+      value: mjsNotAvailable.length,
       icon: Circle,
       color: 'gray',
-      description: 'MJV has not yet published rules',
+      description: 'Configure treatment based on your tax professional\'s guidance',
     },
     {
       label: 'Collecting States',
@@ -82,6 +78,13 @@ export default function SalesTaxOverview({ onNavigate }: { onNavigate: (tab: 'ov
       icon: Map,
       color: 'blue',
       description: 'States where you collect sales tax',
+    },
+    {
+      label: 'Company Rules Added',
+      value: companyRuleStates.length,
+      icon: Settings,
+      color: 'amber',
+      description: 'States with at least one company tax rule',
     },
   ];
 
@@ -126,26 +129,18 @@ export default function SalesTaxOverview({ onNavigate }: { onNavigate: (tab: 'ov
             </button>
           </div>
           <div className="space-y-3">
-            {verified.length > 0 && (
+            {mjsAvailable.length > 0 && (
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-700">
-                  <strong>{verified.length}</strong> verified: {verified.map(s => s.state_code).join(', ')}
-                </span>
-              </div>
-            )}
-            {needsReview.length > 0 && (
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                <span className="text-sm text-gray-700">
-                  <strong>{needsReview.length}</strong> needs review: {needsReview.map(s => s.state_code).join(', ')}
+                  <strong>{mjsAvailable.length}</strong> MJV Default available: {mjsAvailable.map(s => s.state_code).join(', ')}
                 </span>
               </div>
             )}
             <div className="flex items-center gap-2">
               <Circle className="w-4 h-4 text-gray-400" />
               <span className="text-sm text-gray-700">
-                <strong>{notResearched.length}</strong> not yet researched
+                <strong>{mjsNotAvailable.length}</strong> MJV Default not available
               </span>
             </div>
           </div>
@@ -194,7 +189,7 @@ export default function SalesTaxOverview({ onNavigate }: { onNavigate: (tab: 'ov
             <Map className="w-5 h-5 text-blue-600" />
             <div>
               <p className="text-sm font-medium text-gray-900">Browse States</p>
-              <p className="text-xs text-gray-500">View all 50 states and their status</p>
+              <p className="text-xs text-gray-500">View all 50 states and their tax setup</p>
             </div>
           </button>
           <button

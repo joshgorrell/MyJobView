@@ -110,26 +110,18 @@ export default function StateLibraryBrowser({ selectedState, onStateClick, onBac
   }
 
   function getLibraryBadge(status: string) {
-    switch (status) {
-      case 'verified':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            <CheckCircle className="w-3 h-3" /> Verified
-          </span>
-        );
-      case 'needs_review':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-            <AlertTriangle className="w-3 h-3" /> Needs Review
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-            <Circle className="w-3 h-3" /> Not Researched
-          </span>
-        );
+    if (status === 'verified') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <CheckCircle className="w-3 h-3" /> Available
+        </span>
+      );
     }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+        <Circle className="w-3 h-3" /> Not Available
+      </span>
+    );
   }
 
   return (
@@ -138,7 +130,7 @@ export default function StateLibraryBrowser({ selectedState, onStateClick, onBac
         <div>
           <h2 className="text-xl font-bold text-gray-900">State Tax Library</h2>
           <p className="text-sm text-gray-600 mt-1">
-            All 50 states and their MJV rule library status
+            All 50 states and their tax setup
           </p>
         </div>
         <div className="relative w-64">
@@ -160,7 +152,7 @@ export default function StateLibraryBrowser({ selectedState, onStateClick, onBac
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collection Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MJV Rule Library</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MJV Default</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
               </tr>
             </thead>
