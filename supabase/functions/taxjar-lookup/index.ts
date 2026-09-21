@@ -401,7 +401,6 @@ Deno.serve(async (req: Request) => {
     const city: string | undefined = payload.city;
     const state: string | undefined = payload.state;
     const autoSave: boolean = payload.autoSave === true;
-    const organizationId: string | undefined = payload.organizationId;
 
     // ── TEST ──────────────────────────────────────────────────────────────────
     if (action === "test") {
@@ -482,8 +481,11 @@ Deno.serve(async (req: Request) => {
       };
 
       // Auto-save: upsert into tax_jurisdictions as a TaxJar-sourced cached entry
+      // Organization is always derived from the authenticated user — never from
+      // a client-supplied organizationId — so a signed-in user cannot write to
+      // another organization's tax jurisdiction cache.
       if (autoSave) {
-        const orgId = organizationId || userOrgId;
+        const orgId = userOrgId;
         if (orgId) {
           const upsertData: Record<string, unknown> = {
             organization_id: orgId,
