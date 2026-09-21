@@ -20,6 +20,8 @@ interface Contract {
   cancelled_by_profile: { full_name: string; first_name: string; last_name: string } | null;
   monthly_price: number;
   notes: string;
+  account_type: string | null;
+  account_services: string[] | null;
 }
 
 interface StatusColumn {
@@ -35,6 +37,7 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showUnclassifiedOnly, setShowUnclassifiedOnly] = useState(false);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [confirmApproveContract, setConfirmApproveContract] = useState<Contract | null>(null);
   const [activeTab, setActiveTab] = useState<'contracts' | 'stats'>('contracts');
@@ -134,9 +137,13 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
         c.contact?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.contact?.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      return c.status === status && matchesSearch;
+      const matchesUnclassified = !showUnclassifiedOnly || !c.account_type;
+
+      return c.status === status && matchesSearch && matchesUnclassified;
     });
   }
+
+  const unclassifiedCount = contracts.filter(c => c.status === 'active' && !c.account_type).length;
 
   async function handleApproveContract(contract: Contract) {
     try {
@@ -286,8 +293,8 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
         </div>
       </div>
 
-      <div className="mb-6">
-        <div className="relative">
+      <div className="mb-6 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
@@ -297,6 +304,23 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           />
         </div>
+        <button
+          onClick={() => setShowUnclassifiedOnly(!showUnclassifiedOnly)}
+          className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 font-medium text-sm transition-colors whitespace-nowrap ${
+            showUnclassifiedOnly
+              ? 'border-amber-500 bg-amber-50 text-amber-700'
+              : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+          }`}
+        >
+          <AlertCircle className="w-4 h-4" />
+          Unclassified{unclassifiedCount > 0 && (
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+              showUnclassifiedOnly ? 'bg-amber-200 text-amber-800' : 'bg-amber-100 text-amber-700'
+            }`}>
+              {unclassifiedCount}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -336,7 +360,7 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
                             <User className="w-6 h-6 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <h4 className="font-bold text-base text-gray-900">
                                 {contract.contact?.full_name || 'Unknown'}
                               </h4>
@@ -344,6 +368,21 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
                                 <Shield className="w-3 h-3" />
                                 Monitoring
                               </span>
+                              {!contract.account_type && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Unclassified
+                                </span>
+                              )}
+                              {contract.account_type && (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  contract.account_type === 'residential'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {contract.account_type === 'residential' ? 'Residential' : 'Commercial'}
+                                </span>
+                              )}
                             </div>
                             <p className="text-sm text-gray-600 break-words">
                               {contract.contact?.email || 'No email'}

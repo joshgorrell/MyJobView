@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Save, X, Plus, Trash2, User, MapPin, Phone, Shield, CreditCard, FileSignature, Printer } from 'lucide-react';
+import { Save, X, Plus, Trash2, User, MapPin, Phone, Shield, CreditCard, FileSignature, Printer, Home, Building2 } from 'lucide-react';
 
 interface ManualContractEntryProps {
   contract: any;
@@ -22,7 +22,9 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
     paymentDetails: {
       lastFour: '',
       token: 'manual_entry'
-    }
+    },
+    accountType: '' as 'residential' | 'commercial' | '',
+    accountServices: [] as string[]
   });
 
   useEffect(() => {
@@ -77,6 +79,13 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
           }
         }));
       }
+
+      if (data.account_type) {
+        setFormData(prev => ({ ...prev, accountType: data.account_type }));
+      }
+      if (data.account_services) {
+        setFormData(prev => ({ ...prev, accountServices: data.account_services }));
+      }
     } catch (error) {
       console.error('Error loading contract:', error);
       alert('Failed to load contract data');
@@ -117,6 +126,11 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
       return;
     }
 
+    if (!formData.accountType) {
+      alert('Please select an Account Type (Residential or Commercial)');
+      return;
+    }
+
     if (!formData.propertyAddress || !formData.propertyCity || !formData.propertyState || !formData.propertyZip) {
       alert('Please fill in all property address fields');
       return;
@@ -131,6 +145,8 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
           property_city: formData.propertyCity,
           property_state: formData.propertyState,
           property_zip: formData.propertyZip,
+          account_type: formData.accountType,
+          account_services: formData.accountServices,
           payment_method: formData.paymentMethod,
           payment_token: formData.paymentDetails.token,
           last_four: formData.paymentDetails.lastFour,
@@ -249,6 +265,81 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
                 <div>
                   <span className="text-gray-600">Contract #:</span>
                   <span className="ml-2 font-medium">{contractData?.contract_number}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Shield className="w-5 h-5 text-gray-600" />
+                <h3 className="font-semibold text-gray-900">Account Classification</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Account Type <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-3">
+                    {(['residential', 'commercial'] as const).map(type => {
+                      const isActive = formData.accountType === type;
+                      const activeClass = type === 'residential'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-blue-500 bg-blue-50 text-blue-700';
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, accountType: type })}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-colors ${
+                            isActive ? activeClass : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          {type === 'residential' ? <Home className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
+                          <span className="capitalize">{type}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Service Type</label>
+                  <p className="text-xs text-gray-500 mb-3">Select all that apply</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: 'monitored_alarm', label: 'Monitored Alarm' },
+                      { key: 'testing_inspection', label: 'Testing & Inspection' },
+                      { key: 'service_agreement', label: 'Service Agreement' },
+                      { key: 'video_monitoring', label: 'Video / CCTV' },
+                      { key: 'access_control', label: 'Access Control' },
+                      { key: 'other', label: 'Other' },
+                    ].map(svc => {
+                      const checked = formData.accountServices.includes(svc.key);
+                      return (
+                        <label
+                          key={svc.key}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                            checked
+                              ? 'border-blue-400 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({ ...formData, accountServices: [...formData.accountServices, svc.key] });
+                              } else {
+                                setFormData({ ...formData, accountServices: formData.accountServices.filter(s => s !== svc.key) });
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                          <span className="text-sm text-gray-700">{svc.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

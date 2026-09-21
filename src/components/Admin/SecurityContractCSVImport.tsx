@@ -30,6 +30,7 @@ interface ContractColumnMap {
   payment_method?: ColumnMapping;
   last_four?: ColumnMapping;
   services?: ColumnMapping;
+  account_services?: ColumnMapping;
   notes?: ColumnMapping;
   external_id?: ColumnMapping;
   unmapped: string[];
@@ -78,6 +79,7 @@ const CONTRACT_FIELD_LABELS: Record<string, string> = {
   payment_method: 'Payment Method',
   last_four: 'Last Four',
   services: 'Services',
+  account_services: 'Service Type (categories)',
   notes: 'Notes',
   external_id: 'External ID',
   agreement_type: 'Agreement Type',
@@ -108,6 +110,7 @@ function detectContractColumnMapping(parsed: ParsedCSV): ContractColumnMap {
     payment_method: ['payment method', 'payment_method', 'pay method', 'billing method', 'card type', 'payment type'],
     last_four: ['last four', 'last_four', 'last 4', 'card last four', 'last four digits', 'last4'],
     services: ['services', 'service', 'monitoring services', 'account services', 'features', 'plan services', 'included services'],
+    account_services: ['service type', 'service_type', 'service types', 'service category', 'service categories', 'account service type', 'account_services'],
     notes: ['notes', 'note', 'comments', 'comment', 'description', 'memo', 'remarks', 'details'],
     external_id: ['external id', 'external_id', 'bill.com id', 'billdotcom id', 'vendor id', 'customer id', 'reference id', 'ref id', 'billing id'],
     agreement_type: ['agreement type', 'agreement_type', 'contract type', 'plan type'],
@@ -237,6 +240,48 @@ function normalizeAccountType(value: string): string | null {
   return null;
 }
 
+const ACCOUNT_SERVICE_KEYS = ['monitored_alarm', 'testing_inspection', 'service_agreement', 'video_monitoring', 'access_control', 'other'];
+
+const ACCOUNT_SERVICE_ALIASES: Record<string, string> = {
+  'monitored alarm': 'monitored_alarm',
+  'monitored_alarm': 'monitored_alarm',
+  'alarm': 'monitored_alarm',
+  'monitoring': 'monitored_alarm',
+  'testing & inspection': 'testing_inspection',
+  'testing and inspection': 'testing_inspection',
+  'testing_inspection': 'testing_inspection',
+  'testing': 'testing_inspection',
+  'inspection': 'testing_inspection',
+  'service agreement': 'service_agreement',
+  'service_agreement': 'service_agreement',
+  'service': 'service_agreement',
+  'video / cctv': 'video_monitoring',
+  'video/cctv': 'video_monitoring',
+  'video_monitoring': 'video_monitoring',
+  'video': 'video_monitoring',
+  'cctv': 'video_monitoring',
+  'cameras': 'video_monitoring',
+  'access control': 'access_control',
+  'access_control': 'access_control',
+  'access': 'access_control',
+  'other': 'other',
+};
+
+function normalizeAccountServices(value: string): string[] {
+  if (!value) return [];
+  const items = value.split(/[;,\n|]/).map(s => s.trim().toLowerCase()).filter(Boolean);
+  const matched: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const key = ACCOUNT_SERVICE_ALIASES[item] || (ACCOUNT_SERVICE_KEYS.includes(item) ? item : null);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      matched.push(key);
+    }
+  }
+  return matched;
+}
+
 function normalizePaymentMethod(value: string): string | null {
   if (!value) return null;
   const v = value.trim().toLowerCase();
@@ -286,7 +331,7 @@ export function SecurityContractCSVImport() {
   const [mapping, setMapping] = useState<ContractColumnMap | null>(null);
   const [validations, setValidations] = useState<RowValidation[]>([]);
   const [importProgress, setImportProgress] = useState(0);
-  const [importStats, setImportStats] = useState({ imported: 0, skipped: 0, errors: 0, batchId: '', insertErrors: [] as string[] });
+  const [importStats, setImportStats] = useState({ imported: 0, skipped: 0, errors: 0, unclassified: 0, batchId: '', insertErrors: [] as string[] });
   const [history, setHistory] = useState<ImportBatch[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'errors' | 'warnings' | 'valid'>('all');
@@ -462,10 +507,20 @@ export function SecurityContractCSVImport() {
       }
 
       // Validate account type
-      if (cleaned.account_type) {
+      if (!cleaned.account_type) {
+        warnings.push('No account type specified — will be imported as unclassified (fix later in Contract Management)');
+      } else {
         const at = normalizeAccountType(cleaned.account_type);
         if (!at) {
-          warnings.push(`Unrecognized account type: "${cleaned.account_type}" — will default to residential`);
+          warnings.push(`Unrecognized account type: "${cleaned.account_type}" — will be imported as unclassified (fix later in Contract Management)`);
+        }
+      }
+
+      // Validate account services (service type categories)
+      if (cleaned.account_services) {
+        const services = normalizeAccountServices(cleaned.account_services);
+        if (services.length === 0) {
+          warnings.push(`Unrecognized service type: "${cleaned.account_services}" — no categories matched`);
         }
       }
 
@@ -545,6 +600,7 @@ export function SecurityContractCSVImport() {
 
     const batchId = batchData.id;
     let imported = 0;
+    let unclassifiedCount = 0;
     const insertErrors: string[] = [];
 
     // Get template and plan IDs
@@ -572,7 +628,9 @@ export function SecurityContractCSVImport() {
         const rate = parseMonthlyRate(d.monthly_rate || '') || 0;
         const term = parseTermMonths(d.term_months || '') || 12;
         const billingDay = parseBillingDay(d.billing_day || '') || new Date(d.start_date).getDate();
-        const accountType = normalizeAccountType(d.account_type || '') || 'residential';
+        const accountType = normalizeAccountType(d.account_type || '') || null;
+        if (!accountType) unclassifiedCount++;
+        const accountServices = normalizeAccountServices(d.account_services || '');
         const paymentMethod = normalizePaymentMethod(d.payment_method || '') || null;
         const startDate = d.start_date;
         const nextBillingDate = calculateNextBillingDate(startDate, billingDay);
@@ -617,6 +675,7 @@ export function SecurityContractCSVImport() {
           approved_at: startDate,
           subscription_id: subscription.id,
           account_type: accountType,
+          account_services: accountServices.length > 0 ? accountServices : null,
           account_number: d.account_number || null,
           payment_method: paymentMethod,
           last_four: d.last_four || null,
@@ -672,7 +731,7 @@ export function SecurityContractCSVImport() {
       .update({ status: 'completed', row_count: imported })
       .eq('id', batchId);
 
-    setImportStats({ imported, skipped: skippedCount, errors: errorCount, batchId, insertErrors });
+    setImportStats({ imported, skipped: skippedCount, errors: errorCount, unclassified: unclassifiedCount, batchId, insertErrors });
     setStep('complete');
     loadHistory();
   };
@@ -715,7 +774,7 @@ export function SecurityContractCSVImport() {
     setMapping(null);
     setValidations([]);
     setImportProgress(0);
-    setImportStats({ imported: 0, skipped: 0, errors: 0, batchId: '', insertErrors: [] });
+    setImportStats({ imported: 0, skipped: 0, errors: 0, unclassified: 0, batchId: '', insertErrors: [] });
     setSearchTerm('');
     setFilterMode('all');
     setCurrentPage(1);
@@ -890,7 +949,7 @@ export function SecurityContractCSVImport() {
               <ul className="space-y-1 list-disc list-inside text-gray-600">
                 <li>Account Number, Account Type (residential/commercial)</li>
                 <li>Term Months, Billing Day, Payment Method</li>
-                <li>Services (semicolon-separated), Notes, External ID</li>
+                <li>Services (semicolon-separated), Service Type (categories), Notes, External ID</li>
               </ul>
             </div>
           </div>
@@ -1231,7 +1290,7 @@ export function SecurityContractCSVImport() {
           <h3 className="text-2xl font-bold text-gray-800 mb-2">Import Complete!</h3>
           <p className="text-gray-500 mb-8">Your security contracts have been imported with recurring billing.</p>
 
-          <div className="grid grid-cols-3 gap-6 max-w-md mx-auto mb-8">
+          <div className="grid grid-cols-4 gap-6 max-w-2xl mx-auto mb-8">
             <div className="p-4 bg-green-50 rounded-xl">
               <div className="text-3xl font-bold text-green-700">{importStats.imported.toLocaleString()}</div>
               <div className="text-sm text-green-600 mt-1">Imported</div>
@@ -1244,7 +1303,23 @@ export function SecurityContractCSVImport() {
               <div className="text-3xl font-bold text-red-600">{importStats.errors.toLocaleString()}</div>
               <div className="text-sm text-red-500 mt-1">Errors</div>
             </div>
+            <div className="p-4 bg-amber-50 rounded-xl">
+              <div className="text-3xl font-bold text-amber-700">{importStats.unclassified.toLocaleString()}</div>
+              <div className="text-sm text-amber-600 mt-1">Unclassified</div>
+            </div>
           </div>
+
+          {importStats.unclassified > 0 && (
+            <div className="mb-6 max-w-lg mx-auto">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  <strong>{importStats.unclassified}</strong> account{importStats.unclassified !== 1 ? 's' : ''} imported without an Account Type.
+                  Filter by "Unclassified" in Contract Management to find and fix them.
+                </span>
+              </div>
+            </div>
+          )}
 
           {importStats.insertErrors.length > 0 && (
             <div className="mb-6 text-left max-w-lg mx-auto">
