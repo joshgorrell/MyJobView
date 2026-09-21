@@ -115,7 +115,25 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       let query = supabase
         .from('work_orders')
         .select(`
-          *,
+          id,
+          work_order_number,
+          title,
+          description,
+          type,
+          status,
+          priority,
+          assigned_to,
+          start_date,
+          target_completion_date,
+          estimated_hours,
+          actual_hours,
+          created_by,
+          created_at,
+          feedback_email_sent,
+          feedback_email_sent_at,
+          customer_contacted,
+          is_recurring_parent,
+          recurrence_parent_id,
           project:projects(name, project_number, customer_name),
           technician:profiles!assigned_to(full_name),
           sales_rep:profiles!created_by(full_name)
@@ -129,33 +147,54 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       const { data: woData, error: woError } = await query;
       if (woError) throw woError;
 
-      const workOrdersWithCounts = await Promise.all(
-        (woData || []).map(async (wo) => {
-          const [partsResult, photosResult, completionResult] = await Promise.all([
+      const woList = woData || [];
+      const woIds = woList.map(wo => wo.id);
+
+      const [partsResult, photosResult, completionsResult] = woIds.length > 0
+        ? await Promise.all([
             supabase
               .from('parts_requests')
-              .select('id, status')
-              .eq('work_order_id', wo.id),
+              .select('id, status, work_order_id')
+              .in('work_order_id', woIds),
             supabase
               .from('job_photos')
-              .select('id')
-              .eq('work_order_id', wo.id),
+              .select('id, work_order_id')
+              .in('work_order_id', woIds),
             supabase
               .from('job_completions')
-              .select('id')
-              .eq('work_order_id', wo.id)
-              .maybeSingle()
-          ]);
+              .select('id, work_order_id')
+              .in('work_order_id', woIds)
+          ])
+        : [null, null, null];
 
-          return {
-            ...wo,
-            parts_count: partsResult.data?.length || 0,
-            pending_parts: partsResult.data?.filter(p => p.status === 'pending').length || 0,
-            photos_count: photosResult.data?.length || 0,
-            is_completed: !!completionResult.data
-          };
-        })
-      );
+      const partsMap = new Map<string, { count: number; pending: number }>();
+      for (const p of (partsResult?.data || [])) {
+        const entry = partsMap.get(p.work_order_id) || { count: 0, pending: 0 };
+        entry.count++;
+        if (p.status === 'pending') entry.pending++;
+        partsMap.set(p.work_order_id, entry);
+      }
+
+      const photosMap = new Map<string, number>();
+      for (const ph of (photosResult?.data || [])) {
+        photosMap.set(ph.work_order_id, (photosMap.get(ph.work_order_id) || 0) + 1);
+      }
+
+      const completedSet = new Set<string>();
+      for (const c of (completionsResult?.data || [])) {
+        completedSet.add(c.work_order_id);
+      }
+
+      const workOrdersWithCounts = woList.map(wo => {
+        const parts = partsMap.get(wo.id);
+        return {
+          ...wo,
+          parts_count: parts?.count || 0,
+          pending_parts: parts?.pending || 0,
+          photos_count: photosMap.get(wo.id) || 0,
+          is_completed: completedSet.has(wo.id)
+        };
+      });
 
       setWorkOrders(workOrdersWithCounts);
     } catch (error) {

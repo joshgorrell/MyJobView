@@ -131,7 +131,9 @@ export function ProductionManagerDashboard() {
         partsResult,
         weeklyCompletedResult,
         weeklyPhotosResult,
-        techCountResult
+        techCountResult,
+        topCompletionsResult,
+        topPhotosResult
       ] = await Promise.all([
         supabase
           .from('work_orders')
@@ -211,7 +213,19 @@ export function ProductionManagerDashboard() {
         supabase
           .from('profiles')
           .select('id', { count: 'exact', head: true })
-          .in('role', ['tech', 'technician', 'lead_technician'])
+          .in('role', ['tech', 'technician', 'lead_technician']),
+        supabase
+          .from('job_completions')
+          .select(`
+            technician_id,
+            quality_score,
+            technician:profiles!technician_id(id, full_name)
+          `)
+          .gte('completed_at', weekAgo),
+        supabase
+          .from('job_photos')
+          .select('technician_id')
+          .gte('captured_at', weekAgo)
       ]);
 
       const avgQuality = avgQualityResult.data && avgQualityResult.data.length > 0
@@ -239,33 +253,11 @@ export function ProductionManagerDashboard() {
         avgQualityScore: Math.round(avgQuality * 10) / 10
       });
 
-      await loadTopPerformers();
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+      // Process top performers from batch results
+      const completionsData = topCompletionsResult.data || [];
+      const photosData = topPhotosResult.data || [];
 
-  async function loadTopPerformers() {
-    try {
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const { data: completionsData } = await supabase
-        .from('job_completions')
-        .select(`
-          technician_id,
-          quality_score,
-          technician:profiles!technician_id(id, full_name)
-        `)
-        .gte('completed_at', weekAgo);
-
-      const { data: photosData } = await supabase
-        .from('job_photos')
-        .select('technician_id')
-        .gte('captured_at', weekAgo);
-
-      if (!completionsData || completionsData.length === 0) {
+      if (completionsData.length === 0) {
         const { data: techProfiles } = await supabase
           .from('profiles')
           .select('id, full_name')
@@ -274,7 +266,7 @@ export function ProductionManagerDashboard() {
 
         if (techProfiles && techProfiles.length > 0) {
           const photosMap: Record<string, number> = {};
-          (photosData || []).forEach((p: { technician_id: string }) => {
+          (photosData as { technician_id: string }[]).forEach((p) => {
             if (p.technician_id) {
               photosMap[p.technician_id] = (photosMap[p.technician_id] || 0) + 1;
             }
@@ -290,47 +282,48 @@ export function ProductionManagerDashboard() {
             }))
           );
         }
-        return;
+      } else {
+        const photosMap: Record<string, number> = {};
+        (photosData as { technician_id: string }[]).forEach((p) => {
+          if (p.technician_id) {
+            photosMap[p.technician_id] = (photosMap[p.technician_id] || 0) + 1;
+          }
+        });
+
+        const techMap: Record<string, { id: string; full_name: string; scores: number[]; count: number }> = {};
+        (completionsData as { technician_id: string; quality_score: number; technician: { id: string; full_name: string } | null }[]).forEach((c) => {
+          if (!c.technician_id) return;
+          if (!techMap[c.technician_id]) {
+            techMap[c.technician_id] = {
+              id: c.technician_id,
+              full_name: c.technician?.full_name || 'Unknown',
+              scores: [],
+              count: 0
+            };
+          }
+          techMap[c.technician_id].count++;
+          if (c.quality_score) techMap[c.technician_id].scores.push(c.quality_score);
+        });
+
+        const performers: TopPerformer[] = Object.values(techMap)
+          .map(t => ({
+            id: t.id,
+            full_name: t.full_name,
+            completions: t.count,
+            avg_quality: t.scores.length > 0
+              ? Math.round((t.scores.reduce((a, b) => a + b, 0) / t.scores.length) * 10) / 10
+              : 0,
+            photos_count: photosMap[t.id] || 0
+          }))
+          .sort((a, b) => b.completions - a.completions || b.avg_quality - a.avg_quality)
+          .slice(0, 5);
+
+        setTopPerformers(performers);
       }
-
-      const photosMap: Record<string, number> = {};
-      (photosData || []).forEach((p: { technician_id: string }) => {
-        if (p.technician_id) {
-          photosMap[p.technician_id] = (photosMap[p.technician_id] || 0) + 1;
-        }
-      });
-
-      const techMap: Record<string, { id: string; full_name: string; scores: number[]; count: number }> = {};
-      completionsData.forEach((c: { technician_id: string; quality_score: number; technician: { id: string; full_name: string } | null }) => {
-        if (!c.technician_id) return;
-        if (!techMap[c.technician_id]) {
-          techMap[c.technician_id] = {
-            id: c.technician_id,
-            full_name: c.technician?.full_name || 'Unknown',
-            scores: [],
-            count: 0
-          };
-        }
-        techMap[c.technician_id].count++;
-        if (c.quality_score) techMap[c.technician_id].scores.push(c.quality_score);
-      });
-
-      const performers: TopPerformer[] = Object.values(techMap)
-        .map(t => ({
-          id: t.id,
-          full_name: t.full_name,
-          completions: t.count,
-          avg_quality: t.scores.length > 0
-            ? Math.round((t.scores.reduce((a, b) => a + b, 0) / t.scores.length) * 10) / 10
-            : 0,
-          photos_count: photosMap[t.id] || 0
-        }))
-        .sort((a, b) => b.completions - a.completions || b.avg_quality - a.avg_quality)
-        .slice(0, 5);
-
-      setTopPerformers(performers);
     } catch (error) {
-      console.error('Error loading top performers:', error);
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
     }
   }
 

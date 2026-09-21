@@ -59,31 +59,25 @@ export function FinanceDashboard() {
       const monthStartDate = monthStart.slice(0, 10);
       const monthEndDate = monthEnd.slice(0, 10);
 
-      // Get invoices data
-      const { data: invoices } = await supabase
+      // Server-side aggregation for invoice KPIs (replaces unbounded invoice download)
+      const { data: invoiceMetrics, error: metricsError } = await supabase
+        .rpc('get_finance_dashboard_metrics', {
+          p_month_start: monthStartDate,
+          p_month_end: monthEndDate
+        });
+
+      if (metricsError) throw metricsError;
+
+      const m = invoiceMetrics || {};
+
+      // Recent invoices (limited to 5, replaces slicing from full download)
+      const { data: recentInvoicesRaw, error: recentError } = await supabase
         .from('invoices')
-        .select('id, invoice_number, total, amount_due, status, due_date, invoice_date, created_at, contact:contacts(full_name)')
-        .order('created_at', { ascending: false });
+        .select('id, invoice_number, total, status, due_date, contact:contacts(full_name)')
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-      // Sales invoiced and accounts receivable come from invoice accounting fields.
-      const salesInvoiced = invoices?.filter(inv => inv.status !== 'draft' && inv.status !== 'void')
-        .reduce((sum, inv) => sum + Number(inv.total || 0), 0) || 0;
-
-      const monthlySalesInvoiced = invoices?.filter(inv =>
-        inv.status !== 'draft' &&
-        inv.status !== 'void' &&
-        inv.invoice_date >= monthStartDate &&
-        inv.invoice_date <= monthEndDate
-      ).reduce((sum, inv) => sum + Number(inv.total || 0), 0) || 0;
-
-      const accountsReceivable = invoices?.filter(inv => inv.status !== 'draft' && inv.status !== 'void')
-        .reduce((sum, inv) => sum + Number(inv.amount_due || 0), 0) || 0;
-
-      const paidInvoices = invoices?.filter(inv => inv.status === 'paid').length || 0;
-      const partialInvoices = invoices?.filter(inv => inv.status === 'partial').length || 0;
-      const overdueInvoices = invoices?.filter(inv => inv.status === 'overdue' || (
-        Number(inv.amount_due || 0) > 0 && inv.due_date && inv.due_date < monthStartDate
-      )).length || 0;
+      if (recentError) throw recentError;
 
       // Cash collected is based on payment date, not invoice creation date.
       const { data: payments } = await supabase
@@ -115,27 +109,26 @@ export function FinanceDashboard() {
       const activeSubscriptions = subscriptions?.length || 0;
 
       setMetrics({
-        salesInvoiced,
-        monthlySalesInvoiced,
+        salesInvoiced: Number(m.sales_invoiced || 0),
+        monthlySalesInvoiced: Number(m.monthly_sales_invoiced || 0),
         cashCollected,
-        accountsReceivable,
-        paidInvoices,
-        partialInvoices,
-        overdueInvoices,
+        accountsReceivable: Number(m.accounts_receivable || 0),
+        paidInvoices: Number(m.paid_invoices || 0),
+        partialInvoices: Number(m.partial_invoices || 0),
+        overdueInvoices: Number(m.overdue_invoices || 0),
         totalCommissions,
         recurringRevenue,
         activeSubscriptions
       });
 
-      // Get recent invoices
-      const recentInvoicesData = invoices?.slice(0, 5).map((inv: any) => ({
+      const recentInvoicesData = (recentInvoicesRaw || []).map((inv: any) => ({
         id: inv.id,
         invoice_number: inv.invoice_number,
         contact_name: inv.contact?.full_name || 'Unknown',
         total: Number(inv.total || 0),
         status: inv.status,
         due_date: inv.due_date
-      })) || [];
+      }));
 
       setRecentInvoices(recentInvoicesData);
     } catch (error) {

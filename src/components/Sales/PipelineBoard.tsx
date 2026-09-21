@@ -312,36 +312,104 @@ export function PipelineBoard() {
       const dateCutoff = getDateCutoff();
       const showAll = viewMode === 'all' && canViewAllPipeline;
 
-      // Load Contacts with competitor and connection data (only if contacts or prospects widget is selected)
-      let contacts: any[] = [];
-      if (selectedWidgets.includes('contacts') || selectedWidgets.includes('prospects')) {
-        let contactsQuery = supabase
-          .from('contacts')
-          .select(`
-            *,
-            prospect_competitor_relationships!prospect_competitor_relationships_prospect_id_fkey(
-              id,
-              relationship_type,
-              relationship_strength,
-              competitors:competitors(id, name)
-            )
-          `)
-          .gte('created_at', dateCutoff)
-          .order('created_at', { ascending: false });
+      // Build all independent queries
+      const contactsPromise = (selectedWidgets.includes('contacts') || selectedWidgets.includes('prospects'))
+        ? (async () => {
+            let contactsQuery = supabase
+              .from('contacts')
+              .select(`
+                *,
+                prospect_competitor_relationships!prospect_competitor_relationships_prospect_id_fkey(
+                  id,
+                  relationship_type,
+                  relationship_strength,
+                  competitors:competitors(id, name)
+                )
+              `)
+              .gte('created_at', dateCutoff)
+              .order('created_at', { ascending: false });
 
-        if (!showAll && profile?.id) {
-          contactsQuery = contactsQuery.eq('created_by', profile.id);
-        }
+            if (!showAll && profile?.id) {
+              contactsQuery = contactsQuery.eq('created_by', profile.id);
+            }
 
-        const { data } = await contactsQuery;
-        contacts = data || [];
-      }
+            const { data } = await contactsQuery;
+            return data || [];
+          })()
+        : Promise.resolve([]);
 
-      // Batch-fetch last connection and next scheduled connection for all contacts
+      const connectionsPromise = selectedWidgets.includes('connections')
+        ? (async () => {
+            let connectionsQuery = supabase
+              .from('connections')
+              .select(`
+                *,
+                contacts:contact_id (
+                  contact_type,
+                  company_name,
+                  contact_name,
+                  email,
+                  phone
+                )
+              `)
+              .gte('created_at', dateCutoff)
+              .order('created_at', { ascending: false });
+
+            if (!showAll && profile?.id) {
+              connectionsQuery = connectionsQuery.eq('user_id', profile.id);
+            }
+
+            const { data } = await connectionsQuery;
+            return data || [];
+          })()
+        : Promise.resolve([]);
+
+      const leadsPromise = selectedWidgets.includes('leads')
+        ? (async () => {
+            let leadsQuery = supabase
+              .from('leads')
+              .select(`
+                *,
+                assigned_rep:profiles!leads_assigned_to_fkey(id, full_name)
+              `)
+              .eq('is_fishbowl', false)
+              .order('created_at', { ascending: false });
+
+            if (!showAll && profile?.id) {
+              leadsQuery = leadsQuery.or(`assigned_to.eq.${profile.id},assigned_to.is.null`);
+            }
+
+            const { data } = await leadsQuery;
+            return data || [];
+          })()
+        : Promise.resolve([]);
+
+      const fishbowlPromise = selectedWidgets.includes('fishbowl')
+        ? (async () => {
+            let fishbowlQuery = supabase
+              .from('leads')
+              .select('*')
+              .eq('is_fishbowl', true)
+              .or('status.eq.unclaimed,assigned_to.is.null')
+              .order('created_at', { ascending: false });
+
+            const { data } = await fishbowlQuery;
+            return data || [];
+          })()
+        : Promise.resolve([]);
+
+      // Run all independent queries in parallel
+      const [contacts, connections, leads, fishbowl] = await Promise.all([
+        contactsPromise,
+        connectionsPromise,
+        leadsPromise,
+        fishbowlPromise
+      ]);
+
+      // Batch-fetch last connection and next scheduled connection for contacts (depends on contact IDs)
       if (contacts && contacts.length > 0) {
         const contactIds = contacts.map((c: any) => c.id);
 
-        // Batch: all connections for these contacts (we'll pick the latest per contact in JS)
         const [{ data: allConnections }, { data: allScheduled }] = await Promise.all([
           supabase
             .from('connections')
@@ -362,7 +430,6 @@ export function PipelineBoard() {
             .order('scheduled_date', { ascending: true })
         ]);
 
-        // Build lookup maps (keep first/earliest per contact since results are ordered)
         const lastConnectionMap = new Map<string, any>();
         for (const conn of (allConnections || [])) {
           if (!lastConnectionMap.has(conn.contact_id)) {
@@ -388,69 +455,6 @@ export function PipelineBoard() {
           const ns = nextScheduledMap.get(contact.id);
           if (ns) contact.next_scheduled_connection = ns;
         }
-      }
-
-      // Load Connections (only if widget is selected)
-      let connections: any[] = [];
-      if (selectedWidgets.includes('connections')) {
-        let connectionsQuery = supabase
-          .from('connections')
-          .select(`
-            *,
-            contacts:contact_id (
-              contact_type,
-              company_name,
-              contact_name,
-              email,
-              phone
-            )
-          `)
-          .gte('created_at', dateCutoff)
-          .order('created_at', { ascending: false });
-
-        if (!showAll && profile?.id) {
-          connectionsQuery = connectionsQuery.eq('user_id', profile.id);
-        }
-
-        const { data } = await connectionsQuery;
-        connections = data || [];
-      }
-
-      // Load Leads (only if widget is selected)
-      let leads: any[] = [];
-      if (selectedWidgets.includes('leads')) {
-        let leadsQuery = supabase
-          .from('leads')
-          .select(`
-            *,
-            assigned_rep:profiles!leads_assigned_to_fkey(id, full_name)
-          `)
-          .eq('is_fishbowl', false)
-          .order('created_at', { ascending: false });
-
-        // Filter based on view mode
-        if (!showAll && profile?.id) {
-          // My Pipeline: Show my assigned leads OR unclaimed leads
-          leadsQuery = leadsQuery.or(`assigned_to.eq.${profile.id},assigned_to.is.null`);
-        }
-        // All Pipeline: Show all non-fishbowl leads (no additional filter needed)
-
-        const { data } = await leadsQuery;
-        leads = data || [];
-      }
-
-      // Load Fishbowl (unclaimed leads marked as fishbowl) (only if widget is selected)
-      let fishbowl: any[] = [];
-      if (selectedWidgets.includes('fishbowl')) {
-        let fishbowlQuery = supabase
-          .from('leads')
-          .select('*')
-          .eq('is_fishbowl', true)
-          .or('status.eq.unclaimed,assigned_to.is.null')
-          .order('created_at', { ascending: false });
-
-        const { data } = await fishbowlQuery;
-        fishbowl = data || [];
       }
 
       // Build stages based on selected widgets

@@ -34,7 +34,12 @@ export default function ProjectsView() {
       let query = supabase
         .from('projects')
         .select(`
-          *,
+          id,
+          name,
+          project_number,
+          status,
+          start_date,
+          target_completion_date,
           contacts(id, contact_name, full_name, company_name),
           sales_orders!projects_sales_order_id_fkey(id, order_number, status, contract_total),
           work_orders(id, status)
