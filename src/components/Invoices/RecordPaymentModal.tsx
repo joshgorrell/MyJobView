@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, DollarSign, Mail, FileText, Check, CreditCard, Banknote, Building2, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
+import { calculateConvenienceFee, ConvenienceFeeSettings } from '../../lib/convenienceFee';
 
 interface RecordPaymentModalProps {
   invoice: {
@@ -33,11 +34,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [ccFeeEnabled, setCcFeeEnabled] = useState(false);
-  const [ccFeeType, setCcFeeType] = useState<'percentage' | 'flat'>('percentage');
-  const [ccFeePercentage, setCcFeePercentage] = useState(0.03);
-  const [ccFeeFlatAmount, setCcFeeFlatAmount] = useState(3.0);
-  const [ccFeeLabel, setCcFeeLabel] = useState('Credit Card Convenience Fee');
+  const [feeSettings, setFeeSettings] = useState<ConvenienceFeeSettings | null>(null);
 
   const [paymentProcessor, setPaymentProcessor] = useState<string | null>(null);
 
@@ -90,26 +87,15 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
         .from('company_settings')
         .select('cc_convenience_fee_enabled, cc_convenience_fee_type, cc_convenience_fee_percentage, cc_convenience_fee_flat_amount, cc_convenience_fee_label')
         .maybeSingle();
-
-      if (data) {
-        setCcFeeEnabled(data.cc_convenience_fee_enabled || false);
-        setCcFeeType(data.cc_convenience_fee_type || 'percentage');
-        setCcFeePercentage(Number(data.cc_convenience_fee_percentage) || 0.03);
-        setCcFeeFlatAmount(Number(data.cc_convenience_fee_flat_amount) || 3.0);
-        setCcFeeLabel(data.cc_convenience_fee_label || 'Credit Card Convenience Fee');
-      }
+      setFeeSettings(data as ConvenienceFeeSettings);
     } catch (err) {
       console.error('Error loading convenience fee settings:', err);
     }
   }
 
-  const convenienceFee = (() => {
-    if (!ccFeeEnabled || paymentMethod !== 'credit_card') return 0;
-    const base = parseFloat(amount) || 0;
-    return ccFeeType === 'percentage' ? base * ccFeePercentage : ccFeeFlatAmount;
-  })();
-
-  const totalWithFee = (parseFloat(amount) || 0) + convenienceFee;
+  const feeResult = calculateConvenienceFee(parseFloat(amount) || 0, paymentMethod, feeSettings);
+  const convenienceFee = feeResult.feeAmount;
+  const totalWithFee = feeResult.totalWithFee;
   const hasEmail = !!contactEmail;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -130,7 +116,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
 
     try {
       const paymentNotes = convenienceFee > 0
-        ? `${notes ? notes + '\n\n' : ''}${ccFeeLabel}: ${formatCurrency(convenienceFee)}`
+        ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(convenienceFee)}`
         : notes || null;
 
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'ach') && paymentProcessor;
@@ -317,13 +303,13 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
             {/* Convenience fee alert */}
             {convenienceFee > 0 && (
               <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm space-y-2">
-                <p className="font-semibold text-amber-900">{ccFeeLabel}</p>
+                <p className="font-semibold text-amber-900">{feeResult.label}</p>
                 <div className="flex justify-between text-amber-800">
                   <span>Payment Amount</span>
                   <span>{formatCurrency(parseFloat(amount))}</span>
                 </div>
                 <div className="flex justify-between text-amber-800">
-                  <span>Fee ({ccFeeType === 'percentage' ? `${(ccFeePercentage * 100).toFixed(2)}%` : 'Flat'})</span>
+                  <span>Fee ({feeSettings?.cc_convenience_fee_type === 'percentage' ? `${((feeSettings?.cc_convenience_fee_percentage || 0) * 100).toFixed(2)}%` : 'Flat'})</span>
                   <span>{formatCurrency(convenienceFee)}</span>
                 </div>
                 <div className="flex justify-between font-bold pt-2 border-t border-amber-300 text-amber-900 text-base">

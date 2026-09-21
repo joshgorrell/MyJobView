@@ -67,7 +67,6 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
   const [pmPercent, setPmPercent] = useState(proposal?.project_management_percent || 0);
   const [designPercent, setDesignPercent] = useState(proposal?.project_design_percent || 0);
   const [systemDesignPercent, setSystemDesignPercent] = useState(proposal?.system_design_percent || 0);
-  const [ccFeePercent, setCcFeePercent] = useState(proposal?.credit_card_fee_percent || 0);
   const [miscPartsPercent, setMiscPartsPercent] = useState(proposal?.misc_parts_percent || 0);
   const [custom1Label, setCustom1Label] = useState(proposal?.custom_modifier_1_label || '');
   const [custom1Percent, setCustom1Percent] = useState(proposal?.custom_modifier_1_percent || 0);
@@ -77,7 +76,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
   const [applyPm, setApplyPm] = useState(proposal?.apply_project_management ?? (proposal?.project_management_percent > 0));
   const [applyDesign, setApplyDesign] = useState(proposal?.apply_project_design ?? (proposal?.project_design_percent > 0));
   const [applySystemDesign, setApplySystemDesign] = useState(proposal?.apply_system_design ?? (proposal?.system_design_percent > 0));
-  const [applyCcFee, setApplyCcFee] = useState(proposal?.apply_credit_card_fee ?? (proposal?.credit_card_fee_percent > 0));
+
   const [applyMiscParts, setApplyMiscParts] = useState(proposal?.apply_misc_parts ?? (proposal?.misc_parts_percent > 0));
   const [applyCustom1, setApplyCustom1] = useState(proposal?.apply_custom_modifier_1 ?? (proposal?.custom_modifier_1_percent !== 0));
   const [applyCustom2, setApplyCustom2] = useState(proposal?.apply_custom_modifier_2 ?? (proposal?.custom_modifier_2_percent !== 0));
@@ -90,7 +89,6 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
       project_management_percent: pmPercent,
       project_design_percent: designPercent,
       system_design_percent: systemDesignPercent,
-      credit_card_fee_percent: ccFeePercent,
       misc_parts_percent: miscPartsPercent,
       custom_modifier_1_label: custom1Label || null,
       custom_modifier_1_percent: custom1Percent,
@@ -100,7 +98,6 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
       apply_project_management: applyPm,
       apply_project_design: applyDesign,
       apply_system_design: applySystemDesign,
-      apply_credit_card_fee: applyCcFee,
       apply_misc_parts: applyMiscParts,
       apply_custom_modifier_1: applyCustom1,
       apply_custom_modifier_2: applyCustom2,
@@ -220,30 +217,6 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                 placeholder="0.00"
               />
               <p className="text-xs text-gray-500 mt-1">System design fee percentage</p>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-300">Credit Card Fee %</label>
-                {showApplyToggles && (
-                  <button
-                    type="button"
-                    onClick={() => setApplyCcFee(!applyCcFee)}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyCcFee ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
-                  >
-                    {applyCcFee ? 'Active' : 'Off'}
-                  </button>
-                )}
-              </div>
-              <input
-                type="number"
-                value={ccFeePercent}
-                onChange={(e) => setCcFeePercent(parseFloat(e.target.value) || 0)}
-                step="0.01"
-                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applyCcFee ? 'opacity-40' : ''}`}
-                placeholder="0.00"
-              />
-              <p className="text-xs text-gray-500 mt-1">Credit card processing fee</p>
             </div>
 
             <div>

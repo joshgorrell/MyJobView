@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { calculateConvenienceFee } from '../../lib/convenienceFee';
 import { PaymentMethodForm, PaymentFormData } from './PaymentMethodForm';
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { VIPMembershipFAQ } from './VIPMembershipFAQ';
@@ -313,8 +314,13 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       // Calculate payment amounts
       const amount = selectedPlan.amount;
-      const convenienceFee = paymentData.paymentType === 'card' ? amount * 0.03 : 0;
-      const totalAmount = amount + convenienceFee;
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('cc_convenience_fee_enabled, cc_convenience_fee_type, cc_convenience_fee_percentage, cc_convenience_fee_flat_amount, cc_convenience_fee_label')
+        .maybeSingle();
+      const feeResult = calculateConvenienceFee(amount, paymentData.paymentType === 'card' ? 'credit_card' : 'ach', settings as any);
+      const convenienceFee = feeResult.feeAmount;
+      const totalAmount = feeResult.totalWithFee;
 
       // In production, payment method and transaction details would be stored
       // For now, we just activate the subscription

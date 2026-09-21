@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CreditCard, Building2, AlertCircle, Check, X } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
+import { calculateConvenienceFee, ConvenienceFeeSettings } from '../../lib/convenienceFee';
+import { supabase } from '../../lib/supabase';
 
 interface PaymentMethodFormProps {
   onSubmit: (paymentData: PaymentFormData) => Promise<void>;
@@ -25,6 +27,7 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
   const [paymentType, setPaymentType] = useState<'card' | 'ach'>('card');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [feeSettings, setFeeSettings] = useState<ConvenienceFeeSettings | null>(null);
 
   const [formData, setFormData] = useState<PaymentFormData>({
     paymentType: 'card',
@@ -39,8 +42,25 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
     achAccountName: '',
   });
 
-  const convenienceFee = paymentType === 'card' ? amount * 0.03 : 0;
-  const totalAmount = amount + convenienceFee;
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('company_settings')
+        .select('cc_convenience_fee_enabled, cc_convenience_fee_type, cc_convenience_fee_percentage, cc_convenience_fee_flat_amount, cc_convenience_fee_label')
+        .maybeSingle();
+      setFeeSettings(data as ConvenienceFeeSettings);
+    })();
+  }, []);
+
+  const feeResult = calculateConvenienceFee(amount, paymentType === 'card' ? 'credit_card' : 'ach', feeSettings);
+  const convenienceFee = feeResult.feeAmount;
+  const totalAmount = feeResult.totalWithFee;
+
+  const feeLabel = feeResult.applies
+    ? feeSettings?.cc_convenience_fee_type === 'flat'
+      ? `+$${(feeSettings?.cc_convenience_fee_flat_amount || 0).toFixed(2)} fee`
+      : `+${((feeSettings?.cc_convenience_fee_percentage || 0) * 100).toFixed(1)}% fee`
+    : 'No fee';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,7 +96,7 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
               paymentType === 'card' ? 'text-blue-600' : 'text-gray-500'
             }`} />
             <div className="text-sm font-medium text-gray-900">Credit Card</div>
-            <div className="text-xs text-gray-600 mt-0.5">+3% fee</div>
+            <div className="text-xs text-gray-600 mt-0.5">{feeLabel}</div>
           </button>
 
           <button
@@ -288,7 +308,7 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
           </div>
           {convenienceFee > 0 && (
             <div className="flex justify-between text-gray-700">
-              <span>Convenience Fee (3%)</span>
+              <span>{feeResult.label}</span>
               <span>{formatCurrency(convenienceFee)}</span>
             </div>
           )}

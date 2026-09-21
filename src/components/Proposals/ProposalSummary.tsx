@@ -661,13 +661,6 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
             </div>
           )}
 
-          {(proposal.credit_card_fee_amount || 0) > 0 && (
-            <div className="flex justify-between text-blue-400">
-              <span>Credit Card Fee</span>
-              <span>+${proposal.credit_card_fee_amount.toFixed(2)}</span>
-            </div>
-          )}
-
           {(proposal.misc_parts_amount || 0) > 0 && (
             <div className="flex justify-between text-blue-400">
               <span>Misc Parts</span>

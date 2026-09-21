@@ -50,7 +50,6 @@ export function ManualApprovalModal({
 
   const [projectManagementPercent, setProjectManagementPercent] = useState(0);
   const [systemDesignPercent, setSystemDesignPercent] = useState(0);
-  const [creditCardFeePercent, setCreditCardFeePercent] = useState(0);
   const [miscPartsPercent, setMiscPartsPercent] = useState(0);
   const [showModifiers, setShowModifiers] = useState(false);
 
@@ -65,7 +64,7 @@ export function ManualApprovalModal({
       if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
       autoSaveTimeoutRef.current = setTimeout(() => autoSaveToDatabase(), 600);
     }
-  }, [depositType, depositPercent, customDepositAmount, requireDeposit, projectManagementPercent, systemDesignPercent, creditCardFeePercent, miscPartsPercent, paymentTerms]);
+  }, [depositType, depositPercent, customDepositAmount, requireDeposit, projectManagementPercent, systemDesignPercent, miscPartsPercent, paymentTerms]);
 
   async function autoSaveToDatabase() {
     if (!proposalSettingsId) return;
@@ -77,7 +76,6 @@ export function ManualApprovalModal({
         require_deposit: requireDeposit,
         project_management_percent: projectManagementPercent,
         system_design_percent: systemDesignPercent,
-        credit_card_fee_percent: creditCardFeePercent,
         misc_parts_percent: miscPartsPercent,
         balance_payment_terms: paymentTerms
       }).eq('id', proposalSettingsId);
@@ -111,7 +109,7 @@ export function ManualApprovalModal({
         .select(`
           id, acceptance_methods, deposit_type, deposit_percent, deposit_amount,
           require_deposit, project_management_percent, system_design_percent,
-          credit_card_fee_percent, misc_parts_percent, balance_payment_terms
+          misc_parts_percent, balance_payment_terms
         `)
         .eq('proposal_id', proposalId)
         .maybeSingle();
@@ -131,7 +129,6 @@ export function ManualApprovalModal({
         setDepositPercent(settings.deposit_percent || 50);
         setProjectManagementPercent(settings.project_management_percent || 0);
         setSystemDesignPercent(settings.system_design_percent || 0);
-        setCreditCardFeePercent(settings.credit_card_fee_percent || 0);
         setMiscPartsPercent(settings.misc_parts_percent || 0);
         if (settings.balance_payment_terms) {
           setPaymentTerms(settings.balance_payment_terms);
@@ -280,7 +277,6 @@ export function ManualApprovalModal({
         require_deposit: requireDeposit,
         project_management_percent: projectManagementPercent,
         system_design_percent: systemDesignPercent,
-        credit_card_fee_percent: creditCardFeePercent,
         misc_parts_percent: miscPartsPercent,
         balance_payment_terms: paymentTerms
       }).eq('proposal_id', proposalId);
@@ -337,7 +333,7 @@ export function ManualApprovalModal({
   }
 
   const outcome = getOutcomeInfo();
-  const hasModifiers = projectManagementPercent > 0 || systemDesignPercent > 0 || creditCardFeePercent > 0 || miscPartsPercent > 0;
+  const hasModifiers = projectManagementPercent > 0 || systemDesignPercent > 0 || miscPartsPercent > 0;
 
   if (showSuccessAnimation) {
     const isMagic = successPhase === 'magic';
@@ -707,7 +703,6 @@ export function ManualApprovalModal({
                     {[
                       { label: 'Project Mgmt %', value: projectManagementPercent, setter: setProjectManagementPercent },
                       { label: 'System Design %', value: systemDesignPercent, setter: setSystemDesignPercent },
-                      { label: 'Credit Card Fee %', value: creditCardFeePercent, setter: setCreditCardFeePercent },
                       { label: 'Misc Parts %', value: miscPartsPercent, setter: setMiscPartsPercent },
                     ].map(({ label, value, setter }) => (
                       <div key={label}>
