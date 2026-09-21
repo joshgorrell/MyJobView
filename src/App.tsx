@@ -1069,7 +1069,7 @@ function AppContent() {
 
           {activeTab === 'vip-plans' && checkModuleAccess('vip-plans') && <VIPPlanManagement key={activeTab} />}
           {activeTab === 'contract_management' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
-          {activeTab === 'security_onboarding' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
+          {activeTab === 'security_onboarding' && checkModuleAccess('security_onboarding') && <SecurityOnboarding key={activeTab} onNavigateToContracts={() => setActiveTab('contract_management')} canAccessContractManagement={checkModuleAccess('contract_management')} />}
           {activeTab === 'tax_reports' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={checkModuleAccess('tax_filing_guide') ? () => setActiveTab('tax_filing_guide') : undefined} />}
           {activeTab === 'tax_filing_guide' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={() => setActiveTab('tax_reports')} />}
           {activeTab === 'bonus_approvals' && checkModuleAccess('commissions_management') && <CommissionsPage key={activeTab} />}
