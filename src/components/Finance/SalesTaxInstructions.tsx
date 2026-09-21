@@ -385,19 +385,29 @@ export default function SalesTaxInstructions() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase
-      .from('company_settings')
-      .select('nexus_states, tax_filing_due_day, billing_instructions_notes, updated_at')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setNexusStates(data.nexus_states?.length ? data.nexus_states : ['KS']);
-          setFilingDueDay(data.tax_filing_due_day ?? 25);
-          setAdminNotes(data.billing_instructions_notes ?? {});
-          setLastUpdated(data.updated_at ?? null);
-        }
-        setLoading(false);
-      });
+    Promise.all([
+      supabase
+        .from('company_settings')
+        .select('tax_filing_due_day, billing_instructions_notes, updated_at')
+        .maybeSingle(),
+      supabase
+        .from('dealer_nexus_states')
+        .select('state, nexus_status')
+        .eq('is_current', true)
+        .eq('nexus_status', 'yes'),
+    ]).then(([settingsRes, nexusRes]) => {
+      if (settingsRes.data) {
+        setFilingDueDay(settingsRes.data.tax_filing_due_day ?? 25);
+        setAdminNotes(settingsRes.data.billing_instructions_notes ?? {});
+        setLastUpdated(settingsRes.data.updated_at ?? null);
+      }
+      if (nexusRes.data && nexusRes.data.length > 0) {
+        setNexusStates(nexusRes.data.map((r: { state: string }) => r.state));
+      } else {
+        setNexusStates(['KS']);
+      }
+      setLoading(false);
+    });
   }, []);
 
   const activeStates = nexusStates.filter(s => STATE_TAX_RULES[s]);

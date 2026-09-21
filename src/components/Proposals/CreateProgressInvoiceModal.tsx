@@ -14,6 +14,47 @@ interface LineItem {
   source_type: 'manual' | 'proposal_line_item' | 'change_order_line_item';
   source_id?: string;
   unitPriceInput: string;
+  tax_classification_code: string;
+}
+
+const CLASSIFICATION_OPTIONS = [
+  { code: 'material', label: 'Material' },
+  { code: 'labor', label: 'Labor' },
+  { code: 'design_fee', label: 'Design Fee' },
+  { code: 'project_management', label: 'Project Management' },
+  { code: 'freight_delivery', label: 'Freight/Delivery' },
+  { code: 'credit_card_fee', label: 'Credit Card Fee' },
+];
+
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  material: 'Material',
+  labor: 'Labor',
+  design_fee: 'Design Fee',
+  project_management: 'Project Management',
+  freight_delivery: 'Freight/Delivery',
+  credit_card_fee: 'Credit Card Fee',
+};
+
+const CLASSIFICATION_ITEM_TYPE: Record<string, string> = {
+  material: 'material',
+  labor: 'labor',
+  design_fee: 'service',
+  project_management: 'service',
+  freight_delivery: 'service',
+  credit_card_fee: 'service',
+};
+
+let taxClassificationCache: Record<string, string> | null = null;
+
+async function getTaxClassificationIds(): Promise<Record<string, string>> {
+  if (taxClassificationCache) return taxClassificationCache;
+  const { data } = await supabase.from('tax_classifications').select('id, code');
+  const map: Record<string, string> = {};
+  for (const row of (data || [])) {
+    map[row.code] = row.id;
+  }
+  taxClassificationCache = map;
+  return map;
 }
 
 interface ChangeOrder {
@@ -71,7 +112,8 @@ export default function CreateProgressInvoiceModal({
       amount: 0,
       is_taxable: true,
       source_type: 'manual',
-      unitPriceInput: ''
+      unitPriceInput: '',
+      tax_classification_code: 'material',
     }
   ]);
 
@@ -86,6 +128,8 @@ export default function CreateProgressInvoiceModal({
   const [targetTotalInput, setTargetTotalInput] = useState('');
   const targetTotalRef = useRef<HTMLInputElement>(null);
 
+  const [classificationIds, setClassificationIds] = useState<Record<string, string>>({});
+
   useEffect(() => { loadInitialData(); }, []);
   useEffect(() => { calculateDueDate(); }, [invoiceDate, paymentTerms]);
   useEffect(() => {
@@ -96,6 +140,9 @@ export default function CreateProgressInvoiceModal({
   async function loadInitialData() {
     setLoading(true);
     try {
+      const ids = await getTaxClassificationIds();
+      setClassificationIds(ids);
+
       const { data: contact } = await supabase
         .from('contacts')
         .select('tax_rate')
@@ -220,7 +267,8 @@ export default function CreateProgressInvoiceModal({
       amount: 0,
       is_taxable: true,
       source_type: 'manual',
-      unitPriceInput: ''
+      unitPriceInput: '',
+      tax_classification_code: 'material',
     }]);
   }
 
@@ -316,6 +364,10 @@ export default function CreateProgressInvoiceModal({
           quantity: item.quantity,
           unit_price: parseFloat(item.unit_price.toFixed(2)),
           amount: parseFloat((item.quantity * item.unit_price).toFixed(2)),
+          item_type: CLASSIFICATION_ITEM_TYPE[item.tax_classification_code] || 'material',
+          is_taxable: item.is_taxable,
+          tax_amount: item.is_taxable ? parseFloat((item.quantity * item.unit_price * (taxRate / 100)).toFixed(2)) : 0,
+          tax_classification_id: classificationIds[item.tax_classification_code] || null,
           sort_order: index
         }));
 
@@ -577,6 +629,19 @@ export default function CreateProgressInvoiceModal({
                               <div className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800">
                                 {fmt(item.quantity * item.unit_price)}
                               </div>
+                            </div>
+
+                            <div className="col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Classification</label>
+                              <select
+                                value={item.tax_classification_code}
+                                onChange={e => updateLineItem(item.id, 'tax_classification_code', e.target.value)}
+                                className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
+                              >
+                                {CLASSIFICATION_OPTIONS.map(opt => (
+                                  <option key={opt.code} value={opt.code}>{opt.label}</option>
+                                ))}
+                              </select>
                             </div>
 
                             <div className="col-span-1 flex items-end pb-0.5">

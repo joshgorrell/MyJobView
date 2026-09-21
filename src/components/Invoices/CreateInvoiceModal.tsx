@@ -46,6 +46,7 @@ interface LineItem {
   notes?: string;
   notes_visible_on_invoice?: boolean;
   showNotes?: boolean;
+  tax_classification_code?: string;
 }
 
 interface BillingAddress {
@@ -150,9 +151,8 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>('residential');
   const [taxProjectType, setTaxProjectType] = useState('general_installation_repair');
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual' }
+    { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' }
   ]);
-  const [billing, setBilling] = useState<BillingAddress>(EMPTY_BILLING);
   const [billToContact, setBillToContact] = useState<Contact | null>(null);
   const [billingSource, setBillingSource] = useState<'customer' | 'bill_to'>('customer');
   const [editingBilling, setEditingBilling] = useState(false);
@@ -164,6 +164,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [submitting, setSubmitting] = useState(false);
   const [showCatalogBrowser, setShowCatalogBrowser] = useState(false);
   const [newRowId, setNewRowId] = useState<string | null>(null);
+  const [classificationIds, setClassificationIds] = useState<Record<string, string>>({});
 
   const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -223,6 +224,12 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   async function loadData() {
     setLoading(true);
     try {
+      const { data: classData } = await supabase.from('tax_classifications').select('id, code');
+      if (classData) {
+        const map: Record<string, string> = {};
+        for (const row of classData) map[row.code] = row.id;
+        setClassificationIds(map);
+      }
       if (contactId) {
         await loadContactDetails(contactId);
         await loadProjectsForContact(contactId);
@@ -332,7 +339,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     const id = crypto.randomUUID();
     setLineItems(prev => [
       ...prev,
-      { id, description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual' }
+      { id, description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' }
     ]);
     setNewRowId(id);
   }
@@ -569,6 +576,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
         source_type: item.source_type,
         notes: item.notes || null,
         notes_visible_on_invoice: item.notes_visible_on_invoice ?? false,
+        tax_classification_id: classificationIds[item.tax_classification_code || ''] || null,
         sort_order: index
       }));
 
@@ -996,6 +1004,21 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                           title="Taxable"
                         />
                       </div>
+
+                      {/* Classification */}
+                      <select
+                        value={item.tax_classification_code || 'material'}
+                        onChange={(e) => updateLineItem(item.id, 'tax_classification_code', e.target.value)}
+                        className="w-[120px] flex-shrink-0 px-1.5 py-1.5 text-xs bg-gray-900 border border-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        title="Tax classification"
+                      >
+                        <option value="material">Material</option>
+                        <option value="labor">Labor</option>
+                        <option value="design_fee">Design Fee</option>
+                        <option value="project_management">Project Mgmt</option>
+                        <option value="freight_delivery">Freight/Delivery</option>
+                        <option value="credit_card_fee">Credit Card Fee</option>
+                      </select>
 
                       {/* Amount */}
                       <div className="w-[96px] flex-shrink-0 text-right px-2 py-1.5 text-sm text-green-400 font-semibold">

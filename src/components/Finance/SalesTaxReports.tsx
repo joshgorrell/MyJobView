@@ -501,11 +501,12 @@ export default function SalesTaxReports({ onNavigateToGuide }: SalesTaxReportsPr
 
   useEffect(() => {
     supabase
-      .from('company_settings')
-      .select('nexus_states')
-      .maybeSingle()
+      .from('dealer_nexus_states')
+      .select('state')
+      .eq('is_current', true)
+      .eq('nexus_status', 'yes')
       .then(({ data }) => {
-        if (data?.nexus_states?.length) setNexusStates(data.nexus_states);
+        if (data && data.length > 0) setNexusStates(data.map((r: { state: string }) => r.state));
       });
   }, []);
 

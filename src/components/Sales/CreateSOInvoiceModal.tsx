@@ -13,6 +13,62 @@ import {
   type TaxEnvironment, type TaxProjectType,
 } from '../../lib/taxCalculations';
 
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  material: 'Materials',
+  labor: 'Labor',
+  design_fee: 'Design Fee',
+  project_management: 'Project Management',
+  freight_delivery: 'Freight/Delivery',
+  credit_card_fee: 'Credit Card Fee',
+};
+
+const CLASSIFICATION_ITEM_TYPE: Record<string, string> = {
+  material: 'material',
+  labor: 'labor',
+  design_fee: 'service',
+  project_management: 'service',
+  freight_delivery: 'service',
+  credit_card_fee: 'service',
+};
+
+interface ClassificationAllocation {
+  classification_code: string;
+  allocated_amount: number;
+}
+
+interface AllocationResult {
+  allocations: ClassificationAllocation[];
+  total_allocated: number;
+}
+
+let taxClassificationCache: Record<string, string> | null = null;
+
+async function getTaxClassificationIds(): Promise<Record<string, string>> {
+  if (taxClassificationCache) return taxClassificationCache;
+  const { data } = await supabase.from('tax_classifications').select('id, code');
+  const map: Record<string, string> = {};
+  for (const row of (data || [])) {
+    map[row.code] = row.id;
+  }
+  taxClassificationCache = map;
+  return map;
+}
+
+async function allocateBillingAmount(
+  transactionType: 'proposal' | 'change_order',
+  transactionId: string,
+  amountToBill: number
+): Promise<ClassificationAllocation[]> {
+  const { data, error } = await supabase.rpc('allocate_billing_amount', {
+    p_transaction_type: transactionType,
+    p_transaction_id: transactionId,
+    p_amount_to_bill: amountToBill,
+  });
+  if (error) throw error;
+  const result = data as unknown as AllocationResult;
+  return result.allocations || [];
+}
+
 interface BillingRow {
   id: string;
   type: 'contract' | 'change_order';
@@ -155,9 +211,13 @@ export function CreateSOInvoiceModal({
   // Labor/material split derived from proposal line items
   const [proposalLaborPct, setProposalLaborPct] = useState(0.5);
   const [splitLoaded, setSplitLoaded] = useState(false);
+  const [classificationIds, setClassificationIds] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    async function loadProposalSplit() {
+    async function loadClassificationData() {
+      const ids = await getTaxClassificationIds();
+      setClassificationIds(ids);
+
       if (!order.proposal?.id) {
         setSplitLoaded(true);
         return;
@@ -170,8 +230,6 @@ export function CreateSOInvoiceModal({
         setSplitLoaded(true);
         return;
       }
-      // labor_total column stores the labor portion of a material+labor line item
-      // item_type === 'labor' means the whole line is labor
       let totalLabor = 0;
       let totalMaterial = 0;
       for (const item of data) {
@@ -190,7 +248,7 @@ export function CreateSOInvoiceModal({
       }
       setSplitLoaded(true);
     }
-    loadProposalSplit();
+    loadClassificationData();
   }, [order.proposal?.id]);
 
   useEffect(() => {
@@ -432,37 +490,48 @@ export function CreateSOInvoiceModal({
       let sortOrder = 0;
 
       const { partsTaxable, laborTaxable } = getTaxApplicability(taxEnv, taxProjType);
+      const classIds = classificationIds;
 
       for (const row of selectedRows) {
-        const { laborAmt, materialAmt } = getRowLaborMaterialAmounts(row);
+        const sign = row.isNegative ? -1 : 1;
+        const absAmount = Math.abs(row.selectedAmount);
+        const { subtotal } = backCalcTotals(absAmount);
 
-        // Labor line
-        const laborTax = laborTaxable ? Math.abs(laborAmt) * taxRate * (laborAmt < 0 ? -1 : 1) : 0;
-        lineItems.push({
-          invoice_id: invoiceData.id,
-          description: `${row.label} — Labor`,
-          quantity: 1,
-          unit_price: laborAmt,
-          amount: laborAmt,
-          item_type: 'labor',
-          is_taxable: laborTaxable,
-          tax_amount: laborTax,
-          sort_order: sortOrder++,
-        });
+        let allocations: ClassificationAllocation[] = [];
+        if (row.type === 'contract' && order.proposal?.id) {
+          allocations = await allocateBillingAmount('proposal', order.proposal.id, subtotal);
+        } else if (row.type === 'change_order') {
+          allocations = await allocateBillingAmount('change_order', row.id, subtotal);
+        }
 
-        // Material line
-        const materialTax = partsTaxable ? Math.abs(materialAmt) * taxRate * (materialAmt < 0 ? -1 : 1) : 0;
-        lineItems.push({
-          invoice_id: invoiceData.id,
-          description: `${row.label} — Materials`,
-          quantity: 1,
-          unit_price: materialAmt,
-          amount: materialAmt,
-          item_type: 'material',
-          is_taxable: partsTaxable,
-          tax_amount: materialTax,
-          sort_order: sortOrder++,
-        });
+        if (allocations.length === 0) {
+          allocations = [
+            { classification_code: 'material', allocated_amount: subtotal * (1 - proposalLaborPct) },
+            { classification_code: 'labor', allocated_amount: subtotal * proposalLaborPct },
+          ];
+        }
+
+        for (const alloc of allocations) {
+          const allocAmount = sign * alloc.allocated_amount;
+          const code = alloc.classification_code;
+          const isLabor = code === 'labor';
+          const isMaterial = code === 'material';
+          const isTaxable = isLabor ? laborTaxable : isMaterial ? partsTaxable : false;
+          const lineTax = isTaxable ? Math.abs(allocAmount) * taxRate * (allocAmount < 0 ? -1 : 1) : 0;
+
+          lineItems.push({
+            invoice_id: invoiceData.id,
+            description: `${row.label} — ${CLASSIFICATION_LABELS[code] || code}`,
+            quantity: 1,
+            unit_price: allocAmount,
+            amount: allocAmount,
+            item_type: CLASSIFICATION_ITEM_TYPE[code] || 'material',
+            is_taxable: isTaxable,
+            tax_amount: lineTax,
+            tax_classification_id: classIds[code] || null,
+            sort_order: sortOrder++,
+          });
+        }
 
         if (row.type === 'change_order' && row.coData) {
           const isNeg = row.isNegative;

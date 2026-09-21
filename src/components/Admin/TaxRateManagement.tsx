@@ -36,6 +36,7 @@ export default function TaxRateManagement() {
   const [testingApiKey, setTestingApiKey] = useState(false);
   const [apiKeyUpdatedAt, setApiKeyUpdatedAt] = useState<string | null>(null);
   const [nexusStates, setNexusStates] = useState<string[]>(['KS']);
+  const [nexusStatuses, setNexusStatuses] = useState<Record<string, string>>({});
   const [savingNexus, setSavingNexus] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [activeRulesState, setActiveRulesState] = useState<string | null>(null);
@@ -83,16 +84,32 @@ export default function TaxRateManagement() {
 
   async function loadSettings() {
     try {
-      const { data, error } = await supabase
+      const { data: settingsData, error: settingsError } = await supabase
         .from('company_settings')
-        .select('taxjar_api_key, taxjar_api_key_updated_at, nexus_states')
+        .select('taxjar_api_key, taxjar_api_key_updated_at, tax_origin_method')
         .maybeSingle();
 
-      if (error) throw error;
-      setTaxjarApiKey(data?.taxjar_api_key || '');
-      setApiKeyUpdatedAt(data?.taxjar_api_key_updated_at || null);
-      if (data?.nexus_states?.length) setNexusStates(data.nexus_states);
-      if (data?.tax_origin_method) setTaxOriginMethod(data.tax_origin_method);
+      if (settingsError) throw settingsError;
+      setTaxjarApiKey(settingsData?.taxjar_api_key || '');
+      setApiKeyUpdatedAt(settingsData?.taxjar_api_key_updated_at || null);
+      if (settingsData?.tax_origin_method) setTaxOriginMethod(settingsData.tax_origin_method);
+
+      const { data: nexusData, error: nexusError } = await supabase
+        .from('dealer_nexus_states')
+        .select('state, nexus_status')
+        .eq('is_current', true);
+
+      if (nexusError) throw nexusError;
+      if (nexusData) {
+        const states: string[] = [];
+        const statuses: Record<string, string> = {};
+        for (const row of nexusData) {
+          states.push(row.state);
+          statuses[row.state] = row.nexus_status;
+        }
+        setNexusStates(states);
+        setNexusStatuses(statuses);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -132,21 +149,56 @@ export default function TaxRateManagement() {
   async function saveNexusStates() {
     setSavingNexus(true);
     try {
-      const { data: settingsData } = await supabase
-        .from('company_settings')
-        .select('id')
-        .maybeSingle();
+      for (const stateCode of nexusStates) {
+        const status = nexusStatuses[stateCode] || 'yes';
+        const { data: existing } = await supabase
+          .from('dealer_nexus_states')
+          .select('id')
+          .eq('state', stateCode)
+          .eq('is_current', true)
+          .maybeSingle();
 
-      if (!settingsData) throw new Error('Company settings not found');
+        if (existing) {
+          const { error } = await supabase
+            .from('dealer_nexus_states')
+            .update({ nexus_status: status, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('dealer_nexus_states')
+            .insert({
+              state: stateCode,
+              nexus_status: status,
+              source: 'manual_entry',
+              is_current: true,
+              effective_from: new Date().toISOString().split('T')[0],
+            });
+          if (error) throw error;
+        }
+      }
 
-      const { error } = await supabase
-        .from('company_settings')
-        .update({ nexus_states: nexusStates })
-        .eq('id', settingsData.id);
+      for (const stateCode of Object.keys(nexusStatuses)) {
+        if (!nexusStates.includes(stateCode)) {
+          const { data: existing } = await supabase
+            .from('dealer_nexus_states')
+            .select('id')
+            .eq('state', stateCode)
+            .eq('is_current', true)
+            .maybeSingle();
 
-      if (error) throw error;
+          if (existing) {
+            const { error } = await supabase
+              .from('dealer_nexus_states')
+              .update({ is_current: false, effective_through: new Date().toISOString().split('T')[0], updated_at: new Date().toISOString() })
+              .eq('id', existing.id);
+            if (error) throw error;
+          }
+        }
+      }
+
       setShowNexusSettings(false);
-      alert('Nexus states saved. The Sales Tax Reports will now show tabs for each active state.');
+      alert('Nexus states saved. The tax engine will now use these states for collection status.');
     } catch (error) {
       console.error('Error saving nexus states:', error);
       alert('Failed to save nexus states');
@@ -225,6 +277,14 @@ export default function TaxRateManagement() {
     setNexusStates(prev =>
       prev.includes(code) ? prev.filter(s => s !== code) : [...prev, code]
     );
+    setNexusStatuses(prev => {
+      if (prev[code]) {
+        const next = { ...prev };
+        delete next[code];
+        return next;
+      }
+      return { ...prev, [code]: 'yes' };
+    });
   }
 
   const uniqueStates = [...new Set(jurisdictions.map(j => j.state))].sort();
@@ -292,7 +352,7 @@ export default function TaxRateManagement() {
                 Nexus State Configuration
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                Select all states where your company has sales tax nexus. Active states appear as tabs in the Sales Tax Reports.
+                Select all states where your company has sales tax nexus and set the collection status. The tax engine uses these settings to determine whether to collect sales tax.
               </p>
             </div>
           </div>
@@ -326,6 +386,18 @@ export default function TaxRateManagement() {
                   </div>
                   <span className="text-xs text-gray-600">{name}</span>
                   <span className="text-xs text-gray-400">{form}</span>
+                  {isActive && (
+                    <select
+                      value={nexusStatuses[code] || 'yes'}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setNexusStatuses(prev => ({ ...prev, [code]: e.target.value }))}
+                      className="text-xs border border-gray-300 rounded px-1 py-0.5 mt-1"
+                    >
+                      <option value="yes">Collecting</option>
+                      <option value="no">Not Collecting</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  )}
                 </label>
               );
             })}
