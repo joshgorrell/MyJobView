@@ -9,16 +9,11 @@ import {
 } from '../../lib/taxCalculations';
 import ConfirmModal from '../ui/ConfirmModal';
 
-const SUPPORTED_NEXUS_STATES = [
-  { code: 'KS', name: 'Kansas', form: 'ST-36' },
-  { code: 'MO', name: 'Missouri', form: 'Form 53-1' },
-  { code: 'TX', name: 'Texas', form: 'Form 01-117' },
-  { code: 'OK', name: 'Oklahoma', form: 'STS-20002' },
-  { code: 'NE', name: 'Nebraska', form: 'Form 10' },
-  { code: 'CO', name: 'Colorado', form: 'DR 0100' },
-  { code: 'AR', name: 'Arkansas', form: 'ET-1' },
-  { code: 'IA', name: 'Iowa', form: 'GovConnect' },
-];
+interface StateLibraryEntry {
+  state_code: string;
+  state_name: string;
+  library_status: string;
+}
 
 export default function TaxRateManagement() {
   const [jurisdictions, setJurisdictions] = useState<TaxJurisdiction[]>([]);
@@ -43,11 +38,26 @@ export default function TaxRateManagement() {
   const [activeRulesEnv, setActiveRulesEnv] = useState<'residential' | 'commercial'>('residential');
   const [taxOriginMethod, setTaxOriginMethod] = useState<'corporate' | 'assigned_office'>('corporate');
   const [savingTaxOrigin, setSavingTaxOrigin] = useState(false);
+  const [allStates, setAllStates] = useState<StateLibraryEntry[]>([]);
 
   useEffect(() => {
     loadJurisdictions();
     loadSettings();
+    loadStateLibrary();
   }, []);
+
+  async function loadStateLibrary() {
+    try {
+      const { data, error } = await supabase
+        .from('state_library_index')
+        .select('state_code, state_name, library_status')
+        .order('state_code');
+      if (error) throw error;
+      setAllStates(data || []);
+    } catch (error) {
+      console.error('Error loading state library:', error);
+    }
+  }
 
   async function loadJurisdictions() {
     try {
@@ -357,10 +367,11 @@ export default function TaxRateManagement() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-            {SUPPORTED_NEXUS_STATES.map(({ code, name, form }) => {
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-5">
+            {allStates.map(({ state_code: code, state_name: name, library_status }) => {
               const isActive = nexusStates.includes(code);
               const hasRule = !!STATE_TAX_RULES[code];
+              const isVerified = library_status === 'verified';
               return (
                 <label
                   key={code}
@@ -380,12 +391,11 @@ export default function TaxRateManagement() {
                       />
                       <span className="font-semibold text-gray-900">{code}</span>
                     </div>
-                    {hasRule && (
+                    {isVerified && (
                       <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Rules</span>
                     )}
                   </div>
                   <span className="text-xs text-gray-600">{name}</span>
-                  <span className="text-xs text-gray-400">{form}</span>
                   {isActive && (
                     <select
                       value={nexusStatuses[code] || 'yes'}
@@ -406,7 +416,7 @@ export default function TaxRateManagement() {
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex gap-2">
             <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-amber-800">
-              States marked with <strong>Rules</strong> have built-in tax calculation logic (parts vs. labor rules, exemption handling). Other states will use combined rate only until rules are added.
+              States marked with <strong>Rules</strong> have verified MJV tax rules (parts vs. labor, exemption handling). Other states will use combined rate only until rules are researched and added.
             </p>
           </div>
 
@@ -941,6 +951,7 @@ export default function TaxRateManagement() {
       {showAddModal && editingJurisdiction && (
         <JurisdictionModal
           jurisdiction={editingJurisdiction}
+          allStates={allStates}
           onClose={() => {
             setShowAddModal(false);
             setEditingJurisdiction(null);
@@ -971,10 +982,12 @@ export default function TaxRateManagement() {
 
 function JurisdictionModal({
   jurisdiction,
+  allStates,
   onClose,
   onSave,
 }: {
   jurisdiction: TaxJurisdiction;
+  allStates: StateLibraryEntry[];
   onClose: () => void;
   onSave: () => void;
 }) {
@@ -1092,10 +1105,9 @@ function JurisdictionModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select state...</option>
-                  {SUPPORTED_NEXUS_STATES.map(s => (
-                    <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                  {allStates.map(s => (
+                    <option key={s.state_code} value={s.state_code}>{s.state_code} — {s.state_name}</option>
                   ))}
-                  <option value="OTHER">Other</option>
                 </select>
               </div>
 

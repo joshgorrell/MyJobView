@@ -31,7 +31,7 @@ All tax rules live here. Key exports:
 
 1. Add a `StateTaxRule` object to `STATE_TAX_RULES` in `src/lib/taxCalculations.ts`.
 2. Add the state's exemption form to `STATE_EXEMPTION_FORMS`.
-3. Add the state code to the `SUPPORTED_NEXUS_STATES` checkbox list in `src/components/Admin/TaxRateManagement.tsx`.
+3. Update the state's `library_status` to `'verified'` in the `state_library_index` table (via migration). The nexus state checkbox list in `TaxRateManagement.tsx` now reads dynamically from `state_library_index` — all 50 states are automatically available for dealer collection configuration.
 4. If the state has a distinct monthly worksheet, add a new report tab in `src/components/Finance/SalesTaxReports.tsx` (follow the KS/MO pattern).
 5. Add step-by-step DOR filing instructions to `STATE_DOR_INSTRUCTIONS` in `src/components/Finance/SalesTaxInstructions.tsx`.
 6. **The Tax Filing Guide page (`src/components/Finance/SalesTaxInstructions.tsx`) will automatically render the new state's tax matrix, exemption forms, and quick-reference card** — no other changes needed.
