@@ -23,7 +23,6 @@ const CLASSIFICATION_OPTIONS = [
   { code: 'design_fee', label: 'Design Fee' },
   { code: 'project_management', label: 'Project Management' },
   { code: 'freight_delivery', label: 'Freight/Delivery' },
-  { code: 'credit_card_fee', label: 'Credit Card Fee' },
 ];
 
 const CLASSIFICATION_LABELS: Record<string, string> = {
@@ -32,7 +31,6 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
   design_fee: 'Design Fee',
   project_management: 'Project Management',
   freight_delivery: 'Freight/Delivery',
-  credit_card_fee: 'Credit Card Fee',
 };
 
 const CLASSIFICATION_ITEM_TYPE: Record<string, string> = {
@@ -41,7 +39,6 @@ const CLASSIFICATION_ITEM_TYPE: Record<string, string> = {
   design_fee: 'service',
   project_management: 'service',
   freight_delivery: 'service',
-  credit_card_fee: 'service',
 };
 
 let taxClassificationCache: Record<string, string> | null = null;
