@@ -38,6 +38,27 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   const createMenuRef = useRef<HTMLDivElement>(null);
 
   const loading = deptLoading;
+  const initials = profile?.full_name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
+  const avatar = (
+    <button
+      type="button"
+      onClick={() => { onTabChange('preferences'); setMobileMenuOpen(false); }}
+      className="relative w-9 h-9 flex-shrink-0 rounded-full border border-subtle bg-elevated text-brand font-semibold text-xs flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-blue-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      aria-label="Open profile and preferences"
+      title={profile?.full_name ? `${profile.full_name} — Preferences` : 'Preferences'}
+    >
+      <span aria-hidden="true">{initials}</span>
+      {profile?.avatar_url && (
+        <img
+          key={profile.avatar_url}
+          src={profile.avatar_url}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={event => { event.currentTarget.style.display = 'none'; }}
+        />
+      )}
+    </button>
+  );
 
   useEffect(() => {
     async function loadOrgLogo() {
@@ -107,9 +128,9 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   return (
     <header className="bg-canvas border-b border-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 gap-4">
+        <div className="flex items-center justify-between h-14 gap-0 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             {onMenuToggle && (
               <button
                 onClick={onMenuToggle}
@@ -126,7 +147,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               <img
                 src={headerLogoUrl || '/el_logo_color_(2).png'}
                 alt="Logo"
-                className="h-8 flex-shrink-0 object-contain"
+                className="h-8 max-w-[23vw] sm:max-w-none object-contain"
               />
             </button>
           </div>
@@ -278,10 +299,11 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               onProposalClick={onProposalClick}
               onTabChange={onTabChange}
             />
+            {avatar}
           </div>
 
           {/* Mobile Actions */}
-          <div className="md:hidden flex items-center gap-2">
+          <div className="md:hidden flex items-center gap-0.5 sm:gap-2">
             <TimeButton onNavigate={onNavigate} />
             <NotificationBell
               onLeadClick={(leadId) => {
@@ -301,6 +323,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                 setMobileMenuOpen(false);
               }}
             />
+            {avatar}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-muted hover:text-primary hover:bg-surface rounded-lg transition-colors"
