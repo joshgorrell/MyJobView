@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Clock, Briefcase, ChevronDown } from 'lucide-react';
+import { Clock, Briefcase, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { QuickActionModal } from '../Shared/QuickActionModal';
 
 interface Project {
   id: string;
@@ -190,38 +191,16 @@ export function AddProjectTimeModal({
   const canManageOthers = profile?.role && ['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
-        onClick={onClose}
-      />
-
-      {/* Modal — bottom sheet on mobile, centered dialog on sm+ */}
-      <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-50 flex sm:items-center sm:justify-center sm:p-4 pointer-events-none">
-        <div className="pointer-events-auto w-full sm:max-w-md bg-gray-900 border border-gray-700/60 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col">
-
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-blue-500/15 rounded-lg">
-                <Clock className="w-4 h-4 text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-white">Add Project Time</h2>
-                <p className="text-xs text-gray-500">Log time outside of a work order</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
+    <QuickActionModal
+      title="Add Project Time"
+      subtitle="Log time outside of a work order"
+      icon={<Clock className="w-5 h-5 text-white" />}
+      accentColor="from-blue-600 to-cyan-700"
+      onClose={onClose}
+      maxWidth="sm:max-w-md"
+    >
           {/* Form body */}
-          <div className="px-4 py-3 space-y-3">
+          <div className="p-4 sm:p-6 space-y-4">
 
             {/* Project */}
             <div>
@@ -424,7 +403,7 @@ export function AddProjectTimeModal({
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-3 border-t border-gray-700/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 shrink-0 bg-gray-900 rounded-b-none sm:rounded-b-2xl">
+          <div className="px-4 py-3 sm:px-6 border-t border-gray-700/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 shrink-0">
             <button
               onClick={onClose}
               className="py-2.5 sm:py-2 sm:px-4 text-sm text-gray-400 hover:text-white transition-colors text-center"
@@ -446,8 +425,6 @@ export function AddProjectTimeModal({
               )}
             </button>
           </div>
-        </div>
-      </div>
-    </>
+    </QuickActionModal>
   );
 }

@@ -840,10 +840,7 @@ function AppContent() {
               setShowTaskForm(true);
               setActiveTab('tasks');
             }}
-            onCreateJobMedia={() => {
-              setShowJobMediaUpload(true);
-              setActiveTab('job_photos');
-            }}
+            onCreateJobMedia={() => setShowJobMediaUpload(true)}
             onCreateProjectTime={['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role) ? () => setShowAddProjectTime(true) : undefined}
             onLeadClick={(leadId) => setSelectedLeadId(leadId)}
             onTaskClick={(taskId) => {
@@ -980,7 +977,6 @@ function AppContent() {
           {activeTab === 'job_photos' && checkModuleAccess('job_photos') && (
             <JobPhotosGallery
               key={activeTab}
-              initialShowUpload={showJobMediaUpload}
               onClose={() => setShowJobMediaUpload(false)}
             />
           )}
@@ -1237,6 +1233,14 @@ function AppContent() {
 
       {!isStandalone && (
         <PlatformFooter />
+      )}
+
+      {showJobMediaUpload && (
+        <JobPhotosGallery
+          modalOnly
+          initialShowUpload
+          onClose={() => setShowJobMediaUpload(false)}
+        />
       )}
 
       {showAddProjectTime && (

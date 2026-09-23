@@ -28,6 +28,7 @@ interface JobPhoto {
 
 interface JobPhotosGalleryProps {
   initialShowUpload?: boolean;
+  modalOnly?: boolean;
   onClose?: () => void;
 }
 
@@ -153,7 +154,7 @@ function PaparazziRequestsView() {
     );
   };
 
-  if (loading) {
+  if (loading && !modalOnly) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-gray-500">Loading requests...</div>
@@ -361,7 +362,7 @@ function PaparazziRequestsView() {
   );
 }
 
-export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhotosGalleryProps = {}) {
+export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false, onClose }: JobPhotosGalleryProps = {}) {
   const { user, profile } = useAuth();
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -928,7 +929,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
       }
     });
 
-  if (loading) {
+  if (loading && !modalOnly) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Loading photos...</div>
@@ -938,7 +939,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+      <div className={modalOnly ? "hidden" : "bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6"}>
         <div className="flex flex-col gap-4 mb-6">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Job Photos & Videos</h2>
@@ -1188,6 +1189,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
             setShowUploadModal(false);
             setPhotoCaption('');
             setSelectedPaparazziRequestId('');
+            if (modalOnly) onClose?.();
           }}
           maxWidth="sm:max-w-lg"
         >
