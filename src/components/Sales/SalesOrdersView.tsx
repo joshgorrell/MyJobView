@@ -47,14 +47,14 @@ interface SalesOrdersViewProps {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string; icon: typeof Clock }> = {
-  pending_deposit: { label: 'Pending Deposit', color: 'bg-yellow-900/40 text-yellow-400 border border-yellow-700/40', dot: 'bg-yellow-400', icon: DollarSign },
-  pending_po:      { label: 'Pending PO',      color: 'bg-orange-900/40 text-orange-400 border border-orange-700/40', dot: 'bg-orange-400', icon: Clock },
-  planning:        { label: 'Planning',         color: 'bg-blue-900/40 text-blue-400 border border-blue-700/40', dot: 'bg-blue-400', icon: Clock },
-  active:          { label: 'Active',           color: 'bg-green-900/40 text-green-400 border border-green-700/40', dot: 'bg-green-400', icon: CheckCircle },
-  complete:        { label: 'Complete',         color: 'bg-gray-700/60 text-gray-300 border border-gray-600/40', dot: 'bg-gray-400', icon: CheckCircle },
-  closed:          { label: 'Closed',           color: 'bg-gray-700/40 text-gray-500 border border-gray-600/30', dot: 'bg-gray-600', icon: AlertCircle },
+  pending_deposit: { label: 'Pending Deposit', color: 'bg-warningSoft text-warning border border-warningLine', dot: 'bg-warning', icon: DollarSign },
+  pending_po:      { label: 'Pending PO',      color: 'bg-attentionSoft text-attention border border-warningLine', dot: 'bg-attention', icon: Clock },
+  planning:        { label: 'Planning',         color: 'bg-infoSoft text-info border border-subtle', dot: 'bg-info', icon: Clock },
+  active:          { label: 'Active',           color: 'bg-successSoft text-success border border-subtle', dot: 'bg-success', icon: CheckCircle },
+  complete:        { label: 'Complete',         color: 'bg-elevated/60 text-secondary border border-strong/40', dot: 'bg-gray-400', icon: CheckCircle },
+  closed:          { label: 'Closed',           color: 'bg-elevated/40 text-muted border border-strong/30', dot: 'bg-gray-600', icon: AlertCircle },
 };
-const DEFAULT_STATUS = { label: 'Unknown', color: 'bg-gray-700 text-gray-400 border border-gray-600/40', dot: 'bg-gray-500', icon: AlertCircle };
+const DEFAULT_STATUS = { label: 'Unknown', color: 'bg-elevated text-muted border border-strong/40', dot: 'bg-gray-500', icon: AlertCircle };
 
 function getBalanceDue(order: SalesOrder): number {
   if (!order.invoices || order.invoices.length === 0) {
@@ -143,7 +143,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-400 text-sm">Loading sales orders...</div>
+        <div className="text-muted text-sm">Loading sales orders...</div>
       </div>
     );
   }
@@ -154,9 +154,9 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
         key={selectedOrderId}
         fallback={(error) => (
           <div className="text-center py-16 px-4">
-            <p className="text-gray-400 mb-2">Something went wrong loading this sales order.</p>
+            <p className="text-muted mb-2">Something went wrong loading this sales order.</p>
             {error?.message && (
-              <p className="text-red-400 text-xs font-mono mb-4 max-w-lg mx-auto break-all bg-gray-800/60 rounded-lg px-3 py-2">
+              <p className="text-red-400 text-xs font-mono mb-4 max-w-lg mx-auto break-all bg-surface/60 rounded-lg px-3 py-2">
                 {error.message}
               </p>
             )}
@@ -183,25 +183,25 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-0.5">Sales Orders</h1>
-          <p className="text-gray-400 text-sm hidden sm:block">Approved proposals converted to active sales orders</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-primary mb-0.5">Sales Orders</h1>
+          <p className="text-muted text-sm hidden sm:block">Approved proposals converted to active sales orders</p>
           {filteredOrders.length > 0 && (
-            <p className="text-gray-500 text-xs sm:hidden">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</p>
+            <p className="text-muted text-xs sm:hidden">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</p>
           )}
         </div>
       </div>
 
       {/* Office filter banner */}
       {officeIdFilter && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-lg text-sm">
+        <div className="flex items-center gap-3 px-4 py-3 bg-infoSoft border border-subtle rounded-lg text-sm">
           <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
-          <span className="text-blue-300 flex-1">
-            Showing orders for <span className="font-semibold text-blue-200">{officeNameFilter || 'selected office'}</span>
+          <span className="text-info flex-1">
+            Showing orders for <span className="font-semibold text-info">{officeNameFilter || 'selected office'}</span>
           </span>
           {onClearOfficeFilter && (
             <button
               onClick={onClearOfficeFilter}
-              className="flex items-center gap-1.5 text-blue-400 hover:text-blue-200 transition-colors text-xs font-medium"
+              className="flex items-center gap-1.5 text-blue-400 hover:text-info transition-colors text-xs font-medium"
             >
               <X className="w-3.5 h-3.5" />
               Clear filter
@@ -213,19 +213,19 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
       {/* Search + Status filter */}
       <div className="flex items-center gap-2">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
           <input
             type="text"
             placeholder="Search orders, customers..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px]"
+            className="w-full pl-9 pr-4 py-2.5 bg-surface border border-subtle rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px]"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px] max-w-[140px] sm:max-w-none"
+          className="px-3 py-2.5 bg-surface border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px] max-w-[140px] sm:max-w-none"
         >
           <option value="all">All Statuses</option>
           <option value="pending_deposit">Pend. Deposit</option>
@@ -245,7 +245,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               selectedRepId === null
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-elevated text-secondary hover:bg-gray-600'
             }`}
           >
             All Reps
@@ -257,7 +257,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 selectedRepId === rep.id
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-elevated text-secondary hover:bg-gray-600'
               }`}
             >
               {rep.full_name.split(' ')[0]}
@@ -267,12 +267,12 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
       )}
 
       {/* Orders list */}
-      <div className="bg-gray-800/50 rounded-xl border border-gray-700/60 overflow-hidden">
+      <div className="bg-surface/50 rounded-xl border border-subtle/60 overflow-hidden">
         {filteredOrders.length === 0 ? (
           <div className="p-8 sm:p-12 text-center">
-            <FileText className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-            <h3 className="text-base font-semibold text-white mb-1">No Sales Orders Found</h3>
-            <p className="text-gray-400 text-sm">
+            <FileText className="w-10 h-10 text-muted mx-auto mb-3" />
+            <h3 className="text-base font-semibold text-primary mb-1">No Sales Orders Found</h3>
+            <p className="text-muted text-sm">
               {searchTerm || statusFilter !== 'all' || selectedRepId
                 ? 'No sales orders match your current filters'
                 : 'Sales orders will appear here when proposals are approved'}
@@ -297,7 +297,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                   <div
                     key={order.id}
                     onClick={() => setSelectedOrderId(order.id)}
-                    className="p-4 hover:bg-gray-700/30 active:bg-gray-700/60 cursor-pointer transition-colors"
+                    className="p-4 hover:bg-elevated/30 active:bg-elevated/60 cursor-pointer transition-colors"
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 mt-1.5">
@@ -309,27 +309,27 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                             {order.contact?.id ? (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setQuickViewContactId(order.contact.id); }}
-                                className="font-semibold text-blue-400 hover:text-blue-300 text-sm leading-tight truncate block text-left max-w-full transition-colors"
+                                className="customer-link font-semibold text-sm leading-tight truncate block text-left max-w-full transition-colors"
                               >
                                 {order.contact.full_name}
                               </button>
                             ) : (
-                              <div className="font-semibold text-white text-sm leading-tight truncate">{order.contact?.full_name || 'Unknown'}</div>
+                              <div className="font-semibold text-primary text-sm leading-tight truncate">{order.contact?.full_name || 'Unknown'}</div>
                             )}
                             {order.proposal?.title && (
-                              <div className="text-gray-400 text-xs truncate mt-0.5">{order.proposal.title}</div>
+                              <div className="text-muted text-xs truncate mt-0.5">{order.proposal.title}</div>
                             )}
-                            <div className="text-gray-600 text-xs font-mono mt-0.5">SO-{order.order_number}</div>
+                            <div className="text-muted text-xs font-mono mt-0.5">SO-{order.order_number}</div>
                           </div>
                           <div className="flex-shrink-0 text-right">
-                            <div className="font-bold text-white text-sm">${(order.contract_total ?? 0).toLocaleString()}</div>
+                            <div className="font-bold text-primary text-sm">${(order.contract_total ?? 0).toLocaleString()}</div>
                             {balanceDue > 0 && (
-                              <div className="text-amber-400 text-xs mt-0.5">Due: ${balanceDue.toLocaleString()}</div>
+                              <div className="text-warning text-xs mt-0.5">Due: ${balanceDue.toLocaleString()}</div>
                             )}
                           </div>
                         </div>
                         <div className="flex items-center justify-between gap-2 mt-1.5">
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <div className="flex items-center gap-2 text-xs text-muted">
                             {repName && (
                               <span className="flex items-center gap-1">
                                 <User className="w-3 h-3 flex-shrink-0" />
@@ -357,7 +357,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm min-w-[560px]">
                 <thead>
-                  <tr className="border-b border-gray-700/60 text-xs text-gray-500 uppercase tracking-wider">
+                  <tr className="border-b border-subtle/60 text-xs text-muted uppercase tracking-wider">
                     <th className="text-left px-4 py-3 font-medium">Customer / Proposal</th>
                     <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Rep</th>
                     <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Date</th>
@@ -383,7 +383,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                       <tr
                         key={order.id}
                         onClick={() => setSelectedOrderId(order.id)}
-                        className="hover:bg-gray-700/30 cursor-pointer transition-colors group"
+                        className="hover:bg-elevated/30 cursor-pointer transition-colors group"
                       >
                         {/* Customer / Proposal cell with left status bar */}
                         <td className="px-0 py-0">
@@ -393,21 +393,21 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                               {order.contact?.id ? (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setQuickViewContactId(order.contact.id); }}
-                                  className="font-semibold text-blue-400 hover:text-blue-300 text-sm leading-tight truncate block text-left max-w-[200px] md:max-w-[280px] lg:max-w-xs transition-colors"
+                                  className="customer-link font-semibold text-sm leading-tight truncate block text-left max-w-[200px] md:max-w-[280px] lg:max-w-xs transition-colors"
                                 >
                                   {order.contact.full_name}
                                 </button>
                               ) : (
-                                <div className="font-semibold text-white text-sm leading-tight truncate max-w-[200px] md:max-w-[280px] lg:max-w-xs">
+                                <div className="font-semibold text-primary text-sm leading-tight truncate max-w-[200px] md:max-w-[280px] lg:max-w-xs">
                                   {order.contact?.full_name || 'Unknown'}
                                 </div>
                               )}
                               {order.proposal?.title && (
-                                <div className="text-gray-400 text-xs truncate max-w-[200px] md:max-w-[280px] lg:max-w-xs mt-0.5">
+                                <div className="text-muted text-xs truncate max-w-[200px] md:max-w-[280px] lg:max-w-xs mt-0.5">
                                   {order.proposal.title}
                                 </div>
                               )}
-                              <div className="text-gray-600 text-xs font-mono mt-0.5">SO-{order.order_number}</div>
+                              <div className="text-muted text-xs font-mono mt-0.5">SO-{order.order_number}</div>
                             </div>
                           </div>
                         </td>
@@ -415,15 +415,15 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                         {/* Rep */}
                         <td className="px-4 py-3 hidden lg:table-cell whitespace-nowrap">
                           {repName
-                            ? <span className="text-gray-300 text-sm">{repName}</span>
-                            : <span className="text-gray-600 text-xs">—</span>
+                            ? <span className="text-secondary text-sm">{repName}</span>
+                            : <span className="text-muted text-xs">—</span>
                           }
                         </td>
 
                         {/* Date */}
                         <td className="px-4 py-3 hidden md:table-cell whitespace-nowrap">
-                          <div className="text-gray-300 text-sm">{displayDate}</div>
-                          <div className="text-gray-600 text-xs mt-0.5">{dateLabel}</div>
+                          <div className="text-secondary text-sm">{displayDate}</div>
+                          <div className="text-muted text-xs mt-0.5">{dateLabel}</div>
                         </td>
 
                         {/* Status */}
@@ -436,20 +436,20 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                         </td>
 
                         {/* Total */}
-                        <td className="px-4 py-3 text-right font-semibold text-white whitespace-nowrap">
+                        <td className="px-4 py-3 text-right font-semibold text-primary whitespace-nowrap">
                           ${(order.contract_total ?? 0).toLocaleString()}
                         </td>
 
                         {/* Balance Due */}
                         <td className="px-4 py-3 text-right hidden md:table-cell whitespace-nowrap">
                           {balanceDue > 0
-                            ? <span className="text-amber-400 font-medium">${balanceDue.toLocaleString()}</span>
-                            : <span className="text-gray-600">—</span>
+                            ? <span className="text-warning font-medium">${balanceDue.toLocaleString()}</span>
+                            : <span className="text-muted">—</span>
                           }
                         </td>
 
                         {/* Chevron */}
-                        <td className="px-3 py-3 text-gray-600 group-hover:text-gray-400 transition-colors">
+                        <td className="px-3 py-3 text-muted group-hover:text-muted transition-colors">
                           <ChevronRight className="w-4 h-4" />
                         </td>
                       </tr>
@@ -464,7 +464,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
 
       {/* Count footer */}
       {filteredOrders.length > 0 && (
-        <p className="text-gray-600 text-xs text-right">
+        <p className="text-muted text-xs text-right">
           {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
           {orders.length !== filteredOrders.length && ` (filtered from ${orders.length})`}
         </p>

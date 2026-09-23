@@ -21,17 +21,17 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
 
   const getColorClass = (isActive: boolean) => {
     return isActive
-      ? 'bg-blue-500/20 text-blue-500 border border-blue-500/50'
-      : 'text-gray-400 bg-gray-800/20 border border-gray-700/30 hover:text-white hover:bg-gray-700/30';
+      ? 'bg-blue-500/15 text-brand border border-blue-500/50'
+      : 'text-secondary bg-surface border border-subtle hover:text-primary hover:bg-elevated';
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1 text-yellow-400">
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="hidden lg:flex flex-shrink-0 items-center gap-1 text-brand">
         <Star className="w-4 h-4 fill-current" />
         <span className="text-xs font-semibold uppercase tracking-wider hidden lg:inline">Favorites</span>
       </div>
-      <div className="h-6 w-px bg-gray-700 hidden lg:block"></div>
+      <div className="h-5 w-px bg-subtle hidden lg:block"></div>
 
       {loading ? (
         <div className="text-gray-500 text-xs italic">Loading...</div>
@@ -40,7 +40,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
           Click the <Star className="w-3 h-3 inline mx-1" /> on any menu item to add it here
         </div>
       ) : (
-        <nav className="flex flex-wrap gap-2 sm:gap-3">
+        <nav className="flex gap-2 overflow-x-auto min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
           {starredModules.map((module) => {
           const isActive = activeModule === module.module_key;
 
@@ -63,7 +63,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
                   onModuleChange(module.module_key);
                 }
               }}
-              className={`px-4 py-2 font-semibold transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
+              className={`px-3 py-1.5 font-medium transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
               title={`${module.display_name} (${module.description || 'Quick access'})`}
             >
               <div className="flex items-center gap-2">

@@ -830,7 +830,7 @@ export function PipelineBoard() {
                         >
                           <div className="mb-2">
                             <div className="flex items-center justify-between gap-2 mb-1">
-                              <h4 className="font-semibold text-gray-900 text-sm truncate">
+                              <h4 className="customer-link font-semibold text-sm truncate">
                                 {item.contact_type === 'person'
                                   ? (item.contact_name || item.company_name)
                                   : (item.company_name || item.contact_name)}
@@ -960,7 +960,7 @@ export function PipelineBoard() {
                         >
                           <div className="mb-2">
                             <div className="flex items-center justify-between gap-2 mb-1">
-                              <h4 className="font-semibold text-gray-900 text-sm truncate">
+                              <h4 className="customer-link font-semibold text-sm truncate">
                                 {contact.contact_type === 'person'
                                   ? (contact.contact_name || contact.company_name)
                                   : (contact.company_name || contact.contact_name)}
@@ -1007,7 +1007,7 @@ export function PipelineBoard() {
                       >
                         <div className="mb-2">
                           <div className="flex items-center justify-between gap-2 mb-1">
-                            <h4 className="font-semibold text-gray-900 text-sm truncate">
+                            <h4 className="customer-link font-semibold text-sm truncate">
                               {item.contact_name}
                             </h4>
                             <div className="flex items-center gap-1">

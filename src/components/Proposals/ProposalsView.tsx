@@ -85,8 +85,8 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   }
 
   if (selectedProposalId) return (
-    <Suspense fallback={<div className="w-full h-full min-h-[400px] flex items-center justify-center bg-gray-900 text-gray-400">Loading proposal...</div>}>
-      <div className="w-full h-full flex flex-col min-h-0 bg-gray-900">
+    <Suspense fallback={<div className="w-full h-full min-h-[400px] flex items-center justify-center bg-canvas text-muted">Loading proposal...</div>}>
+      <div className="w-full h-full flex flex-col min-h-0 bg-canvas">
         <div className="min-h-0 flex-1">
           <ProposalBuilderCompact proposalId={selectedProposalId}
             onBack={() => {
@@ -104,11 +104,11 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     </Suspense>
   );
 
-  if (isStandalone) return <div className="h-screen flex items-center justify-center bg-gray-900"><div className="text-center"><div className="text-yellow-400 text-lg mb-2">No Proposal ID</div><div className="text-gray-400 text-sm mb-4">This window requires a proposal ID in the URL</div><button onClick={() => window.close()} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">Close Window</button></div></div>;
+  if (isStandalone) return <div className="h-screen flex items-center justify-center bg-canvas"><div className="text-center"><div className="text-yellow-400 text-lg mb-2">No Proposal ID</div><div className="text-muted text-sm mb-4">This window requires a proposal ID in the URL</div><button onClick={() => window.close()} className="px-4 py-2 bg-elevated text-primary rounded-lg hover:bg-strong/25">Close Window</button></div></div>;
 
-  if (showVideoLibrary) return <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">Loading video library...</div>}><div className="w-full h-full"><div className="bg-gray-900 border-b border-gray-700 px-4 py-2"><button onClick={() => setShowVideoLibrary(false)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">&larr; Back to Proposals</button></div><VideoLibrary /></div></Suspense>;
+  if (showVideoLibrary) return <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-canvas text-muted">Loading video library...</div>}><div className="w-full h-full"><div className="bg-canvas border-b border-subtle px-4 py-2"><button onClick={() => setShowVideoLibrary(false)} className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors">&larr; Back to Proposals</button></div><VideoLibrary /></div></Suspense>;
 
-  return <div className="w-full space-y-6">
+  return <div className="w-full space-y-2">
     <ProposalsList onSelectProposal={navigateToProposal} onCreateNew={openCreateModal} onSelectSalesOrder={onSelectSalesOrder} onNavigateToSalesOrders={onNavigateToSalesOrders} onNavigateToSalesStats={onNavigateToSalesStats} onOpenVideoLibrary={() => setShowVideoLibrary(true)} />
     {showCreateModal && <CreateProposalModal onClose={closeCreateModal} onCreated={handleProposalCreated} prefill={aiPrefill ?? undefined} contactId={aiPrefill?.contactId} leadId={aiPrefill?.leadId} />}
   </div>;

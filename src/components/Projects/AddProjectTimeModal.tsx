@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Clock, Briefcase, ChevronDown } from 'lucide-react';
+import { Clock, Briefcase, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { QuickActionModal } from '../Shared/QuickActionModal';
 
 interface Project {
   id: string;
@@ -190,62 +191,40 @@ export function AddProjectTimeModal({
   const canManageOthers = profile?.role && ['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
-        onClick={onClose}
-      />
+    <QuickActionModal
+      title="Add Project Time"
+      subtitle="Log time outside of a work order"
+      icon={<Clock className="w-5 h-5 text-white" />}
+      accentColor="from-blue-600 to-cyan-700"
+      onClose={onClose}
 
-      {/* Modal — bottom sheet on mobile, centered dialog on sm+ */}
-      <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-50 flex sm:items-center sm:justify-center sm:p-4 pointer-events-none">
-        <div className="pointer-events-auto w-full sm:max-w-md bg-gray-900 border border-gray-700/60 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col">
-
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-blue-500/15 rounded-lg">
-                <Clock className="w-4 h-4 text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-white">Add Project Time</h2>
-                <p className="text-xs text-gray-500">Log time outside of a work order</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
+    >
           {/* Form body */}
-          <div className="px-4 py-3 space-y-3">
+          <div className="p-4 sm:p-6 space-y-4">
 
             {/* Project */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Project
               </label>
               {preselectedProjectId ? (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg">
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface border border-subtle rounded-lg">
                   <Briefcase className="w-4 h-4 text-blue-400 shrink-0" />
-                  <span className="text-sm text-white truncate">{preselectedProjectName || 'Selected Project'}</span>
+                  <span className="text-sm text-primary truncate">{preselectedProjectName || 'Selected Project'}</span>
                 </div>
               ) : (
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setShowProjectDropdown(v => !v)}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-left hover:border-gray-600 transition-colors"
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-surface border border-subtle rounded-lg text-left hover:border-strong transition-colors"
                   >
-                    <span className={`text-sm truncate ${selectedProject ? 'text-white' : 'text-gray-500'}`}>
+                    <span className={`text-sm truncate ${selectedProject ? 'text-primary' : 'text-gray-500'}`}>
                       {selectedProject
                         ? `${selectedProject.project_number} — ${selectedProject.name}`
                         : 'Select a project...'}
                     </span>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${showProjectDropdown ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-muted shrink-0 transition-transform ${showProjectDropdown ? 'rotate-180' : ''}`} />
                   </button>
 
                   {showProjectDropdown && (
@@ -254,15 +233,15 @@ export function AddProjectTimeModal({
                         className="fixed inset-0 z-10 sm:hidden"
                         onClick={() => setShowProjectDropdown(false)}
                       />
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-52 overflow-hidden flex flex-col">
-                        <div className="p-2 border-b border-gray-700">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-subtle rounded-lg shadow-xl z-20 max-h-52 overflow-hidden flex flex-col">
+                        <div className="p-2 border-b border-subtle">
                           <input
                             autoFocus
                             type="text"
                             placeholder="Search projects..."
                             value={projectSearch}
                             onChange={e => setProjectSearch(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                            className="w-full bg-canvas border border-subtle rounded px-2 py-1.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="overflow-y-auto">
@@ -278,9 +257,9 @@ export function AddProjectTimeModal({
                                   setShowProjectDropdown(false);
                                   setProjectSearch('');
                                 }}
-                                className="w-full px-3 py-2.5 text-left hover:bg-gray-700 transition-colors border-b border-gray-700/40 last:border-0"
+                                className="w-full px-3 py-2.5 text-left hover:bg-elevated transition-colors border-b border-subtle/40 last:border-0"
                               >
-                                <div className="text-sm text-white font-medium">{p.project_number} — {p.name}</div>
+                                <div className="text-sm text-primary font-medium">{p.project_number} — {p.name}</div>
                               </button>
                             ))
                           )}
@@ -296,13 +275,13 @@ export function AddProjectTimeModal({
             <div className={canManageOthers ? 'grid grid-cols-2 gap-3' : ''}>
               {canManageOthers && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                  <label className="block text-sm font-medium text-secondary mb-1.5">
                     Staff
                   </label>
                   <select
                     value={staffId}
                     onChange={e => setStaffId(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    className="w-full bg-surface border border-subtle rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                   >
                     <option value="">Select...</option>
                     {staffMembers.map(s => (
@@ -312,21 +291,21 @@ export function AddProjectTimeModal({
                 </div>
               )}
               <div className={canManageOthers ? '' : 'w-full'}>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-sm font-medium text-secondary mb-1.5">
                   Date
                 </label>
                 <input
                   type="date"
                   value={entryDate}
                   onChange={e => setEntryDate(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-surface border border-subtle rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
             </div>
 
             {/* Duration */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Duration
               </label>
               <div className="flex gap-2">
@@ -340,7 +319,7 @@ export function AddProjectTimeModal({
                       className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
                         active
                           ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'
+                          : 'bg-surface border-subtle text-secondary hover:border-gray-500 hover:text-primary'
                       }`}
                     >
                       {opt.label}
@@ -359,9 +338,9 @@ export function AddProjectTimeModal({
                     placeholder="0.00"
                     value={customHours}
                     onChange={e => setCustomHours(e.target.value)}
-                    className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    className="w-28 bg-surface border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                   />
-                  <span className="text-sm text-gray-400">hours</span>
+                  <span className="text-sm text-muted">hours</span>
                 </div>
               )}
             </div>
@@ -369,14 +348,14 @@ export function AddProjectTimeModal({
             {/* Labor Phase + Activity Type side by side */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-sm font-medium text-secondary mb-1.5">
                   Labor Phase <span className="text-red-400 normal-case font-normal">(required)</span>
                 </label>
                 <select
                   value={laborPhaseId}
                   onChange={e => setLaborPhaseId(e.target.value)}
-                  className={`w-full bg-gray-800 border rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors ${
-                    !laborPhaseId && error === 'Please select a labor phase.' ? 'border-red-500' : 'border-gray-700'
+                  className={`w-full bg-surface border rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors ${
+                    !laborPhaseId && error === 'Please select a labor phase.' ? 'border-red-500' : 'border-subtle'
                   }`}
                 >
                   <option value="" disabled>— Select a phase —</option>
@@ -386,13 +365,13 @@ export function AddProjectTimeModal({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-sm font-medium text-secondary mb-1.5">
                   Activity
                 </label>
                 <select
                   value={activityType}
                   onChange={e => setActivityType(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-surface border border-subtle rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                 >
                   <option value="">Select...</option>
                   {ACTIVITY_TYPES.map(a => (
@@ -404,7 +383,7 @@ export function AddProjectTimeModal({
 
             {/* Notes */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Notes {activityType === 'other' && <span className="text-red-400 normal-case font-normal">(required)</span>}
               </label>
               <textarea
@@ -412,7 +391,7 @@ export function AddProjectTimeModal({
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Optional details..."
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                className="w-full bg-surface border border-subtle rounded-lg px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-blue-500 transition-colors resize-none"
               />
             </div>
 
@@ -424,10 +403,10 @@ export function AddProjectTimeModal({
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-3 border-t border-gray-700/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 shrink-0 bg-gray-900 rounded-b-none sm:rounded-b-2xl">
+          <div className="px-4 py-3 sm:px-6 border-t border-subtle/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 shrink-0">
             <button
               onClick={onClose}
-              className="py-2.5 sm:py-2 sm:px-4 text-sm text-gray-400 hover:text-white transition-colors text-center"
+              className="py-2.5 sm:py-2 sm:px-4 text-sm text-muted hover:text-primary transition-colors text-center"
             >
               Cancel
             </button>
@@ -446,8 +425,6 @@ export function AddProjectTimeModal({
               )}
             </button>
           </div>
-        </div>
-      </div>
-    </>
+    </QuickActionModal>
   );
 }
