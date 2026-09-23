@@ -15,9 +15,11 @@ interface DepartmentSidebarProps {
   onToggle?: () => void;
   isPinned?: boolean;
   onPinToggle?: () => void;
+  bookmarksVisible?: boolean;
+  onBookmarksToggle?: () => void;
 }
 
-export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: externalIsOpen, onToggle, isPinned = false, onPinToggle }: DepartmentSidebarProps) {
+export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: externalIsOpen, onToggle, isPinned = false, onPinToggle, bookmarksVisible, onBookmarksToggle }: DepartmentSidebarProps) {
   const toast = useToast();
   const { mainDepartments, footerDepartments, getUserModules, starredModules, starModule, unstarModule, loading } = useDepartments();
   const taskCount = useTaskCount();
@@ -233,6 +235,18 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                     ? <Pin className="w-3.5 h-3.5 fill-current" />
                     : <Pin className="w-3.5 h-3.5" />
                   }
+                </button>
+              )}
+              {onBookmarksToggle && (
+                <button
+                  type="button"
+                  onClick={onBookmarksToggle}
+                  aria-label={bookmarksVisible ? 'Hide bookmarks bar' : 'Show bookmarks bar'}
+                  aria-pressed={bookmarksVisible}
+                  title={bookmarksVisible ? 'Hide bookmarks bar' : 'Show bookmarks bar'}
+                  className={`p-1 rounded transition-colors flex items-center justify-center ${bookmarksVisible ? 'text-brand hover:bg-blue-500/20' : 'text-muted hover:bg-surface hover:text-primary'}`}
+                >
+                  <Star className={`w-3.5 h-3.5 ${bookmarksVisible ? 'fill-current' : ''}`} />
                 </button>
               )}
               {!isPinned && (

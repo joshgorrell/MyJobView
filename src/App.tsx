@@ -862,8 +862,6 @@ function AppContent() {
             onTabChange={setActiveTab}
             isAdmin={profile.role === 'admin'}
             onMenuToggle={toggleSidebar}
-            bookmarksVisible={bookmarksVisible}
-            onBookmarksToggle={toggleBookmarks}
             onNavigate={(tab, params) => {
               setActiveTab(tab);
               if (params?.workOrderId) setSelectedWorkOrderId(params.workOrderId);
@@ -882,14 +880,15 @@ function AppContent() {
           onToggle={toggleSidebar}
           isPinned={sidebarPinned}
           onPinToggle={toggleSidebarPin}
+          bookmarksVisible={bookmarksVisible}
+          onBookmarksToggle={toggleBookmarks}
         />
       )}
 
       <div className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
         {!isStandalone && bookmarksVisible && starredModules.length > 0 && (
-          <div className="border-b border-subtle bg-canvas px-3 sm:px-4 lg:px-5 py-1.5 flex items-center gap-2">
-            <div className="min-w-0 flex-1"><QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} /></div>
-            <button type="button" onClick={toggleBookmarks} className="text-xs text-muted hover:text-primary px-2 py-1" aria-label="Hide bookmarks bar">Hide</button>
+          <div className="border-b border-subtle bg-canvas px-3 sm:px-4 lg:px-5 py-1.5">
+            <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
           </div>
         )}
         <main
