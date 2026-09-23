@@ -3495,7 +3495,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 {showDeliverDropdown && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowDeliverDropdown(false)} />
-                    <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[200px]">
+                    <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
                       {/* Submit to Portal */}
                       <button
                         onClick={() => {
@@ -3505,8 +3505,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         disabled={sending}
                         className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm disabled:opacity-50 ${
                           proposalReadiness?.isReady
-                            ? 'text-blue-600 hover:bg-blue-50'
-                            : 'text-muted hover:bg-gray-50'
+                            ? 'text-brand hover:bg-infoSoft'
+                            : 'text-muted hover:bg-surface'
                         }`}
                         title={proposalReadiness?.isReady ? "Submit to customer portal" : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
                       >
@@ -3526,7 +3526,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm ${
                           proposalReadiness?.isReady
                             ? 'text-gray-700 hover:bg-gray-100'
-                            : 'text-muted hover:bg-gray-50'
+                            : 'text-muted hover:bg-surface'
                         }`}
                         title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
                       >
@@ -3560,7 +3560,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         <span>Download PDF</span>
                       </button>
 
-                      <div className="border-t border-gray-200 my-1" />
+                      <div className="border-t border-subtle my-1" />
 
                       {/* Present Live */}
                       <button
@@ -3577,14 +3577,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       {/* Portal management for already-sent proposals */}
                       {(proposal?.status === 'sent' || proposal?.status === 'portal' || proposal?.status === 'expired') && (
                         <>
-                          <div className="border-t border-gray-200 my-1" />
+                          <div className="border-t border-subtle my-1" />
                           {proposal?.status === 'expired' ? (
                             <button
                               onClick={() => {
                                 setShowReactivateModal(true);
                                 setShowDeliverDropdown(false);
                               }}
-                              className="w-full px-3 py-2 text-left text-green-600 hover:bg-green-50 flex items-center gap-2 text-sm"
+                              className="w-full px-3 py-2 text-left text-success hover:bg-successSoft flex items-center gap-2 text-sm"
                             >
                               <RefreshCw className="w-4 h-4" />
                               Reactivate
@@ -3630,7 +3630,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   {showStatusDropdown && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setShowStatusDropdown(false)} />
-                      <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[180px]">
+                      <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[180px]">
                         <button
                           onClick={() => {
                             setShowManualApprovalModal(true);
@@ -3639,8 +3639,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           disabled={updatingStatus}
                           className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm disabled:opacity-50 ${
                             proposalReadiness?.isReady
-                              ? 'text-green-600 hover:bg-green-50'
-                              : 'text-muted hover:bg-gray-50'
+                              ? 'text-success hover:bg-successSoft'
+                              : 'text-muted hover:bg-surface'
                           }`}
                           title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete — review settings before approving`}
                         >
@@ -3654,7 +3654,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           <button
                             onClick={handleDeclineProposal}
                             disabled={updatingStatus}
-                            className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 text-sm disabled:opacity-50"
+                            className="w-full px-3 py-2 text-left text-danger hover:bg-dangerSoft flex items-center gap-2 text-sm disabled:opacity-50"
                           >
                             <XCircle className="w-4 h-4" />
                             Decline
@@ -3663,11 +3663,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                         {proposal?.status === 'designing' && (
                           <>
-                            <div className="border-t border-gray-200 my-1" />
+                            <div className="border-t border-subtle my-1" />
                             <button
                               onClick={() => handleUpdateStatus('ready_to_submit')}
                               disabled={updatingStatus}
-                              className="w-full px-3 py-2 text-left text-yellow-600 hover:bg-yellow-50 flex items-center gap-2 text-sm disabled:opacity-50"
+                              className="w-full px-3 py-2 text-left text-warning hover:bg-warningSoft flex items-center gap-2 text-sm disabled:opacity-50"
                             >
                               <ThumbsUp className="w-4 h-4" />
                               Mark Ready
@@ -3677,7 +3677,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                         {proposal?.status !== 'designing' && (
                           <>
-                            <div className="border-t border-gray-200 my-1" />
+                            <div className="border-t border-subtle my-1" />
                             <button
                               onClick={() => handleUpdateStatus('designing')}
                               disabled={updatingStatus}
@@ -3719,7 +3719,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               {showMoreOptionsMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMoreOptionsMenu(false)} />
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[200px]">
+                  <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
                     {/* Customer Section */}
                     {proposal?.contact_id && (
                       <>
@@ -3743,7 +3743,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           <Edit2 className="w-4 h-4" />
                           <span>Change Customer</span>
                         </button>
-                        <div className="border-t border-gray-200 my-1" />
+                        <div className="border-t border-subtle my-1" />
                       </>
                     )}
 
@@ -3765,7 +3765,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       )}
                     </button>
 
-                    <div className="border-t border-gray-200 my-1" />
+                    <div className="border-t border-subtle my-1" />
 
                     {/* View Options */}
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">View</div>
@@ -3796,7 +3796,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       )}
                     </button>
 
-                    <div className="border-t border-gray-200 my-1" />
+                    <div className="border-t border-subtle my-1" />
 
                     {/* Reports & History */}
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Reports</div>
@@ -3878,7 +3878,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       </button>
                     )}
 
-                    <div className="border-t border-gray-200 my-1" />
+                    <div className="border-t border-subtle my-1" />
 
                     {/* Settings */}
                     <button
@@ -3894,7 +3894,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                     {!isStandalone && (
                       <>
-                        <div className="border-t border-gray-200 my-1" />
+                        <div className="border-t border-subtle my-1" />
                         <button
                           onClick={() => {
                             handlePopOut();
@@ -3910,7 +3910,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                     {isStandalone && (
                       <>
-                        <div className="border-t border-gray-200 my-1" />
+                        <div className="border-t border-subtle my-1" />
                         <button
                           onClick={() => window.close()}
                           className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"

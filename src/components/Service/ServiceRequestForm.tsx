@@ -640,7 +640,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     <QuickActionModal
       title={isEditMode ? 'Update & Resubmit' : 'Work Order Request'}
       subtitle={isEditMode ? 'Address feedback, then resubmit for review' : 'Request a new service or project work order'}
-      icon={isEditMode ? <RotateCcw className="w-5 h-5 text-white" /> : <FileText className="w-5 h-5 text-white" />}
+      icon={isEditMode ? <RotateCcw className="w-5 h-5 text-primary" /> : <FileText className="w-5 h-5 text-primary" />}
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
       onClose={onClose}
       showSuccess={showSuccess}
@@ -662,7 +662,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           {/* Request Type Toggle */}
           {!isEditMode && (
             <div className="space-y-3">
-              <h3 className="font-semibold text-white flex items-center gap-2">
+              <h3 className="font-semibold text-primary flex items-center gap-2">
                 <Briefcase className="w-5 h-5" />
                 Request Type
               </h3>
@@ -673,7 +673,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   className={`py-3 rounded-lg border font-semibold transition-all flex items-center justify-center gap-2 ${
                     requestType === 'service'
                       ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-blue-500'
+                      : 'bg-surface text-secondary border-strong hover:border-blue-500'
                   }`}
                 >
                   <FileText className="w-4 h-4" />
@@ -685,7 +685,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   className={`py-3 rounded-lg border font-semibold transition-all flex items-center justify-center gap-2 ${
                     requestType === 'project'
                       ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-emerald-500'
+                      : 'bg-surface text-secondary border-strong hover:border-emerald-500'
                   }`}
                 >
                   <Briefcase className="w-4 h-4" />
@@ -696,8 +696,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           )}
 
           {/* Customer Section */}
-          <div className="space-y-4 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
+          <div className="space-y-4 border-t border-subtle pt-4">
+            <h3 className="font-semibold text-primary flex items-center gap-2">
               <User className="w-5 h-5" />
               Customer
             </h3>
@@ -705,26 +705,26 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             {!isEditMode && !formData.contact_id && !showNewCustomer && (
               <>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Type customer name, company, or phone..."
-                    className="w-full pl-10 pr-4 py-3 bg-gray-800 border-2 border-blue-500/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg text-white placeholder-gray-500"
+                    className="w-full pl-10 pr-4 py-3 bg-surface border-2 border-blue-500/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg text-primary placeholder-gray-500"
                     autoFocus
                   />
                 </div>
 
                 {searching && (
-                  <div className="text-center py-4 text-gray-400">
+                  <div className="text-center py-4 text-muted">
                     <div className="animate-spin inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                     <p className="mt-2">Searching...</p>
                   </div>
                 )}
 
                 {!searching && searchResults.length > 0 && (
-                  <div className="border border-blue-500/40 rounded-lg max-h-48 overflow-y-auto bg-gray-800">
+                  <div className="border border-blue-500/40 rounded-lg max-h-48 overflow-y-auto bg-surface">
                     <div className="bg-blue-900/40 px-3 py-2 border-b border-blue-500/40">
                       <p className="text-sm text-blue-300 font-medium">Found {searchResults.length} customer{searchResults.length !== 1 ? 's' : ''}</p>
                     </div>
@@ -733,22 +733,22 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                         key={contact.id}
                         type="button"
                         onClick={() => selectContact(contact)}
-                        className="w-full text-left p-3 hover:bg-gray-700 border-b border-gray-700 last:border-b-0 transition-colors"
+                        className="w-full text-left p-3 hover:bg-elevated border-b border-subtle last:border-b-0 transition-colors"
                       >
-                        <p className="font-medium text-white">
+                        <p className="font-medium text-primary">
                           {contact.full_name || contact.company_name || 'Unnamed Contact'}
                         </p>
                         {contact.company_name && contact.full_name && (
-                          <p className="text-sm text-gray-400">{contact.company_name}</p>
+                          <p className="text-sm text-muted">{contact.company_name}</p>
                         )}
-                        <p className="text-sm text-gray-400">{contact.phone || 'No phone'}</p>
+                        <p className="text-sm text-muted">{contact.phone || 'No phone'}</p>
                       </button>
                     ))}
                   </div>
                 )}
 
                 {!searching && searchQuery.length >= 1 && searchResults.length === 0 && (
-                  <div className="text-center py-4 text-gray-400 border border-dashed border-gray-600 rounded-lg">
+                  <div className="text-center py-4 text-muted border border-dashed border-strong rounded-lg">
                     <p>No customers found matching "{searchQuery}"</p>
                     <p className="text-sm mt-1">Try a different search or create a new customer below</p>
                   </div>
@@ -757,7 +757,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 <button
                   type="button"
                   onClick={() => setShowNewCustomer(true)}
-                  className="w-full py-3 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 border border-dashed border-strong rounded-lg text-muted hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
                 >
                   <Plus className="w-5 h-5" />
                   Create New Customer
@@ -833,7 +833,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
                   placeholder="Customer Name *"
                   required
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500"
+                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative">
@@ -842,10 +842,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                       value={formData.customer_phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
                       placeholder="Phone"
-                      className={`w-full px-4 py-3 bg-gray-800 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500 ${
+                      className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                         originalContact && !originalContact.phone && formData.customer_phone?.trim()
                           ? 'border-emerald-500'
-                          : 'border-gray-600'
+                          : 'border-strong'
                       }`}
                     />
                     {originalContact && !originalContact.phone && formData.customer_phone?.trim() && (
@@ -858,10 +858,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                       value={formData.customer_email}
                       onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
                       placeholder="Email"
-                      className={`w-full px-4 py-3 bg-gray-800 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500 ${
+                      className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                         originalContact && !originalContact.email && formData.customer_email?.trim()
                           ? 'border-emerald-500'
-                          : 'border-gray-600'
+                          : 'border-strong'
                       }`}
                     />
                     {originalContact && !originalContact.email && formData.customer_email?.trim() && (
@@ -875,18 +875,18 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
           {/* Project Selector (Project mode only) */}
           {requestType === 'project' && formData.contact_id && !isEditMode && (
-            <div className="space-y-3 border-t border-gray-700 pt-4">
-              <h3 className="font-semibold text-white flex items-center gap-2">
+            <div className="space-y-3 border-t border-subtle pt-4">
+              <h3 className="font-semibold text-primary flex items-center gap-2">
                 <Briefcase className="w-5 h-5" />
                 Project
               </h3>
               {loadingProjects ? (
-                <div className="text-center py-4 text-gray-400">
+                <div className="text-center py-4 text-muted">
                   <div className="animate-spin inline-block w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
                   <p className="mt-2">Loading projects...</p>
                 </div>
               ) : customerProjects.length === 0 ? (
-                <div className="text-center py-4 text-gray-400 border border-dashed border-gray-600 rounded-lg">
+                <div className="text-center py-4 text-muted border border-dashed border-strong rounded-lg">
                   <p>No projects found for this customer.</p>
                   <p className="text-sm mt-1">Select a different customer or create a project first.</p>
                 </div>
@@ -898,7 +898,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     if (proj) selectProject(proj);
                     else setSelectedProjectId(e.target.value);
                   }}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-white"
+                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-primary"
                 >
                   <option value="">Select a project *</option>
                   {customerProjects.map(p => (
@@ -912,8 +912,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           )}
 
           {/* Location Section */}
-          <div className="space-y-4 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
+          <div className="space-y-4 border-t border-subtle pt-4">
+            <h3 className="font-semibold text-primary flex items-center gap-2">
               <MapPin className="w-5 h-5" />
               Job Location
             </h3>
@@ -931,10 +931,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 }}
                 placeholder="Street Address *"
                 required
-                className={`w-full px-4 py-3 bg-gray-800 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500 ${
+                className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                   originalContact && !originalContact.street_address && formData.job_location_address?.trim()
                     ? 'border-emerald-500'
-                    : 'border-gray-600'
+                    : 'border-strong'
                 }`}
               />
               {originalContact && !originalContact.street_address && formData.job_location_address?.trim() && (
@@ -947,28 +947,28 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 value={formData.job_location_city}
                 onChange={(e) => setFormData(prev => ({ ...prev, job_location_city: e.target.value }))}
                 placeholder="City"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500"
+                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
               <input
                 type="text"
                 value={formData.job_location_state}
                 onChange={(e) => setFormData(prev => ({ ...prev, job_location_state: e.target.value }))}
                 placeholder="State"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500"
+                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
               <input
                 type="text"
                 value={formData.job_location_zip}
                 onChange={(e) => setFormData(prev => ({ ...prev, job_location_zip: e.target.value }))}
                 placeholder="ZIP"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500"
+                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
             </div>
           </div>
 
           {/* Job Description */}
-          <div className="space-y-4 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
+          <div className="space-y-4 border-t border-subtle pt-4">
+            <h3 className="font-semibold text-primary flex items-center gap-2">
               <FileText className="w-5 h-5" />
               Job Description
             </h3>
@@ -978,14 +978,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               placeholder="What needs to be done? *"
               required
               rows={4}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-white placeholder-gray-500 resize-none"
+              className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500 resize-none"
             />
           </div>
 
           {/* Billable Type (Service mode only) */}
           {requestType === 'service' && (
-            <div className="space-y-4 border-t border-gray-700 pt-4">
-              <h3 className="font-semibold text-white flex items-center gap-2">
+            <div className="space-y-4 border-t border-subtle pt-4">
+              <h3 className="font-semibold text-primary flex items-center gap-2">
                 <DollarSign className="w-5 h-5" />
                 Billable Type
               </h3>
@@ -996,7 +996,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   className={`py-3 rounded-lg border font-semibold transition-all ${
                     formData.billable_type === 'billable'
                       ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-green-500'
+                      : 'bg-surface text-secondary border-strong hover:border-green-500'
                   }`}
                 >
                   Billable
@@ -1007,7 +1007,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   className={`py-3 rounded-lg border font-semibold transition-all ${
                     formData.billable_type === 'warranty'
                       ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-blue-500'
+                      : 'bg-surface text-secondary border-strong hover:border-blue-500'
                   }`}
                 >
                   Warranty
@@ -1018,12 +1018,12 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
           {/* Billable By (Service mode only) */}
           {requestType === 'service' && (
-            <div className="space-y-3 border-t border-gray-700 pt-4">
-              <h3 className="font-semibold text-white">Billable By</h3>
+            <div className="space-y-3 border-t border-subtle pt-4">
+              <h3 className="font-semibold text-primary">Billable By</h3>
               <select
                 value={formData.billable_by}
                 onChange={(e) => setFormData(prev => ({ ...prev, billable_by: e.target.value as any }))}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
               >
                 <option value="admin">Admin</option>
                 <option value="dispatch">Dispatch</option>
@@ -1035,7 +1035,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 <select
                   value={formData.billable_by_user_id || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, billable_by_user_id: e.target.value || null }))}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
                 >
                   <option value="">Select Sales Rep</option>
                   {salesReps.map(rep => (
@@ -1047,8 +1047,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           )}
 
           {/* Priority */}
-          <div className="space-y-3 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
+          <div className="space-y-3 border-t border-subtle pt-4">
+            <h3 className="font-semibold text-primary flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
               Priority
             </h3>
@@ -1059,7 +1059,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 className={`py-3 rounded-lg border font-semibold transition-all ${
                   formData.priority === 'normal'
                     ? 'bg-gray-600 text-white border-gray-500'
-                    : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-gray-500'
+                    : 'bg-surface text-secondary border-strong hover:border-gray-500'
                 }`}
               >
                 Normal
@@ -1070,30 +1070,30 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 className={`py-3 rounded-lg border font-semibold transition-all ${
                   formData.priority === 'urgent'
                     ? 'bg-orange-600 text-white border-orange-600'
-                    : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-orange-500'
+                    : 'bg-surface text-secondary border-strong hover:border-orange-500'
                 }`}
               >
                 Urgent
               </button>
             </div>
-            <p className="text-xs text-gray-500 italic">
+            <p className="text-xs text-muted italic">
               * Dispatch cannot guarantee urgent requests or need by date requests.
             </p>
           </div>
 
           {/* Optional Fields */}
-          <div className="space-y-4 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white">Optional Details</h3>
+          <div className="space-y-4 border-t border-subtle pt-4">
+            <h3 className="font-semibold text-primary">Optional Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   <Clock className="w-4 h-4 inline mr-1" />
                   Estimated Duration
                 </label>
                 <select
                   value={formData.estimated_duration}
                   onChange={(e) => setFormData(prev => ({ ...prev, estimated_duration: e.target.value }))}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
                 >
                   <option value="">Not Sure</option>
                   <option value="30min">30 minutes</option>
@@ -1104,7 +1104,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   <Calendar className="w-4 h-4 inline mr-1" />
                   Need By (ASAP if blank)
                 </label>
@@ -1112,26 +1112,26 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   type="date"
                   value={formData.requested_date}
                   onChange={(e) => setFormData(prev => ({ ...prev, requested_date: e.target.value }))}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Additional Notes</label>
+              <label className="block text-sm font-medium text-secondary mb-2">Additional Notes</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Any additional context for the service team..."
                 rows={3}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-500 resize-none"
+                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder-gray-500 resize-none"
               />
             </div>
           </div>
 
           {/* Photo Upload (both modes, max 3) */}
-          <div className="space-y-3 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
+          <div className="space-y-3 border-t border-subtle pt-4">
+            <h3 className="font-semibold text-primary flex items-center gap-2">
               <Camera className="w-5 h-5" />
               Photos (Optional, up to {MAX_PHOTOS})
             </h3>
@@ -1148,7 +1148,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               <div className="grid grid-cols-3 gap-3">
                 {photoPreviews.map((preview, i) => (
                   <div key={i} className="relative group">
-                    <img src={preview} alt={`Photo ${i + 1}`} className="w-full h-24 object-cover rounded-lg border border-gray-600" />
+                    <img src={preview} alt={`Photo ${i + 1}`} className="w-full h-24 object-cover rounded-lg border border-strong" />
                     <button
                       type="button"
                       onClick={() => removePhoto(i)}
@@ -1164,14 +1164,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-3 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 border border-dashed border-strong rounded-lg text-muted hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
               >
                 <Paperclip className="w-5 h-5" />
                 {photos.length === 0 ? 'Attach Photos' : `Add More (${photos.length}/${MAX_PHOTOS})`}
               </button>
             )}
             {photos.length >= MAX_PHOTOS && (
-              <p className="text-xs text-gray-500 text-center">Maximum {MAX_PHOTOS} photos reached.</p>
+              <p className="text-xs text-muted text-center">Maximum {MAX_PHOTOS} photos reached.</p>
             )}
           </div>
 
@@ -1180,7 +1180,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-gray-300 font-medium hover:bg-gray-800 transition-colors"
+              className="flex-1 px-4 py-2.5 border border-subtle rounded-lg text-secondary font-medium hover:bg-surface transition-colors"
             >
               Cancel
             </button>
@@ -1211,37 +1211,37 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       {/* Save to Contact prompt modal */}
       {showSaveToContactPrompt && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70] p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md">
+          <div className="bg-canvas border border-subtle rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-6">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-12 h-12 rounded-full bg-blue-900/50 flex items-center justify-center flex-shrink-0">
                   <Save className="w-6 h-6 text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Save to Contact Record?</h3>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <h3 className="text-lg font-semibold text-primary">Save to Contact Record?</h3>
+                  <p className="text-sm text-muted mt-1">
                     You added information that was missing from this customer's contact record. Would you like to save it?
                   </p>
                 </div>
               </div>
 
-              <div className="bg-gray-800 rounded-lg p-4 mb-5 space-y-2">
+              <div className="bg-surface rounded-lg p-4 mb-5 space-y-2">
                 {pendingContactUpdates.phone && (
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <span className="text-gray-300"><span className="font-medium text-white">Phone:</span> {pendingContactUpdates.phone}</span>
+                    <span className="text-secondary"><span className="font-medium text-primary">Phone:</span> {pendingContactUpdates.phone}</span>
                   </div>
                 )}
                 {pendingContactUpdates.email && (
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <span className="text-gray-300"><span className="font-medium text-white">Email:</span> {pendingContactUpdates.email}</span>
+                    <span className="text-secondary"><span className="font-medium text-primary">Email:</span> {pendingContactUpdates.email}</span>
                   </div>
                 )}
                 {pendingContactUpdates.street_address && (
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <span className="text-gray-300"><span className="font-medium text-white">Address:</span> {[pendingContactUpdates.street_address, pendingContactUpdates.city, pendingContactUpdates.state, pendingContactUpdates.zip_code].filter(Boolean).join(', ')}</span>
+                    <span className="text-secondary"><span className="font-medium text-primary">Address:</span> {[pendingContactUpdates.street_address, pendingContactUpdates.city, pendingContactUpdates.state, pendingContactUpdates.zip_code].filter(Boolean).join(', ')}</span>
                   </div>
                 )}
               </div>
@@ -1253,7 +1253,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     setShowSaveToContactPrompt(false);
                     await submitForm();
                   }}
-                  className="flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-gray-300 font-medium hover:bg-gray-800 transition-colors"
+                  className="flex-1 px-4 py-2.5 border border-subtle rounded-lg text-secondary font-medium hover:bg-surface transition-colors"
                 >
                   Skip, don't save
                 </button>

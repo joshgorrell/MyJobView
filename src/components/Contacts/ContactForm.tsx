@@ -720,7 +720,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
     <QuickActionModal
       title="New Contact"
       subtitle={isOffline ? 'Offline — will sync when reconnected' : 'Add a person or business to your contacts'}
-      icon={<UserCircle2 className="w-5 h-5 text-white" />}
+      icon={<UserCircle2 className="w-5 h-5 text-primary" />}
       accentColor="from-blue-600 to-cyan-700"
       onClose={onClose}
       showSuccess={showSuccess}
@@ -761,7 +761,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           )}
           {/* Contact Type Selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-secondary mb-2">
               Contact Type <span className="text-red-400">*</span>
             </label>
             <div className="flex gap-4">
@@ -774,7 +774,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   onChange={(e) => setFormData({ ...formData, contact_type: 'person' })}
                   className="w-4 h-4 text-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="text-sm font-medium text-gray-300">Person</span>
+                <span className="text-sm font-medium text-secondary">Person</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -785,7 +785,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   onChange={(e) => setFormData({ ...formData, contact_type: 'business' })}
                   className="w-4 h-4 text-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="text-sm font-medium text-gray-300">Business</span>
+                <span className="text-sm font-medium text-secondary">Business</span>
               </label>
             </div>
           </div>
@@ -796,7 +796,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               {/* Person Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     First Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -804,13 +804,13 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                     required
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                    className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                     placeholder="John"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Last Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -818,34 +818,34 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                     required
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                    className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                     placeholder="Doe"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-secondary mb-1">
                   Company Name
                 </label>
                 <input
                   type="text"
                   value={formData.company_name}
                   onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                  className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                   placeholder="Acme Corp"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-secondary mb-1">
                   Title
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                  className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                   placeholder="CEO"
                 />
               </div>
@@ -854,7 +854,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             <>
               {/* Business Fields */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-secondary mb-1">
                   Company Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -862,48 +862,48 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   required
                   value={formData.company_name}
                   onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                  className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                   placeholder="Acme Corp"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Contact First Name
                   </label>
                   <input
                     type="text"
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                    className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                     placeholder="John"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Contact Last Name
                   </label>
                   <input
                     type="text"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                    className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                     placeholder="Doe"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-secondary mb-1">
                   Contact Title
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                  className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                   placeholder="Account Manager"
                 />
               </div>
@@ -948,8 +948,8 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                       }`}>
                         {match.source === 'contact' ? 'Contact' : 'Lead'}
                       </span>
-                      <span className="text-sm text-gray-200 font-medium truncate">{match.displayName}</span>
-                      <span className="text-xs text-gray-500 flex-shrink-0">matched by {match.matchReason}</span>
+                      <span className="text-sm text-primary font-medium truncate">{match.displayName}</span>
+                      <span className="text-xs text-muted flex-shrink-0">matched by {match.matchReason}</span>
                     </div>
                     <button
                       type="button"
@@ -966,12 +966,12 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-secondary mb-1">
               Username (@ mention name)
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <AtSign className="w-4 h-4 text-gray-400" />
+                <AtSign className="w-4 h-4 text-muted" />
               </div>
               <input
                 type="text"
@@ -981,10 +981,10 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   setUsernameAvailable(null);
                 }}
                 onBlur={handleUsernameBlur}
-                className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500 ${
+                className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder:text-muted ${
                   usernameAvailable === false ? 'border-red-500' :
                   usernameAvailable === true ? 'border-green-500' :
-                  'border-gray-600'
+                  'border-strong'
                 }`}
                 placeholder={formData.first_name ? `${formData.first_name}${formData.last_name}`.toLowerCase().replace(/[^a-z0-9]/g, '') : 'johndoe'}
               />
@@ -996,7 +996,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               {!checkingUsername && usernameAvailable === true && (
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                   <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
@@ -1005,7 +1005,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               {!checkingUsername && usernameAvailable === false && (
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                   <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </div>
@@ -1020,13 +1020,13 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               ) : usernameAvailable === true ? (
                 <span className="text-green-400">Username available!</span>
               ) : (
-                <span className="text-gray-500">Leave blank to auto-generate from contact name. Used for @mentions in discussions.</span>
+                <span className="text-muted">Leave blank to auto-generate from contact name. Used for @mentions in discussions.</span>
               )}
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-secondary mb-1">
               Email
             </label>
             <input
@@ -1034,14 +1034,14 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               onBlur={handleEmailBlur}
-              className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+              className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
               placeholder="john@acme.com"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 Cell Phone
               </label>
               <input
@@ -1049,20 +1049,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: formatPhoneNumber(e.target.value) })}
                 onBlur={handlePhoneBlur}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                 placeholder="+1 (555) 123-4567"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 Business Phone
               </label>
               <input
                 type="tel"
                 value={formData.business_phone}
                 onChange={(e) => setFormData({ ...formData, business_phone: formatPhoneNumber(e.target.value) })}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                 placeholder="+1 (555) 987-6543"
               />
             </div>
@@ -1081,23 +1081,23 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   <span className="text-sm font-medium text-sky-200">Electrician Used (Optional)</span>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Electrician / Company Name</label>
+                  <label className="block text-xs font-medium text-muted mb-1">Electrician / Company Name</label>
                   <input
                     type="text"
                     value={electricianName}
                     onChange={(e) => setElectricianName(e.target.value)}
                     placeholder="e.g. ABC Electric"
-                    className="w-full px-3 py-2 border border-gray-600 rounded-lg text-sm bg-gray-800 text-white placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-strong rounded-lg text-sm bg-surface text-primary placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Electrician Notes (Optional)</label>
+                  <label className="block text-xs font-medium text-muted mb-1">Electrician Notes (Optional)</label>
                   <input
                     type="text"
                     value={electricianNotes}
                     onChange={(e) => setElectricianNotes(e.target.value)}
                     placeholder="e.g. Mostly commercial, long-term relationship"
-                    className="w-full px-3 py-2 border border-gray-600 rounded-lg text-sm bg-gray-800 text-white placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-strong rounded-lg text-sm bg-surface text-primary placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -1105,7 +1105,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-secondary mb-1">
               Street Address
             </label>
             <AddressAutocomplete
@@ -1120,46 +1120,46 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                 }));
               }}
               placeholder="123 Main St"
-              className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+              className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="sm:col-span-2 md:col-span-1">
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 City
               </label>
               <input
                 type="text"
                 value={formData.city}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                 placeholder="City"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 State
               </label>
               <input
                 type="text"
                 value={formData.state}
                 onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                 placeholder="CA"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 ZIP Code <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={formData.zip_code}
                 onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                 placeholder="90210"
                 required
               />
@@ -1169,20 +1169,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             </div>
           </div>
 
-          <div className="border-t border-gray-700 pt-4">
+          <div className="border-t border-subtle pt-4">
             <button
               type="button"
               onClick={() => setShowTaxSection(v => !v)}
               className="flex items-center justify-between w-full text-left group"
             >
-              <h3 className="text-base font-semibold text-white group-hover:text-blue-300 transition-colors">Tax Information</h3>
+              <h3 className="text-base font-semibold text-primary group-hover:text-blue-300 transition-colors">Tax Information</h3>
               {showTaxSection
-                ? <ChevronDown className="w-4 h-4 text-gray-400" />
-                : <ChevronRight className="w-4 h-4 text-gray-400" />
+                ? <ChevronDown className="w-4 h-4 text-muted" />
+                : <ChevronRight className="w-4 h-4 text-muted" />
               }
             </button>
             {!showTaxSection && (
-              <p className="text-xs text-gray-500 mt-1">Tax exempt status, exemption reason, certificate upload</p>
+              <p className="text-xs text-muted mt-1">Tax exempt status, exemption reason, certificate upload</p>
             )}
           </div>
           {showTaxSection && (
@@ -1201,20 +1201,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   })}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="text-sm font-medium text-gray-300">Tax Exempt</span>
+                <span className="text-sm font-medium text-secondary">Tax Exempt</span>
               </label>
 
               {formData.is_tax_exempt ? (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-secondary mb-1">
                       Exemption Reason
                     </label>
                     <input
                       type="text"
                       value={formData.tax_exemption_reason}
                       onChange={(e) => setFormData({ ...formData, tax_exemption_reason: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                      className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                       placeholder="Non-profit, Government entity, etc."
                     />
                   </div>
@@ -1231,13 +1231,13 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-2">
+                      <label className="block text-xs font-medium text-muted mb-2">
                         Certificate File (Optional)
                       </label>
                       {taxCertificateFile ? (
-                        <div className="flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded-lg">
+                        <div className="flex items-center gap-2 p-3 bg-surface border border-strong rounded-lg">
                           <FileText className="w-4 h-4 text-blue-400" />
-                          <span className="text-sm text-gray-300 flex-1">{taxCertificateFile.name}</span>
+                          <span className="text-sm text-secondary flex-1">{taxCertificateFile.name}</span>
                           <button
                             type="button"
                             onClick={() => setTaxCertificateFile(null)}
@@ -1247,10 +1247,10 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                           </button>
                         </div>
                       ) : (
-                        <label className="flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 transition-colors bg-gray-800/50">
-                          <Upload className="w-6 h-6 text-gray-500 mb-2" />
-                          <span className="text-sm text-gray-400">Click to upload certificate</span>
-                          <span className="text-xs text-gray-500 mt-1">PDF, JPG, PNG (Max 10MB)</span>
+                        <label className="flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed border-strong rounded-lg cursor-pointer hover:border-blue-500 transition-colors bg-surface/50">
+                          <Upload className="w-6 h-6 text-muted mb-2" />
+                          <span className="text-sm text-muted">Click to upload certificate</span>
+                          <span className="text-xs text-muted mt-1">PDF, JPG, PNG (Max 10MB)</span>
                           <input
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png"
@@ -1268,7 +1268,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                           />
                         </label>
                       )}
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-muted mt-2">
                         Certificate details can be added later in the Tax Exemption Manager or contact details page.
                       </p>
                     </div>
@@ -1276,7 +1276,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Tax Rate <span className="text-red-500">*</span>
                     {lookingUpTaxRate && (
                       <span className="ml-2 text-xs text-blue-600 animate-pulse">Looking up by zip code...</span>
@@ -1289,11 +1289,11 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                     max="100"
                     value={formData.tax_rate ? parseFloat(formData.tax_rate) * 100 : ''}
                     onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value ? (parseFloat(e.target.value) / 100).toString() : '' })}
-                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                    className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                     placeholder="8.25"
                     required
                   />
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     {formData.tax_rate ?
                       `Rate: ${(parseFloat(formData.tax_rate) * 100).toFixed(2)}%. ${formData.zip_code && formData.zip_code.length >= 5 ? 'Auto-populated from zip code.' : 'Using company default.'}` :
                       'Enter as percentage (e.g., 8.25 for 8.25%). Will auto-populate from zip code when entered.'
@@ -1307,20 +1307,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           )}
 
           {/* Billing Information Section */}
-          <div className="border-t border-gray-700 pt-4">
+          <div className="border-t border-subtle pt-4">
             <button
               type="button"
               onClick={() => setShowBillingSection(v => !v)}
               className="flex items-center justify-between w-full text-left group"
             >
-              <h3 className="text-base font-semibold text-white group-hover:text-blue-300 transition-colors">Billing Information</h3>
+              <h3 className="text-base font-semibold text-primary group-hover:text-blue-300 transition-colors">Billing Information</h3>
               {showBillingSection
-                ? <ChevronDown className="w-4 h-4 text-gray-400" />
-                : <ChevronRight className="w-4 h-4 text-gray-400" />
+                ? <ChevronDown className="w-4 h-4 text-muted" />
+                : <ChevronRight className="w-4 h-4 text-muted" />
               }
             </button>
             {!showBillingSection && (
-              <p className="text-xs text-gray-500 mt-1">Payment terms, purchase order acceptance</p>
+              <p className="text-xs text-muted mt-1">Payment terms, purchase order acceptance</p>
             )}
           </div>
           {showBillingSection && (
@@ -1328,13 +1328,13 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             <div className="space-y-4">
               {/* Default Payment Terms */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-secondary mb-1">
                   Default Payment Terms <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.default_payment_terms}
                   onChange={(e) => setFormData({ ...formData, default_payment_terms: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+                  className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
                   required
                 >
                   <option value="Net 10">Net 10 (Default)</option>
@@ -1342,13 +1342,13 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   <option value="Due on Receipt">Due on Receipt</option>
                   <option value="COD">COD (Cash on Delivery)</option>
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted mt-1">
                   Will be used as default when creating proposals and invoices for this customer.
                 </p>
               </div>
 
               {/* Purchase Order Acceptance */}
-              <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+              <div className="bg-surface/50 border border-subtle rounded-lg p-4">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1357,8 +1357,8 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                     className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 mt-0.5"
                   />
                   <div className="flex-1">
-                    <span className="text-sm font-medium text-white block">Accepts Purchase Orders</span>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <span className="text-sm font-medium text-primary block">Accepts Purchase Orders</span>
+                    <p className="text-xs text-muted mt-1">
                       Enable this to allow the customer to submit purchase orders for proposal approval.
                     </p>
                   </div>
@@ -1411,7 +1411,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-secondary mb-1">
               Notes
             </label>
             <textarea
@@ -1424,28 +1424,28 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-secondary mb-1">
               Tags
             </label>
             <input
               type="text"
               value={formData.tags}
               onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500"
+              className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary placeholder-gray-500"
               placeholder="#enterprise #referral"
             />
-            <p className="text-xs text-gray-400 mt-1">Separate tags with spaces. Use # prefix.</p>
+            <p className="text-xs text-muted mt-1">Separate tags with spaces. Use # prefix.</p>
           </div>
 
           {offices.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 Office Location <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.office_id}
                 onChange={(e) => setFormData({ ...formData, office_id: e.target.value })}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white ${!formData.office_id ? 'border-red-500' : 'border-gray-600'}`}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary ${!formData.office_id ? 'border-red-500' : 'border-strong'}`}
                 required
               >
                 <option value="">-- Select an Office --</option>
@@ -1462,13 +1462,13 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-secondary mb-1">
               Sales Rep <span className="text-red-500">*</span>
             </label>
             <select
               value={salesRepId}
               onChange={(e) => setSalesRepId(e.target.value)}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-800 text-white ${!salesRepId ? 'border-red-500' : 'border-gray-600'}`}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-surface text-primary ${!salesRepId ? 'border-red-500' : 'border-strong'}`}
               required
             >
               <option value="">-- Select a Sales Rep --</option>
@@ -1483,20 +1483,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             )}
           </div>
 
-          <div className="border-t border-gray-700 pt-4">
+          <div className="border-t border-subtle pt-4">
             <button
               type="button"
               onClick={() => setShowBusinessCardSection(v => !v)}
               className="flex items-center justify-between w-full text-left group"
             >
-              <h3 className="text-base font-semibold text-white group-hover:text-blue-300 transition-colors">Business Card Photo</h3>
+              <h3 className="text-base font-semibold text-primary group-hover:text-blue-300 transition-colors">Business Card Photo</h3>
               {showBusinessCardSection
-                ? <ChevronDown className="w-4 h-4 text-gray-400" />
-                : <ChevronRight className="w-4 h-4 text-gray-400" />
+                ? <ChevronDown className="w-4 h-4 text-muted" />
+                : <ChevronRight className="w-4 h-4 text-muted" />
               }
             </button>
             {!showBusinessCardSection && (
-              <p className="text-xs text-gray-500 mt-1">Upload or scan a card to auto-fill contact details</p>
+              <p className="text-xs text-muted mt-1">Upload or scan a card to auto-fill contact details</p>
             )}
           </div>
           {showBusinessCardSection && (
@@ -1541,7 +1541,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   </button>
 
                   <label className="flex flex-col items-center justify-center px-6 py-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
-                    <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                    <Upload className="w-6 h-6 text-muted mb-1" />
                     <span className="text-sm text-gray-600">Upload</span>
                     <input
                       type="file"
@@ -1586,7 +1586,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   Scan or upload a business card to auto-fill contact details
                 </p>
                 {ocrConfidence && (
-                  <div className="mt-2 text-xs text-gray-500">
+                  <div className="mt-2 text-xs text-muted">
                     <p className="font-medium mb-1">Auto-filled fields (review for accuracy):</p>
                     {Object.entries(ocrConfidence).filter(([_, conf]: any) => conf > 0).map(([field, conf]: any) => (
                       <div key={field} className="flex items-center gap-1">
@@ -1604,8 +1604,8 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           )}
 
           {/* Sales Status Selector */}
-          <div className="border-t border-gray-700 pt-4">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
+          <div className="border-t border-subtle pt-4">
+            <label className="block text-sm font-medium text-secondary mb-3">
               Sales Status <span className="text-red-400">*</span>
             </label>
             {initialSalesStatus === 'prospect' ? (
@@ -1613,9 +1613,9 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                 <Users className="w-4 h-4 text-blue-400 flex-shrink-0" />
                 <div>
                   <span className="font-semibold text-sm text-blue-300">Prospect</span>
-                  <p className="text-xs text-gray-500 leading-tight mt-0.5">Being pursued — no interest expressed yet</p>
+                  <p className="text-xs text-muted leading-tight mt-0.5">Being pursued — no interest expressed yet</p>
                 </div>
-                <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full flex-shrink-0">Locked</span>
+                <span className="ml-auto text-xs text-muted bg-surface px-2 py-0.5 rounded-full flex-shrink-0">Locked</span>
               </div>
             ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1625,14 +1625,14 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                   salesStatus === 'customer'
                     ? 'border-green-500 bg-green-950/40'
-                    : 'border-gray-700 hover:border-gray-500 bg-gray-800/40'
+                    : 'border-subtle hover:border-gray-500 bg-surface/40'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <UserCheck className={`w-4 h-4 ${salesStatus === 'customer' ? 'text-green-400' : 'text-gray-400'}`} />
-                  <span className={`font-semibold text-sm ${salesStatus === 'customer' ? 'text-green-300' : 'text-gray-300'}`}>Customer</span>
+                  <UserCheck className={`w-4 h-4 ${salesStatus === 'customer' ? 'text-green-400' : 'text-muted'}`} />
+                  <span className={`font-semibold text-sm ${salesStatus === 'customer' ? 'text-green-300' : 'text-secondary'}`}>Customer</span>
                 </div>
-                <p className="text-xs text-gray-500 leading-tight">Has purchased or has an active project</p>
+                <p className="text-xs text-muted leading-tight">Has purchased or has an active project</p>
               </button>
 
               <button
@@ -1641,14 +1641,14 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                   salesStatus === 'prospect'
                     ? 'border-blue-500 bg-blue-950/40'
-                    : 'border-gray-700 hover:border-gray-500 bg-gray-800/40'
+                    : 'border-subtle hover:border-gray-500 bg-surface/40'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Users className={`w-4 h-4 ${salesStatus === 'prospect' ? 'text-blue-400' : 'text-gray-400'}`} />
-                  <span className={`font-semibold text-sm ${salesStatus === 'prospect' ? 'text-blue-300' : 'text-gray-300'}`}>Prospect</span>
+                  <Users className={`w-4 h-4 ${salesStatus === 'prospect' ? 'text-blue-400' : 'text-muted'}`} />
+                  <span className={`font-semibold text-sm ${salesStatus === 'prospect' ? 'text-blue-300' : 'text-secondary'}`}>Prospect</span>
                 </div>
-                <p className="text-xs text-gray-500 leading-tight">Being pursued — no interest expressed yet</p>
+                <p className="text-xs text-muted leading-tight">Being pursued — no interest expressed yet</p>
               </button>
 
               <button
@@ -1657,14 +1657,14 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                   salesStatus === 'lead'
                     ? 'border-amber-500 bg-amber-950/40'
-                    : 'border-gray-700 hover:border-gray-500 bg-gray-800/40'
+                    : 'border-subtle hover:border-gray-500 bg-surface/40'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className={`w-4 h-4 ${salesStatus === 'lead' ? 'text-amber-400' : 'text-gray-400'}`} />
-                  <span className={`font-semibold text-sm ${salesStatus === 'lead' ? 'text-amber-300' : 'text-gray-300'}`}>Lead</span>
+                  <TrendingUp className={`w-4 h-4 ${salesStatus === 'lead' ? 'text-amber-400' : 'text-muted'}`} />
+                  <span className={`font-semibold text-sm ${salesStatus === 'lead' ? 'text-amber-300' : 'text-secondary'}`}>Lead</span>
                 </div>
-                <p className="text-xs text-gray-500 leading-tight">Expressed interest — requesting quote or info</p>
+                <p className="text-xs text-muted leading-tight">Expressed interest — requesting quote or info</p>
               </button>
             </div>
             )}
@@ -1685,23 +1685,23 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                     <span className="text-sm font-medium text-sky-200">Electrician Used (Optional)</span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Electrician / Company Name</label>
+                    <label className="block text-xs font-medium text-muted mb-1">Electrician / Company Name</label>
                     <input
                       type="text"
                       value={electricianName}
                       onChange={(e) => setElectricianName(e.target.value)}
                       placeholder="e.g. ABC Electric"
-                      className="w-full px-3 py-2 border border-gray-600 rounded-lg text-sm bg-gray-800 text-white placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-strong rounded-lg text-sm bg-surface text-primary placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Notes (Optional)</label>
+                    <label className="block text-xs font-medium text-muted mb-1">Notes (Optional)</label>
                     <input
                       type="text"
                       value={electricianNotes}
                       onChange={(e) => setElectricianNotes(e.target.value)}
                       placeholder="e.g. Mostly commercial, long-term relationship"
-                      className="w-full px-3 py-2 border border-gray-600 rounded-lg text-sm bg-gray-800 text-white placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-strong rounded-lg text-sm bg-surface text-primary placeholder-gray-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -1712,20 +1712,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             {salesStatus === 'lead' && (
               <div className="mt-4 space-y-3 p-4 bg-amber-950/20 border border-amber-800/40 rounded-lg">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Opportunity Details
                   </label>
                   <textarea
                     value={opportunityDetails}
                     onChange={(e) => setOpportunityDetails(e.target.value)}
                     rows={2}
-                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-gray-800 text-white placeholder-gray-500 resize-none text-sm"
+                    className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-surface text-primary placeholder-gray-500 resize-none text-sm"
                     placeholder="What are they interested in? Any details for the sales rep..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Priority</label>
+                  <label className="block text-sm font-medium text-secondary mb-2">Priority</label>
                   <div className="grid grid-cols-2 gap-2">
                     {(['urgent', 'high', 'medium', 'low'] as const).map((p) => {
                       const colors = {
@@ -1741,14 +1741,14 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                           type="button"
                           onClick={() => setPriority(p)}
                           className={`p-2 rounded-lg border-2 text-left transition-all ${
-                            priority === p ? `${c.border} ${c.bg}` : 'border-gray-600 hover:border-gray-500'
+                            priority === p ? `${c.border} ${c.bg}` : 'border-strong hover:border-gray-500'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 mb-0.5">
                             <AlertCircle className={`w-3.5 h-3.5 ${c.text}`} />
                             <span className={`font-semibold text-sm ${c.text}`}>{c.label}</span>
                           </div>
-                          <p className="text-xs text-gray-400">{c.hint}</p>
+                          <p className="text-xs text-muted">{c.hint}</p>
                         </button>
                       );
                     })}
@@ -1763,7 +1763,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                       onChange={() => setLeadDestination('fishbowl')}
                       className="w-4 h-4 text-amber-500 focus:ring-2 focus:ring-amber-500"
                     />
-                    <span className="text-sm text-gray-300">Send to Fishbowl</span>
+                    <span className="text-sm text-secondary">Send to Fishbowl</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1772,18 +1772,18 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                       onChange={() => setLeadDestination('assign')}
                       className="w-4 h-4 text-amber-500 focus:ring-2 focus:ring-amber-500"
                     />
-                    <span className="text-sm text-gray-300">Assign to Sales Rep</span>
+                    <span className="text-sm text-secondary">Assign to Sales Rep</span>
                   </label>
                 </div>
 
                 {leadDestination === 'assign' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Assign To</label>
+                    <label className="block text-sm font-medium text-secondary mb-1">Assign To</label>
                     <select
                       value={assignedTo}
                       onChange={(e) => setAssignedTo(e.target.value)}
                       required={salesStatus === 'lead' && leadDestination === 'assign'}
-                      className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-gray-800 text-white"
+                      className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-surface text-primary"
                     >
                       <option value="">Select a sales rep...</option>
                       {salesReps.map((rep) => (
@@ -1800,7 +1800,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              className="flex-1 px-4 py-2 border border-subtle text-secondary rounded-lg hover:bg-surface transition-colors font-medium"
             >
               Cancel
             </button>
