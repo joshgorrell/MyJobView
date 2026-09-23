@@ -12,7 +12,11 @@ export function UserPreferences() {
   const { profile } = useAuth();
   const { preference, setPreference } = useTheme();
   const [themeError, setThemeError] = useState('');
-  const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards' | 'proposals'>('notifications');
+  const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards' | 'proposals'>(() => {
+    const target = sessionStorage.getItem('mjv-preferences-tab');
+    sessionStorage.removeItem('mjv-preferences-tab');
+    return target === 'business-card' ? 'business-card' : 'notifications';
+  });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -37,6 +41,12 @@ export function UserPreferences() {
   const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  useEffect(() => {
+    const openProfile = () => setActiveTab('business-card');
+    window.addEventListener('mjv-open-profile-settings', openProfile);
+    return () => window.removeEventListener('mjv-open-profile-settings', openProfile);
+  }, []);
 
   useEffect(() => {
     loadPreferences();

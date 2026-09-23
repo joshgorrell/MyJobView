@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
 
 export function UserBusinessCardEditor() {
-  const { user } = useAuth();
+  const { user, profile, setProfileAvatar } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,7 +46,9 @@ export function UserBusinessCardEditor() {
         setPhone(data.phone);
         setLinkedinUrl(data.linkedin_url || '');
         setBio(data.bio || '');
-        setPhotoUrl(data.photo_url || '');
+        setPhotoUrl(data.photo_url || profile?.avatar_url || '');
+      } else {
+        setPhotoUrl(profile?.avatar_url || '');
       }
     } catch (error) {
       console.error('Error loading card:', error);
@@ -59,8 +61,8 @@ export function UserBusinessCardEditor() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      alert('Please select a JPG, PNG, or WebP image');
       return;
     }
 
@@ -71,17 +73,8 @@ export function UserBusinessCardEditor() {
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
       const fileName = `${user.id}/photo-${Date.now()}.${fileExt}`;
-
-      if (photoUrl) {
-        const oldFileName = photoUrl.split('/').pop();
-        if (oldFileName) {
-          await supabase.storage
-            .from('business_card_photos')
-            .remove([`${user.id}/${oldFileName}`]);
-        }
-      }
 
       const { error: uploadError } = await supabase.storage
         .from('business_card_photos')
@@ -112,13 +105,18 @@ export function UserBusinessCardEditor() {
     if (!photoUrl || !user) return;
 
     try {
-      const fileName = photoUrl.split('/').pop();
-      if (fileName) {
-        await supabase.storage
-          .from('business_card_photos')
-          .remove([`${user.id}/${fileName}`]);
+      if (card) {
+        const { error } = await supabase.from('business_cards').update({ photo_url: null }).eq('id', card.id);
+        if (error) throw error;
       }
+      const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id);
+      if (error) throw error;
+      setProfileAvatar(null);
       setPhotoUrl('');
+      const oldPath = photoUrl.split('/business_card_photos/')[1];
+      if (oldPath?.startsWith(`${user.id}/`)) {
+        await supabase.storage.from('business_card_photos').remove([decodeURIComponent(oldPath)]);
+      }
     } catch (error) {
       console.error('Error removing photo:', error);
       alert('Failed to remove photo');
@@ -160,6 +158,13 @@ export function UserBusinessCardEditor() {
 
         if (error) throw error;
       }
+
+      const { error: avatarError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: photoUrl || null })
+        .eq('id', user.id);
+      if (avatarError) throw avatarError;
+      setProfileAvatar(photoUrl || null);
 
       alert('Business card saved successfully!');
       loadCard();
@@ -225,7 +230,7 @@ export function UserBusinessCardEditor() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handlePhotoUpload}
               className="hidden"
               id="photo-upload"
@@ -244,7 +249,7 @@ export function UserBusinessCardEditor() {
               </span>
             </label>
             <p className="text-xs text-gray-400">
-              Square image recommended. Max 5MB.
+              Square JPG, PNG, or WebP recommended. Max 5MB. Save the card to update your header avatar.
             </p>
           </div>
         </div>

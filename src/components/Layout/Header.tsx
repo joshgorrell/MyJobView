@@ -30,6 +30,7 @@ interface HeaderProps {
 
 export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
+  const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
   const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMobileItems, setExpandedMobileItems] = useState<Set<string>>(new Set());
@@ -42,16 +43,21 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   const avatar = (
     <button
       type="button"
-      onClick={() => { onTabChange('preferences'); setMobileMenuOpen(false); }}
+      onClick={() => {
+        sessionStorage.setItem('mjv-preferences-tab', 'business-card');
+        window.dispatchEvent(new Event('mjv-open-profile-settings'));
+        onTabChange('preferences');
+        setMobileMenuOpen(false);
+      }}
       className="relative w-9 h-9 flex-shrink-0 rounded-full border border-subtle bg-elevated text-brand font-semibold text-xs flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-blue-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       aria-label="Open profile and preferences"
       title={profile?.full_name ? `${profile.full_name} — Preferences` : 'Preferences'}
     >
       <span aria-hidden="true">{initials}</span>
-      {profile?.avatar_url && (
+      {(profile?.avatar_url || businessCardPhoto) && (
         <img
-          key={profile.avatar_url}
-          src={profile.avatar_url}
+          key={profile?.avatar_url || businessCardPhoto}
+          src={profile.avatar_url || businessCardPhoto || ''}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
           onError={event => { event.currentTarget.style.display = 'none'; }}
@@ -78,6 +84,17 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
     }
     loadOrgLogo();
   }, [profile?.organization_id]);
+
+  useEffect(() => {
+    if (!profile?.id || profile.avatar_url) {
+      setBusinessCardPhoto(null);
+      return;
+    }
+    let cancelled = false;
+    supabase.from('business_cards').select('photo_url').eq('user_id', profile.id).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setBusinessCardPhoto(data?.photo_url || null); });
+    return () => { cancelled = true; };
+  }, [profile?.id, profile?.avatar_url]);
 
   // Close create menu on click outside
   useEffect(() => {
