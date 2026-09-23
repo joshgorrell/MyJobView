@@ -381,11 +381,11 @@ export function UserPreferences() {
         <h2 className="font-semibold">Appearance</h2>
         <p className="mt-1 text-sm text-muted">Choose how MyJobView appears. Your choice is saved to your account after the theme update is released.</p>
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Color theme">
-          {(['light', 'dark', 'system'] as ThemePreference[]).map(option => (
+          {(['classic', 'light', 'dark', 'system'] as ThemePreference[]).map(option => (
             <button key={option} type="button" aria-pressed={preference === option}
               onClick={async () => { setThemeError(''); try { await setPreference(option); } catch { setThemeError('Could not save your theme. Please try again.'); } }}
               className={`rounded-lg border px-4 py-2 text-sm font-medium ${preference === option ? 'border-blue-500 bg-blue-600 text-white' : 'border-subtle bg-surface text-primary hover:bg-elevated'}`}>
-              {option[0].toUpperCase() + option.slice(1)}
+              {option === 'classic' ? 'Classic Gradient' : option[0].toUpperCase() + option.slice(1)}
             </button>
           ))}
         </div>

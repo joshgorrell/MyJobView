@@ -827,7 +827,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-workspace flex flex-col overflow-hidden">
+    <div className="workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>

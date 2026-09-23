@@ -2,16 +2,16 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
-export type ThemePreference = 'light' | 'dark' | 'system';
+export type ThemePreference = 'light' | 'dark' | 'classic' | 'system';
 type ThemeContextValue = {
   preference: ThemePreference;
-  resolvedTheme: 'light' | 'dark';
+  resolvedTheme: 'light' | 'dark' | 'classic';
   setPreference: (value: ThemePreference) => Promise<void>;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const validTheme = (value: unknown): value is ThemePreference =>
-  value === 'light' || value === 'dark' || value === 'system';
+  value === 'light' || value === 'dark' || value === 'classic' || value === 'system';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
@@ -28,13 +28,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!profile) return;
     const saved = localStorage.getItem(`mjv-theme-${profile.id}`);
-    setPreferenceState(validTheme(profile.ui_theme) ? profile.ui_theme : validTheme(saved) ? saved : 'dark');
+    setPreferenceState(validTheme(saved) ? saved : validTheme(profile.ui_theme) ? profile.ui_theme : 'dark');
   }, [profile?.id, profile?.ui_theme]);
 
   const resolvedTheme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme;
-    document.documentElement.style.colorScheme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme === 'light' ? 'light' : 'dark';
   }, [resolvedTheme]);
 
   const value = useMemo<ThemeContextValue>(() => ({
@@ -49,7 +49,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         // A preview branch can run before its additive migration is applied.
         // Keep the browser preference for visual QA; account sync begins after migration.
-        if (error.code === '42703' || error.code === 'PGRST204') return;
+        if (error.code === '42703' || error.code === 'PGRST204' || error.code === '23514') return;
         setPreferenceState(previous);
         localStorage.setItem(`mjv-theme-${profile.id}`, previous);
         throw error;

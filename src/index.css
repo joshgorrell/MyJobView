@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-:root, [data-theme='dark'] {
+:root, [data-theme='dark'], [data-theme='classic'] {
   --workspace: 15 23 42;
   --canvas: 17 24 39;
   --surface: 31 41 55;
@@ -24,6 +24,10 @@
   --danger-surface: 69 10 10;
   --attention-text: 253 186 116;
   --attention-surface: 67 20 7;
+}
+
+[data-theme='classic'] .workspace-shell {
+  background: linear-gradient(to bottom right, #0f172a, #581c87, #0f172a);
 }
 
 [data-theme='light'] {
