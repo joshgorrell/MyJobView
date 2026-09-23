@@ -242,13 +242,13 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-600">
+      <div className="flex border-b border-subtle">
         <button
           onClick={() => setActiveTab('invoices')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'invoices'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-muted hover:text-gray-200'
+              ? 'border-blue-500 text-brand'
+              : 'border-transparent text-muted hover:text-primary'
           }`}
         >
           <DollarSign className="w-4 h-4" />
@@ -258,8 +258,8 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           onClick={() => setActiveTab('stats')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'stats'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-muted hover:text-gray-200'
+              ? 'border-blue-500 text-brand'
+              : 'border-transparent text-muted hover:text-primary'
           }`}
         >
           <BarChart2 className="w-4 h-4" />
@@ -280,13 +280,13 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search invoices..."
-                  className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-2 text-base border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-2 text-base bg-surface text-primary placeholder:text-muted border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-base border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -297,11 +297,11 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
               </select>
             </div>
             {contactIdFilter && (
-              <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <span className="text-xs text-amber-700 font-medium flex-1">Filtered by contact</span>
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-warningSoft border border-warningLine rounded-lg">
+                <span className="text-xs text-warning font-medium flex-1">Filtered by contact</span>
                 <button
                   onClick={onClearContactFilter}
-                  className="text-amber-500 hover:text-amber-700 transition-colors"
+                  className="text-warning hover:text-primary transition-colors"
                   title="Clear filter"
                 >
                   <X className="w-4 h-4" />

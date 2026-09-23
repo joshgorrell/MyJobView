@@ -1196,11 +1196,11 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
           <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
 
             <div className="p-3 bg-blue-950/40 rounded-lg border border-blue-700/50">
-              <div className="flex items-center gap-2 text-blue-300 mb-1">
+              <div className="flex items-center gap-2 text-info mb-1">
                 <Award className="w-4 h-4" />
                 <span className="font-medium text-sm">Earn {photoPoints} {photoPoints === 1 ? 'Point' : 'Points'} Per Photo!</span>
               </div>
-              <p className="text-xs text-blue-400">
+              <p className="text-xs text-info">
                 Help improve documentation by uploading job photos
               </p>
             </div>
@@ -1217,7 +1217,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
                 className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder:text-muted"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Caption will be applied to all media uploaded together
               </p>
             </div>
@@ -1242,7 +1242,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-blue-400 mt-1">
+                <p className="text-xs text-info mt-1">
                   Photos will be linked to this request and the requester will be notified
                 </p>
               </div>

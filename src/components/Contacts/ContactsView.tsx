@@ -376,7 +376,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             </button>
           </div>
 
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             {searchLoading ? (
               <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
             ) : (
@@ -391,7 +391,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 typeFilter === 'customer' ? 'Search customers...' :
                 typeFilter === 'prospect' ? 'Search prospects...' : 'Search leads...'
               }
-              className="w-full pl-9 pr-3 py-1.5 text-sm border border-strong rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full pl-9 pr-3 py-1.5 text-sm bg-surface text-primary placeholder:text-muted border border-strong rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
 
@@ -400,7 +400,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             <button
               onClick={() => setShowColumnSettings(!showColumnSettings)}
               className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-md border transition-colors ${
-                showColumnSettings ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-canvas border-strong text-secondary hover:bg-surface'
+                showColumnSettings ? 'bg-infoSoft border-blue-300 text-info' : 'bg-canvas border-strong text-secondary hover:bg-surface'
               }`}
               title="Show or hide columns"
             >
@@ -410,7 +410,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowColumnSettings(false)} />
                 <div className="absolute right-0 top-full mt-1 z-20 bg-canvas rounded-lg border border-subtle shadow-lg min-w-[180px] py-1">
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-gray-100">
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-subtle">
                     Toggle Columns
                   </div>
                   {(Object.keys(COLUMN_LABELS) as ColumnKey[]).map((key) => (
@@ -526,7 +526,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 disabled={temperatureCounts.on_fire === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
                   temperatureFilter === 'on_fire' ? 'bg-orange-600 text-white' :
-                  temperatureCounts.on_fire === 0 ? 'bg-surface text-gray-300 cursor-not-allowed' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                  temperatureCounts.on_fire === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-attentionSoft text-attention hover:bg-elevated'
                 }`}
               >
                 <Flame className="w-3 h-3" />
@@ -537,7 +537,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 disabled={temperatureCounts.hot === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
                   temperatureFilter === 'hot' ? 'bg-red-600 text-white' :
-                  temperatureCounts.hot === 0 ? 'bg-surface text-gray-300 cursor-not-allowed' : 'bg-red-50 text-red-700 hover:bg-red-100'
+                  temperatureCounts.hot === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-dangerSoft text-danger hover:bg-elevated'
                 }`}
               >
                 <Thermometer className="w-3 h-3" />
@@ -548,8 +548,8 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 onClick={() => setTemperatureFilter('warm')}
                 disabled={temperatureCounts.warm === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
-                  temperatureFilter === 'warm' ? 'bg-yellow-600 text-white' :
-                  temperatureCounts.warm === 0 ? 'bg-surface text-gray-300 cursor-not-allowed' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                  temperatureFilter === 'warm' ? 'bg-amber-700 text-white' :
+                  temperatureCounts.warm === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-warningSoft text-warning hover:bg-elevated'
                 }`}
               >
                 <Thermometer className="w-3 h-3" />
@@ -561,7 +561,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 disabled={temperatureCounts.cold === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
                   temperatureFilter === 'cold' ? 'bg-blue-600 text-white' :
-                  temperatureCounts.cold === 0 ? 'bg-surface text-gray-300 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  temperatureCounts.cold === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-infoSoft text-info hover:bg-elevated'
                 }`}
               >
                 <Thermometer className="w-3 h-3" />

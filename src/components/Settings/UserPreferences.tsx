@@ -480,7 +480,7 @@ export function UserPreferences() {
 
             {proposalTemplates.length === 0 ? (
               <div className="bg-surface border border-subtle rounded-lg p-6 text-center">
-                <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                <FileText className="w-12 h-12 mx-auto mb-3 text-muted" />
                 <p className="text-secondary">No proposal templates available</p>
                 <p className="text-sm text-muted mt-2">
                   Contact your administrator to create proposal templates
@@ -558,7 +558,7 @@ export function UserPreferences() {
             <Smartphone className="w-6 h-6 text-brand" />
             Push Notifications
           </h3>
-          <p className="text-gray-300">Get instant notifications on your device even when the app is closed</p>
+          <p className="text-secondary">Get instant notifications on your device even when the app is closed</p>
         </div>
 
         <div className="bg-canvas border border-subtle rounded-lg p-6">
@@ -585,7 +585,7 @@ export function UserPreferences() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-gray-400">
+              <div className="flex items-center gap-3 text-muted">
                 <XCircle className="w-6 h-6" />
                 <div className="font-semibold">Push Notifications Disabled</div>
               </div>
@@ -612,7 +612,7 @@ export function UserPreferences() {
               <Eye className="w-6 h-6 text-brand" />
               Office Visibility
             </h3>
-            <p className="text-gray-300">Control what data you can see based on office locations</p>
+            <p className="text-secondary">Control what data you can see based on office locations</p>
           </div>
 
           <div className="bg-canvas border border-subtle rounded-lg p-6 space-y-6">
@@ -749,7 +749,7 @@ export function UserPreferences() {
             <Calendar className="w-6 h-6 text-brand" />
             Google Calendar Integration
           </h3>
-          <p className="text-gray-300">Connect your Google Calendar to automatically create reminders</p>
+          <p className="text-secondary">Connect your Google Calendar to automatically create reminders</p>
         </div>
 
         <div className="bg-canvas border border-subtle rounded-lg p-6">
@@ -776,7 +776,7 @@ export function UserPreferences() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-gray-400">
+              <div className="flex items-center gap-3 text-muted">
                 <XCircle className="w-6 h-6" />
                 <div className="font-semibold">Not Connected</div>
               </div>
@@ -802,7 +802,7 @@ export function UserPreferences() {
             <Bell className="w-6 h-6 text-brand" />
             Notification Preferences
           </h3>
-          <p className="text-gray-300">Choose which notifications you want to receive</p>
+          <p className="text-secondary">Choose which notifications you want to receive</p>
         </div>
 
         <div className="space-y-4">

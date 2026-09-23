@@ -47,10 +47,10 @@ interface SalesOrdersViewProps {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string; icon: typeof Clock }> = {
-  pending_deposit: { label: 'Pending Deposit', color: 'bg-yellow-900/40 text-yellow-400 border border-yellow-700/40', dot: 'bg-yellow-400', icon: DollarSign },
-  pending_po:      { label: 'Pending PO',      color: 'bg-orange-900/40 text-orange-400 border border-orange-700/40', dot: 'bg-orange-400', icon: Clock },
-  planning:        { label: 'Planning',         color: 'bg-blue-900/40 text-blue-400 border border-blue-700/40', dot: 'bg-blue-400', icon: Clock },
-  active:          { label: 'Active',           color: 'bg-green-900/40 text-green-400 border border-green-700/40', dot: 'bg-green-400', icon: CheckCircle },
+  pending_deposit: { label: 'Pending Deposit', color: 'bg-warningSoft text-warning border border-warningLine', dot: 'bg-warning', icon: DollarSign },
+  pending_po:      { label: 'Pending PO',      color: 'bg-attentionSoft text-attention border border-warningLine', dot: 'bg-attention', icon: Clock },
+  planning:        { label: 'Planning',         color: 'bg-infoSoft text-info border border-subtle', dot: 'bg-info', icon: Clock },
+  active:          { label: 'Active',           color: 'bg-successSoft text-success border border-subtle', dot: 'bg-success', icon: CheckCircle },
   complete:        { label: 'Complete',         color: 'bg-elevated/60 text-secondary border border-strong/40', dot: 'bg-gray-400', icon: CheckCircle },
   closed:          { label: 'Closed',           color: 'bg-elevated/40 text-muted border border-strong/30', dot: 'bg-gray-600', icon: AlertCircle },
 };
