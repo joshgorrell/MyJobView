@@ -707,7 +707,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                         {task.contact_id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickViewContactId(task.contact_id); }}
-                            className="text-blue-400 hover:text-blue-300 text-left font-medium transition-colors"
+                            className="customer-link text-left font-medium transition-colors"
                           >
                             {task.contact.full_name}
                           </button>

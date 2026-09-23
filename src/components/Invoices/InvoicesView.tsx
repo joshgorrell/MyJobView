@@ -347,7 +347,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                         {invoice.contact_id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickViewContactId(invoice.contact_id!); }}
-                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left font-medium"
+                            className="customer-link text-sm text-left font-medium"
                           >
                             {invoice.customer_name}
                           </button>
@@ -426,7 +426,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                             {invoice.contact_id ? (
                               <button
                                 onClick={() => setQuickViewContactId(invoice.contact_id!)}
-                                className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left font-medium"
+                                className="customer-link text-sm text-left font-medium"
                               >
                                 {invoice.customer_name}
                               </button>

@@ -309,7 +309,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                             {order.contact?.id ? (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setQuickViewContactId(order.contact.id); }}
-                                className="font-semibold text-blue-400 hover:text-blue-300 text-sm leading-tight truncate block text-left max-w-full transition-colors"
+                                className="customer-link font-semibold text-sm leading-tight truncate block text-left max-w-full transition-colors"
                               >
                                 {order.contact.full_name}
                               </button>
@@ -393,7 +393,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                               {order.contact?.id ? (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setQuickViewContactId(order.contact.id); }}
-                                  className="font-semibold text-blue-400 hover:text-blue-300 text-sm leading-tight truncate block text-left max-w-[200px] md:max-w-[280px] lg:max-w-xs transition-colors"
+                                  className="customer-link font-semibold text-sm leading-tight truncate block text-left max-w-[200px] md:max-w-[280px] lg:max-w-xs transition-colors"
                                 >
                                   {order.contact.full_name}
                                 </button>

@@ -656,7 +656,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="font-medium text-gray-900 text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
                                 {getDisplayName(contact)}
                               </span>
                               {contact.company_name && (
@@ -801,7 +801,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="font-medium text-gray-900 text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
                                 {getDisplayName(contact)}
                               </span>
                               {(() => {

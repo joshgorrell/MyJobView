@@ -54,6 +54,19 @@
   --attention-surface: 255 237 213;
 }
 
+@layer components {
+  .customer-link {
+    color: rgb(var(--brand-text));
+    text-decoration: none;
+  }
+  .customer-link:hover,
+  .customer-link:focus-visible {
+    color: rgb(var(--brand-text));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;

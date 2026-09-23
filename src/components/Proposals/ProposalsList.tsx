@@ -1467,7 +1467,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         {(proposal.contacts as any)?.id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
-                            className="text-sm font-bold text-info hover:text-info leading-snug truncate min-w-0 flex-1 text-left transition-colors"
+                            className="text-sm font-bold customer-link leading-snug truncate min-w-0 flex-1 text-left transition-colors"
                           >
                             {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
                           </button>
@@ -1766,7 +1766,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {(proposal.contacts as any)?.id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
-                          className="text-sm font-bold text-info hover:text-info flex-shrink-0 max-w-[35%] truncate text-left transition-colors"
+                          className="text-sm font-bold customer-link flex-shrink-0 max-w-[35%] truncate text-left transition-colors"
                         >
                           {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
                         </button>
