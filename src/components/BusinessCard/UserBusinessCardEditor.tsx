@@ -177,7 +177,7 @@ export function UserBusinessCardEditor() {
   }
 
   if (loading) {
-    return <div className="text-center py-8 text-gray-400">Loading your business card...</div>;
+    return <div className="text-center py-8 text-muted">Loading your business card...</div>;
   }
 
   return (
@@ -186,7 +186,7 @@ export function UserBusinessCardEditor() {
         <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start justify-between gap-3">
           <div className="flex-1">
             <p className="text-sm font-medium text-cyan-400 mb-1">Your card is live!</p>
-            <p className="text-xs sm:text-sm text-gray-400 break-all">
+            <p className="text-xs sm:text-sm text-muted break-all">
               Share: {window.location.origin}/card/{card.slug}
             </p>
           </div>
@@ -203,14 +203,14 @@ export function UserBusinessCardEditor() {
         </div>
       )}
 
-      <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="bg-surface rounded-lg shadow-sm border border-subtle p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div>
-          <label className="block text-sm font-medium text-white mb-2">
+          <label className="block text-sm font-medium text-primary mb-2">
             Profile Photo
           </label>
 
           {photoUrl && (
-            <div className="mb-3 flex items-center gap-3 p-3 bg-gray-700 rounded-lg border border-gray-600">
+            <div className="mb-3 flex items-center gap-3 p-3 bg-elevated rounded-lg border border-strong">
               <img
                 src={photoUrl}
                 alt="Profile"
@@ -218,7 +218,7 @@ export function UserBusinessCardEditor() {
               />
               <button
                 onClick={() => setConfirmModal({ title: 'Remove Photo', message: 'Are you sure you want to remove your photo?', onConfirm: removePhoto })}
-                className="ml-auto p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                className="ml-auto p-2 text-danger hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
                 title="Remove photo"
               >
                 <X className="w-5 h-5" />
@@ -239,16 +239,16 @@ export function UserBusinessCardEditor() {
               htmlFor="photo-upload"
               className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
                 uploading
-                  ? 'border-gray-600 bg-gray-700 cursor-not-allowed'
-                  : 'border-gray-600 hover:border-cyan-500 hover:bg-gray-700'
+                  ? 'border-strong bg-elevated cursor-not-allowed'
+                  : 'border-strong hover:border-cyan-500 hover:bg-elevated'
               }`}
             >
-              <Upload className="w-5 h-5 text-gray-400" />
-              <span className="text-sm font-medium text-white">
+              <Upload className="w-5 h-5 text-muted" />
+              <span className="text-sm font-medium text-primary">
                 {uploading ? 'Uploading...' : 'Upload Photo'}
               </span>
             </label>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted">
               Square JPG, PNG, or WebP recommended. Max 5MB. Save the card to update your header avatar.
             </p>
           </div>
@@ -256,7 +256,7 @@ export function UserBusinessCardEditor() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-white mb-1">
+            <label className="block text-sm font-medium text-primary mb-1">
               Full Name *
             </label>
             <input
@@ -264,12 +264,12 @@ export function UserBusinessCardEditor() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-elevated border border-strong text-primary rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white mb-1">
+            <label className="block text-sm font-medium text-primary mb-1">
               Job Title *
             </label>
             <input
@@ -278,12 +278,12 @@ export function UserBusinessCardEditor() {
               onChange={(e) => setTitle(e.target.value)}
               required
               placeholder="e.g., Sales Manager"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white mb-1">
+            <label className="block text-sm font-medium text-primary mb-1">
               Email *
             </label>
             <input
@@ -291,12 +291,12 @@ export function UserBusinessCardEditor() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-elevated border border-strong text-primary rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white mb-1">
+            <label className="block text-sm font-medium text-primary mb-1">
               Phone *
             </label>
             <input
@@ -305,12 +305,12 @@ export function UserBusinessCardEditor() {
               onChange={(e) => setPhone(e.target.value)}
               required
               placeholder="(555) 123-4567"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-white mb-1">
+            <label className="block text-sm font-medium text-primary mb-1">
               LinkedIn URL
             </label>
             <input
@@ -318,12 +318,12 @@ export function UserBusinessCardEditor() {
               value={linkedinUrl}
               onChange={(e) => setLinkedinUrl(e.target.value)}
               placeholder="https://linkedin.com/in/yourprofile"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-white mb-1">
+            <label className="block text-sm font-medium text-primary mb-1">
               Bio
             </label>
             <textarea
@@ -331,7 +331,7 @@ export function UserBusinessCardEditor() {
               onChange={(e) => setBio(e.target.value)}
               rows={4}
               placeholder="Tell people about yourself and what you do..."
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
             />
           </div>
         </div>

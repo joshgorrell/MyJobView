@@ -204,27 +204,27 @@ export function AddProjectTimeModal({
 
             {/* Project */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Project
               </label>
               {preselectedProjectId ? (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg">
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface border border-subtle rounded-lg">
                   <Briefcase className="w-4 h-4 text-blue-400 shrink-0" />
-                  <span className="text-sm text-white truncate">{preselectedProjectName || 'Selected Project'}</span>
+                  <span className="text-sm text-primary truncate">{preselectedProjectName || 'Selected Project'}</span>
                 </div>
               ) : (
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setShowProjectDropdown(v => !v)}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-left hover:border-gray-600 transition-colors"
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-surface border border-subtle rounded-lg text-left hover:border-strong transition-colors"
                   >
-                    <span className={`text-sm truncate ${selectedProject ? 'text-white' : 'text-gray-500'}`}>
+                    <span className={`text-sm truncate ${selectedProject ? 'text-primary' : 'text-gray-500'}`}>
                       {selectedProject
                         ? `${selectedProject.project_number} — ${selectedProject.name}`
                         : 'Select a project...'}
                     </span>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${showProjectDropdown ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-muted shrink-0 transition-transform ${showProjectDropdown ? 'rotate-180' : ''}`} />
                   </button>
 
                   {showProjectDropdown && (
@@ -233,15 +233,15 @@ export function AddProjectTimeModal({
                         className="fixed inset-0 z-10 sm:hidden"
                         onClick={() => setShowProjectDropdown(false)}
                       />
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-52 overflow-hidden flex flex-col">
-                        <div className="p-2 border-b border-gray-700">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-subtle rounded-lg shadow-xl z-20 max-h-52 overflow-hidden flex flex-col">
+                        <div className="p-2 border-b border-subtle">
                           <input
                             autoFocus
                             type="text"
                             placeholder="Search projects..."
                             value={projectSearch}
                             onChange={e => setProjectSearch(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                            className="w-full bg-canvas border border-subtle rounded px-2 py-1.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="overflow-y-auto">
@@ -257,9 +257,9 @@ export function AddProjectTimeModal({
                                   setShowProjectDropdown(false);
                                   setProjectSearch('');
                                 }}
-                                className="w-full px-3 py-2.5 text-left hover:bg-gray-700 transition-colors border-b border-gray-700/40 last:border-0"
+                                className="w-full px-3 py-2.5 text-left hover:bg-elevated transition-colors border-b border-subtle/40 last:border-0"
                               >
-                                <div className="text-sm text-white font-medium">{p.project_number} — {p.name}</div>
+                                <div className="text-sm text-primary font-medium">{p.project_number} — {p.name}</div>
                               </button>
                             ))
                           )}
@@ -275,13 +275,13 @@ export function AddProjectTimeModal({
             <div className={canManageOthers ? 'grid grid-cols-2 gap-3' : ''}>
               {canManageOthers && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  <label className="block text-sm font-medium text-secondary mb-1.5">
                     Staff
                   </label>
                   <select
                     value={staffId}
                     onChange={e => setStaffId(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    className="w-full bg-surface border border-subtle rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                   >
                     <option value="">Select...</option>
                     {staffMembers.map(s => (
@@ -291,21 +291,21 @@ export function AddProjectTimeModal({
                 </div>
               )}
               <div className={canManageOthers ? '' : 'w-full'}>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-secondary mb-1.5">
                   Date
                 </label>
                 <input
                   type="date"
                   value={entryDate}
                   onChange={e => setEntryDate(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-surface border border-subtle rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
             </div>
 
             {/* Duration */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Duration
               </label>
               <div className="flex gap-2">
@@ -319,7 +319,7 @@ export function AddProjectTimeModal({
                       className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
                         active
                           ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'
+                          : 'bg-surface border-subtle text-secondary hover:border-gray-500 hover:text-primary'
                       }`}
                     >
                       {opt.label}
@@ -338,9 +338,9 @@ export function AddProjectTimeModal({
                     placeholder="0.00"
                     value={customHours}
                     onChange={e => setCustomHours(e.target.value)}
-                    className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    className="w-28 bg-surface border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                   />
-                  <span className="text-sm text-gray-400">hours</span>
+                  <span className="text-sm text-muted">hours</span>
                 </div>
               )}
             </div>
@@ -348,14 +348,14 @@ export function AddProjectTimeModal({
             {/* Labor Phase + Activity Type side by side */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-secondary mb-1.5">
                   Labor Phase <span className="text-red-400 normal-case font-normal">(required)</span>
                 </label>
                 <select
                   value={laborPhaseId}
                   onChange={e => setLaborPhaseId(e.target.value)}
-                  className={`w-full bg-gray-800 border rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors ${
-                    !laborPhaseId && error === 'Please select a labor phase.' ? 'border-red-500' : 'border-gray-700'
+                  className={`w-full bg-surface border rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors ${
+                    !laborPhaseId && error === 'Please select a labor phase.' ? 'border-red-500' : 'border-subtle'
                   }`}
                 >
                   <option value="" disabled>— Select a phase —</option>
@@ -365,13 +365,13 @@ export function AddProjectTimeModal({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-secondary mb-1.5">
                   Activity
                 </label>
                 <select
                   value={activityType}
                   onChange={e => setActivityType(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-surface border border-subtle rounded-lg px-2.5 py-2 text-sm text-primary focus:outline-none focus:border-blue-500 transition-colors"
                 >
                   <option value="">Select...</option>
                   {ACTIVITY_TYPES.map(a => (
@@ -383,7 +383,7 @@ export function AddProjectTimeModal({
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Notes {activityType === 'other' && <span className="text-red-400 normal-case font-normal">(required)</span>}
               </label>
               <textarea
@@ -391,7 +391,7 @@ export function AddProjectTimeModal({
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Optional details..."
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                className="w-full bg-surface border border-subtle rounded-lg px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-blue-500 transition-colors resize-none"
               />
             </div>
 
@@ -403,10 +403,10 @@ export function AddProjectTimeModal({
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-3 sm:px-6 border-t border-gray-700/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 shrink-0">
+          <div className="px-4 py-3 sm:px-6 border-t border-subtle/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 shrink-0">
             <button
               onClick={onClose}
-              className="py-2.5 sm:py-2 sm:px-4 text-sm text-gray-400 hover:text-white transition-colors text-center"
+              className="py-2.5 sm:py-2 sm:px-4 text-sm text-muted hover:text-primary transition-colors text-center"
             >
               Cancel
             </button>

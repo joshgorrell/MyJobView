@@ -248,7 +248,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'invoices'
               ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
+              : 'border-transparent text-muted hover:text-gray-200'
           }`}
         >
           <DollarSign className="w-4 h-4" />
@@ -259,7 +259,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'stats'
               ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
+              : 'border-transparent text-muted hover:text-gray-200'
           }`}
         >
           <BarChart2 className="w-4 h-4" />
@@ -271,22 +271,22 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
         <InvoiceStats />
       ) : (
         <>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+          <div className="bg-canvas rounded-lg shadow-sm border border-subtle p-3 sm:p-4">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search invoices..."
-                  className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-2 text-base border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-base border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -311,12 +311,12 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           </div>
 
           {filteredInvoices.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-              <DollarSign className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <div className="bg-canvas rounded-lg shadow-sm border border-subtle p-12 text-center">
+              <DollarSign className="w-16 h-16 text-muted mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-primary mb-2">
                 {searchTerm || statusFilter !== 'all' ? 'No Matching Invoices' : 'No Invoices Yet'}
               </h3>
-              <p className="text-gray-600 mb-6">
+              <p className="text-secondary mb-6">
                 {searchTerm || statusFilter !== 'all'
                   ? 'Try adjusting your search or filters'
                   : 'Create your first invoice to get started'}
@@ -338,12 +338,12 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                 {filteredInvoices.map((invoice) => (
                   <div
                     key={invoice.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
+                    className="bg-canvas rounded-lg shadow-sm border border-subtle p-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
                     onClick={() => setViewingInvoiceId(invoice.id)}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{invoice.invoice_number}</p>
+                        <p className="text-sm font-semibold text-primary">{invoice.invoice_number}</p>
                         {invoice.contact_id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickViewContactId(invoice.contact_id!); }}
@@ -352,15 +352,15 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                             {invoice.customer_name}
                           </button>
                         ) : (
-                          <p className="text-sm text-gray-600">{invoice.customer_name}</p>
+                          <p className="text-sm text-secondary">{invoice.customer_name}</p>
                         )}
                       </div>
                       <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
                     </div>
                     <div className="flex items-center justify-between text-sm mb-3">
-                      <span className="text-gray-500">{new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                      <span className="text-muted">{new Date(invoice.invoice_date).toLocaleDateString()}</span>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">${(invoice.total ?? 0).toFixed(2)}</p>
+                        <p className="font-semibold text-primary">${(invoice.total ?? 0).toFixed(2)}</p>
                         {invoice.amount_due > 0 && (
                           <p className="text-xs text-orange-600">Due: ${(invoice.amount_due ?? 0).toFixed(2)}</p>
                         )}
@@ -383,7 +383,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                       <button onClick={(e) => { e.stopPropagation(); setConvertingInvoice(invoice); }} className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg touch-manipulation" aria-label="Convert to Recurring">
                         <RefreshCw className="w-4 h-4" />
                       </button>
-                      <button onClick={(e) => e.stopPropagation()} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg touch-manipulation" aria-label="Download PDF">
+                      <button onClick={(e) => e.stopPropagation()} className="p-2 text-secondary hover:bg-surface rounded-lg touch-manipulation" aria-label="Download PDF">
                         <Download className="w-4 h-4" />
                       </button>
                     </div>
@@ -392,19 +392,19 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
               </div>
 
               {/* Desktop table view */}
-              <div className="hidden sm:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="hidden sm:block bg-canvas rounded-lg shadow-sm border border-subtle overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-surface border-b border-subtle">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                        <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                        <th className="hidden lg:table-cell px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Due</th>
-                        <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opened</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Invoice</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Customer</th>
+                        <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Total</th>
+                        <th className="hidden lg:table-cell px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Due</th>
+                        <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Opened</th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -416,9 +416,9 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                         >
                           <td className="px-6 py-4">
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{invoice.invoice_number}</p>
+                              <p className="text-sm font-medium text-primary">{invoice.invoice_number}</p>
                               {invoice.project_number && (
-                                <p className="text-xs text-gray-500">{invoice.project_number}</p>
+                                <p className="text-xs text-muted">{invoice.project_number}</p>
                               )}
                             </div>
                           </td>
@@ -431,14 +431,14 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                                 {invoice.customer_name}
                               </button>
                             ) : (
-                              <p className="text-sm text-gray-900">{invoice.customer_name}</p>
+                              <p className="text-sm text-primary">{invoice.customer_name}</p>
                             )}
                           </td>
                           <td className="hidden lg:table-cell px-6 py-4">
                             <div>
-                              <p className="text-sm text-gray-900">{new Date(invoice.invoice_date).toLocaleDateString()}</p>
+                              <p className="text-sm text-primary">{new Date(invoice.invoice_date).toLocaleDateString()}</p>
                               {invoice.due_date && (
-                                <p className="text-xs text-gray-500">Due: {new Date(invoice.due_date).toLocaleDateString()}</p>
+                                <p className="text-xs text-muted">Due: {new Date(invoice.due_date).toLocaleDateString()}</p>
                               )}
                             </div>
                           </td>
@@ -446,7 +446,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                             <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <p className="text-sm font-medium text-gray-900">${(invoice.total ?? 0).toFixed(2)}</p>
+                            <p className="text-sm font-medium text-primary">${(invoice.total ?? 0).toFixed(2)}</p>
                           </td>
                           <td className="hidden lg:table-cell px-6 py-4 text-right">
                             <p className="text-sm font-medium text-orange-600">${(invoice.amount_due ?? 0).toFixed(2)}</p>
@@ -485,7 +485,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                               </button>
                               <button
                                 onClick={(e) => e.stopPropagation()}
-                                className="p-2 sm:p-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation"
+                                className="p-2 sm:p-2.5 text-secondary hover:text-primary hover:bg-surface active:bg-elevated rounded-lg transition-colors touch-manipulation"
                                 title="Download PDF"
                               >
                                 <Download className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -550,41 +550,41 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
       {/* Send Invoice Modal with editable email */}
       {confirmSendInvoice && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+          <div className="bg-canvas rounded-xl shadow-2xl max-w-sm w-full p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <Mail className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900">Send Invoice</h3>
-                  <p className="text-sm text-gray-500">{confirmSendInvoice.invoice_number}</p>
+                  <h3 className="text-base font-semibold text-primary">Send Invoice</h3>
+                  <p className="text-sm text-muted">{confirmSendInvoice.invoice_number}</p>
                 </div>
               </div>
               <button
                 onClick={() => setConfirmSendInvoice(null)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-surface rounded-lg transition-colors"
               >
-                <X className="w-4 h-4 text-gray-500" />
+                <X className="w-4 h-4 text-muted" />
               </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">
-              Invoice <span className="font-medium text-gray-900">{confirmSendInvoice.invoice_number}</span> for <span className="font-medium text-gray-900">{confirmSendInvoice.customer_name}</span>. Confirm or update the recipient email below.
+            <p className="text-sm text-secondary mb-4">
+              Invoice <span className="font-medium text-primary">{confirmSendInvoice.invoice_number}</span> for <span className="font-medium text-primary">{confirmSendInvoice.customer_name}</span>. Confirm or update the recipient email below.
             </p>
 
             <div className="mb-5">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              <label className="block text-xs font-medium text-secondary mb-1.5">
                 Recipient Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                 <input
                   type="email"
                   value={sendEmailOverride}
                   onChange={(e) => setSendEmailOverride(e.target.value)}
                   placeholder="customer@example.com"
-                  className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-9 pr-4 py-2.5 text-sm border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               {!confirmSendInvoice.customer_email && (
@@ -601,7 +601,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmSendInvoice(null)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors"
+                className="flex-1 px-4 py-2.5 border border-strong text-secondary rounded-lg hover:bg-surface font-medium text-sm transition-colors"
               >
                 Cancel
               </button>
@@ -665,7 +665,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
 function OpenedCell({ stats }: { stats: InvoiceOpenStats | null }) {
   if (!stats || stats.open_count === 0) {
     return (
-      <div className="flex items-center gap-1.5 text-gray-400">
+      <div className="flex items-center gap-1.5 text-muted">
         <Eye className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="text-xs">Not opened</span>
       </div>
@@ -702,7 +702,7 @@ function OpenedCell({ stats }: { stats: InvoiceOpenStats | null }) {
         </span>
       </div>
       {relativeLabel && (
-        <span className="text-xs text-gray-400 pl-5">Last: {relativeLabel}</span>
+        <span className="text-xs text-muted pl-5">Last: {relativeLabel}</span>
       )}
     </div>
   );
@@ -710,12 +710,12 @@ function OpenedCell({ stats }: { stats: InvoiceOpenStats | null }) {
 
 function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string }) {
   const configs = {
-    draft: { icon: <Clock className="w-3 h-3" />, label: 'Draft', className: 'bg-gray-100 text-gray-700' },
+    draft: { icon: <Clock className="w-3 h-3" />, label: 'Draft', className: 'bg-surface text-secondary' },
     submitted: { icon: <Send className="w-3 h-3" />, label: 'Submitted', className: 'bg-blue-100 text-blue-700' },
     partial: { icon: <AlertCircle className="w-3 h-3" />, label: 'Partial', className: 'bg-yellow-100 text-yellow-700' },
     paid: { icon: <CheckCircle className="w-3 h-3" />, label: 'Paid', className: 'bg-green-100 text-green-700' },
     overdue: { icon: <AlertCircle className="w-3 h-3" />, label: 'Overdue', className: 'bg-red-100 text-red-700' },
-    void: { icon: <AlertCircle className="w-3 h-3" />, label: 'Void', className: 'bg-gray-100 text-gray-500' },
+    void: { icon: <AlertCircle className="w-3 h-3" />, label: 'Void', className: 'bg-surface text-muted' },
   };
 
   let config = configs[status as keyof typeof configs] || configs.draft;

@@ -362,8 +362,8 @@ export function AIAssistant({
         >
           <div className="flex flex-col min-h-0">
             {messages.length > 0 && (
-              <div className="flex justify-end px-4 py-2 border-b border-gray-700/50">
-                <button onClick={clearConversation} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white" title="Clear conversation">
+              <div className="flex justify-end px-4 py-2 border-b border-subtle/50">
+                <button onClick={clearConversation} className="flex items-center gap-1.5 text-xs text-muted hover:text-white" title="Clear conversation">
                   <RotateCcw className="w-3.5 h-3.5" /> Clear conversation
                 </button>
               </div>
@@ -376,10 +376,10 @@ export function AIAssistant({
                       <div className="w-12 h-12 bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                         <Sparkles className="w-6 h-6 text-blue-600" />
                       </div>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-sm font-medium text-primary">
                         Hi{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!
                       </p>
-                      <p className="text-xs text-gray-400 mt-1 leading-relaxed px-4">
+                      <p className="text-xs text-muted mt-1 leading-relaxed px-4">
                         Describe what you need in plain English and I'll pre-fill the form for you.
                       </p>
                     </div>
@@ -388,7 +388,7 @@ export function AIAssistant({
                         <button
                           key={qp.label}
                           onClick={() => sendMessage(qp.prompt)}
-                          className="text-left px-3 py-2.5 text-xs bg-gray-800 hover:bg-blue-900/30 hover:text-blue-300 hover:border-blue-700 border border-gray-700 rounded-xl transition-colors leading-snug font-medium text-gray-200"
+                          className="text-left px-3 py-2.5 text-xs bg-surface hover:bg-blue-900/30 hover:text-blue-300 hover:border-blue-700 border border-subtle rounded-xl transition-colors leading-snug font-medium text-primary"
                         >
                           <Zap className="w-3 h-3 mb-1 text-blue-500" />
                           {qp.label}
@@ -410,7 +410,7 @@ export function AIAssistant({
                       <Sparkles className="w-4 h-4 text-blue-400 ml-auto flex-shrink-0" />
                     </button>
 
-                    <p className="text-center text-xs text-gray-400 px-2 leading-relaxed">
+                    <p className="text-center text-xs text-muted px-2 leading-relaxed">
                       Try: "Create a proposal for John Smith for a home theater in his Family Room with a JVC HZ300 and 6 hours of labor"
                     </p>
                   </div>
@@ -422,7 +422,7 @@ export function AIAssistant({
                       className={`max-w-[88%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                         msg.role === 'user'
                           ? 'bg-blue-600 text-white rounded-br-sm'
-                          : 'bg-gray-800 text-white rounded-bl-sm'
+                          : 'bg-surface text-primary rounded-bl-sm'
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -447,16 +447,16 @@ export function AIAssistant({
                       </div>
                     )}
 
-                    <span className="text-xs text-gray-400 mt-1 px-1">{formatTime(msg.timestamp)}</span>
+                    <span className="text-xs text-muted mt-1 px-1">{formatTime(msg.timestamp)}</span>
                   </div>
                 ))}
 
                 {loading && (
                   <div className="flex items-start">
-                    <div className="bg-gray-800 px-3.5 py-2.5 rounded-2xl rounded-bl-sm">
+                    <div className="bg-surface px-3.5 py-2.5 rounded-2xl rounded-bl-sm">
                       <div className="flex items-center gap-2">
-                        <Loader className="w-3.5 h-3.5 text-gray-400 animate-spin" />
-                        <span className="text-xs text-gray-400">Thinking...</span>
+                        <Loader className="w-3.5 h-3.5 text-muted animate-spin" />
+                        <span className="text-xs text-muted">Thinking...</span>
                       </div>
                     </div>
                   </div>
@@ -466,7 +466,7 @@ export function AIAssistant({
               </div>
 
               {/* Input area */}
-              <div className="border-t border-gray-700 p-4 sm:px-6 flex-shrink-0">
+              <div className="border-t border-subtle p-4 sm:px-6 flex-shrink-0">
                 <div className="flex items-end gap-2">
                   <textarea
                     ref={inputRef}
@@ -475,7 +475,7 @@ export function AIAssistant({
                     onKeyDown={handleKeyDown}
                     placeholder="Describe what you need..."
                     rows={1}
-                    className="flex-1 resize-none px-3 py-2.5 text-sm border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-28 min-h-[40px] leading-relaxed"
+                    className="flex-1 resize-none px-3 py-2.5 text-sm border border-subtle rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-28 min-h-[40px] leading-relaxed"
                     style={{ height: 'auto' }}
                     onInput={e => {
                       const el = e.currentTarget;
@@ -491,7 +491,7 @@ export function AIAssistant({
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 mt-1.5 text-center">Enter to send · Shift+Enter for new line</p>
+                <p className="text-xs text-muted mt-1.5 text-center">Enter to send · Shift+Enter for new line</p>
               </div>
           </div>
         </QuickActionModal>

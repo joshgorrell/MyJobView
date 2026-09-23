@@ -380,7 +380,7 @@ export function UserPreferences() {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="text-gray-600">Loading preferences...</div>
+        <div className="text-secondary">Loading preferences...</div>
       </div>
     );
   }
@@ -468,21 +468,21 @@ export function UserPreferences() {
 
       {activeTab === 'proposals' && (
         <div className="max-w-2xl space-y-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <FileText className="w-6 h-6 text-blue-600" />
+          <div className="bg-canvas rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
+              <FileText className="w-6 h-6 text-brand" />
               Default Proposal Template
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-secondary mb-6">
               Choose your preferred template layout for new proposals. This will be automatically
               selected when you review proposals before sending to customers.
             </p>
 
             {proposalTemplates.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+              <div className="bg-surface border border-subtle rounded-lg p-6 text-center">
                 <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                <p className="text-gray-600">No proposal templates available</p>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-secondary">No proposal templates available</p>
+                <p className="text-sm text-muted mt-2">
                   Contact your administrator to create proposal templates
                 </p>
               </div>
@@ -494,8 +494,8 @@ export function UserPreferences() {
                       key={template.id}
                       className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
                         defaultTemplateId === template.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-blue-500 bg-infoSoft'
+                          : 'border-subtle hover:border-strong'
                       }`}
                     >
                       <input
@@ -503,11 +503,11 @@ export function UserPreferences() {
                         value={template.id}
                         checked={defaultTemplateId === template.id}
                         onChange={(e) => setDefaultTemplateId(e.target.value)}
-                        className="mt-1 w-4 h-4 text-blue-600"
+                        className="mt-1 w-4 h-4 text-brand"
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-gray-900">{template.name}</span>
+                          <span className="font-semibold text-primary">{template.name}</span>
                           {template.is_personal && (
                             <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">
                               Personal
@@ -520,18 +520,18 @@ export function UserPreferences() {
                           )}
                         </div>
                         {template.description && (
-                          <p className="text-sm text-gray-600">{template.description}</p>
+                          <p className="text-sm text-secondary">{template.description}</p>
                         )}
                       </div>
                     </label>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between pt-4 border-t border-subtle">
                   <button
                     onClick={() => setDefaultTemplateId('')}
                     disabled={!defaultTemplateId}
-                    className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-sm text-secondary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Clear Selection
                   </button>
@@ -554,24 +554,24 @@ export function UserPreferences() {
         <div className="max-w-2xl space-y-8">
       <div>
         <div className="mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-            <Smartphone className="w-6 h-6 text-blue-600" />
+          <h3 className="text-xl font-bold text-primary mb-2 flex items-center gap-2">
+            <Smartphone className="w-6 h-6 text-brand" />
             Push Notifications
           </h3>
           <p className="text-gray-300">Get instant notifications on your device even when the app is closed</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-canvas border border-subtle rounded-lg p-6">
           {pushEnabled ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3 text-green-600">
                 <CheckCircle className="w-6 h-6" />
                 <div>
                   <div className="font-semibold">Push Notifications Enabled</div>
-                  <div className="text-sm text-gray-600">You will receive notifications on this device</div>
+                  <div className="text-sm text-secondary">You will receive notifications on this device</div>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-secondary">
                 You will receive push notifications for mentions, lead assignments, and other important updates based on your notification preferences below.
               </p>
               <button
@@ -589,7 +589,7 @@ export function UserPreferences() {
                 <XCircle className="w-6 h-6" />
                 <div className="font-semibold">Push Notifications Disabled</div>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-secondary">
                 Enable push notifications to receive instant updates on your device even when the app is closed. You will be notified about mentions, lead assignments, and other important events.
               </p>
               <button
@@ -608,20 +608,20 @@ export function UserPreferences() {
       {profile?.role !== 'admin' && profile?.role !== 'manager' && (
         <div>
           <div className="mb-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-              <Eye className="w-6 h-6 text-blue-600" />
+            <h3 className="text-xl font-bold text-primary mb-2 flex items-center gap-2">
+              <Eye className="w-6 h-6 text-brand" />
               Office Visibility
             </h3>
             <p className="text-gray-300">Control what data you can see based on office locations</p>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
+          <div className="bg-canvas border border-subtle rounded-lg p-6 space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 What can you see?
               </label>
               <div className="space-y-3">
-                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <label className="flex items-start gap-3 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="radio"
                     name="visibility"
@@ -631,12 +631,12 @@ export function UserPreferences() {
                     className="mt-1"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">My Records Only</div>
-                    <div className="text-sm text-gray-600">See only proposals, projects, invoices, and leads that you created</div>
+                    <div className="font-medium text-primary">My Records Only</div>
+                    <div className="text-sm text-secondary">See only proposals, projects, invoices, and leads that you created</div>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <label className="flex items-start gap-3 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="radio"
                     name="visibility"
@@ -646,12 +646,12 @@ export function UserPreferences() {
                     className="mt-1"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">My Office</div>
-                    <div className="text-sm text-gray-600">See all records from your primary office location</div>
+                    <div className="font-medium text-primary">My Office</div>
+                    <div className="text-sm text-secondary">See all records from your primary office location</div>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <label className="flex items-start gap-3 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="radio"
                     name="visibility"
@@ -661,12 +661,12 @@ export function UserPreferences() {
                     className="mt-1"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">Selected Offices</div>
-                    <div className="text-sm text-gray-600">Choose specific offices to see records from</div>
+                    <div className="font-medium text-primary">Selected Offices</div>
+                    <div className="text-sm text-secondary">Choose specific offices to see records from</div>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <label className="flex items-start gap-3 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="radio"
                     name="visibility"
@@ -676,8 +676,8 @@ export function UserPreferences() {
                     className="mt-1"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">All Offices</div>
-                    <div className="text-sm text-gray-600">See records from all office locations (full visibility)</div>
+                    <div className="font-medium text-primary">All Offices</div>
+                    <div className="text-sm text-secondary">See records from all office locations (full visibility)</div>
                   </div>
                 </label>
               </div>
@@ -692,7 +692,7 @@ export function UserPreferences() {
                 <select
                   value={primaryOfficeId}
                   onChange={(e) => setPrimaryOfficeId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Select your primary office</option>
                   {offices.map((office) => (
@@ -709,7 +709,7 @@ export function UserPreferences() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Additional Offices
                 </label>
-                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-subtle rounded-lg p-3">
                   {offices.map((office) => (
                     <label key={office.id} className="flex items-center gap-2">
                       <input
@@ -724,7 +724,7 @@ export function UserPreferences() {
                         }}
                         className="rounded"
                       />
-                      <span className="text-sm text-gray-900">{office.name}</span>
+                      <span className="text-sm text-primary">{office.name}</span>
                     </label>
                   ))}
                 </div>
@@ -745,24 +745,24 @@ export function UserPreferences() {
 
       <div>
         <div className="mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-blue-600" />
+          <h3 className="text-xl font-bold text-primary mb-2 flex items-center gap-2">
+            <Calendar className="w-6 h-6 text-brand" />
             Google Calendar Integration
           </h3>
           <p className="text-gray-300">Connect your Google Calendar to automatically create reminders</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-canvas border border-subtle rounded-lg p-6">
           {calendarConnected ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3 text-green-600">
                 <CheckCircle className="w-6 h-6" />
                 <div>
                   <div className="font-semibold">Connected</div>
-                  <div className="text-sm text-gray-600">{calendarEmail}</div>
+                  <div className="text-sm text-secondary">{calendarEmail}</div>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-secondary">
                 When you set reminder dates on leads, tasks, or discussions, calendar events will automatically be created in your Google Calendar.
               </p>
               <button
@@ -780,7 +780,7 @@ export function UserPreferences() {
                 <XCircle className="w-6 h-6" />
                 <div className="font-semibold">Not Connected</div>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-secondary">
                 Connect your Google Calendar to automatically create calendar reminders when you set follow-up dates on leads, tasks, and discussions.
               </p>
               <button
@@ -798,110 +798,110 @@ export function UserPreferences() {
 
       <div>
         <div className="mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-blue-600" />
+          <h3 className="text-xl font-bold text-primary mb-2 flex items-center gap-2">
+            <Bell className="w-6 h-6 text-brand" />
             Notification Preferences
           </h3>
           <p className="text-gray-300">Choose which notifications you want to receive</p>
         </div>
 
         <div className="space-y-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={preferences.notify_on_mention}
               onChange={(e) => setPreferences({ ...preferences, notify_on_mention: e.target.checked })}
-              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
-              <div className="font-semibold text-gray-900">Mention Notifications</div>
-              <div className="text-sm text-gray-600 mt-1">
+              <div className="font-semibold text-primary">Mention Notifications</div>
+              <div className="text-sm text-secondary mt-1">
                 Receive notifications when someone mentions you with @ in discussions
               </div>
             </div>
           </label>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={preferences.notify_on_lead_assigned}
               onChange={(e) => setPreferences({ ...preferences, notify_on_lead_assigned: e.target.checked })}
-              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
-              <div className="font-semibold text-gray-900">Lead Assignment Notifications</div>
-              <div className="text-sm text-gray-600 mt-1">
+              <div className="font-semibold text-primary">Lead Assignment Notifications</div>
+              <div className="text-sm text-secondary mt-1">
                 Receive notifications when leads are assigned to you
               </div>
             </div>
           </label>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={preferences.notify_on_fishbowl}
               onChange={(e) => setPreferences({ ...preferences, notify_on_fishbowl: e.target.checked })}
-              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
-              <div className="font-semibold text-gray-900">Fishbowl Lead Notifications</div>
-              <div className="text-sm text-gray-600 mt-1">
+              <div className="font-semibold text-primary">Fishbowl Lead Notifications</div>
+              <div className="text-sm text-secondary mt-1">
                 Receive notifications when new leads are added to the fishbowl
               </div>
             </div>
           </label>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={preferences.notify_on_escalated}
               onChange={(e) => setPreferences({ ...preferences, notify_on_escalated: e.target.checked })}
-              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
-              <div className="font-semibold text-gray-900">Lead Escalation Notifications</div>
-              <div className="text-sm text-gray-600 mt-1">
+              <div className="font-semibold text-primary">Lead Escalation Notifications</div>
+              <div className="text-sm text-secondary mt-1">
                 Receive notifications when leads are escalated
               </div>
             </div>
           </label>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={preferences.notify_on_lead_status}
               onChange={(e) => setPreferences({ ...preferences, notify_on_lead_status: e.target.checked })}
-              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
-              <div className="font-semibold text-gray-900">Priority Lead Status Updates</div>
-              <div className="text-sm text-gray-600 mt-1">
+              <div className="font-semibold text-primary">Priority Lead Status Updates</div>
+              <div className="text-sm text-secondary mt-1">
                 Receive notifications when your High or Urgent priority leads are claimed or status changes
               </div>
             </div>
           </label>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={preferences.notify_on_product_requests}
               onChange={(e) => setPreferences({ ...preferences, notify_on_product_requests: e.target.checked })}
-              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
-              <div className="font-semibold text-gray-900">Product Request Notifications</div>
-              <div className="text-sm text-gray-600 mt-1">
+              <div className="font-semibold text-primary">Product Request Notifications</div>
+              <div className="text-sm text-secondary mt-1">
                 Receive email notifications when new product/parts requests are submitted for purchasing
               </div>
             </div>

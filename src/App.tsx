@@ -1101,7 +1101,7 @@ function AppContent() {
 
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-canvas text-primary rounded-xl shadow-sm border border-subtle p-4 sm:p-6">
                 <UserPreferences />
               </div>
             </div>
