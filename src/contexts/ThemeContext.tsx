@@ -47,6 +47,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(`mjv-theme-${profile.id}`, next);
       const { error } = await supabase.from('profiles').update({ ui_theme: next }).eq('id', profile.id);
       if (error) {
+        // A preview branch can run before its additive migration is applied.
+        // Keep the browser preference for visual QA; account sync begins after migration.
+        if (error.code === '42703' || error.code === 'PGRST204') return;
         setPreferenceState(previous);
         localStorage.setItem(`mjv-theme-${profile.id}`, previous);
         throw error;
