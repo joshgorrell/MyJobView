@@ -8,8 +8,6 @@ import { DuplicateProposalModal } from './DuplicateProposalModal';
 import { CreateRevisionModal } from './CreateRevisionModal';
 import { ProposalVersionHistory } from './ProposalVersionHistory';
 import { ManualApprovalModal } from './ManualApprovalModal';
-import DepositReminderButton from './DepositReminderButton';
-import { RecordPaymentModal } from '../Invoices/RecordPaymentModal';
 import { ReactivateProposalModalEnhanced } from './ReactivateProposalModalEnhanced';
 import { DeclineProposalModal } from './DeclineProposalModal';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
@@ -31,7 +29,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [pendingDeposits, setPendingDeposits] = useState<Proposal[]>([]);
   const [showPendingDeposits, setShowPendingDeposits] = useState(true);
-  const [openDepositActionsId, setOpenDepositActionsId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -60,8 +57,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [depositPaymentInvoice, setDepositPaymentInvoice] = useState<any>(null);
-  const [loadingDepositInvoice, setLoadingDepositInvoice] = useState<string | null>(null);
   const [pendingDepositSalesOrders, setPendingDepositSalesOrders] = useState<Record<string, string>>({});
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineModalMode, setDeclineModalMode] = useState<'decline' | 'cancel'>('decline');
@@ -487,34 +482,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     setSelectedProposal(proposal);
     setShowReactivateModal(true);
     setOpenMenuId(null);
-  }
-
-  async function handleRecordDepositPayment(proposal: any) {
-    setLoadingDepositInvoice(proposal.id);
-    try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('id, invoice_number, contact_id, total, amount_paid, amount_due')
-        .eq('proposal_id', proposal.id)
-        .eq('invoice_type', 'deposit')
-        .neq('status', 'paid')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setDepositPaymentInvoice(data);
-      } else {
-        alert('No unpaid deposit invoice found for this proposal. The deposit invoice may have already been paid or not yet created.');
-      }
-    } catch (err) {
-      console.error('Error fetching deposit invoice:', err);
-      alert('Failed to load deposit invoice. Please try again.');
-    } finally {
-      setLoadingDepositInvoice(null);
-    }
   }
 
   async function handleViewActivity(proposal: Proposal) {
@@ -1377,14 +1344,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           {pendingDepositSalesOrders[proposal.id] && <ExternalLink size={9} className="opacity-60 flex-shrink-0" />}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        aria-expanded={openDepositActionsId === proposal.id}
-                        onClick={() => setOpenDepositActionsId(openDepositActionsId === proposal.id ? null : proposal.id)}
-                        className="mt-1 text-xs text-muted hover:text-warning hover:underline"
-                      >
-                        {openDepositActionsId === proposal.id ? 'Hide actions' : 'Deposit actions'}
-                      </button>
                     </div>
                     <span className="text-xs text-warning font-semibold flex-shrink-0 flex items-center gap-0.5 whitespace-nowrap">
                       <DollarSign size={10} />
@@ -1396,26 +1355,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       </span>
                     )}
                   </div>
-                  {openDepositActionsId === proposal.id && (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => handleRecordDepositPayment(proposal)}
-                        disabled={loadingDepositInvoice === proposal.id}
-                        className="px-3 py-2 text-xs font-medium border border-warningLine rounded-lg text-warning hover:bg-elevated disabled:opacity-50"
-                      >
-                        {loadingDepositInvoice === proposal.id ? 'Loading...' : 'Record deposit payment'}
-                      </button>
-                      <DepositReminderButton
-                        proposalId={proposal.id}
-                        proposalNumber={proposal.proposal_number}
-                        depositAmount={proposal.deposit_amount_due || 0}
-                        reminderCount={proposal.deposit_reminder_count || 0}
-                        lastReminderSent={proposal.last_deposit_reminder_sent_at}
-                        customerName={proposal.contacts?.full_name}
-                        variant="text"
-                      />
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -2216,18 +2155,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             } else {
               loadProposals();
             }
-          }}
-        />
-      )}
-
-      {depositPaymentInvoice && (
-        <RecordPaymentModal
-          invoice={depositPaymentInvoice}
-          onClose={() => setDepositPaymentInvoice(null)}
-          onSuccess={() => {
-            setDepositPaymentInvoice(null);
-            loadPendingDeposits();
-            loadProposals();
           }}
         />
       )}
