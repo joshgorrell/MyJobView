@@ -11,6 +11,7 @@ interface DepositReminderButtonProps {
   reminderCount?: number;
   lastReminderSent?: string;
   customerName?: string;
+  variant?: 'icon' | 'text';
 }
 
 export default function DepositReminderButton({
@@ -19,7 +20,8 @@ export default function DepositReminderButton({
   depositAmount,
   reminderCount = 0,
   lastReminderSent,
-  customerName
+  customerName,
+  variant = 'icon'
 }: DepositReminderButtonProps) {
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [resultMessage, setResultMessage] = useState('');
@@ -84,12 +86,12 @@ export default function DepositReminderButton({
         <button
           onClick={() => setModalState('select')}
           disabled={modalState === 'sending'}
-          className="flex items-center justify-center w-8 h-8 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={variant === 'text' ? 'px-3 py-2 text-xs font-medium border border-warningLine rounded-lg text-warning hover:bg-elevated disabled:opacity-50' : 'flex items-center justify-center w-8 h-8 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'}
           title={`Send deposit reminder (${reminderCount} sent, last: ${lastSentText})`}
         >
-          <Send size={14} />
+          {variant === 'text' ? `Send reminder${reminderCount ? ` (${reminderCount})` : ''}` : <Send size={14} />}
         </button>
-        {reminderCount > 0 && (
+        {variant === 'icon' && reminderCount > 0 && (
           <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 bg-yellow-900 border border-yellow-700 text-yellow-100 text-[10px] font-bold rounded-full flex items-center justify-center pointer-events-none">
             {reminderCount}
           </span>

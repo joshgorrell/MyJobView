@@ -31,6 +31,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [pendingDeposits, setPendingDeposits] = useState<Proposal[]>([]);
   const [showPendingDeposits, setShowPendingDeposits] = useState(true);
+  const [openDepositActionsId, setOpenDepositActionsId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -1356,58 +1357,65 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           {showPendingDeposits && (
             <div className="mt-1.5 space-y-0">
               {pendingDeposits.map(proposal => (
-                <div key={proposal.id} className="flex items-center gap-2 py-2 border-t border-warningLine/60">
-                  <button
-                    onClick={() => {
-                      const salesOrderId = pendingDepositSalesOrders[proposal.id];
-                      if (salesOrderId && onSelectSalesOrder) {
-                        onSelectSalesOrder(salesOrderId);
-                      } else {
-                        onSelectProposal(proposal.id);
-                      }
-                    }}
-                    className="text-xs font-medium text-warning hover:underline flex items-center gap-1 min-w-0 flex-1 py-1"
-                    title={pendingDepositSalesOrders[proposal.id] ? 'Open Sales Order' : 'Open Proposal'}
-                  >
-                    <span className="flex flex-col items-start min-w-0">
-                      <span className="text-sm font-semibold text-warning truncate max-w-full leading-tight">
-                        {proposal.contacts?.full_name || 'Unknown'}
-                      </span>
-                      <span className="text-xs text-warning font-normal truncate max-w-full leading-tight flex items-center gap-1">
-                        {proposal.proposal_number}{proposal.title ? ` — ${proposal.title}` : ''}
-                        {pendingDepositSalesOrders[proposal.id] && (
-                          <ExternalLink size={9} className="opacity-60 flex-shrink-0" />
-                        )}
-                      </span>
+                <div key={proposal.id} className="py-2 border-t border-warningLine/60">
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <button
+                        onClick={() => {
+                          const salesOrderId = pendingDepositSalesOrders[proposal.id];
+                          if (salesOrderId && onSelectSalesOrder) onSelectSalesOrder(salesOrderId);
+                          else onSelectProposal(proposal.id);
+                        }}
+                        className="flex flex-col items-start min-w-0 max-w-full text-left hover:underline"
+                        title={pendingDepositSalesOrders[proposal.id] ? 'Open Sales Order' : 'Open Proposal'}
+                      >
+                        <span className="text-sm font-semibold text-warning truncate max-w-full leading-tight">
+                          {proposal.contacts?.full_name || 'Unknown'}
+                        </span>
+                        <span className="text-xs text-warning font-normal truncate max-w-full leading-tight flex items-center gap-1">
+                          {proposal.proposal_number}{proposal.title ? ` — ${proposal.title}` : ''}
+                          {pendingDepositSalesOrders[proposal.id] && <ExternalLink size={9} className="opacity-60 flex-shrink-0" />}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-expanded={openDepositActionsId === proposal.id}
+                        onClick={() => setOpenDepositActionsId(openDepositActionsId === proposal.id ? null : proposal.id)}
+                        className="mt-1 text-xs text-muted hover:text-warning hover:underline"
+                      >
+                        {openDepositActionsId === proposal.id ? 'Hide actions' : 'Deposit actions'}
+                      </button>
+                    </div>
+                    <span className="text-xs text-warning font-semibold flex-shrink-0 flex items-center gap-0.5 whitespace-nowrap">
+                      <DollarSign size={10} />
+                      {proposal.deposit_amount_due?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
-                  </button>
-                  <span className="text-xs text-warning font-semibold flex-shrink-0 flex items-center gap-0.5 whitespace-nowrap">
-                    <DollarSign size={10} />
-                    {proposal.deposit_amount_due?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </span>
-                  {proposal.approval_completed_at && (
-                    <span className="text-xs text-muted flex-shrink-0 hidden sm:inline">
-                      {new Date(proposal.approval_completed_at).toLocaleDateString()}
-                    </span>
-                  )}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => handleRecordDepositPayment(proposal)}
-                      disabled={loadingDepositInvoice === proposal.id}
-                      className="flex items-center justify-center w-8 h-8 bg-green-700 hover:bg-green-600 active:bg-green-800 disabled:opacity-50 text-white rounded-lg transition-colors flex-shrink-0"
-                      title={loadingDepositInvoice === proposal.id ? 'Loading...' : 'Record deposit payment'}
-                    >
-                      <DollarSign size={14} />
-                    </button>
-                    <DepositReminderButton
-                      proposalId={proposal.id}
-                      proposalNumber={proposal.proposal_number}
-                      depositAmount={proposal.deposit_amount_due || 0}
-                      reminderCount={proposal.deposit_reminder_count || 0}
-                      lastReminderSent={proposal.last_deposit_reminder_sent_at}
-                      customerName={proposal.contacts?.full_name}
-                    />
+                    {proposal.approval_completed_at && (
+                      <span className="text-xs text-muted flex-shrink-0 hidden sm:inline">
+                        {new Date(proposal.approval_completed_at).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
+                  {openDepositActionsId === proposal.id && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => handleRecordDepositPayment(proposal)}
+                        disabled={loadingDepositInvoice === proposal.id}
+                        className="px-3 py-2 text-xs font-medium border border-warningLine rounded-lg text-warning hover:bg-elevated disabled:opacity-50"
+                      >
+                        {loadingDepositInvoice === proposal.id ? 'Loading...' : 'Record deposit payment'}
+                      </button>
+                      <DepositReminderButton
+                        proposalId={proposal.id}
+                        proposalNumber={proposal.proposal_number}
+                        depositAmount={proposal.deposit_amount_due || 0}
+                        reminderCount={proposal.deposit_reminder_count || 0}
+                        lastReminderSent={proposal.last_deposit_reminder_sent_at}
+                        customerName={proposal.contacts?.full_name}
+                        variant="text"
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
