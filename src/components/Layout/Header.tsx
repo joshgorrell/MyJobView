@@ -121,18 +121,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                 <Menu className="w-5 h-5" />
               </button>
             )}
-            {onBookmarksToggle && (
-              <button
-                type="button"
-                onClick={onBookmarksToggle}
-                aria-label={bookmarksVisible ? 'Hide bookmarks' : 'Show bookmarks'}
-                aria-pressed={bookmarksVisible}
-                title={bookmarksVisible ? 'Hide bookmarks' : 'Show bookmarks'}
-                className={`p-2 rounded-lg transition-colors ${bookmarksVisible ? 'text-brand bg-blue-500/10' : 'text-muted hover:text-primary hover:bg-elevated'}`}
-              >
-                <Star className={`w-5 h-5 ${bookmarksVisible ? 'fill-current' : ''}`} />
-              </button>
-            )}
             <button
               onClick={() => onTabChange('feed')}
               className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity"
@@ -150,6 +138,17 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
+            {onBookmarksToggle && (
+              <button
+                type="button"
+                onClick={onBookmarksToggle}
+                aria-pressed={bookmarksVisible}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${bookmarksVisible ? 'text-brand bg-blue-500/10' : 'text-secondary hover:text-primary hover:bg-elevated'}`}
+              >
+                <Star className={`w-4 h-4 ${bookmarksVisible ? 'fill-current' : ''}`} />
+                Bookmarks
+              </button>
+            )}
             <TimeButton onNavigate={onNavigate} />
 
             <div className="relative" ref={createMenuRef}>
@@ -344,6 +343,17 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
             </div>
 
             <div className="px-4 py-4 flex flex-col gap-6">
+              {onBookmarksToggle && (
+                <button
+                  type="button"
+                  onClick={() => { onBookmarksToggle(); setMobileMenuOpen(false); }}
+                  aria-pressed={bookmarksVisible}
+                  className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary rounded-lg flex items-center gap-3"
+                >
+                  <Star className={`w-4 h-4 text-brand ${bookmarksVisible ? 'fill-current' : ''}`} />
+                  {bookmarksVisible ? 'Hide bookmarks bar' : 'Show bookmarks bar'}
+                </button>
+              )}
               {/* Favorites */}
               {starredModules.length > 0 && (
                 <div>
