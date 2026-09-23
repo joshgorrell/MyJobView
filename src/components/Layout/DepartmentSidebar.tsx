@@ -199,24 +199,24 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
 
       <aside
         ref={sidebarRef}
-        className={`fixed top-16 left-0 h-[calc(100vh-4rem)] bg-gray-900 border-r border-gray-700 transition-transform duration-300 ease-in-out w-64 overflow-hidden shadow-2xl ${
+        className={`fixed top-14 left-0 h-[calc(100vh-3.5rem)] bg-canvas border-r border-subtle transition-transform duration-300 ease-in-out w-64 overflow-hidden shadow-2xl ${
           isPinned ? 'z-20' : 'z-40'
         } ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
-          <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Departments</h2>
+          <div className="p-4 border-b border-subtle flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">Departments</h2>
             <div className="flex items-center gap-1">
               <button
                 onClick={toggleAllDepartments}
-                className="p-1 hover:bg-gray-800 rounded transition-colors"
+                className="p-1 hover:bg-surface rounded transition-colors"
                 title={allExpanded ? 'Collapse all' : 'Expand all'}
               >
                 {allExpanded
-                  ? <ChevronsDownUp className="w-3.5 h-3.5 text-gray-400" />
-                  : <ChevronsUpDown className="w-3.5 h-3.5 text-gray-400" />
+                  ? <ChevronsDownUp className="w-3.5 h-3.5 text-muted" />
+                  : <ChevronsUpDown className="w-3.5 h-3.5 text-muted" />
                 }
               </button>
               {onPinToggle && (
@@ -224,8 +224,8 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                   onClick={onPinToggle}
                   className={`p-1 rounded transition-colors hidden sm:flex items-center justify-center ${
                     isPinned
-                      ? 'text-blue-400 hover:bg-blue-500/20'
-                      : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300'
+                      ? 'text-brand hover:bg-blue-500/20'
+                      : 'text-muted hover:bg-surface hover:text-secondary'
                   }`}
                   title={isPinned ? 'Unpin menu (auto-hide)' : 'Pin menu (always visible)'}
                 >
@@ -238,24 +238,24 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
               {!isPinned && (
                 <button
                   onClick={toggleSidebar}
-                  className="p-1 hover:bg-gray-800 rounded transition-colors"
+                  className="p-1 hover:bg-surface rounded transition-colors"
                   title="Close menu"
                 >
-                  <X className="w-4 h-4 text-gray-400" />
+                  <X className="w-4 h-4 text-muted" />
                 </button>
               )}
             </div>
           </div>
 
-          <div className="p-3 border-b border-gray-700">
+          <div className="p-3 border-b border-subtle">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
               <input
                 type="text"
                 placeholder="Search modules..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-9 pr-3 py-2 bg-surface border border-subtle rounded-lg text-sm text-secondary placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -272,8 +272,8 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                     onClick={() => toggleDepartment(dept.id)}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                       hasActiveModule
-                        ? 'bg-blue-500/10 text-blue-400'
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                        ? 'bg-blue-500/10 text-brand'
+                        : 'text-muted hover:bg-surface hover:text-gray-200'
                     }`}
                     title={dept.description}
                   >
@@ -283,7 +283,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                     {modules.length === 0 && <div className="w-4" />}
                     {renderIcon(dept.icon, "w-4 h-4 flex-shrink-0")}
                     <span className="text-sm font-medium truncate flex-1 text-left">{dept.display_name}</span>
-                    <span className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
+                    <span className="text-xs bg-surface text-muted px-1.5 py-0.5 rounded flex-shrink-0">
                       {modules.length}
                     </span>
                   </button>
@@ -300,15 +300,15 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                             className={`flex items-center group rounded-lg ${
                               isActive
                                 ? 'bg-blue-500/20'
-                                : 'hover:bg-gray-800'
+                                : 'hover:bg-surface'
                             }`}
                           >
                             <button
                               onClick={() => handleModuleClick(module.module_key)}
                               className={`flex-1 flex items-center gap-2 px-3 py-2 text-left transition-colors ${
                                 isActive
-                                  ? 'text-blue-400'
-                                  : 'text-gray-400 group-hover:text-gray-200'
+                                  ? 'text-brand'
+                                  : 'text-muted group-hover:text-gray-200'
                               }`}
                               title={module.description || ''}
                             >
@@ -356,7 +356,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
             })}
 
             {searchQuery.trim() && filteredDepartments.length === 0 && (
-              <div className="text-center py-8 text-gray-500 text-sm">
+              <div className="text-center py-8 text-muted text-sm">
                 No modules found
               </div>
             )}

@@ -391,14 +391,14 @@ export function UserPreferences() {
         </div>
         {themeError && <p role="alert" className="mt-2 text-sm text-red-500">{themeError}</p>}
       </section>
-      <div className="border-b border-gray-700">
-        <nav className="flex gap-4">
+      <div className="border-b border-subtle">
+        <nav className="flex gap-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('notifications')}
             className={`px-4 py-3 font-medium transition-colors border-b-2 ${
               activeTab === 'notifications'
-                ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
+                ? 'border-blue-500 text-brand'
+                : 'border-transparent text-muted hover:text-primary'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -410,8 +410,8 @@ export function UserPreferences() {
             onClick={() => setActiveTab('business-card')}
             className={`px-4 py-3 font-medium transition-colors border-b-2 ${
               activeTab === 'business-card'
-                ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
+                ? 'border-blue-500 text-brand'
+                : 'border-transparent text-muted hover:text-primary'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -423,8 +423,8 @@ export function UserPreferences() {
             onClick={() => setActiveTab('rewards')}
             className={`px-4 py-3 font-medium transition-colors border-b-2 ${
               activeTab === 'rewards'
-                ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
+                ? 'border-blue-500 text-brand'
+                : 'border-transparent text-muted hover:text-primary'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -436,8 +436,8 @@ export function UserPreferences() {
             onClick={() => setActiveTab('proposals')}
             className={`px-4 py-3 font-medium transition-colors border-b-2 ${
               activeTab === 'proposals'
-                ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
+                ? 'border-blue-500 text-brand'
+                : 'border-transparent text-muted hover:text-primary'
             }`}
           >
             <div className="flex items-center gap-2">

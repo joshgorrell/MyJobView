@@ -97,7 +97,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
       <header className="bg-canvas border-b border-subtle">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
-            <div className="text-gray-400">Loading...</div>
+            <div className="text-muted">Loading...</div>
           </div>
         </div>
       </header>
@@ -149,18 +149,18 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               </button>
 
               {showCreateMenu && (
-                <div className="absolute top-full right-0 mt-2 w-56 bg-gray-900 border border-purple-500/30 rounded-lg shadow-xl overflow-hidden z-50">
+                <div className="absolute top-full right-0 mt-2 w-56 bg-canvas border border-purple-500/30 rounded-lg shadow-xl overflow-hidden z-50">
                   <button
                     onClick={() => {
                       onCreateContact();
                       setShowCreateMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <UserPlus className="w-4 h-4 text-blue-400" />
                     <div>
                       <div className="font-medium">New Contact</div>
-                      <div className="text-xs text-gray-400">Add a person or company</div>
+                      <div className="text-xs text-muted">Add a person or company</div>
                     </div>
                   </button>
 
@@ -169,12 +169,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                       onCreateLead();
                       setShowCreateMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <TrendingUp className="w-4 h-4 text-green-400" />
                     <div>
                       <div className="font-medium">New Lead</div>
-                      <div className="text-xs text-gray-400">Create sales opportunity</div>
+                      <div className="text-xs text-muted">Create sales opportunity</div>
                     </div>
                   </button>
 
@@ -183,12 +183,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                       onCreateMessage();
                       setShowCreateMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <MessageSquare className="w-4 h-4 text-purple-400" />
                     <div>
                       <div className="font-medium">New Message</div>
-                      <div className="text-xs text-gray-400">Start a conversation</div>
+                      <div className="text-xs text-muted">Start a conversation</div>
                     </div>
                   </button>
 
@@ -197,12 +197,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                       onCreateServiceRequest();
                       setShowCreateMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <Wrench className="w-4 h-4 text-orange-400" />
                     <div>
                       <div className="font-medium">Work Order Request</div>
-                      <div className="text-xs text-gray-400">Request service or project work</div>
+                      <div className="text-xs text-muted">Request service or project work</div>
                     </div>
                   </button>
 
@@ -211,12 +211,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                       onCreateTask();
                       setShowCreateMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <CheckSquare className="w-4 h-4 text-cyan-400" />
                     <div>
                       <div className="font-medium">New Task</div>
-                      <div className="text-xs text-gray-400">Create a task or reminder</div>
+                      <div className="text-xs text-muted">Create a task or reminder</div>
                     </div>
                   </button>
 
@@ -226,12 +226,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                         onCreateProjectTime();
                         setShowCreateMenu(false);
                       }}
-                      className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"
+                      className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                     >
                       <Clock className="w-4 h-4 text-blue-400" />
                       <div>
                         <div className="font-medium">Add Project Time</div>
-                        <div className="text-xs text-gray-400">Log time against a project</div>
+                        <div className="text-xs text-muted">Log time against a project</div>
                       </div>
                     </button>
                   )}
@@ -242,12 +242,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                         onCreateJobMedia();
                         setShowCreateMenu(false);
                       }}
-                      className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"
+                      className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                     >
                       <Camera className="w-4 h-4 text-pink-400" />
                       <div>
                         <div className="font-medium">New Job Pic</div>
-                        <div className="text-xs text-gray-400">Upload photo or video</div>
+                        <div className="text-xs text-muted">Upload photo or video</div>
                       </div>
                     </button>
                   )}
@@ -258,12 +258,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                         onOpenAIAssistant();
                         setShowCreateMenu(false);
                       }}
-                      className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 border-t border-gray-700/50"
+                      className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 border-t border-subtle/50"
                     >
                       <Sparkles className="w-4 h-4 text-blue-400" />
                       <div>
                         <div className="font-medium">AI Assistant</div>
-                        <div className="text-xs text-gray-400">Ask anything or create with AI</div>
+                        <div className="text-xs text-muted">Ask anything or create with AI</div>
                       </div>
                     </button>
                   )}
@@ -303,7 +303,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
             />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 text-muted hover:text-primary hover:bg-surface rounded-lg transition-colors"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -312,17 +312,17 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
         {/* Mobile Menu — full-screen overlay, favorites + quick actions only */}
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-50 bg-gray-900 overflow-y-auto">
+          <div className="md:hidden fixed inset-0 z-50 bg-canvas overflow-y-auto">
             {/* Header row with user info + close button */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-subtle sticky top-0 bg-canvas z-10">
               {profile && (
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-muted">
                   {profile.full_name} • {formatRoleName(profile.role)}
                 </div>
               )}
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
+                className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-surface"
                 aria-label="Close menu"
               >
                 <X className="w-5 h-5" />
@@ -333,7 +333,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               {/* Favorites */}
               {starredModules.length > 0 && (
                 <div>
-                  <div className="px-1 mb-2 font-semibold uppercase text-xs text-gray-500 tracking-wider">
+                  <div className="px-1 mb-2 font-semibold uppercase text-xs text-muted tracking-wider">
                     Favorites
                   </div>
                   <div className="space-y-1">
@@ -344,7 +344,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                         className={`w-full px-3 py-2.5 text-sm font-medium transition-all flex items-center gap-3 rounded-lg ${
                           activeTab === module.module_key
                             ? 'bg-blue-500/20 text-blue-400'
-                            : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                            : 'text-secondary hover:bg-surface hover:text-primary'
                         }`}
                       >
                         {renderIcon(module.icon, "w-4 h-4")}
@@ -357,74 +357,74 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
               {/* Quick Actions */}
               <div>
-                <div className="px-1 mb-2 font-semibold uppercase text-xs text-gray-500 tracking-wider">
+                <div className="px-1 mb-2 font-semibold uppercase text-xs text-muted tracking-wider">
                   Quick Actions
                 </div>
                 <div className="space-y-1">
                   <button
                     onClick={() => { onCreateContact(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <UserPlus className="w-4 h-4 text-blue-400 flex-shrink-0" />
                     <div>
                       <div className="text-sm font-medium">New Contact</div>
-                      <div className="text-xs text-gray-500">Add a person or company</div>
+                      <div className="text-xs text-muted">Add a person or company</div>
                     </div>
                   </button>
 
                   <button
                     onClick={() => { onCreateLead(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <TrendingUp className="w-4 h-4 text-green-400 flex-shrink-0" />
                     <div>
                       <div className="text-sm font-medium">New Lead</div>
-                      <div className="text-xs text-gray-500">Create sales opportunity</div>
+                      <div className="text-xs text-muted">Create sales opportunity</div>
                     </div>
                   </button>
 
                   <button
                     onClick={() => { onCreateMessage(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0" />
                     <div>
                       <div className="text-sm font-medium">New Message</div>
-                      <div className="text-xs text-gray-500">Start a conversation</div>
+                      <div className="text-xs text-muted">Start a conversation</div>
                     </div>
                   </button>
 
                   <button
                     onClick={() => { onCreateServiceRequest(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <Wrench className="w-4 h-4 text-orange-400 flex-shrink-0" />
                     <div>
                       <div className="text-sm font-medium">Work Order Request</div>
-                      <div className="text-xs text-gray-500">Request service or project work</div>
+                      <div className="text-xs text-muted">Request service or project work</div>
                     </div>
                   </button>
 
                   <button
                     onClick={() => { onCreateTask(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <CheckSquare className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                     <div>
                       <div className="text-sm font-medium">New Task</div>
-                      <div className="text-xs text-gray-500">Create a task or reminder</div>
+                      <div className="text-xs text-muted">Create a task or reminder</div>
                     </div>
                   </button>
 
                   {onCreateProjectTime && (
                     <button
                       onClick={() => { onCreateProjectTime(); setMobileMenuOpen(false); }}
-                      className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                      className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                     >
                       <Clock className="w-4 h-4 text-blue-400 flex-shrink-0" />
                       <div>
                         <div className="text-sm font-medium">Add Project Time</div>
-                        <div className="text-xs text-gray-500">Log time against a project</div>
+                        <div className="text-xs text-muted">Log time against a project</div>
                       </div>
                     </button>
                   )}
@@ -432,12 +432,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                   {onCreateJobMedia && (
                     <button
                       onClick={() => { onCreateJobMedia(); setMobileMenuOpen(false); }}
-                      className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                      className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                     >
                       <Camera className="w-4 h-4 text-pink-400 flex-shrink-0" />
                       <div>
                         <div className="text-sm font-medium">New Job Pic</div>
-                        <div className="text-xs text-gray-500">Upload photo or video</div>
+                        <div className="text-xs text-muted">Upload photo or video</div>
                       </div>
                     </button>
                   )}
@@ -445,12 +445,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                   {onOpenAIAssistant && (
                     <button
                       onClick={() => { onOpenAIAssistant(); setMobileMenuOpen(false); }}
-                      className="w-full px-3 py-2.5 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3 rounded-lg"
+                      className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                     >
                       <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0" />
                       <div>
                         <div className="text-sm font-medium">AI Assistant</div>
-                        <div className="text-xs text-gray-500">Ask anything or create with AI</div>
+                        <div className="text-xs text-muted">Ask anything or create with AI</div>
                       </div>
                     </button>
                   )}

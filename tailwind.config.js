@@ -14,6 +14,7 @@ export default {
         muted: 'rgb(var(--text-muted) / <alpha-value>)',
         subtle: 'rgb(var(--border-subtle) / <alpha-value>)',
         strong: 'rgb(var(--border-strong) / <alpha-value>)',
+        brand: 'rgb(var(--brand-text) / <alpha-value>)',
       },
     },
   },
