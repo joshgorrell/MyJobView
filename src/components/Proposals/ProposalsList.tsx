@@ -557,21 +557,21 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   function getStatusIcon(status: string) {
     switch (status) {
       case 'designing':
-        return <FileEdit size={18} className="text-amber-400" title="Being Designed" />;
+        return <FileEdit size={18} className="text-warning" title="Being Designed" />;
       case 'ready_to_submit':
-        return <ThumbsUp size={18} className="text-cyan-400" title="Ready to Submit" />;
+        return <ThumbsUp size={18} className="text-info" title="Ready to Submit" />;
       case 'sent':
-        return <Send size={18} className="text-blue-400" title="Submitted to Portal" />;
+        return <Send size={18} className="text-info" title="Submitted to Portal" />;
       case 'viewed':
         return <Eye size={18} className="text-purple-400" />;
       case 'approved':
-        return <CheckCircle size={18} className="text-green-400" />;
+        return <CheckCircle size={18} className="text-success" />;
       case 'approved_pending_action':
-        return <AlertCircle size={18} className="text-yellow-400" title="Approved - Pending PO/Deposit" />;
+        return <AlertCircle size={18} className="text-warning" title="Approved - Pending PO/Deposit" />;
       case 'declined':
-        return <XCircle size={18} className="text-red-400" />;
+        return <XCircle size={18} className="text-danger" />;
       case 'expired':
-        return <Clock size={18} className="text-orange-400" title="Expired" />;
+        return <Clock size={18} className="text-attention" title="Expired" />;
       case 'archived':
         return <Archive size={18} className="text-muted" title="Archived" />;
       default:
@@ -582,23 +582,23 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   function getStatusColor(status: string) {
     switch (status) {
       case 'designing':
-        return 'bg-amber-900 text-amber-300';
+        return 'bg-warningSoft text-warning';
       case 'ready_to_submit':
-        return 'bg-cyan-900 text-cyan-300';
+        return 'bg-infoSoft text-info';
       case 'sent':
-        return 'bg-blue-900 text-blue-300';
+        return 'bg-infoSoft text-info';
       case 'portal':
-        return 'bg-blue-900 text-blue-300';
+        return 'bg-infoSoft text-info';
       case 'approved':
-        return 'bg-green-900 text-green-300';
+        return 'bg-successSoft text-success';
       case 'approved_pending_action':
-        return 'bg-yellow-900 text-yellow-300';
+        return 'bg-warningSoft text-warning';
       case 'declined':
-        return 'bg-red-900 text-red-300';
+        return 'bg-dangerSoft text-danger';
       case 'cancelled':
         return 'bg-elevated text-muted';
       case 'expired':
-        return 'bg-orange-900 text-orange-300';
+        return 'bg-attentionSoft text-attention';
       case 'archived':
         return 'bg-elevated text-muted';
       default:
@@ -684,7 +684,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       if (days < STALE_DAYS) return null;
       return {
         label: `Stale ${days}d`,
-        className: 'bg-amber-900/70 text-amber-300 border border-amber-800',
+        className: 'bg-warningSoft text-warning border border-warningLine',
         title: `Not updated in ${days} days — needs attention or cleanup`,
       };
     }
@@ -693,9 +693,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     if (!activeStatuses.includes(proposal.status)) return null;
     const days = getProposalAgeDays(proposal);
     if (days < 14) return null;
-    if (days >= 60) return { label: `${days}d`, className: 'bg-red-900/70 text-red-300 border border-red-800', title: `${days} days old — needs follow-up` };
-    if (days >= 30) return { label: `${days}d`, className: 'bg-orange-900/70 text-orange-300 border border-orange-800', title: `${days} days old — needs follow-up` };
-    return { label: `${days}d`, className: 'bg-yellow-900/70 text-yellow-300 border border-yellow-800', title: `${days} days old — needs follow-up` };
+    if (days >= 60) return { label: `${days}d`, className: 'bg-dangerSoft text-danger border border-danger', title: `${days} days old — needs follow-up` };
+    if (days >= 30) return { label: `${days}d`, className: 'bg-attentionSoft text-attention border border-attention', title: `${days} days old — needs follow-up` };
+    return { label: `${days}d`, className: 'bg-warningSoft text-warning border border-warningLine', title: `${days} days old — needs follow-up` };
   }
 
   function getLastViewedAt(proposal: any): Date | null {
@@ -1337,17 +1337,17 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       {/* Pending Deposits Alert Section */}
       {pendingDeposits.length > 0 && (
-        <div className="flex-shrink-0 px-3 sm:px-6 py-2 bg-yellow-900/20 border-b border-yellow-800/30">
+        <div className="flex-shrink-0 px-3 sm:px-6 py-2 bg-warningSoft border-b border-warningLine/60">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-              <span className="text-xs font-semibold text-yellow-400">
+              <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
+              <span className="text-xs font-semibold text-warning">
                 {pendingDeposits.length} Awaiting Deposit
               </span>
             </div>
             <button
               onClick={() => setShowPendingDeposits(!showPendingDeposits)}
-              className="text-xs text-yellow-400 hover:text-yellow-300 font-medium whitespace-nowrap py-1 px-2 -mr-1"
+              className="text-xs text-warning hover:underline font-medium whitespace-nowrap py-1 px-2 -mr-1"
             >
               {showPendingDeposits ? 'Hide' : 'Show'}
             </button>
@@ -1356,7 +1356,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           {showPendingDeposits && (
             <div className="mt-1.5 space-y-0">
               {pendingDeposits.map(proposal => (
-                <div key={proposal.id} className="flex items-center gap-2 py-2 border-t border-yellow-800/20">
+                <div key={proposal.id} className="flex items-center gap-2 py-2 border-t border-warningLine/60">
                   <button
                     onClick={() => {
                       const salesOrderId = pendingDepositSalesOrders[proposal.id];
@@ -1366,14 +1366,14 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         onSelectProposal(proposal.id);
                       }
                     }}
-                    className="text-xs font-medium text-yellow-300 hover:text-yellow-200 active:text-yellow-100 flex items-center gap-1 min-w-0 flex-1 py-1"
+                    className="text-xs font-medium text-warning hover:underline flex items-center gap-1 min-w-0 flex-1 py-1"
                     title={pendingDepositSalesOrders[proposal.id] ? 'Open Sales Order' : 'Open Proposal'}
                   >
                     <span className="flex flex-col items-start min-w-0">
-                      <span className="text-sm font-semibold text-yellow-200 truncate max-w-full leading-tight">
+                      <span className="text-sm font-semibold text-warning truncate max-w-full leading-tight">
                         {proposal.contacts?.full_name || 'Unknown'}
                       </span>
-                      <span className="text-xs text-yellow-400/70 font-normal truncate max-w-full leading-tight flex items-center gap-1">
+                      <span className="text-xs text-warning font-normal truncate max-w-full leading-tight flex items-center gap-1">
                         {proposal.proposal_number}{proposal.title ? ` — ${proposal.title}` : ''}
                         {pendingDepositSalesOrders[proposal.id] && (
                           <ExternalLink size={9} className="opacity-60 flex-shrink-0" />
@@ -1381,7 +1381,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       </span>
                     </span>
                   </button>
-                  <span className="text-xs text-yellow-400 font-semibold flex-shrink-0 flex items-center gap-0.5 whitespace-nowrap">
+                  <span className="text-xs text-warning font-semibold flex-shrink-0 flex items-center gap-0.5 whitespace-nowrap">
                     <DollarSign size={10} />
                     {proposal.deposit_amount_due?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
@@ -1467,7 +1467,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         {(proposal.contacts as any)?.id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
-                            className="text-sm font-bold text-blue-400 hover:text-blue-300 leading-snug truncate min-w-0 flex-1 text-left transition-colors"
+                            className="text-sm font-bold text-info hover:text-info leading-snug truncate min-w-0 flex-1 text-left transition-colors"
                           >
                             {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
                           </button>
@@ -1477,7 +1477,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           </p>
                         )}
                         {(proposal.revision_count && proposal.revision_count > 1) && (
-                          <span className="flex-shrink-0 px-1.5 h-4 bg-blue-900 text-blue-200 text-[10px] font-medium rounded flex items-center">
+                          <span className="flex-shrink-0 px-1.5 h-4 bg-infoSoft text-info text-[10px] font-medium rounded flex items-center">
                             R:{proposal.revision_count}
                           </span>
                         )}
@@ -1501,7 +1501,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {/* Bill-To badge */}
                       {proposal.bill_to_contact_id && proposal.bill_to_contact && (
                         <div className="flex items-center gap-1 mb-0.5">
-                          <span className="text-[10px] text-amber-400 font-medium truncate max-w-[200px] flex items-center gap-1">
+                          <span className="text-[10px] text-warning font-medium truncate max-w-[200px] flex items-center gap-1">
                             <Receipt size={9} className="flex-shrink-0" />
                             Billed to: {(proposal.bill_to_contact as any).company_name || (proposal.bill_to_contact as any).full_name}
                           </span>
@@ -1521,7 +1521,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           </span>
                         )}
                         {proposal.expires_at && (proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'declined' || proposal.status === 'expired') && (
-                          <span className={`flex items-center gap-0.5 ${isExpired(proposal) ? 'text-red-400' : ''}`}>
+                          <span className={`flex items-center gap-0.5 ${isExpired(proposal) ? 'text-danger' : ''}`}>
                             <Clock size={9} className="flex-shrink-0" />
                             {formatDate(proposal.expires_at)}
                           </span>
@@ -1535,7 +1535,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     {/* Portal visibility pill */}
                     {(proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'declined' || proposal.status === 'expired') && (
                       proposal.is_portal_visible ? (
-                        <span className="h-5 px-1.5 bg-green-900/50 text-green-300 text-[10px] font-medium rounded flex items-center gap-0.5 whitespace-nowrap" title="Visible on portal">
+                        <span className="h-5 px-1.5 bg-successSoft text-success text-[10px] font-medium rounded flex items-center gap-0.5 whitespace-nowrap" title="Visible on portal">
                           <Globe size={9} />
                         </span>
                       ) : (
@@ -1560,7 +1560,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     })()}
                     {/* View count badge */}
                     {getViewCount(proposal) > 0 && (
-                      <span className="h-5 px-1.5 rounded text-[10px] font-medium whitespace-nowrap bg-blue-900/50 text-blue-300 flex items-center gap-1">
+                      <span className="h-5 px-1.5 rounded text-[10px] font-medium whitespace-nowrap bg-infoSoft text-info flex items-center gap-1">
                         <Eye size={9} />
                         {getViewCount(proposal)}
                       </span>
@@ -1592,7 +1592,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setShowReactivateModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-orange-400 hover:bg-strong/25 hover:text-orange-300 transition-colors flex items-center gap-2.5 border-b border-strong"
+                              className="w-full px-4 py-3 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RotateCcw className="w-4 h-4 flex-shrink-0" />
                               Reactivate Proposal
@@ -1604,7 +1604,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleRefreshProposal(proposal.id);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-amber-400 hover:bg-strong/25 hover:text-amber-300 transition-colors flex items-center gap-2.5 border-b border-strong"
+                              className="w-full px-4 py-3 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RefreshCw className="w-4 h-4 flex-shrink-0" />
                               Mark as Active
@@ -1618,7 +1618,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setShowManualApprovalModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-green-400 hover:bg-strong/25 hover:text-green-300 transition-colors flex items-center gap-2.5 border-b border-strong"
+                              className="w-full px-4 py-3 text-left text-sm text-success hover:bg-strong/25 hover:text-success transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <ThumbsUp className="w-4 h-4 flex-shrink-0" />
                               Manual Approve
@@ -1630,7 +1630,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleRecallProposal(proposal.id, proposal.status);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-amber-400 hover:bg-strong/25 hover:text-amber-300 transition-colors flex items-center gap-2.5 border-b border-strong"
+                              className="w-full px-4 py-3 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RotateCcw className="w-4 h-4 flex-shrink-0" />
                               Recall from Portal
@@ -1645,7 +1645,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setShowDeclineModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-strong/25 hover:text-red-300 transition-colors flex items-center gap-2.5 border-b border-strong"
+                              className="w-full px-4 py-3 text-left text-sm text-danger hover:bg-strong/25 hover:text-danger transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <XCircle className="w-4 h-4 flex-shrink-0" />
                               Mark as Declined
@@ -1672,7 +1672,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleViewActivity(proposal);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-strong/25 hover:text-blue-300 transition-colors flex items-center gap-2.5 border-b border-strong"
+                              className="w-full px-4 py-3 text-left text-sm text-info hover:bg-strong/25 hover:text-info transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <Activity className="w-4 h-4 flex-shrink-0" />
                               Proposal Activity
@@ -1741,7 +1741,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               handleDeleteProposal(proposal.id);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-strong/25 hover:text-red-300 transition-colors flex items-center gap-2.5 rounded-b-lg"
+                            className="w-full px-4 py-3 text-left text-sm text-danger hover:bg-strong/25 hover:text-danger transition-colors flex items-center gap-2.5 rounded-b-lg"
                           >
                             <Trash2 className="w-4 h-4 flex-shrink-0" />
                             Delete
@@ -1766,7 +1766,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {(proposal.contacts as any)?.id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
-                          className="text-sm font-bold text-blue-400 hover:text-blue-300 flex-shrink-0 max-w-[35%] truncate text-left transition-colors"
+                          className="text-sm font-bold text-info hover:text-info flex-shrink-0 max-w-[35%] truncate text-left transition-colors"
                         >
                           {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
                         </button>
@@ -1778,7 +1778,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       <span className="text-muted flex-shrink-0 text-xs">—</span>
                       <h3 className="text-sm text-secondary truncate flex-1 min-w-0">{getDisplayTitle(proposal)}</h3>
                       {(proposal.revision_count && proposal.revision_count > 1) && (
-                        <span className="px-1.5 py-0.5 bg-blue-900 text-blue-200 text-[10px] font-medium rounded whitespace-nowrap flex-shrink-0">
+                        <span className="px-1.5 py-0.5 bg-infoSoft text-info text-[10px] font-medium rounded whitespace-nowrap flex-shrink-0">
                           R:{proposal.revision_count}
                         </span>
                       )}
@@ -1794,7 +1794,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             e.stopPropagation();
                             handleViewActivity(proposal);
                           }}
-                          className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer flex-shrink-0"
+                          className="px-2 py-0.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium rounded flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer flex-shrink-0"
                         >
                           <Bell size={12} />
                           New Activity
@@ -1806,7 +1806,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {proposal.bill_to_contact_id && proposal.bill_to_contact && (
                         <>
                           <span className="flex-shrink-0">•</span>
-                          <span className="whitespace-nowrap flex-shrink-0 flex items-center gap-1 text-amber-400">
+                          <span className="whitespace-nowrap flex-shrink-0 flex items-center gap-1 text-warning">
                             <Receipt size={10} />
                             Billed to: {(proposal.bill_to_contact as any).company_name || (proposal.bill_to_contact as any).full_name}
                           </span>
@@ -1832,7 +1832,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {proposal.expires_at && (proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'declined' || proposal.status === 'expired') && (
                         <>
                           <span className="flex-shrink-0">•</span>
-                          <span className={`whitespace-nowrap flex-shrink-0 flex items-center gap-1 ${isExpired(proposal) ? 'text-red-400' : ''}`}>
+                          <span className={`whitespace-nowrap flex-shrink-0 flex items-center gap-1 ${isExpired(proposal) ? 'text-danger' : ''}`}>
                             <Clock size={10} />
                             Expires: {formatDate(proposal.expires_at)}
                           </span>
@@ -1847,7 +1847,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   {/* Status + aging badges — fixed width so price never shifts */}
                   <div className="w-40 flex justify-end items-center gap-1.5">
                     {getViewCount(proposal) > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap bg-blue-900/50 text-blue-300 flex items-center gap-0.5 flex-shrink-0">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap bg-infoSoft text-info flex items-center gap-0.5 flex-shrink-0">
                         <Eye size={9} />
                         {getViewCount(proposal)}
                       </span>
@@ -1894,7 +1894,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowReactivateModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-orange-400 hover:bg-strong/25 hover:text-orange-300 transition-colors flex items-center gap-2 border-b border-strong"
+                            className="w-full px-3 py-2 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Reactivate Proposal
@@ -1906,7 +1906,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleRefreshProposal(proposal.id);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-amber-400 hover:bg-strong/25 hover:text-amber-300 transition-colors flex items-center gap-2 border-b border-strong"
+                            className="w-full px-3 py-2 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
                             Mark as Active
@@ -1920,7 +1920,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowManualApprovalModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-green-400 hover:bg-strong/25 hover:text-green-300 transition-colors flex items-center gap-2 border-b border-strong"
+                            className="w-full px-3 py-2 text-left text-sm text-success hover:bg-strong/25 hover:text-success transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <ThumbsUp className="w-3.5 h-3.5" />
                             Manual Approve
@@ -1932,7 +1932,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleRecallProposal(proposal.id, proposal.status);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-amber-400 hover:bg-strong/25 hover:text-amber-300 transition-colors flex items-center gap-2 border-b border-strong"
+                            className="w-full px-3 py-2 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Recall from Portal
@@ -1947,7 +1947,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowDeclineModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-strong/25 hover:text-red-300 transition-colors flex items-center gap-2 border-b border-strong"
+                            className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-strong/25 hover:text-danger transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             Mark as Declined
@@ -1974,7 +1974,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleViewActivity(proposal);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-strong/25 hover:text-blue-300 transition-colors flex items-center gap-2 border-b border-strong"
+                            className="w-full px-3 py-2 text-left text-sm text-info hover:bg-strong/25 hover:text-info transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <Activity className="w-3.5 h-3.5" />
                             Proposal Activity
@@ -2042,7 +2042,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             e.stopPropagation();
                             handleDeleteProposal(proposal);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors flex items-center gap-2"
+                          className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-dangerSoft/30 hover:text-danger transition-colors flex items-center gap-2"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           Delete
@@ -2270,7 +2270,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             <div className="p-6 border-b border-subtle">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Activity className="text-blue-400" size={24} />
+                  <Activity className="text-info" size={24} />
                   <div>
                     <h2 className="text-xl font-bold text-primary">
                       Customer Activity
@@ -2413,7 +2413,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             className="bg-elevated p-3 rounded-lg"
                           >
                             <div className="flex items-center justify-between mb-1">
-                              <div className="font-mono text-sm text-blue-400">{ipInfo.ip}</div>
+                              <div className="font-mono text-sm text-info">{ipInfo.ip}</div>
                               <div className="text-xs text-muted">
                                 {ipInfo.views} {ipInfo.views === 1 ? 'view' : 'views'}
                               </div>
@@ -2455,10 +2455,10 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           >
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-3">
-                                {activity.type === 'viewed' && <Eye className="text-blue-400" size={16} />}
-                                {activity.type === 'downloaded' && <FileText className="text-green-400" size={16} />}
-                                {activity.type === 'accepted' && <CheckCircle className="text-green-400" size={16} />}
-                                {activity.type === 'declined' && <XCircle className="text-red-400" size={16} />}
+                                {activity.type === 'viewed' && <Eye className="text-info" size={16} />}
+                                {activity.type === 'downloaded' && <FileText className="text-success" size={16} />}
+                                {activity.type === 'accepted' && <CheckCircle className="text-success" size={16} />}
+                                {activity.type === 'declined' && <XCircle className="text-danger" size={16} />}
                                 <div>
                                   <div className="text-sm text-primary capitalize">{activity.type}</div>
                                   {activity.duration > 0 && (
@@ -2480,7 +2480,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             {(activity.ip_address || activity.deviceType || activity.browser) && (
                               <div className="flex items-center gap-3 text-xs text-muted mt-2 pl-7">
                                 {activity.ip_address && (
-                                  <span className="font-mono text-blue-400">{activity.ip_address}</span>
+                                  <span className="font-mono text-info">{activity.ip_address}</span>
                                 )}
                                 {activity.deviceType && (
                                   <span className="capitalize">{activity.deviceType}</span>
