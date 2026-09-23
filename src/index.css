@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+:root, [data-theme='dark'] {
+  --workspace: 15 23 42;
+  --canvas: 17 24 39;
+  --surface: 31 41 55;
+  --elevated: 55 65 81;
+  --text-primary: 249 250 251;
+  --text-secondary: 229 231 235;
+  --text-muted: 209 213 219;
+  --border-subtle: 75 85 99;
+  --border-strong: 107 114 128;
+}
+
+[data-theme='light'] {
+  --workspace: 243 246 252;
+  --canvas: 255 255 255;
+  --surface: 248 250 252;
+  --elevated: 235 239 246;
+  --text-primary: 17 24 39;
+  --text-secondary: 55 65 81;
+  --text-muted: 75 85 99;
+  --border-subtle: 203 213 225;
+  --border-strong: 148 163 184;
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;

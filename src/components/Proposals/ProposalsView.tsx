@@ -108,7 +108,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
 
   if (showVideoLibrary) return <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">Loading video library...</div>}><div className="w-full h-full"><div className="bg-gray-900 border-b border-gray-700 px-4 py-2"><button onClick={() => setShowVideoLibrary(false)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">&larr; Back to Proposals</button></div><VideoLibrary /></div></Suspense>;
 
-  return <div className="w-full space-y-6">
+  return <div className="w-full space-y-2">
     <ProposalsList onSelectProposal={navigateToProposal} onCreateNew={openCreateModal} onSelectSalesOrder={onSelectSalesOrder} onNavigateToSalesOrders={onNavigateToSalesOrders} onNavigateToSalesStats={onNavigateToSalesStats} onOpenVideoLibrary={() => setShowVideoLibrary(true)} />
     {showCreateModal && <CreateProposalModal onClose={closeCreateModal} onCreated={handleProposalCreated} prefill={aiPrefill ?? undefined} contactId={aiPrefill?.contactId} leadId={aiPrefill?.leadId} />}
   </div>;

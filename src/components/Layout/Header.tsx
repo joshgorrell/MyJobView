@@ -94,9 +94,9 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
   if (loading) {
     return (
-      <header className="bg-gray-900 border-b border-purple-500/30 shadow-lg">
+      <header className="bg-canvas border-b border-subtle">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-14">
             <div className="text-gray-400">Loading...</div>
           </div>
         </div>
@@ -105,15 +105,15 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   }
 
   return (
-    <header className="bg-gray-900 border-b border-purple-500/30 shadow-lg">
+    <header className="bg-canvas border-b border-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div className="flex items-center justify-between h-14 gap-4">
           {/* Menu Button and Logo - Left Side */}
           <div className="flex items-center gap-2 sm:gap-3">
             {onMenuToggle && (
               <button
                 onClick={onMenuToggle}
-                className="p-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-2 text-secondary hover:text-primary hover:bg-elevated rounded-lg transition-colors"
                 title="Toggle menu"
               >
                 <Menu className="w-5 h-5" />
@@ -126,28 +126,13 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               <img
                 src={headerLogoUrl || '/el_logo_color_(2).png'}
                 alt="Logo"
-                className="h-8 sm:h-10 flex-shrink-0 object-contain"
+                className="h-8 flex-shrink-0 object-contain"
               />
             </button>
           </div>
 
           {/* User Info - Center (Desktop/iPad only) */}
-          {profile && (
-            <div className="hidden md:flex items-center gap-2 flex-1 justify-center">
-              <div className="px-4 py-2 bg-gray-800/50 rounded-lg border border-purple-500/20 flex items-center gap-2">
-                <p className="text-sm font-medium text-cyan-400">
-                  Welcome!
-                </p>
-                <p className="text-sm font-medium text-gray-200">
-                  {profile.full_name}
-                </p>
-                <span className="text-gray-500">•</span>
-                <p className="text-sm text-gray-400">
-                  {formatRoleName(profile.role)}
-                </p>
-              </div>
-            </div>
-          )}
+          <div className="hidden md:block flex-1" />
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">

@@ -80,20 +80,20 @@ export function MessageTicker() {
   const getColor = () => {
     switch (currentMessage.priority) {
       case 'urgent':
-        return 'bg-red-500/10 border-red-500/30 text-red-300';
+        return 'bg-red-500/10 border-red-500/40 text-primary';
       case 'high':
-        return 'bg-orange-500/10 border-orange-500/30 text-orange-300';
+        return 'bg-orange-500/10 border-orange-500/40 text-primary';
       case 'normal':
-        return 'bg-blue-500/10 border-blue-500/30 text-blue-300';
+        return 'bg-blue-500/10 border-blue-500/40 text-primary';
       default:
-        return 'bg-gray-500/10 border-gray-500/30 text-gray-300';
+        return 'bg-surface border-subtle text-primary';
     }
   };
 
   return (
-    <div className="border-b border-gray-700 bg-gray-900/50 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-        <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border ${getColor()} transition-all duration-300`}>
+    <div className="border-b border-subtle bg-canvas overflow-hidden">
+      <div className="w-full px-3 sm:px-4 lg:px-5 py-1">
+        <div className={`flex items-center gap-3 px-3 py-1 rounded-lg border ${getColor()} transition-all duration-300`}>
           <div className="flex-shrink-0">
             {getIcon()}
           </div>

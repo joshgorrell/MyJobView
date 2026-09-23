@@ -6,9 +6,12 @@ import { subscribeToPushNotifications, unsubscribeFromPushNotifications, checkPu
 import { UserBusinessCardEditor } from '../BusinessCard/UserBusinessCardEditor';
 import { RewardsDashboard } from '../Rewards/RewardsDashboard';
 import ConfirmModal from '../ui/ConfirmModal';
+import { useTheme, type ThemePreference } from '../../contexts/ThemeContext';
 
 export function UserPreferences() {
   const { profile } = useAuth();
+  const { preference, setPreference } = useTheme();
+  const [themeError, setThemeError] = useState('');
   const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards' | 'proposals'>('notifications');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -374,6 +377,20 @@ export function UserPreferences() {
 
   return (
     <div className="space-y-6">
+      <section className="rounded-lg border border-subtle bg-canvas p-4 text-primary">
+        <h2 className="font-semibold">Appearance</h2>
+        <p className="mt-1 text-sm text-muted">Choose how MyJobView appears. Your choice follows your account.</p>
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Color theme">
+          {(['light', 'dark', 'system'] as ThemePreference[]).map(option => (
+            <button key={option} type="button" aria-pressed={preference === option}
+              onClick={async () => { setThemeError(''); try { await setPreference(option); } catch { setThemeError('Could not save your theme. Please try again.'); } }}
+              className={`rounded-lg border px-4 py-2 text-sm font-medium ${preference === option ? 'border-blue-500 bg-blue-600 text-white' : 'border-subtle bg-surface text-primary hover:bg-elevated'}`}>
+              {option[0].toUpperCase() + option.slice(1)}
+            </button>
+          ))}
+        </div>
+        {themeError && <p role="alert" className="mt-2 text-sm text-red-500">{themeError}</p>}
+      </section>
       <div className="border-b border-gray-700">
         <nav className="flex gap-4">
           <button

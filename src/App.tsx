@@ -3,9 +3,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { MessageTicker } from './components/Layout/MessageTicker';
 import { DepartmentSidebar } from './components/Layout/DepartmentSidebar';
-import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
 import { PlatformFooter } from './components/Layout/PlatformFooter';
 import { OfflineIndicator } from './components/Offline/OfflineIndicator';
 import BugReportModal from './components/Shared/BugReportModal';
@@ -814,7 +814,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>
@@ -872,17 +872,9 @@ function AppContent() {
 
       <div className={`flex-1 overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
         <main
-          className={`h-full overflow-y-auto ${isStandalone ? 'w-full' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8'}`}
+          className={`h-full overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
         >
-          {!isStandalone && (
-            <div className="hidden sm:block mb-6">
-              <div className="border-b border-purple-500/30 pb-3">
-                <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
-              </div>
-            </div>
-          )}
-
         <Suspense fallback={<LoadingFallback />}>
           {activeTab === 'time' && <DailyClock key={activeTab} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
@@ -1404,9 +1396,11 @@ function App() {
     <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
-          <DepartmentProvider>
-            <AppContent />
-          </DepartmentProvider>
+          <ThemeProvider>
+            <DepartmentProvider>
+              <AppContent />
+            </DepartmentProvider>
+          </ThemeProvider>
         </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
