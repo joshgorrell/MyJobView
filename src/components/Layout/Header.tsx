@@ -1,4 +1,4 @@
-import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
+import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock, Star } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,11 +24,13 @@ interface HeaderProps {
   onTabChange: (tab: string) => void;
   isAdmin: boolean;
   onMenuToggle?: () => void;
+  bookmarksVisible?: boolean;
+  onBookmarksToggle?: () => void;
   onNavigate?: (tab: string, params?: Record<string, string>) => void;
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, bookmarksVisible, onBookmarksToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -117,6 +119,18 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                 title="Toggle menu"
               >
                 <Menu className="w-5 h-5" />
+              </button>
+            )}
+            {onBookmarksToggle && (
+              <button
+                type="button"
+                onClick={onBookmarksToggle}
+                aria-label={bookmarksVisible ? 'Hide bookmarks' : 'Show bookmarks'}
+                aria-pressed={bookmarksVisible}
+                title={bookmarksVisible ? 'Hide bookmarks' : 'Show bookmarks'}
+                className={`p-2 rounded-lg transition-colors ${bookmarksVisible ? 'text-brand bg-blue-500/10' : 'text-muted hover:text-primary hover:bg-elevated'}`}
+              >
+                <Star className={`w-5 h-5 ${bookmarksVisible ? 'fill-current' : ''}`} />
               </button>
             )}
             <button

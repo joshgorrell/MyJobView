@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
+import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { MessageTicker } from './components/Layout/MessageTicker';
 import { DepartmentSidebar } from './components/Layout/DepartmentSidebar';
@@ -173,7 +174,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
-  const { footerDepartments, getUserModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
+  const { footerDepartments, getUserModules, starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -216,6 +217,18 @@ function AppContent() {
     const saved = localStorage.getItem('departmentSidebarPinned');
     return saved === 'true';
   });
+  const [bookmarksVisible, setBookmarksVisible] = useState(true);
+  useEffect(() => {
+    if (!profile?.id) return;
+    setBookmarksVisible(localStorage.getItem(`mjv-bookmarks-visible-${profile.id}`) !== 'false');
+  }, [profile?.id]);
+  const toggleBookmarks = () => {
+    if (!profile?.id) return;
+    setBookmarksVisible(current => {
+      localStorage.setItem(`mjv-bookmarks-visible-${profile.id}`, String(!current));
+      return !current;
+    });
+  };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [newPassword, setNewPassword] = useState('');
@@ -849,6 +862,8 @@ function AppContent() {
             onTabChange={setActiveTab}
             isAdmin={profile.role === 'admin'}
             onMenuToggle={toggleSidebar}
+            bookmarksVisible={bookmarksVisible}
+            onBookmarksToggle={toggleBookmarks}
             onNavigate={(tab, params) => {
               setActiveTab(tab);
               if (params?.workOrderId) setSelectedWorkOrderId(params.workOrderId);
@@ -870,9 +885,14 @@ function AppContent() {
         />
       )}
 
-      <div className={`flex-1 overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+      <div className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+        {!isStandalone && bookmarksVisible && starredModules.length > 0 && (
+          <div className="border-b border-subtle bg-canvas px-3 sm:px-4 lg:px-5 py-1.5">
+            <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
+          </div>
+        )}
         <main
-          className={`h-full overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
+          className={`min-h-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
         >
         <Suspense fallback={<LoadingFallback />}>
