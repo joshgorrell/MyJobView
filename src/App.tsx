@@ -1307,7 +1307,7 @@ function AppContent() {
           icon={<MessageSquare className="w-5 h-5 text-white" />}
           accentColor="from-teal-600 to-cyan-700"
           onClose={() => setShowMessageForm(false)}
-          maxWidth="sm:max-w-md"
+
         >
           <div className="p-4 sm:p-6 space-y-5">
             <p className="text-gray-400 text-sm leading-relaxed">

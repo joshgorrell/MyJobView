@@ -10,7 +10,6 @@ interface QuickActionModalProps {
   children: ReactNode;
   showSuccess?: boolean;
   successMessage?: string;
-  maxWidth?: string;
 }
 
 export function QuickActionModal({
@@ -22,7 +21,6 @@ export function QuickActionModal({
   children,
   showSuccess = false,
   successMessage = 'Created!',
-  maxWidth = 'sm:max-w-2xl',
 }: QuickActionModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -116,7 +114,7 @@ export function QuickActionModal({
       >
         <div
           className={`
-            qam-sheet bg-gray-900 w-full ${maxWidth}
+            qam-sheet bg-gray-900 w-full sm:max-w-2xl
             rounded-t-2xl sm:rounded-xl
             shadow-2xl border-t sm:border border-gray-700/80
             flex flex-col

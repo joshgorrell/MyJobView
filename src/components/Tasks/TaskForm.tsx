@@ -322,7 +322,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       onClose={handleClose}
       showSuccess={showSuccess}
       successMessage={task ? 'Task Updated!' : 'Task Created!'}
-      maxWidth="sm:max-w-lg"
+
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 space-y-4">

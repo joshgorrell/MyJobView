@@ -197,14 +197,14 @@ export function AddProjectTimeModal({
       icon={<Clock className="w-5 h-5 text-white" />}
       accentColor="from-blue-600 to-cyan-700"
       onClose={onClose}
-      maxWidth="sm:max-w-md"
+
     >
           {/* Form body */}
           <div className="p-4 sm:p-6 space-y-4">
 
             {/* Project */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
                 Project
               </label>
               {preselectedProjectId ? (
@@ -275,7 +275,7 @@ export function AddProjectTimeModal({
             <div className={canManageOthers ? 'grid grid-cols-2 gap-3' : ''}>
               {canManageOthers && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
                     Staff
                   </label>
                   <select
@@ -291,7 +291,7 @@ export function AddProjectTimeModal({
                 </div>
               )}
               <div className={canManageOthers ? '' : 'w-full'}>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
                   Date
                 </label>
                 <input
@@ -305,7 +305,7 @@ export function AddProjectTimeModal({
 
             {/* Duration */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
                 Duration
               </label>
               <div className="flex gap-2">
@@ -348,7 +348,7 @@ export function AddProjectTimeModal({
             {/* Labor Phase + Activity Type side by side */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
                   Labor Phase <span className="text-red-400 normal-case font-normal">(required)</span>
                 </label>
                 <select
@@ -365,7 +365,7 @@ export function AddProjectTimeModal({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
                   Activity
                 </label>
                 <select
@@ -383,7 +383,7 @@ export function AddProjectTimeModal({
 
             {/* Notes */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
                 Notes {activityType === 'other' && <span className="text-red-400 normal-case font-normal">(required)</span>}
               </label>
               <textarea

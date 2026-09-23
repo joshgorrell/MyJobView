@@ -1191,7 +1191,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
             setSelectedPaparazziRequestId('');
             if (modalOnly) onClose?.();
           }}
-          maxWidth="sm:max-w-lg"
+
         >
           <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
 
