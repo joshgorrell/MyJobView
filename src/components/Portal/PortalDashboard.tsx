@@ -280,7 +280,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         supabase.from('proposals').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['sent', 'viewed']),
         supabase.from('projects').select('id', { count: 'exact', head: true }).eq('customer_id', contactId).in('status', ['planning', 'active']),
         supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).gte('appointment_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
-        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['sent', 'partial', 'overdue']),
+        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['submitted', 'partial', 'overdue']),
         supabase.from('message_threads').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('is_internal', false),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('type', 'vip_program').gte('start_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
         supabase.from('punchlist_tasks').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['draft', 'requested', 'scheduled']),

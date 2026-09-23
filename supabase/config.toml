@@ -25,6 +25,9 @@ verify_jwt = true
 [functions.quickbooks-sync-invoices]
 verify_jwt = true
 
+[functions.quickbooks-void-invoice]
+verify_jwt = true
+
 [functions.quickbooks-sync-payments]
 verify_jwt = true
 

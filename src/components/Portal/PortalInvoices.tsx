@@ -120,6 +120,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             amount_due,
             project_id,
             qbo_invoice_id,
+            portal_visible,
             projects:project_id (
               project_number
             )
@@ -166,7 +167,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       setRecurringSubscriptions(subscriptionsRes.data || []);
 
       const unpaidIds = (invoicesRes.data || [])
-        .filter((inv: any) => inv.status !== 'paid' && inv.status !== 'void')
+        .filter((inv: any) => inv.status !== 'paid' && inv.status !== 'void' && inv.amount_due > 0)
         .map((inv: any) => inv.id);
       recordInvoiceOpens(unpaidIds);
     } catch (error) {
@@ -390,7 +391,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     }
   }
 
-  const outstandingInvoices = invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'void');
+  const outstandingInvoices = invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'void' && inv.status !== 'draft' && (inv.amount_due ?? 0) > 0);
   const paidInvoices = invoices.filter(inv => inv.status === 'paid');
   const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.includes(inv.id));
   const selectedTotal = selectedInvoices.reduce((sum, inv) => sum + inv.amount_due, 0);

@@ -69,7 +69,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
 
   async function loadInvoices() {
     try {
-      const isManager = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'finance';
+      const isManager = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'service_manager' || profile?.role === 'finance';
 
       let query = supabase
         .from('invoices')
@@ -85,6 +85,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           contact_id,
           project_id,
           created_by,
+          updated_at,
           contacts:contact_id (
             id,
             first_name,
@@ -289,7 +290,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
               >
                 <option value="all">All Statuses</option>
                 <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
+                <option value="submitted">Submitted</option>
                 <option value="partial">Partially Paid</option>
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
@@ -354,7 +355,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                           <p className="text-sm text-gray-600">{invoice.customer_name}</p>
                         )}
                       </div>
-                      <StatusBadge status={invoice.status} />
+                      <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
                     </div>
                     <div className="flex items-center justify-between text-sm mb-3">
                       <span className="text-gray-500">{new Date(invoice.invoice_date).toLocaleDateString()}</span>
@@ -442,7 +443,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <StatusBadge status={invoice.status} />
+                            <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
                           </td>
                           <td className="px-6 py-4 text-right">
                             <p className="text-sm font-medium text-gray-900">${(invoice.total ?? 0).toFixed(2)}</p>
@@ -707,16 +708,26 @@ function OpenedCell({ stats }: { stats: InvoiceOpenStats | null }) {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string }) {
   const configs = {
     draft: { icon: <Clock className="w-3 h-3" />, label: 'Draft', className: 'bg-gray-100 text-gray-700' },
-    sent: { icon: <Clock className="w-3 h-3" />, label: 'Sent', className: 'bg-blue-100 text-blue-700' },
+    submitted: { icon: <Send className="w-3 h-3" />, label: 'Submitted', className: 'bg-blue-100 text-blue-700' },
     partial: { icon: <AlertCircle className="w-3 h-3" />, label: 'Partial', className: 'bg-yellow-100 text-yellow-700' },
     paid: { icon: <CheckCircle className="w-3 h-3" />, label: 'Paid', className: 'bg-green-100 text-green-700' },
     overdue: { icon: <AlertCircle className="w-3 h-3" />, label: 'Overdue', className: 'bg-red-100 text-red-700' },
+    void: { icon: <AlertCircle className="w-3 h-3" />, label: 'Void', className: 'bg-gray-100 text-gray-500' },
   };
 
-  const config = configs[status as keyof typeof configs] || configs.draft;
+  let config = configs[status as keyof typeof configs] || configs.draft;
+
+  if (status === 'draft' && updatedAt) {
+    const daysSinceUpdate = Math.floor((Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSinceUpdate > 30) {
+      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Aging Draft', className: 'bg-red-100 text-red-700' };
+    } else if (daysSinceUpdate >= 16) {
+      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Needs Attention', className: 'bg-amber-100 text-amber-700' };
+    }
+  }
 
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${config.className}`}>

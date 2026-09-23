@@ -1414,7 +1414,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 relatedInvoices.find(inv => inv.invoice_type === 'deposit' as any) ||
                 relatedInvoices.find(inv => inv.invoice_number?.toLowerCase().includes('deposit'));
               const isDepositPaid = proposal.deposit_paid || depositInvoice?.status === 'paid';
-              const isDepositInvoiceReady = depositInvoice && depositInvoice.status === 'sent' && depositInvoice.qbo_invoice_id;
+              const isDepositInvoiceReady = depositInvoice && depositInvoice.status === 'submitted' && depositInvoice.qbo_invoice_id;
               const isAwaitingInvoice = !depositInvoice && (proposal.status === 'approved' || proposal.status === 'approved_pending_action') && !isDepositPaid;
 
               return (
@@ -1487,6 +1487,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     const isOverdue = inv.status === 'overdue';
                     const statusColors: Record<string, string> = {
                       sent: 'bg-blue-100 text-blue-700',
+                      submitted: 'bg-blue-100 text-blue-700',
                       partial: 'bg-amber-100 text-amber-700',
                       paid: 'bg-green-100 text-green-700',
                       overdue: 'bg-red-100 text-red-700',

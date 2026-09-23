@@ -128,7 +128,7 @@ async function syncInvoice(
     const total = Number(qboInvoice.TotalAmt || 0);
     const amountDue = Number(qboInvoice.Balance || 0);
     const amountPaid = Math.max(0, total - amountDue);
-    const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
+    const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'submitted';
 
     const { error } = await supabase
       .from('invoices')
@@ -229,7 +229,7 @@ async function pushInvoice(
     const total = Number(result.data.Invoice.TotalAmt || 0);
     const amountDue = Number(result.data.Invoice.Balance || 0);
     const amountPaid = Math.max(0, total - amountDue);
-    const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
+    const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'submitted';
 
     await supabase
       .from('invoices')
@@ -259,7 +259,7 @@ async function pushInvoice(
   const total = Number(result.data.Invoice.TotalAmt || 0);
   const amountDue = Number(result.data.Invoice.Balance || 0);
   const amountPaid = Math.max(0, total - amountDue);
-  const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'sent';
+  const status = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'submitted';
 
   await supabase
     .from('invoices')

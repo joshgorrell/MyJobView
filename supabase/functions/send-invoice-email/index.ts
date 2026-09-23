@@ -346,12 +346,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (invoice.status === 'draft') {
-      await supabaseClient
-        .from('invoices')
-        .update({
-          status: 'sent',
-        })
-        .eq('id', invoiceId);
+      return new Response(
+        JSON.stringify({ error: 'Cannot email a draft invoice. Submit it first.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Record notification if proposalId is provided

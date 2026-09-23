@@ -50,7 +50,7 @@ function InvoiceStatusBadge({ status }: { status: string }) {
       </span>
     );
   }
-  if (status === 'sent' || status === 'open') {
+  if (status === 'submitted' || status === 'open') {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
         <Clock className="w-3 h-3" />

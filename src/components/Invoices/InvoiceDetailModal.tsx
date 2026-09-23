@@ -215,15 +215,17 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
     try {
       await reverseCOBillingForInvoice(invoice);
       await supabase.from('invoice_change_order_links').delete().eq('invoice_id', invoice.id);
-      const { error } = await supabase
-        .from('invoices')
-        .update({ status: 'void' })
-        .eq('id', invoice.id);
-      if (error) throw error;
+      const { data: voidResult, error: voidError } = await supabase
+        .rpc('void_invoice', { p_invoice_id: invoice.id });
+      if (voidError) throw voidError;
+      if (voidResult && !voidResult.success) {
+        throw new Error(voidResult.errors?.join(', ') || 'Void failed');
+      }
       onVoided?.();
       onClose();
     } catch (err) {
       console.error('Error voiding invoice:', err);
+      alert(err instanceof Error ? err.message : 'Failed to void invoice.');
     } finally {
       setActionLoading(false);
     }
@@ -231,16 +233,20 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
 
   async function handleDeleteInvoice() {
     if (!invoice) return;
+    if (invoice.status !== 'draft') {
+      alert('Only draft invoices can be deleted. Void the invoice instead.');
+      return;
+    }
     setActionLoading(true);
     setConfirmDelete(false);
     try {
-      await reverseCOBillingForInvoice(invoice);
       const { error } = await supabase.from('invoices').delete().eq('id', invoice.id);
       if (error) throw error;
       onDeleted?.();
       onClose();
     } catch (err) {
       console.error('Error deleting invoice:', err);
+      alert('Failed to delete invoice. Only draft invoices can be deleted.');
     } finally {
       setActionLoading(false);
     }
@@ -270,7 +276,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
         notes, payment_terms, contact_id, sales_order_id, source_type,
         billing_name, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip,
         tax_environment, tax_project_type, tax_override, tax_override_reason, tax_jurisdiction_id,
-        tax_calculation_status,
+        tax_calculation_status, portal_visible,
         bill_to_contact_id,
         contacts:contact_id (
           contact_name, first_name, last_name, full_name, email, phone,
@@ -565,7 +571,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   function getStatusStyle(status: string) {
     switch (status) {
       case 'paid': return { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle };
-      case 'sent': return { bg: 'bg-blue-100', text: 'text-blue-700', icon: Send };
+      case 'submitted': return { bg: 'bg-blue-100', text: 'text-blue-700', icon: Send };
       case 'partial': return { bg: 'bg-amber-100', text: 'text-amber-700', icon: CreditCard };
       case 'overdue': return { bg: 'bg-red-100', text: 'text-red-700', icon: AlertCircle };
       case 'void': return { bg: 'bg-gray-100', text: 'text-gray-500', icon: Ban };
@@ -603,8 +609,8 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
     `${invoice.contacts?.first_name || ''} ${invoice.contacts?.last_name || ''}`.trim() || 'Customer';
   const canPay = invoice.status !== 'paid' && invoice.status !== 'void' && invoice.amount_due > 0;
   const canVoid = invoice.status !== 'void' &&
-    (invoice.status === 'draft' || invoice.status === 'sent' || canDeletePaidInvoices);
-  const canDelete = invoice.status === 'draft' || invoice.status === 'sent' || canDeletePaidInvoices;
+    (invoice.status === 'draft' || invoice.status === 'submitted' || canDeletePaidInvoices);
+  const canDelete = invoice.status === 'draft';
   const isSalesOrderInvoice = !!invoice.sales_order_id;
 
   return (
@@ -872,6 +878,30 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Terms</span>
                     <span className="text-gray-900">{formatPaymentTerms(invoice.payment_terms)}</span>
+                  </div>
+                )}
+                {!readonly && invoice.status !== 'draft' && invoice.status !== 'void' && (
+                  <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100">
+                    <span className="text-gray-500">Visible on Customer Portal</span>
+                    <button
+                      onClick={async () => {
+                        if (!invoice) return;
+                        const newValue = !invoice.portal_visible;
+                        try {
+                          const { error } = await supabase
+                            .from('invoices')
+                            .update({ portal_visible: newValue })
+                            .eq('id', invoice.id);
+                          if (error) throw error;
+                          setInvoice(prev => prev ? { ...prev, portal_visible: newValue } : prev);
+                        } catch (err) {
+                          console.error('Error toggling portal visibility:', err);
+                        }
+                      }}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${invoice.portal_visible ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${invoice.portal_visible ? 'translate-x-4' : 'translate-x-1'}`} />
+                    </button>
                   </div>
                 )}
               </div>

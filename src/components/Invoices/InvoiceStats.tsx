@@ -25,7 +25,7 @@ interface InvoiceStatsData {
   };
   statusBreakdown: {
     draft: number;
-    sent: number;
+    submitted: number;
     partial: number;
     paid: number;
     overdue: number;
@@ -70,7 +70,7 @@ export function InvoiceStats() {
 
       const aging = { current: 0, days1_30: 0, days31_60: 0, days61_90: 0, over90: 0 };
       const agingAmounts = { current: 0, days1_30: 0, days31_60: 0, days61_90: 0, over90: 0 };
-      const statusBreakdown = { draft: 0, sent: 0, partial: 0, paid: 0, overdue: 0, void: 0 };
+      const statusBreakdown = { draft: 0, submitted: 0, partial: 0, paid: 0, overdue: 0, void: 0 };
       const customerBalances: Record<string, { name: string; balance: number }> = {};
 
       for (const inv of invoices) {
@@ -84,7 +84,7 @@ export function InvoiceStats() {
         const amountDue = Number(inv.amount_due) || 0;
         const total = Number(inv.total) || 0;
 
-        if (['sent', 'partial', 'overdue'].includes(status)) {
+        if (['submitted', 'partial', 'overdue'].includes(status)) {
           totalOpen += amountDue;
           openInvoiceCount++;
 
@@ -129,7 +129,7 @@ export function InvoiceStats() {
         const customerName = contact?.full_name || contact?.contact_name ||
           `${contact?.first_name || ''} ${contact?.last_name || ''}`.trim() || 'Unknown';
 
-        if (['sent', 'partial', 'overdue'].includes(status) && amountDue > 0) {
+        if (['submitted', 'partial', 'overdue'].includes(status) && amountDue > 0) {
           const key = customerName;
           if (!customerBalances[key]) {
             customerBalances[key] = { name: customerName, balance: 0 };
@@ -265,7 +265,7 @@ export function InvoiceStats() {
           <div className="p-5 space-y-3">
             {[
               { key: 'draft', label: 'Draft', color: 'bg-gray-400' },
-              { key: 'sent', label: 'Sent', color: 'bg-blue-500' },
+              { key: 'submitted', label: 'Submitted', color: 'bg-blue-500' },
               { key: 'partial', label: 'Partially Paid', color: 'bg-yellow-400' },
               { key: 'paid', label: 'Paid', color: 'bg-green-500' },
               { key: 'overdue', label: 'Overdue', color: 'bg-red-500' },

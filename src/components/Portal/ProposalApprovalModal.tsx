@@ -155,7 +155,7 @@ export function ProposalApprovalModal({
       let msg: string;
       if (!requireDeposit) {
         msg = 'Your proposal has been approved! A sales order has been created and is ready for scheduling. Your sales representative has been notified.';
-      } else if (depositInvoiceId && depositInvoiceStatus === 'sent' && depositInvoiceQboId) {
+      } else if (depositInvoiceId && depositInvoiceStatus === 'submitted' && depositInvoiceQboId) {
         msg = 'Your proposal has been approved! Click the button below to pay your deposit now. Once your deposit is confirmed, your order will be ready for scheduling.';
       } else if (depositInvoiceId && depositInvoiceStatus === 'paid') {
         msg = 'Your proposal has been approved and your deposit has been received. Your order is ready for scheduling!';
@@ -365,7 +365,7 @@ export function ProposalApprovalModal({
                       ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  {depositInvoiceId && depositInvoiceStatus === 'sent' && depositInvoiceQboId ? (
+                  {depositInvoiceId && depositInvoiceStatus === 'submitted' && depositInvoiceQboId ? (
                     <p className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
                       Deposit invoice is ready — you can pay immediately after approving

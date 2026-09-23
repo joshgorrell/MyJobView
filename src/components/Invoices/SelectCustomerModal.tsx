@@ -51,7 +51,7 @@ export function SelectCustomerModal({ onSelect, onClose }: SelectCustomerModalPr
             email
           )
         `)
-        .in('status', ['sent', 'partial', 'overdue'])
+        .in('status', ['submitted', 'partial', 'overdue'])
         .order('invoice_date', { ascending: true });
 
       if (error) throw error;
@@ -84,7 +84,7 @@ export function SelectCustomerModal({ onSelect, onClose }: SelectCustomerModalPr
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .select('contact_id, amount_due')
-        .in('status', ['sent', 'partial', 'overdue'])
+        .in('status', ['submitted', 'partial', 'overdue'])
         .in('contact_id', contactIds);
 
       if (invoiceError) throw invoiceError;
