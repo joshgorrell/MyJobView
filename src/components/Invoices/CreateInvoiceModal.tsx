@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle } from 'lucide-react';
+import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -156,6 +156,10 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [billToContact, setBillToContact] = useState<Contact | null>(null);
   const [billingSource, setBillingSource] = useState<'customer' | 'bill_to'>('customer');
   const [editingBilling, setEditingBilling] = useState(false);
+  const [transactionLocation, setTransactionLocation] = useState<'customer' | 'dealer' | 'custom'>('customer');
+  const [offices, setOffices] = useState<Array<{ id: string; office_name: string; address_line1: string; address_line2: string | null; city: string; state: string; zip: string }>>([]);
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string>('');
+  const [customLocation, setCustomLocation] = useState({ address: '', city: '', state: '', zip: '' });
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -197,6 +201,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
 
   useEffect(() => {
     loadData();
+    loadOffices();
   }, []);
 
   useEffect(() => {
@@ -220,6 +225,23 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       if (computed) setDueDate(computed);
     }
   }, [invoiceDate]);
+
+  async function loadOffices() {
+    try {
+      const { data, error } = await supabase
+        .from('company_offices')
+        .select('id, office_name, address_line1, address_line2, city, state, zip')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      setOffices(data || []);
+      if (data && data.length === 1) {
+        setSelectedOfficeId(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading offices:', error);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -555,6 +577,10 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           billing_state: billing.billing_state || null,
           billing_zip: billing.billing_zip || null,
           bill_to_contact_id: billToContact?.id || null,
+          jobsite_address: jobsiteAddress,
+          jobsite_city: jobsiteCity,
+          jobsite_state: jobsiteState,
+          jobsite_zip: jobsiteZip,
           created_by: user.id
         })
         .select()
@@ -631,6 +657,28 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const termsLabel = formatTermsLabel(selectedContact?.default_payment_terms);
   const hasBillingData = billing.billing_name || billing.billing_address_line1;
   const billingOneLine = formatBillingOneLine(billing);
+
+  const selectedOffice = offices.find(o => o.id === selectedOfficeId);
+  const jobsiteAddress = transactionLocation === 'customer'
+    ? (selectedContact?.street_address || null)
+    : transactionLocation === 'dealer'
+      ? (selectedOffice ? `${selectedOffice.address_line1}${selectedOffice.address_line2 ? ' ' + selectedOffice.address_line2 : ''}` : null)
+      : (customLocation.address || null);
+  const jobsiteCity = transactionLocation === 'customer'
+    ? (selectedContact?.city || null)
+    : transactionLocation === 'dealer'
+      ? (selectedOffice?.city || null)
+      : (customLocation.city || null);
+  const jobsiteState = transactionLocation === 'customer'
+    ? (selectedContact?.state || null)
+    : transactionLocation === 'dealer'
+      ? (selectedOffice?.state || null)
+      : (customLocation.state || null);
+  const jobsiteZip = transactionLocation === 'customer'
+    ? (selectedContact?.zip_code || null)
+    : transactionLocation === 'dealer'
+      ? (selectedOffice?.zip || null)
+      : (customLocation.zip || null);
 
   return (
     <>
@@ -897,6 +945,143 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Transaction Location */}
+            {selectedContactId && (
+              <div className="border border-gray-700 rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-750">
+                  <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Transaction Location</span>
+                  <span className="text-xs text-gray-500 ml-1">Determines tax jurisdiction</span>
+                </div>
+                <div className="p-3 space-y-2.5">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTransactionLocation('customer')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                        transactionLocation === 'customer'
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      Customer Location
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTransactionLocation('dealer')}
+                      disabled={offices.length === 0}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        transactionLocation === 'dealer'
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      Dealer / Pickup
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTransactionLocation('custom')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                        transactionLocation === 'custom'
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      <Truck className="w-3.5 h-3.5" />
+                      Custom Location
+                    </button>
+                  </div>
+
+                  {/* Customer Location summary */}
+                  {transactionLocation === 'customer' && (
+                    <div className="text-xs text-gray-400 px-1">
+                      {selectedContact
+                        ? [selectedContact.street_address, selectedContact.city, selectedContact.state, selectedContact.zip_code].filter(Boolean).join(', ') || 'No address on file'
+                        : 'Select a customer first'}
+                    </div>
+                  )}
+
+                  {/* Dealer / Pickup office selector */}
+                  {transactionLocation === 'dealer' && (
+                    <div className="space-y-2">
+                      {offices.length > 1 && (
+                        <select
+                          value={selectedOfficeId}
+                          onChange={(e) => setSelectedOfficeId(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select office...</option>
+                          {offices.map(o => (
+                            <option key={o.id} value={o.id}>{o.office_name}</option>
+                          ))}
+                        </select>
+                      )}
+                      {selectedOffice ? (
+                        <div className="text-xs text-gray-400 px-1">
+                          {selectedOffice.address_line1}{selectedOffice.address_line2 ? `, ${selectedOffice.address_line2}` : ''}, {selectedOffice.city}, {selectedOffice.state} {selectedOffice.zip}
+                        </div>
+                      ) : offices.length === 1 ? (
+                        <div className="text-xs text-gray-400 px-1">{offices[0].office_name}</div>
+                      ) : (
+                        <div className="text-xs text-gray-500 px-1">No active offices configured</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Custom Location fields */}
+                  {transactionLocation === 'custom' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] text-gray-400 mb-1">Address</label>
+                        <input
+                          type="text"
+                          value={customLocation.address}
+                          onChange={(e) => setCustomLocation(prev => ({ ...prev, address: e.target.value }))}
+                          placeholder="Street address..."
+                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">City</label>
+                        <input
+                          type="text"
+                          value={customLocation.city}
+                          onChange={(e) => setCustomLocation(prev => ({ ...prev, city: e.target.value }))}
+                          placeholder="City..."
+                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] text-gray-400 mb-1">State</label>
+                          <input
+                            type="text"
+                            value={customLocation.state}
+                            onChange={(e) => setCustomLocation(prev => ({ ...prev, state: e.target.value.toUpperCase().slice(0, 2) }))}
+                            placeholder="KS"
+                            maxLength={2}
+                            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-gray-400 mb-1">ZIP</label>
+                          <input
+                            type="text"
+                            value={customLocation.zip}
+                            onChange={(e) => setCustomLocation(prev => ({ ...prev, zip: e.target.value }))}
+                            placeholder="66101"
+                            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

@@ -221,6 +221,45 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
       if (voidResult && !voidResult.success) {
         throw new Error(voidResult.errors?.join(', ') || 'Void failed');
       }
+
+      // If invoice has a QBO mapping, attempt immediate QBO void
+      if (voidResult?.qbo_void_pending && invoice.qbo_invoice_id) {
+        try {
+          const { error: qboVoidError } = await supabase.functions.invoke('quickbooks-void-invoice', {
+            body: { invoiceId: invoice.id }
+          });
+          if (qboVoidError) {
+            // MJV void succeeded but QBO void failed - warn user, do NOT restore
+            console.error('QBO void failed:', qboVoidError);
+            alert(
+              `Invoice ${invoice.invoice_number} has been voided in MJV. ` +
+              `However, voiding the invoice in QuickBooks failed. ` +
+              `The scheduled QBO sync will retry the void automatically. ` +
+              `The MJV void is authoritative and will not be reversed.`
+            );
+            onVoided?.();
+            onClose();
+            return;
+          }
+          // QBO void succeeded - clear the pending flag
+          await supabase
+            .from('invoices')
+            .update({ qbo_void_pending: false })
+            .eq('id', invoice.id);
+        } catch (qboErr) {
+          console.error('QBO void exception:', qboErr);
+          alert(
+            `Invoice ${invoice.invoice_number} has been voided in MJV. ` +
+            `However, voiding the invoice in QuickBooks failed. ` +
+            `The scheduled QBO sync will retry the void automatically. ` +
+            `The MJV void is authoritative and will not be reversed.`
+          );
+          onVoided?.();
+          onClose();
+          return;
+        }
+      }
+
       onVoided?.();
       onClose();
     } catch (err) {
@@ -276,7 +315,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
         notes, payment_terms, contact_id, sales_order_id, source_type,
         billing_name, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip,
         tax_environment, tax_project_type, tax_override, tax_override_reason, tax_jurisdiction_id,
-        tax_calculation_status, portal_visible,
+        tax_calculation_status, portal_visible, qbo_invoice_id, qbo_void_pending,
         bill_to_contact_id,
         contacts:contact_id (
           contact_name, first_name, last_name, full_name, email, phone,

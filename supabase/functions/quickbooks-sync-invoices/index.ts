@@ -51,6 +51,9 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(result, result.success ? 200 : 500);
     }
 
+    // Retry pending QBO voids before pulling from QBO
+    await retryPendingVoids(supabase, connection, profile.organization_id);
+
     const result = await qboRequest(
       supabase,
       connection,
@@ -114,13 +117,19 @@ async function syncInvoice(
     const qboId = String(qboInvoice.Id);
     const { data: localInvoice } = await supabase
       .from('invoices')
-      .select('id, total, amount_paid, amount_due, status')
+      .select('id, total, amount_paid, amount_due, status, qbo_void_pending')
       .eq('organization_id', organizationId)
       .eq('qbo_invoice_id', qboId)
       .maybeSingle();
 
     if (!localInvoice) {
       await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'stage', 'invoice', null, qboId, 'success', null, { reason: 'No local invoice match' });
+      return { success: true };
+    }
+
+    // MJV void is authoritative: never un-void a voided MJV invoice
+    if (localInvoice.status === 'void') {
+      await logSyncOperation(supabase, organizationId, 'from_quickbooks', 'skip', 'invoice', localInvoice.id, qboId, 'success', null, { reason: 'MJV void is authoritative, skipping inbound update' });
       return { success: true };
     }
 
@@ -277,4 +286,72 @@ function jsonResponse(data: any, status = 200): Response {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+/**
+ * Retry pending QBO voids: find MJV-voided invoices with qbo_void_pending = true
+ * and attempt to void them in QBO. MJV void is authoritative.
+ */
+async function retryPendingVoids(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  connection: any,
+  organizationId: string
+): Promise<void> {
+  try {
+    const { data: pendingVoids } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, qbo_invoice_id')
+      .eq('organization_id', organizationId)
+      .eq('qbo_void_pending', true)
+      .not('qbo_invoice_id', 'is', null);
+
+    if (!pendingVoids || pendingVoids.length === 0) return;
+
+    for (const inv of pendingVoids) {
+      try {
+        const mapping = await getEntityMapping(supabase, organizationId, 'invoice', inv.id);
+        if (!mapping) {
+          await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'void_retry', 'invoice', inv.id, inv.qbo_invoice_id, 'failed', 'No entity mapping found');
+          continue;
+        }
+
+        const voidResult = await qboRequest(supabase, connection, 'POST', `invoice?operation=void`, {
+          Id: mapping.qbo_id,
+          SyncToken: mapping.qbo_sync_token,
+        });
+
+        if (voidResult.ok) {
+          await supabase
+            .from('invoices')
+            .update({ qbo_void_pending: false })
+            .eq('id', inv.id);
+          await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'void', 'invoice', inv.id, inv.qbo_invoice_id, 'success');
+        } else {
+          // SyncToken mismatch — re-fetch and retry once
+          if (voidResult.status === 400 && voidResult.data?.Fault?.Error?.[0]?.code === '3200') {
+            const fetchResult = await qboRequest(supabase, connection, 'GET', `invoice/${mapping.qbo_id}?minorversion=40`);
+            if (fetchResult.ok && fetchResult.data?.Invoice) {
+              const retryResult = await qboRequest(supabase, connection, 'POST', `invoice?operation=void`, {
+                Id: mapping.qbo_id,
+                SyncToken: fetchResult.data.Invoice.SyncToken,
+              });
+              if (retryResult.ok) {
+                await supabase
+                  .from('invoices')
+                  .update({ qbo_void_pending: false })
+                  .eq('id', inv.id);
+                await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'void', 'invoice', inv.id, inv.qbo_invoice_id, 'success');
+                continue;
+              }
+            }
+          }
+          await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'void_retry', 'invoice', inv.id, inv.qbo_invoice_id, 'failed', voidResult.data?.Fault?.Error?.[0]?.Message || 'QBO void failed');
+        }
+      } catch (err: any) {
+        await logSyncOperation(supabase, organizationId, 'to_quickbooks', 'void_retry', 'invoice', inv.id, inv.qbo_invoice_id, 'failed', err.message);
+      }
+    }
+  } catch (error: any) {
+    console.error('Error retrying pending voids:', error);
+  }
 }
