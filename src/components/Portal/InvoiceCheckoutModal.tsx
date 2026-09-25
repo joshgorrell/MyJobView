@@ -16,7 +16,7 @@ interface InvoiceCheckoutModalProps {
   onContinue: (choice: InvoicePaymentChoice) => Promise<void>;
 }
 
-/** This component never accepts card or bank credentials. The payment provider owns those fields. */
+/** MJV owns the single checkout. Secure payment fields must tokenize directly with Intuit. */
 export function InvoiceCheckoutModal({ invoice, onClose, onContinue }: InvoiceCheckoutModalProps) {
   const [method, setMethod] = useState<'credit_card' | 'ach'>('credit_card');
   const [amount, setAmount] = useState(invoice.amount_due.toFixed(2));
@@ -105,9 +105,9 @@ export function InvoiceCheckoutModal({ invoice, onClose, onContinue }: InvoiceCh
           {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
           <button type="submit" disabled={!validAmount || !settings || loading || submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
             {submitting || loading ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
-            Continue securely
+            Pay {formatCurrency(fee.totalWithFee)}
           </button>
-          <p className="text-center text-xs text-slate-500">You will review the final amount before your payment is submitted.</p>
+          <p className="text-center text-xs text-slate-500">Your payment method and final total stay in this checkout.</p>
         </form>
       </section>
     </div>
