@@ -31,8 +31,8 @@ Deno.serve(async (req: Request) => {
     .select('contact_id, organization_id').eq('id', user.id).maybeSingle();
   if (profileError || !profile?.contact_id || !profile.organization_id) return respond({ error: 'Portal access required' }, 403);
   const { data: invoice, error: invoiceError } = await client.from('invoices')
-    .select('id, company_id, contact_id, amount_due, status, qbo_invoice_id')
-    .eq('id', invoiceId).eq('contact_id', profile.contact_id).eq('company_id', profile.organization_id).maybeSingle();
+    .select('id, organization_id, contact_id, amount_due, status, qbo_invoice_id')
+    .eq('id', invoiceId).eq('contact_id', profile.contact_id).eq('organization_id', profile.organization_id).maybeSingle();
   if (invoiceError) return respond({ error: 'Invoice could not be loaded' }, 500);
   if (!invoice || !['submitted', 'partial', 'overdue'].includes(invoice.status) || !invoice.qbo_invoice_id) {
     return respond({ error: 'Invoice is not available for online payment' }, 409);
