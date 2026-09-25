@@ -115,9 +115,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
     setLoading(true);
 
     try {
-      const paymentNotes = convenienceFee > 0
-        ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(convenienceFee)}`
-        : notes || null;
+      const paymentNotes = notes || null;
 
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'ach') && paymentProcessor;
 
@@ -126,7 +124,11 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
         .insert({
           invoice_id: invoice.id,
           contact_id: invoice.contact_id,
-          amount: totalWithFee,
+          amount: paymentAmount,
+          card_fee_amount: convenienceFee,
+          card_fee_rate: convenienceFee > 0 && feeSettings?.cc_convenience_fee_type !== 'flat' ? Number(feeSettings?.cc_convenience_fee_percentage) : null,
+          card_fee_label: convenienceFee > 0 ? feeResult.label : null,
+          total_collected: totalWithFee,
           payment_date: paymentDate,
           payment_method: paymentMethod,
           reference_number: referenceNumber || null,
