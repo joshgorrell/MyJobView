@@ -19,6 +19,9 @@ verify_jwt = false
 [functions.quickbooks-reconcile]
 verify_jwt = true
 
+[functions.quote-invoice-payment]
+verify_jwt = true
+
 [functions.quickbooks-sync-customer]
 verify_jwt = true
 
