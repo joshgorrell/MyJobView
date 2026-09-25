@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Building2, CreditCard, Loader2, ShieldCheck, X } from 'lucide-react';
-import { calculateConvenienceFee, type ConvenienceFeeSettings } from '../../lib/convenienceFee';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 
@@ -9,6 +8,8 @@ export type InvoicePaymentChoice = {
   amount: number;
   method: 'credit_card' | 'ach';
 };
+
+type PaymentQuote = { invoiceId: string; amount: number; method: 'credit_card' | 'ach'; fee: number; total: number; feeLabel: string | null };
 
 interface InvoiceCheckoutModalProps {
   invoice: { id: string; invoice_number: string; amount_due: number };
@@ -20,35 +21,39 @@ interface InvoiceCheckoutModalProps {
 export function InvoiceCheckoutModal({ invoice, onClose, onContinue }: InvoiceCheckoutModalProps) {
   const [method, setMethod] = useState<'credit_card' | 'ach'>('credit_card');
   const [amount, setAmount] = useState(invoice.amount_due.toFixed(2));
-  const [settings, setSettings] = useState<ConvenienceFeeSettings | null>(null);
+  const [quote, setQuote] = useState<PaymentQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    supabase.from('company_settings')
-      .select('cc_convenience_fee_enabled, cc_convenience_fee_type, cc_convenience_fee_percentage, cc_convenience_fee_flat_amount, cc_convenience_fee_label')
-      .maybeSingle()
-      .then(({ data, error: settingsError }) => {
+    setQuote(null);
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 0.01 || value > invoice.amount_due || Math.abs(value * 100 - Math.round(value * 100)) > 0.000001) {
+      setLoading(false);
+      return () => { active = false; };
+    }
+    setLoading(true);
+    const timer = window.setTimeout(() => {
+      supabase.functions.invoke('quote-invoice-payment', { body: { invoiceId: invoice.id, amount: value, method } })
+      .then(({ data, error: quoteError }) => {
         if (!active) return;
-        if (settingsError || !data) setError('Payment options could not be loaded. Please try again.');
-        else setSettings(data as ConvenienceFeeSettings);
+        if (quoteError || data?.error) setError('Payment quote could not be loaded. Please try again.');
+        else { setQuote(data as PaymentQuote); setError(''); }
         setLoading(false);
       });
-    return () => { active = false; };
-  }, []);
+    }, 250);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [amount, method, invoice.id, invoice.amount_due]);
 
   const paymentAmount = Number(amount);
-  const validAmount = Number.isFinite(paymentAmount) && paymentAmount >= 0.01 && paymentAmount <= invoice.amount_due;
-  const fee = calculateConvenienceFee(validAmount ? paymentAmount : 0, method, settings);
-  const rateLabel = settings?.cc_convenience_fee_type === 'flat'
-    ? ''
-    : ` (${((Number(settings?.cc_convenience_fee_percentage) || 0) * 100).toFixed(2)}%)`;
+  const validAmount = Number.isFinite(paymentAmount) && paymentAmount >= 0.01 && paymentAmount <= invoice.amount_due &&
+    Math.abs(paymentAmount * 100 - Math.round(paymentAmount * 100)) < 0.000001;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!validAmount || !settings || loading || submitting) return;
+    if (!validAmount || !quote || loading || submitting || quote.amount !== paymentAmount || quote.method !== method) return;
     setError('');
     setSubmitting(true);
     try {
@@ -86,7 +91,7 @@ export function InvoiceCheckoutModal({ invoice, onClose, onContinue }: InvoiceCh
             <legend className="mb-2 text-sm font-semibold text-slate-800">How would you like to pay?</legend>
             <div className="grid grid-cols-2 gap-3">
               {([
-                { value: 'credit_card' as const, title: 'Credit card', subtitle: fee.applies ? `${fee.label}${rateLabel}` : 'No card fee', icon: CreditCard },
+                { value: 'credit_card' as const, title: 'Credit card', subtitle: quote?.feeLabel || 'Card fee shown below', icon: CreditCard },
                 { value: 'ach' as const, title: 'Bank account', subtitle: 'No card fee', icon: Building2 },
               ]).map(option => <button key={option.value} type="button" onClick={() => setMethod(option.value)} aria-pressed={method === option.value} className={`rounded-xl border-2 p-4 text-left transition-colors ${method === option.value ? 'border-blue-600 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                 <option.icon className={method === option.value ? 'text-blue-600' : 'text-slate-500'} size={22} />
@@ -97,15 +102,15 @@ export function InvoiceCheckoutModal({ invoice, onClose, onContinue }: InvoiceCh
           </fieldset>
 
           <div className="rounded-xl bg-slate-50 p-4 text-sm">
-            <div className="flex justify-between text-slate-600"><span>Applied to invoice</span><span>{formatCurrency(validAmount ? paymentAmount : 0)}</span></div>
-            {method === 'credit_card' && fee.applies && <div className="mt-2 flex justify-between gap-4 text-slate-600"><span>{fee.label}{rateLabel}</span><span>{formatCurrency(fee.feeAmount)}</span></div>}
-            <div className="mt-3 flex justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900"><span>Total to authorize</span><span>{formatCurrency(fee.totalWithFee)}</span></div>
+            <div className="flex justify-between text-slate-600"><span>Applied to invoice</span><span>{formatCurrency(quote?.amount ?? 0)}</span></div>
+            {quote?.feeLabel && <div className="mt-2 flex justify-between gap-4 text-slate-600"><span>{quote.feeLabel}</span><span>{formatCurrency(quote.fee)}</span></div>}
+            <div className="mt-3 flex justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900"><span>Total to authorize</span><span>{quote ? formatCurrency(quote.total) : 'Calculating…'}</span></div>
           </div>
 
           {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-          <button type="submit" disabled={!validAmount || !settings || loading || submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="submit" disabled={!validAmount || !quote || loading || submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
             {submitting || loading ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
-            Pay {formatCurrency(fee.totalWithFee)}
+            Pay {quote ? formatCurrency(quote.total) : '—'}
           </button>
           <p className="text-center text-xs text-slate-500">Your payment method and final total stay in this checkout.</p>
         </form>
