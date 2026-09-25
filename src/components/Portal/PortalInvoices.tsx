@@ -530,7 +530,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                           Clear ({selectedInvoiceIds.length})
                         </button>
                         <button
-                          onClick={() => handlePayAll}
+                          onClick={handlePayAll}
                           disabled={payingAll}
                           className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium disabled:opacity-50 transition-colors min-h-[40px]"
                         >
