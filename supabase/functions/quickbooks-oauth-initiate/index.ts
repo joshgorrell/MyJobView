@@ -94,17 +94,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Request Payments only after the Intuit app has been enabled for it.
-    // Existing accounting-only connections continue to use their current scope.
-    const scopes = ['com.intuit.quickbooks.accounting'];
-    if (Deno.env.get('QUICKBOOKS_PAYMENTS_API_ENABLED') === 'true') {
-      scopes.push('com.intuit.quickbooks.payment');
-    }
-
     const params = new URLSearchParams({
       client_id: clientId,
       response_type: 'code',
-      scope: scopes.join(' '),
+      scope: 'com.intuit.quickbooks.accounting com.intuit.quickbooks.payment',
       redirect_uri: redirectUri,
       state: state,
     });
