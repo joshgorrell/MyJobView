@@ -32,6 +32,10 @@ interface Payment {
   amount: number;
   payment_date: string;
   payment_method: string;
+  card_fee_amount: number;
+  card_fee_rate: number | null;
+  card_fee_label: string | null;
+  total_collected: number | null;
 }
 
 interface InvoiceDetail {
@@ -329,7 +333,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
           id, description, quantity, unit_price, amount, is_taxable, item_type, notes, notes_visible_on_invoice
         ),
         payments (
-          id, amount, payment_date, payment_method
+          id, amount, payment_date, payment_method, card_fee_amount, card_fee_rate, card_fee_label, total_collected
         ),
         tax_jurisdictions:tax_jurisdiction_id (
           jurisdiction_name, combined_rate, city, county, state
@@ -1132,7 +1136,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                         <tr key={p.id}>
                           <td className="px-4 py-2.5 text-green-800">{new Date(p.payment_date).toLocaleDateString()}</td>
                           <td className="px-4 py-2.5 text-green-700 capitalize">{p.payment_method}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-green-800">${fmt(p.amount)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-green-800">${fmt(p.amount)}{Number(p.card_fee_amount) > 0 && <div className="text-xs font-normal text-green-700">{p.card_fee_label || 'Card fee'}: ${fmt(p.card_fee_amount)} · Total collected: ${fmt(p.total_collected ?? Number(p.amount) + Number(p.card_fee_amount))}</div>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1731,7 +1735,7 @@ function buildPrintHTML(invoice: InvoiceDetail, settings: CompanySettings | null
             <tr>
               <td style="padding:6px 8px;font-size:12px;color:#166534;">${new Date(p.payment_date).toLocaleDateString()}</td>
               <td style="padding:6px 8px;font-size:12px;color:#166534;text-transform:capitalize;">${p.payment_method}</td>
-              <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:600;color:#166534;">$${fmt(p.amount)}</td>
+              <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:600;color:#166534;">$${fmt(p.amount)}${Number(p.card_fee_amount) > 0 ? `<div style="font-size:11px;font-weight:400;">${p.card_fee_label || 'Card fee'}: $${fmt(p.card_fee_amount)}<br>Total collected: $${fmt(p.total_collected ?? Number(p.amount) + Number(p.card_fee_amount))}</div>` : ''}</td>
             </tr>
           `).join('')}
         </tbody>
