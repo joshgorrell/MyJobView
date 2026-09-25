@@ -265,7 +265,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   async function handlePrintInvoice(invoice: Invoice) {
     setPrintingInvoiceId(invoice.id);
     try {
-      const [itemsRes, paymentsRes, settingsRes, officeRes, contactRes] = await Promise.all([
+      const [itemsRes, depositsRes, paymentsRes, settingsRes, officeRes, contactRes] = await Promise.all([
         supabase
           .from('invoice_line_items')
           .select('description, quantity, unit_price, amount, notes, notes_visible_on_invoice')
@@ -274,6 +274,11 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
         supabase
           .from('invoice_payments')
           .select('payment_date, payment_method, amount')
+          .eq('invoice_id', invoice.id)
+          .order('payment_date'),
+        supabase
+          .from('payments')
+          .select('payment_date, payment_method, amount, card_fee_amount, card_fee_label, total_collected')
           .eq('invoice_id', invoice.id)
           .order('payment_date'),
         supabase
@@ -327,7 +332,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       const html = buildPortalInvoicePrintHTML(
         printable,
         itemsRes.data || [],
-        paymentsRes.data || [],
+        [...(depositsRes.data || []), ...(paymentsRes.data || [])].sort((a, b) => a.payment_date.localeCompare(b.payment_date)),
         company,
       );
       openInvoicePrint(html);
