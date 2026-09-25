@@ -1037,11 +1037,10 @@ export function CompanySettings() {
             />
             <div className="flex-1">
               <label htmlFor="cc-fee-enabled" className="font-medium text-gray-900 cursor-pointer">
-                Enable Credit Card Convenience Fee
+                Charge Credit Card Fee
               </label>
               <p className="text-sm text-gray-600 mt-1">
-                Automatically add a convenience fee when customers pay invoices with a credit card.
-                No fee is charged for ACH, check, or cash payments.
+                Apply this fee when recording eligible credit card payments in MJV. The QuickBooks payment page has its own checkout settings; changing this setting does not change fees charged there.
               </p>
             </div>
           </div>
@@ -1061,7 +1060,7 @@ export function CompanySettings() {
                       onChange={(e) => setCcFeeType(e.target.value as 'percentage' | 'flat')}
                       className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-700">Percentage of invoice amount</span>
+                    <span className="text-sm text-gray-700">Percentage of amount paid by card</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1091,7 +1090,7 @@ export function CompanySettings() {
                     className="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Common range: 2.5% - 3.5%. Example: 3% fee on $1,000 invoice = $30.00
+                    Example: 3% on a $1,000 card payment = $30. Confirm your rate and wording with your processor and applicable requirements.
                   </p>
                 </div>
               )}
