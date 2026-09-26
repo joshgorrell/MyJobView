@@ -316,6 +316,15 @@ Deno.serve(async (req: Request) => {
             <td style="padding: 5px 0; color: #15803d; font-weight: 700; font-size: 16px;">Payment Received:</td>
             <td style="padding: 5px 0; color: #15803d; font-weight: 700; font-size: 16px; text-align: right;">−$${payment.amount.toFixed(2)}</td>
           </tr>
+          ${Number(payment.card_fee_amount) > 0 ? `
+          <tr>
+            <td style="padding: 5px 0; color: #92400e;">${payment.card_fee_label || 'Card fee'}:</td>
+            <td style="padding: 5px 0; text-align: right;">$${Number(payment.card_fee_amount).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 5px 0; color: #92400e;">Total collected:</td>
+            <td style="padding: 5px 0; text-align: right;">$${Number(payment.total_collected ?? Number(payment.amount) + Number(payment.card_fee_amount)).toFixed(2)}</td>
+          </tr>` : ''}
           <tr style="border-top: 2px solid #fbbf24;">
             <td style="padding: 10px 0 4px 0; color: ${isPaidInFull ? '#15803d' : '#b91c1c'}; font-weight: 700; font-size: 16px;">New Balance:</td>
             <td style="padding: 10px 0 4px 0; color: ${isPaidInFull ? '#15803d' : '#b91c1c'}; font-weight: 700; font-size: 18px; text-align: right;">$${newBalance.toFixed(2)}</td>

@@ -110,7 +110,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   const totalAllocated = allocations.reduce((s, row) => s + (parseFloat(row.allocation) || 0), 0);
   const remaining = totalEntered - totalAllocated;
 
-  const feeResult = calculateConvenienceFee(totalEntered, paymentMethod, feeSettings);
+  const feeResult = calculateConvenienceFee(totalAllocated, paymentMethod, feeSettings);
   const convenienceFee = feeResult.feeAmount;
 
   const autoDistribute = useCallback((amount: string) => {
@@ -156,7 +156,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
     return alloc > row.amount_due;
   });
 
-  const allocationExceedsTotal = totalAllocated > totalEntered + 0.005;
+  const allocationExceedsTotal = Math.abs(totalAllocated - totalEntered) > 0.005;
   const canSubmit = totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
 
   async function handleSubmit(e: React.FormEvent) {
@@ -168,15 +168,19 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
     const rows = allocations.filter(row => (parseFloat(row.allocation) || 0) > 0);
 
     try {
-      const paymentNotes = convenienceFee > 0
-        ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(convenienceFee)}`
-        : notes || null;
+      const paymentNotes = notes || null;
 
       const insertedPaymentIds: string[] = [];
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && paymentProcessor;
 
-      for (const row of rows) {
+      let feeAssigned = 0;
+      for (const [index, row] of rows.entries()) {
         const alloc = parseFloat(row.allocation);
+        // Assign rounding remainder to the last invoice so fee snapshots sum to the charge.
+        const rowFee = index === rows.length - 1
+          ? Math.round((convenienceFee - feeAssigned) * 100) / 100
+          : Math.round(convenienceFee * alloc / totalAllocated * 100) / 100;
+        feeAssigned += rowFee;
 
         const { data: paymentData, error: paymentError } = await supabase
           .from('payments')
@@ -184,6 +188,10 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
             invoice_id: row.id,
             contact_id: contactId,
             amount: alloc,
+            card_fee_amount: rowFee,
+            card_fee_rate: rowFee > 0 && feeSettings?.cc_convenience_fee_type !== 'flat' ? Number(feeSettings?.cc_convenience_fee_percentage) : null,
+            card_fee_label: rowFee > 0 ? feeResult.label : null,
+            total_collected: Math.round((alloc + rowFee) * 100) / 100,
             payment_date: paymentDate,
             payment_method: paymentMethod,
             reference_number: referenceNumber || null,

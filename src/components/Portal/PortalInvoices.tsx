@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
+import { InvoiceCheckoutModal } from './InvoiceCheckoutModal';
 
 interface Invoice {
   id: string;
@@ -65,6 +66,9 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   const [confirmPayAll, setConfirmPayAll] = useState(false);
   const [paymentWindowsOpened, setPaymentWindowsOpened] = useState(false);
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
+  const [checkoutInvoice, setCheckoutInvoice] = useState<Invoice | null>(null);
+  // Preview is limited to local development until the Payments API is connected.
+  const checkoutPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).has('checkoutPreview');
 
   const dissatisfactionReasons = ['too_expensive', 'not_using_service', 'switching_provider', 'service_quality', 'financial_reasons', 'other'];
 
@@ -197,6 +201,10 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
   async function handlePayment(invoice: Invoice) {
     try {
+      if (checkoutPreview) {
+        setCheckoutInvoice(invoice);
+        return;
+      }
       if (!invoice.qbo_invoice_id) {
         setPaymentUnavailableInvoice(invoice);
         return;
@@ -265,7 +273,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   async function handlePrintInvoice(invoice: Invoice) {
     setPrintingInvoiceId(invoice.id);
     try {
-      const [itemsRes, paymentsRes, settingsRes, officeRes, contactRes] = await Promise.all([
+      const [itemsRes, depositsRes, paymentsRes, settingsRes, officeRes, contactRes] = await Promise.all([
         supabase
           .from('invoice_line_items')
           .select('description, quantity, unit_price, amount, notes, notes_visible_on_invoice')
@@ -274,6 +282,11 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
         supabase
           .from('invoice_payments')
           .select('payment_date, payment_method, amount')
+          .eq('invoice_id', invoice.id)
+          .order('payment_date'),
+        supabase
+          .from('payments')
+          .select('payment_date, payment_method, amount, card_fee_amount, card_fee_label, total_collected')
           .eq('invoice_id', invoice.id)
           .order('payment_date'),
         supabase
@@ -327,7 +340,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       const html = buildPortalInvoicePrintHTML(
         printable,
         itemsRes.data || [],
-        paymentsRes.data || [],
+        [...(depositsRes.data || []), ...(paymentsRes.data || [])].sort((a, b) => a.payment_date.localeCompare(b.payment_date)),
         company,
       );
       openInvoicePrint(html);
@@ -517,7 +530,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                           Clear ({selectedInvoiceIds.length})
                         </button>
                         <button
-                          onClick={() => handlePayAll}
+                          onClick={handlePayAll}
                           disabled={payingAll}
                           className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium disabled:opacity-50 transition-colors min-h-[40px]"
                         >
@@ -836,6 +849,11 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
   const modals = (
     <>
+      {checkoutInvoice && <InvoiceCheckoutModal
+        invoice={checkoutInvoice}
+        onClose={() => setCheckoutInvoice(null)}
+        onContinue={async () => { throw new Error('Secure payment setup is still in progress. No charge was made.'); }}
+      />}
       {/* Cancel Subscription Modal */}
       {cancelModalOpen && selectedSubscription && (
         <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">

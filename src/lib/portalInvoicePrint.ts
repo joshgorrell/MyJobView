@@ -33,6 +33,9 @@ export interface PrintablePayment {
   payment_date: string;
   payment_method: string;
   amount: number;
+  card_fee_amount?: number | null;
+  card_fee_label?: string | null;
+  total_collected?: number | null;
 }
 
 export interface PrintableCompanyInfo {
@@ -110,7 +113,7 @@ export function buildPortalInvoicePrintHTML(
             <tr>
               <td style="padding:6px 8px;font-size:12px;color:#166534;">${new Date(p.payment_date).toLocaleDateString()}</td>
               <td style="padding:6px 8px;font-size:12px;color:#166534;text-transform:capitalize;">${p.payment_method}</td>
-              <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:600;color:#166534;">$${fmt(p.amount)}</td>
+              <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:600;color:#166534;">$${fmt(p.amount)}${Number(p.card_fee_amount) > 0 ? `<div style="font-size:11px;font-weight:400;">${p.card_fee_label || 'Card fee'}: $${fmt(Number(p.card_fee_amount))}<br>Total collected: $${fmt(p.total_collected ?? p.amount + Number(p.card_fee_amount))}</div>` : ''}</td>
             </tr>
           `).join('')}
         </tbody>
