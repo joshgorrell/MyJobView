@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { corsHeaders } from '../_shared/qbo-client.ts';
+import { corsHeaders, getSupabaseAdmin } from '../_shared/qbo-client.ts';
 
 function respond(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -44,6 +44,11 @@ Deno.serve(async (req: Request) => {
     .select('cc_convenience_fee_enabled, cc_convenience_fee_type, cc_convenience_fee_percentage, cc_convenience_fee_flat_amount, cc_convenience_fee_label')
     .eq('organization_id', profile.organization_id).maybeSingle();
   if (settingsError || !settings) return respond({ error: 'Payment settings unavailable' }, 503);
+  const { data: connection } = await getSupabaseAdmin().from('quickbooks_settings')
+    .select('environment, is_connected').eq('organization_id', profile.organization_id).maybeSingle();
+  if (!connection?.is_connected || !['sandbox', 'production'].includes(connection.environment)) {
+    return respond({ error: 'Online payment is unavailable' }, 503);
+  }
   const applies = method === 'credit_card' && settings.cc_convenience_fee_enabled === true;
   const rate = Number(settings.cc_convenience_fee_percentage);
   const flat = Number(settings.cc_convenience_fee_flat_amount);
@@ -55,5 +60,6 @@ Deno.serve(async (req: Request) => {
     ? Math.round(flat * 100) : Math.round(amountCents * rate);
   return respond({ invoiceId, method, amount: amountCents / 100, fee: feeCents / 100,
     total: (amountCents + feeCents) / 100,
+    environment: connection.environment,
     feeLabel: applies ? settings.cc_convenience_fee_label || 'Credit Card Convenience Fee' : null });
 });
