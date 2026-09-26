@@ -8,6 +8,7 @@ import { Product, ProposalRoom } from '../../lib/types';
 import SinglePageProductForm from '../Products/SinglePageProductForm';
 import ProductSelector from './ProductSelector';
 import ProductDetailPanel, { type ProductDetailPanelData } from '../Products/ProductDetailPanel';
+import { CatalogTaxonomyFilters, catalogTaxonomy, type CatalogTaxonomy } from '../Products/CatalogTaxonomyFilters';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface AddItemToAreasModalProps {
@@ -70,9 +71,12 @@ export default function AddItemToAreasModal({
   const { profile } = useAuth();
   const canEditProducts = profile?.can_edit_products ?? false;
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<(Product & CatalogTaxonomy)[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [selectedVendor, setSelectedVendor] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -123,12 +127,12 @@ export default function AddItemToAreasModal({
 
   async function loadAll() {
     const [prodsRes, phasesRes, classesRes, itemsRes] = await Promise.all([
-      supabase.from('products').select('*').order('sku'),
+      supabase.from('products').select('*, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)').eq('is_active', true).order('sku'),
       supabase.from('labor_phases').select('id, name, default_price').eq('is_active', true).order('sort_order'),
       supabase.from('proposal_classes').select('id, name, color').eq('is_active', true).order('name'),
       supabase.from('proposal_line_items').select('room_id, product_id').eq('proposal_id', proposalId).is('parent_item_id', null),
     ]);
-    if (prodsRes.data) setProducts(prodsRes.data);
+    if (prodsRes.data) setProducts(prodsRes.data.map(p => ({ ...p, ...catalogTaxonomy(p) })) as (Product & CatalogTaxonomy)[]);
     if (phasesRes.data) setLaborPhases(phasesRes.data);
     if (classesRes.data) setClasses(classesRes.data);
     if (itemsRes.data) {
@@ -151,7 +155,7 @@ export default function AddItemToAreasModal({
         default_labor_hours, image_url, product_link, manufacturer_model_number,
         item_type, is_taxable, labor_phase_id, class_id, sales_description,
         manufacturer:manufacturers(name),
-        vendor:vendors(vendor_name),
+        vendor:vendors!products_default_vendor_id_fkey(vendor_name),
         category:product_categories(name),
         subcategory:product_subcategories(name),
         labor_phase:labor_phases(name, default_price)
@@ -162,13 +166,17 @@ export default function AddItemToAreasModal({
   }
 
   const filteredProducts = products.filter(p => {
+    if (selectedCategory && p.categoryName !== selectedCategory) return false;
+    if (selectedSubcategory && p.subcategoryName !== selectedSubcategory) return false;
+    if (selectedVendor && p.vendorName !== selectedVendor) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
       p.sku?.toLowerCase().includes(q) ||
       p.name?.toLowerCase().includes(q) ||
       p.description?.toLowerCase().includes(q) ||
-      (p as any).category?.toLowerCase().includes(q)
+      p.categoryName.toLowerCase().includes(q) || p.subcategoryName.toLowerCase().includes(q) ||
+      p.vendorName.toLowerCase().includes(q)
     );
   });
 
@@ -371,17 +379,24 @@ export default function AddItemToAreasModal({
   const accessoriesTotal = pendingAccessories.reduce((s, a) => s + a.quantity * a.unit_price, 0);
 
   // Build panelData for ProductDetailPanel
+  const selectedTaxonomy = selectedProduct ? catalogTaxonomy({
+    ...selectedProduct,
+    catalog_category: masterProduct?.category,
+    catalog_subcategory: masterProduct?.subcategory,
+    default_vendor: masterProduct?.vendor,
+  }) : null;
   const panelData: ProductDetailPanelData | null = selectedProduct ? {
     productId: selectedProduct.id ?? null,
     productName: selectedProduct.name || '',
     sku: selectedProduct.sku || masterProduct?.sku || null,
     upc: (selectedProduct as any).upc ?? masterProduct?.upc ?? null,
-    category: masterProduct?.category?.name || (selectedProduct as any).category || null,
-    subcategory: masterProduct?.subcategory?.name || null,
+    category: selectedTaxonomy?.categoryName || null,
+    subcategory: selectedTaxonomy?.subcategoryName || null,
     inventoryType: masterProduct?.inventory_type ?? (selectedProduct as any).inventory_type ?? null,
     itemColor: masterProduct?.item_color ?? (selectedProduct as any).item_color ?? null,
     itemSize: masterProduct?.item_size ?? (selectedProduct as any).item_size ?? null,
     manufacturerName: masterProduct?.manufacturer?.name || null,
+    vendorName: selectedTaxonomy?.vendorName || null,
     imageUrl: (selectedProduct as any).image_url || masterProduct?.image_url || null,
     manufacturerUrl: masterProduct?.manufacturer_url ?? null,
     supplierUrl: masterProduct?.supplier_url ?? null,
@@ -448,6 +463,9 @@ export default function AddItemToAreasModal({
                 </div>
               </div>
 
+              <CatalogTaxonomyFilters theme="light" products={products} category={selectedCategory} subcategory={selectedSubcategory} vendor={selectedVendor}
+                onCategory={setSelectedCategory} onSubcategory={setSelectedSubcategory} onVendor={setSelectedVendor} />
+
               <button
                 onClick={() => setShowNewProductForm(true)}
                 className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-colors shadow-sm"
@@ -473,6 +491,9 @@ export default function AddItemToAreasModal({
                         <Package className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-gray-900 text-sm">{product.name}</div>
+                          {(product.categoryName || product.subcategoryName || product.vendorName) && <div className="text-xs text-blue-700 mt-0.5">
+                            {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
+                          </div>}
                           {product.sku && <div className="text-xs text-gray-500 mt-0.5 font-mono">SKU: {product.sku}</div>}
                           {product.description && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</div>}
                         </div>

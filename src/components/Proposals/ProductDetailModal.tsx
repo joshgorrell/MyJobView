@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ProductDetailPanel, { type ProductDetailPanelData, type LaborPhaseOption, type ClassOption } from '../Products/ProductDetailPanel';
+import { catalogTaxonomy } from '../Products/CatalogTaxonomyFilters';
 import type { ProposalLineItem } from '../../lib/types';
 
 interface ProductDetailModalProps {
@@ -63,7 +64,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       const [itemRes, phasesRes, classesRes] = await Promise.all([
         supabase
           .from('proposal_line_items')
-          .select('*, products(*, image_url, thumbnail_url, manufacturers(name))')
+          .select('*, products(*, image_url, thumbnail_url, manufacturers(name), catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name))')
           .eq('id', lineItemId)
           .maybeSingle(),
         supabase
@@ -81,6 +82,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       if (itemRes.data) {
         const item = itemRes.data;
         const product = item.products || null;
+        const taxonomy = product ? catalogTaxonomy(product) : null;
         setLineItem(item);
 
         setPanelData({
@@ -88,12 +90,13 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
           productName: product?.name || item.description || '',
           sku: product?.sku || null,
           upc: product?.upc || null,
-          category: product?.category || null,
-          subcategory: product?.subcategory || null,
+          category: taxonomy?.categoryName || null,
+          subcategory: taxonomy?.subcategoryName || null,
           inventoryType: product?.inventory_type || null,
           itemColor: product?.item_color || null,
           itemSize: product?.item_size || null,
           manufacturerName: product?.manufacturers?.name || null,
+          vendorName: taxonomy?.vendorName || null,
           imageUrl: product?.image_url || product?.thumbnail_url || null,
           manufacturerUrl: product?.manufacturer_url || null,
           supplierUrl: product?.supplier_url || null,
