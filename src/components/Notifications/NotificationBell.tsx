@@ -179,6 +179,14 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
     // Handle different notification types
     const notifType = notification.notification_type;
 
+    // A mention opens the whole thread, including the messages around it.
+    if (notifType === 'message_mention' && notification.related_id && onMessageClick) {
+      await markAsRead(notification);
+      onMessageClick(notification.related_id);
+      setIsOpen(false);
+      return;
+    }
+
     // Proposal-related notifications
     if (notification.type === 'proposal' && notification.proposal_id && onProposalClick) {
       onProposalClick(notification.proposal_id);
