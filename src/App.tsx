@@ -1066,7 +1066,7 @@ function AppContent() {
           {activeTab === 'test_tune' && checkModuleAccess('test_tune') && <TestTunePerformanceDashboard key={activeTab} />}
 
           {activeTab === 'vip-plans' && checkModuleAccess('vip-plans') && <VIPPlanManagement key={activeTab} />}
-          {activeTab === 'contract_management' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
+          {activeTab === 'contract_management' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} onNavigateToOnboarding={checkModuleAccess('security_onboarding') ? () => setActiveTab('security_onboarding') : undefined} />}
           {activeTab === 'security_onboarding' && checkModuleAccess('security_onboarding') && <SecurityOnboarding key={activeTab} onNavigateToContracts={() => setActiveTab('contract_management')} canAccessContractManagement={checkModuleAccess('contract_management')} />}
           {activeTab === 'tax_reports' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={checkModuleAccess('tax_filing_guide') ? () => setActiveTab('tax_filing_guide') : undefined} />}
           {activeTab === 'tax_filing_guide' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={() => setActiveTab('tax_reports')} />}
