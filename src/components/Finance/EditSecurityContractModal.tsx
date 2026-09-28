@@ -39,6 +39,8 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>(contract.account_type || '');
   const [accountServices, setAccountServices] = useState<string[]>(contract.account_services || []);
   const [accountNumber, setAccountNumber] = useState(contract.account_number || '');
+  const [isMonitoring, setIsMonitoring] = useState(contract.is_monitoring || false);
+  const [monitoringAccountNumber, setMonitoringAccountNumber] = useState(contract.account_number || '');
   const [installationDate, setInstallationDate] = useState(contract.installation_date || '');
   const [serviceAccountNumbers, setServiceAccountNumbers] = useState<Record<string, string>>(contract.service_account_numbers || {});
   const [notes, setNotes] = useState(contract.notes || '');
@@ -164,7 +166,8 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           ...(renewalTermMonths === 1 ? { cancellation_notice_days: 30 } : {}),
           account_type: accountType || null,
           account_services: accountServices,
-          account_number: accountNumber.trim() || null,
+          is_monitoring: isMonitoring,
+          account_number: isMonitoring ? (monitoringAccountNumber.trim() || null) : null,
           installation_date: installationDate || null,
           service_account_numbers: serviceAccountNumbers,
           notes: notes.trim() || null,
@@ -428,6 +431,31 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Monitoring</label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isMonitoring}
+                  onChange={(e) => setIsMonitoring(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-blue-600 rounded"
+                />
+                <span className="text-xs sm:text-sm text-gray-700">Yes, this system calls a monitoring center when the alarm goes off</span>
+              </label>
+              {isMonitoring && (
+                <div className="mt-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Monitoring Account Number <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <input
+                    type="text"
+                    value={monitoringAccountNumber}
+                    onChange={(e) => setMonitoringAccountNumber(e.target.value)}
+                    placeholder="e.g. 12345"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
             </div>
 
             <div>

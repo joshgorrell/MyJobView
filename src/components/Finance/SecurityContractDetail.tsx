@@ -1185,12 +1185,24 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Account Info</h2>
             <div className="space-y-3">
-              {contractData.account_number && (
-                <div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Account Number</div>
-                  <div className="font-medium text-gray-900">{contractData.account_number}</div>
+              <div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide">Monitoring</div>
+                <div className="mt-1">
+                  {contractData.is_monitoring ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                      <ShieldCheck className="w-3 h-3" />
+                      Monitoring Active
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400 italic">Not monitored</span>
+                  )}
                 </div>
-              )}
+                {contractData.is_monitoring && contractData.account_number && (
+                  <div className="text-sm text-gray-700 mt-1">
+                    <span className="text-xs text-gray-500">Monitoring Account Number:</span> {contractData.account_number}
+                  </div>
+                )}
+              </div>
               <div>
                 <div className="text-xs text-gray-500 uppercase tracking-wide">Account Type</div>
                 <div className="mt-1">
