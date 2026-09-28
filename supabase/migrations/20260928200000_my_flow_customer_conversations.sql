@@ -139,11 +139,13 @@ CREATE OR REPLACE FUNCTION flow_private.notify_message_mentions() RETURNS trigge
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_user uuid;
 BEGIN
- IF NEW.source_table='messages' THEN
+ IF NEW.source_table IN ('messages','discussion_posts') THEN
   FOREACH v_user IN ARRAY NEW.mentioned_user_ids LOOP
    INSERT INTO public.notifications(organization_id,user_id,type,title,body,related_id,is_read)
-   VALUES(NEW.organization_id,v_user,'message_mention','You were mentioned',
-     NEW.actor_name||' mentioned you in a conversation. Open the thread for context.',NEW.thread_id,false);
+   VALUES(NEW.organization_id,v_user,
+     CASE WHEN NEW.source_table='messages' THEN 'message_mention' ELSE 'discussion_post_mention' END,
+     'You were mentioned',NEW.actor_name||' mentioned you. Open the conversation for context.',
+     CASE WHEN NEW.source_table='messages' THEN NEW.thread_id ELSE NEW.source_id END,false);
   END LOOP;
  END IF;
  RETURN NEW;
