@@ -600,28 +600,39 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
             <h1 className="text-xl sm:text-2xl font-bold text-white">Security Onboarding</h1>
           </div>
           <p className="text-sm sm:text-base text-gray-300">Track pending and in-progress customer agreement onboarding</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {onNavigateToContracts && canAccessContractManagement !== false && (
             <button
+              type="button"
               onClick={onNavigateToContracts}
-              className="flex items-center gap-2 mt-3 text-blue-400 hover:text-blue-300 transition-colors group"
+              aria-label="View all agreements"
+              title="View all agreements"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/25 px-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
             >
-              <span className="text-sm font-medium">View All Agreements</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Agreements</span>
             </button>
           )}
-        </div>
-        <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-4 py-3 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium"
+            aria-label="Paper onboarding"
+            title="Paper onboarding"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
           >
-            <Printer className="w-4 h-4" /> Paper Onboarding
+            <Printer className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Paper Form</span>
           </button>
           <button
+            type="button"
             onClick={() => { setCreatePaperOnboarding(false); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            aria-label="New online agreement"
+            title="New online agreement"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
-            <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> New Online Agreement
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">New Online</span>
           </button>
         </div>
       </div>
