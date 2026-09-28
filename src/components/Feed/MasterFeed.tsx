@@ -1,22 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import Flow from '../Flow/Flow';
-import { MessageSquare, UserPlus, Users, AlertTriangle, CheckCircle, TrendingUp, Activity, MessageCircle, Hash, X, AtSign, Search, Briefcase, ListTodo, CheckSquare, Edit3, Trash2, ChevronDown, ChevronUp, Heart, User, Building2 } from 'lucide-react';
+import { AtSign, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { FeedEvent } from '../../lib/types';
-import { formatDistanceToNow } from '../../lib/utils';
 import { DiscussionFeed } from './DiscussionFeed';
 import { DiscussionPostForm } from './DiscussionPostForm';
-import { LeadsHistory } from './LeadsHistory';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface MasterFeedProps {
   onLeadClick: (leadId: string) => void;
 }
 
-function LegacyDiscussionFeed({ onLeadClick }: MasterFeedProps) {
-  const { profile } = useAuth();
-  const [events, setEvents] = useState<FeedEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+function LegacyDiscussionFeed({ onLeadClick, focusPostId }: MasterFeedProps & { focusPostId?: string | null }) {
   const [selectedHashtag, setSelectedHashtag] = useState<string | undefined>();
   const [trendingHashtags, setTrendingHashtags] = useState<Array<{ hashtag: string; count: number }>>([]);
   const [showOnlyMentions, setShowOnlyMentions] = useState(false);
@@ -25,14 +18,10 @@ function LegacyDiscussionFeed({ onLeadClick }: MasterFeedProps) {
   const hashtagReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadEvents();
     loadTrendingHashtags();
 
     const channel = supabase
       .channel('master_feed_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feed_events' }, () => {
-        loadEvents();
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'discussion_posts' }, () => {
         if (hashtagReloadTimer.current) clearTimeout(hashtagReloadTimer.current);
         hashtagReloadTimer.current = setTimeout(() => loadTrendingHashtags(), 2000);
@@ -44,52 +33,6 @@ function LegacyDiscussionFeed({ onLeadClick }: MasterFeedProps) {
       supabase.removeChannel(channel);
     };
   }, []);
-
-  async function loadEvents() {
-    try {
-      const { data, error } = await supabase
-        .from('feed_events')
-        .select(`
-          *,
-          leads (
-            id,
-            company_name,
-            contact_name,
-            status
-          ),
-          lead_messages (
-            id,
-            message,
-            profiles (
-              full_name
-            )
-          ),
-          tasks (
-            id,
-            title,
-            description,
-            status
-          ),
-          profiles (
-            full_name,
-            avatar_url
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        console.error('Error loading feed events:', error);
-        throw error;
-      }
-
-      setEvents(data || []);
-    } catch (error) {
-      console.error('Error loading feed:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function loadTrendingHashtags() {
     try {
@@ -129,182 +72,6 @@ function LegacyDiscussionFeed({ onLeadClick }: MasterFeedProps) {
     } else {
       setSelectedHashtag(hashtag);
     }
-  }
-
-  function getEventIcon(eventType: string) {
-    switch (eventType) {
-      case 'lead_created':
-        return <UserPlus className="w-5 h-5 text-blue-600" />;
-      case 'lead_assigned':
-        return <UserPlus className="w-5 h-5 text-green-600" />;
-      case 'lead_claimed':
-        return <CheckCircle className="w-5 h-5 text-emerald-600" />;
-      case 'message_posted':
-        return <MessageSquare className="w-5 h-5 text-indigo-600" />;
-      case 'lead_escalated':
-        return <AlertTriangle className="w-5 h-5 text-orange-600" />;
-      case 'lead_updated':
-        return <TrendingUp className="w-5 h-5 text-purple-600" />;
-      case 'lead_closed':
-        return <CheckCircle className="w-5 h-5 text-gray-600" />;
-      case 'task_created':
-        return <ListTodo className="w-5 h-5 text-cyan-600" />;
-      case 'task_completed':
-        return <CheckSquare className="w-5 h-5 text-green-600" />;
-      case 'task_updated':
-        return <Edit3 className="w-5 h-5 text-amber-600" />;
-      case 'task_deleted':
-        return <Trash2 className="w-5 h-5 text-red-600" />;
-      case 'discussion_created':
-        return <MessageCircle className="w-5 h-5 text-blue-600" />;
-      case 'discussion_replied':
-        return <MessageSquare className="w-5 h-5 text-cyan-600" />;
-      case 'discussion_liked':
-        return <Heart className="w-5 h-5 text-pink-600" />;
-      case 'contact_created':
-        return <User className="w-5 h-5 text-emerald-600" />;
-      case 'contact_updated':
-        return <Building2 className="w-5 h-5 text-teal-600" />;
-      default:
-        return <Users className="w-5 h-5 text-gray-600" />;
-    }
-  }
-
-  function getEventDescription(event: FeedEvent) {
-    const userName = event.profiles?.full_name || 'Someone';
-    const leadName = event.leads?.contact_name || 'Unknown';
-    const company = event.leads?.company_name ? ` from ${event.leads.company_name}` : '';
-    const taskTitle = event.tasks?.title || 'Unknown task';
-
-    switch (event.event_type) {
-      case 'lead_created':
-        return (
-          <>
-            <strong>{userName}</strong> created a new lead: <strong>{leadName}</strong>
-            {company}
-          </>
-        );
-      case 'lead_assigned':
-        return (
-          <>
-            <strong>{leadName}</strong>
-            {company} was assigned to <strong>{event.metadata.assigned_to_name}</strong>
-          </>
-        );
-      case 'lead_claimed':
-        return (
-          <>
-            <strong>{userName}</strong> claimed <strong>{leadName}</strong>
-            {company} from the Fishbowl
-          </>
-        );
-      case 'message_posted':
-        return (
-          <>
-            <strong>{event.lead_messages?.profiles?.full_name || userName}</strong> commented on{' '}
-            <strong>{leadName}</strong>: {event.lead_messages?.message?.substring(0, 60)}
-            {(event.lead_messages?.message?.length || 0) > 60 ? '...' : ''}
-          </>
-        );
-      case 'lead_escalated':
-        return (
-          <>
-            <strong>{leadName}</strong>
-            {company} has been escalated (unclaimed for 3+ days)
-          </>
-        );
-      case 'lead_updated':
-        return (
-          <>
-            <strong>{userName}</strong> updated <strong>{leadName}</strong>
-            {company}
-          </>
-        );
-      case 'lead_closed':
-        return (
-          <>
-            <strong>{userName}</strong> closed <strong>{leadName}</strong>
-            {company} as {event.metadata.status}
-          </>
-        );
-      case 'task_created':
-        return (
-          <>
-            <strong>{userName}</strong> created a task: <strong>{taskTitle}</strong>
-          </>
-        );
-      case 'task_completed':
-        return (
-          <>
-            <strong>{userName}</strong> completed task: <strong>{taskTitle}</strong>
-          </>
-        );
-      case 'task_updated':
-        return (
-          <>
-            <strong>{userName}</strong> updated task: <strong>{taskTitle}</strong>
-          </>
-        );
-      case 'task_deleted':
-        return (
-          <>
-            <strong>{userName}</strong> deleted task: <strong>{taskTitle}</strong>
-          </>
-        );
-      case 'discussion_created': {
-        const postType = event.metadata?.post_type || 'post';
-        const preview = event.metadata?.content_preview || '';
-        return (
-          <>
-            <strong>{userName}</strong> created a {postType}: {preview}{preview.length >= 100 ? '...' : ''}
-          </>
-        );
-      }
-      case 'discussion_replied': {
-        const preview = event.metadata?.content_preview || '';
-        return (
-          <>
-            <strong>{userName}</strong> replied to a discussion: {preview}{preview.length >= 100 ? '...' : ''}
-          </>
-        );
-      }
-      case 'discussion_liked':
-        return (
-          <>
-            <strong>{userName}</strong> liked a discussion post
-          </>
-        );
-      case 'contact_created': {
-        const contactName = event.metadata?.name || 'Unknown';
-        const contactCompany = event.metadata?.company;
-        return (
-          <>
-            <strong>{userName}</strong> created contact: <strong>{contactName}</strong>
-            {contactCompany && ` from ${contactCompany}`}
-          </>
-        );
-      }
-      case 'contact_updated': {
-        const contactName = event.metadata?.name || 'Unknown';
-        const contactCompany = event.metadata?.company;
-        return (
-          <>
-            <strong>{userName}</strong> updated contact: <strong>{contactName}</strong>
-            {contactCompany && ` from ${contactCompany}`}
-          </>
-        );
-      }
-      default:
-        return `Activity on ${leadName}${company}`;
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading feed...</div>
-      </div>
-    );
   }
 
   return (
@@ -362,6 +129,7 @@ function LegacyDiscussionFeed({ onLeadClick }: MasterFeedProps) {
 
               <DiscussionFeed
                 onLeadClick={onLeadClick}
+                focusPostId={focusPostId}
                 selectedHashtag={selectedHashtag}
                 onHashtagClick={handleHashtagClick}
                 showOnlyMentions={showOnlyMentions}
@@ -418,12 +186,13 @@ function LegacyDiscussionFeed({ onLeadClick }: MasterFeedProps) {
 }
 
 export function MasterFeed({ onLeadClick }: MasterFeedProps) {
-  const [view, setView] = useState<'flow' | 'discussions'>('flow');
+  const focusPostId = new URLSearchParams(window.location.search).get('postId');
+  const [view, setView] = useState<'flow' | 'discussions'>(focusPostId ? 'discussions' : 'flow');
   return <div className="space-y-3">
     <div className="flex gap-2" aria-label="Feed view">
-      <button onClick={() => setView('flow')} aria-pressed={view === 'flow'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'flow' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>Flow</button>
+      <button onClick={() => setView('flow')} aria-pressed={view === 'flow'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'flow' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>My Flow</button>
       <button onClick={() => setView('discussions')} aria-pressed={view === 'discussions'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'discussions' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>Discussions</button>
     </div>
-    {view === 'flow' ? <Flow /> : <LegacyDiscussionFeed onLeadClick={onLeadClick} />}
+    {view === 'flow' ? <Flow /> : <LegacyDiscussionFeed onLeadClick={onLeadClick} focusPostId={focusPostId} />}
   </div>;
 }
