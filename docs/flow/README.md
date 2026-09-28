@@ -14,7 +14,7 @@ Flow is the default view of the existing Feed module. Discussions remain in its 
 
 ## Release sequence
 
-1. Apply `supabase/migrations/20260923224946_customer_job_flow.sql` to the same database used by the frontend.
+1. Apply `supabase/migrations/20260928183403_customer_job_flow.sql` to the same database used by the frontend.
 2. Deploy the frontend from this branch. The migration also labels the existing `feed` navigation module **Flow**, preserving its existing grants and module ID.
 3. With two employee accounts, open the same work order: post an update, open the entry, verify only the reader's status changes, and verify the other account sees a new-activity button.
 
