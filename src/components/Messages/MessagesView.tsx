@@ -136,7 +136,6 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager';
 
   const loadThreads = useCallback(async () => {
     if (!profile?.organization_id) {
@@ -155,9 +154,8 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
         .eq('organization_id', profile.organization_id)
         .order('last_message_at', { ascending: false });
 
-      if (!isPrivileged && profile?.id) {
-        query = query.or(`assigned_sales_rep_id.eq.${profile.id},created_by.eq.${profile.id}`);
-      }
+      // Row-level security resolves customer, project, service, and executive access.
+      // Filtering here by the assigned sales rep would hide a rep's other customer threads.
 
       const { data: threadsData, error } = await query;
       if (error) throw error;
@@ -260,7 +258,7 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
     } finally {
       setLoading(false);
     }
-  }, [profile?.id, profile?.organization_id, isPrivileged]);
+  }, [profile?.id, profile?.organization_id]);
 
   async function loadContacts() {
     const { data } = await supabase
