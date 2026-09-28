@@ -34,8 +34,8 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   const [selectedContact, setSelectedContact] = useState(contract.contact_id || '');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [priceOverride, setPriceOverride] = useState(contract.monthly_price?.toString() || '');
-  const [termMonths, setTermMonths] = useState<number>(contract.term_months || 12);
-  const [renewalTermMonths, setRenewalTermMonths] = useState<number>(contract.renewal_term_months || 12);
+  const [termMonths, setTermMonths] = useState<number>(contract.term_months || 36);
+  const [renewalTermMonths, setRenewalTermMonths] = useState<number>(contract.renewal_term_months || 1);
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>(contract.account_type || '');
   const [accountServices, setAccountServices] = useState<string[]>(contract.account_services || []);
   const [accountNumber, setAccountNumber] = useState(contract.account_number || '');
@@ -159,6 +159,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           monthly_price: monthlyPrice,
           term_months: termMonths,
           renewal_term_months: renewalTermMonths,
+          ...(renewalTermMonths === 1 ? { cancellation_notice_days: 30 } : {}),
           account_type: accountType || null,
           account_services: accountServices,
           account_number: accountNumber.trim() || null,
@@ -470,19 +471,18 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           {/* Renewal Term */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-              Renewal Term (Months)
+              Renewal Term
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={renewalTermMonths}
-                onChange={(e) => setRenewalTermMonths(parseInt(e.target.value) || 12)}
-                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <p className="text-sm text-gray-700">
+              {renewalTermMonths === 1
+                ? "Automatically renews month-to-month after the initial term; 30 days' notice to cancel."
+                : `Existing agreement: ${renewalTermMonths} month renewal term.`}
+            </p>
+            {renewalTermMonths !== 1 && contract.status === 'draft' && (
+              <button type="button" onClick={() => setRenewalTermMonths(1)} className="mt-2 text-sm text-blue-700 underline">
+                Change this draft to month-to-month renewal
+              </button>
+            )}
           </div>
 
           {/* Notes */}
@@ -513,7 +513,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Renewal Term:</span>
-                <span className="font-semibold text-gray-900">{renewalTermMonths} months</span>
+                <span className="font-semibold text-gray-900">{renewalTermMonths === 1 ? 'Month-to-month' : `${renewalTermMonths} months`}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-300">
                 <span className="text-gray-600">Total Contract Value:</span>

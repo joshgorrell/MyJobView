@@ -65,8 +65,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, prefil
   const [selectedSalesOrder, setSelectedSalesOrder] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [priceOverride, setPriceOverride] = useState('');
-  const [termMonths, setTermMonths] = useState<number>(12);
-  const [renewalTermMonths, setRenewalTermMonths] = useState<number>(12);
+  const [termMonths, setTermMonths] = useState<number>(36);
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>('');
   const [accountServices, setAccountServices] = useState<string[]>([]);
   const [accountNumber, setAccountNumber] = useState('');
@@ -323,7 +322,8 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, prefil
           monthly_price: finalMonthlyPrice,
           price_override: priceOverride ? parseFloat(priceOverride) : null,
           term_months: termMonths,
-          renewal_term_months: renewalTermMonths,
+          renewal_term_months: 1,
+          cancellation_notice_days: 30,
           account_type: accountType || null,
           account_services: accountServices,
           account_number: accountNumber.trim() || null,
@@ -553,25 +553,9 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, prefil
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Renewal Term <span className="text-red-500">*</span>
+                Renewal Term
               </label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {[12, 24, 36, 48, 60].map((months) => (
-                  <button
-                    key={months}
-                    type="button"
-                    onClick={() => setRenewalTermMonths(months)}
-                    className={`px-2 sm:px-4 py-3 text-center rounded-lg border-2 transition-all ${
-                      renewalTermMonths === months
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                    }`}
-                  >
-                    {months}<br/>
-                    <span className="text-xs">months</span>
-                  </button>
-                ))}
-              </div>
+              <p className="text-sm text-gray-700">Automatically renews month-to-month after the initial term. Cancellation after the initial term requires 30 days' notice.</p>
             </div>
 
             <div>
