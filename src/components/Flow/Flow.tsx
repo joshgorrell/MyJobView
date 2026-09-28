@@ -10,7 +10,7 @@ import { FlowTargetPicker } from './FlowTargetPicker';
 import './flow.css';
 
 type Option = { id: string; name: string };
-const ICONS = { work: Wrench, service: Wrench, sales: FileText, materials: Package, scheduling: Calendar, customer: User, financial: DollarSign, update: MessageSquare };
+const ICONS = { work: Wrench, service: Wrench, sales: FileText, materials: Package, scheduling: Calendar, customer: User, financial: DollarSign, update: MessageSquare, communication: MessageSquare };
 
 export default function Flow({ contactId, projectId, workOrderId, dark = false }: FlowScope & { dark?: boolean }) {
   const { profile } = useAuth();
@@ -20,6 +20,8 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(false);
+  const [mentionsOnly, setMentionsOnly] = useState(false);
+  const [todayOnly, setTodayOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [category, setCategory] = useState('');
   const [office, setOffice] = useState('');
@@ -40,11 +42,14 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const filters = useMemo<FlowFilters>(() => {
     const until = to ? new Date(`${to}T00:00:00`) : null;
     if (until) until.setDate(until.getDate() + 1);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
     return { ...scopeFilters(target ? { ...scope, ...targetScope(target) } : scope),
-      search: debouncedSearch, my_work: myWork, new_only: newOnly, category, office_id: office, actor_id: actor, location_id: location,
-      since: from ? new Date(`${from}T00:00:00`).toISOString() : undefined, until: until?.toISOString(),
+      search: debouncedSearch, my_work: myWork, new_only: newOnly, mentions_only: mentionsOnly, category, office_id: office, actor_id: actor, location_id: location,
+      since: todayOnly ? today.toISOString() : from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
+      until: todayOnly ? tomorrow.toISOString() : until?.toISOString(),
     };
-  }, [scope, target, debouncedSearch, myWork, newOnly, category, office, actor, location, from, to]);
+  }, [scope, target, debouncedSearch, myWork, newOnly, mentionsOnly, todayOnly, category, office, actor, location, from, to]);
   const flow = useFlow(filters);
   const scopeModule = workOrderId ? 'work_orders' : projectId ? 'projects' : contactId ? 'contacts' : null;
   const canPost = scopeModule ? hasModuleAccess(scopeModule) : ['contacts', 'projects', 'work_orders'].some(hasModuleAccess);
@@ -82,6 +87,9 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
 
   function links(event: FlowEvent) {
     const result: { label: string; url: string }[] = [];
+    if (event.thread_id && hasModuleAccess('messages')) result.push({ label: 'Read full conversation', url: `?tab=messages&threadId=${event.thread_id}` });
+    if ((event.source_table === 'tasks' || event.source_table === 'task_comments') && hasModuleAccess('tasks')) result.push({ label: 'Open task and comments', url: `?tab=tasks&taskId=${event.task_id || event.source_id}` });
+    if (event.source_table === 'discussion_posts' && hasModuleAccess('feed')) result.push({ label: 'Read full discussion', url: `?tab=feed&postId=${event.source_id}` });
     if (event.contact_id && hasModuleAccess('contacts')) result.push({ label: 'Open customer', url: `?tab=contacts&contactId=${event.contact_id}` });
     if (event.project_id && hasModuleAccess('projects')) result.push({ label: 'Open project', url: `?tab=projects&projectId=${event.project_id}` });
     if (event.work_order_id && hasModuleAccess('work_orders')) result.push({ label: 'Open work order', url: `?tab=work_orders&workOrderId=${event.work_order_id}` });
@@ -94,12 +102,14 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   }
   const newShown = flow.events.filter(e => !e.viewed).length;
   return <section className={`flow ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
-    <header className="flow-heading"><div><h2><Activity size={20} />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'Activity for this record' : 'Customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
+    <header className="flow-heading"><div><h2><Activity size={20} />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'My Flow'}</h2><span className="flow-subtitle">{scoped ? 'Activity and conversations for this record' : 'Customer conversations, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
       {canPost && <button className="flow-primary" onClick={() => setComposing(!composing)}><Plus size={15} />Post update</button>}
     </header>
     {composing && <PostFlowUpdate scope={chosenScope} onClose={() => setComposing(false)} onPosted={() => { setComposing(false); void flow.refresh(); }} />}
     <div className="flow-toolbar">
       {!scoped && <div className="flow-segment" aria-label="Activity scope"><button aria-pressed={myWork} onClick={() => setMyWork(true)}>My Work</button><button aria-pressed={!myWork} onClick={() => setMyWork(false)}>All Activity</button></div>}
+      <button className={todayOnly ? 'flow-selected' : ''} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
+      <button className={mentionsOnly ? 'flow-selected' : ''} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
       <label className="flow-search"><Search size={16} /><input aria-label="Search activity" placeholder="Search customer, job or activity…" value={search} onChange={e => setSearch(e.target.value)} />{search && <button onClick={() => setSearch('')} aria-label="Clear search"><X size={14} /></button>}</label>
       <button className={newOnly ? 'flow-selected' : ''} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" />New only</button>
       <button aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}><Filter size={14} />Filters{chips.length ? ` (${chips.length})` : ''}</button>
@@ -130,15 +140,15 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
           {showDay && <h3 className="flow-day">{group}</h3>}
           <div className={`flow-row ${event.viewed ? '' : 'flow-row--new'} ${open ? 'flow-row--open' : ''}`}>
             <button className="flow-read-toggle" aria-label={event.viewed ? 'Mark as new' : 'Mark as viewed'} title={event.viewed ? 'Viewed — mark as new' : 'New — mark as viewed'} onClick={() => void flow.markViewed([event.id], !event.viewed)}>{event.viewed ? <Check size={13} /> : <span className="flow-dot" />}</button>
-            <button className="flow-row-main" aria-expanded={open} aria-controls={`flow-detail-${event.id}`} title={`${event.summary}${event.details ? '\n' + event.details : ''}`} onClick={() => { setExpanded(open ? null : event.id); if (!open && !event.viewed) void flow.markViewed([event.id]); }}>
+            <button className="flow-row-main" aria-expanded={open} aria-controls={`flow-detail-${event.id}`} title={`${event.summary}${event.preview ? '\n' + event.preview : event.details ? '\n' + event.details : ''}`} onClick={() => { setExpanded(open ? null : event.id); if (!open && !event.viewed) void flow.markViewed([event.id]); }}>
               <time dateTime={event.created_at} title={new Date(event.created_at).toLocaleString()}>{new Date(event.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</time>
               <span className="flow-context" title={[event.customer_name, job, event.location_name].filter(Boolean).join(' · ')}>{event.customer_name}{job && <small> · {job}</small>}</span>
-              <span className="flow-summary"><Icon size={15} className={`flow-icon flow-icon--${event.category}`} /><span>{event.summary}</span></span>
+              <span className="flow-summary"><Icon size={15} className={`flow-icon flow-icon--${event.category}`} /><span>{event.summary}{event.preview && <small> · {event.preview}</small>}</span>{profile?.id && event.mentioned_user_ids?.includes(profile.id) && <strong className="flow-mention">@ You</strong>}</span>
               <span className="flow-actor" title={event.actor_name}>{event.actor_name}</span>
               {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           </div>
-          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small><div className="flow-links">{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
+          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.preview ? <p className="flow-detail-body">{event.preview}</p> : event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small><div className="flow-links">{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
         </Fragment>;
       })}
     </div>
