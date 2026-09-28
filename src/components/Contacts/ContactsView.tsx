@@ -327,7 +327,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading contacts...</p>
+          <p className="text-secondary">Loading contacts...</p>
         </div>
       </div>
     );
@@ -338,8 +338,8 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
       <div className="flex items-center justify-center h-96">
         <div className="text-center max-w-sm">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Taking longer than expected</h3>
-          <p className="text-sm text-gray-600 mb-4">The contacts list is taking too long to load. This is usually a temporary issue.</p>
+          <h3 className="text-lg font-semibold text-primary mb-2">Taking longer than expected</h3>
+          <p className="text-sm text-secondary mb-4">The contacts list is taking too long to load. This is usually a temporary issue.</p>
           <button
             onClick={() => loadContacts(displayLimit, searchQuery)}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
@@ -357,11 +357,11 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
       <div className="mb-3 space-y-2">
         {/* Row 1: View toggle, Search, Column settings, Action button */}
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-md border border-gray-300 bg-white p-0.5 flex-shrink-0">
+          <div className="inline-flex rounded-md border border-strong bg-canvas p-0.5 flex-shrink-0">
             <button
               onClick={() => setViewFilter('my')}
               className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                viewFilter === 'my' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                viewFilter === 'my' ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:text-primary hover:bg-surface'
               }`}
             >
               Mine
@@ -369,18 +369,18 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             <button
               onClick={() => setViewFilter('all')}
               className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                viewFilter === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                viewFilter === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:text-primary hover:bg-surface'
               }`}
             >
               All
             </button>
           </div>
 
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             {searchLoading ? (
               <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
             ) : (
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             )}
             <input
               type="text"
@@ -391,7 +391,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 typeFilter === 'customer' ? 'Search customers...' :
                 typeFilter === 'prospect' ? 'Search prospects...' : 'Search leads...'
               }
-              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full pl-9 pr-3 py-1.5 text-sm bg-surface text-primary placeholder:text-muted border border-strong rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
 
@@ -400,7 +400,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             <button
               onClick={() => setShowColumnSettings(!showColumnSettings)}
               className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-md border transition-colors ${
-                showColumnSettings ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                showColumnSettings ? 'bg-infoSoft border-blue-300 text-info' : 'bg-canvas border-strong text-secondary hover:bg-surface'
               }`}
               title="Show or hide columns"
             >
@@ -409,22 +409,22 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             {showColumnSettings && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowColumnSettings(false)} />
-                <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg border border-gray-200 shadow-lg min-w-[180px] py-1">
-                  <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+                <div className="absolute right-0 top-full mt-1 z-20 bg-canvas rounded-lg border border-subtle shadow-lg min-w-[180px] py-1">
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-subtle">
                     Toggle Columns
                   </div>
                   {(Object.keys(COLUMN_LABELS) as ColumnKey[]).map((key) => (
                     <label
                       key={key}
-                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm"
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface cursor-pointer text-sm"
                     >
                       <input
                         type="checkbox"
                         checked={visibleColumns[key]}
                         onChange={() => toggleColumn(key)}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-1 focus:ring-blue-500"
+                        className="w-3.5 h-3.5 rounded border-strong text-blue-600 focus:ring-1 focus:ring-blue-500"
                       />
-                      <span className="text-gray-700">{COLUMN_LABELS[key]}</span>
+                      <span className="text-secondary">{COLUMN_LABELS[key]}</span>
                     </label>
                   ))}
                 </div>
@@ -442,7 +442,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
               <span className="sm:hidden">New</span>
             </button>
           ) : (
-            <div className="inline-flex items-center gap-1 px-3 py-1.5 text-gray-500 text-xs bg-gray-100 rounded-md flex-shrink-0">
+            <div className="inline-flex items-center gap-1 px-3 py-1.5 text-muted text-xs bg-surface rounded-md flex-shrink-0">
               <Lock className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">View Only</span>
             </div>
@@ -454,11 +454,11 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <button
             onClick={() => handleTypeFilterChange('all')}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
-              typeFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              typeFilter === 'all' ? 'bg-elevated text-primary' : 'bg-surface text-secondary hover:bg-elevated'
             }`}
           >
             All
-            <span className={`ml-0.5 text-xs ${typeFilter === 'all' ? 'text-gray-300' : 'text-gray-400'}`}>
+            <span className={`ml-0.5 text-xs ${typeFilter === 'all' ? 'text-gray-300' : 'text-muted'}`}>
               {typeCounts.all}
             </span>
           </button>
@@ -466,7 +466,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <button
             onClick={() => handleTypeFilterChange('customer')}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
-              typeFilter === 'customer' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              typeFilter === 'customer' ? 'bg-green-600 text-white' : 'bg-surface text-secondary hover:bg-elevated'
             }`}
           >
             <UserCheck className="w-3 h-3" />
@@ -477,13 +477,13 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <button
             onClick={() => handleTypeFilterChange('prospect')}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
-              typeFilter === 'prospect' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              typeFilter === 'prospect' ? 'bg-blue-600 text-white' : 'bg-surface text-secondary hover:bg-elevated'
             }`}
           >
             <Target className="w-3 h-3" />
             <span className="hidden sm:inline">Prospects</span>
             <span className="sm:hidden">Pros</span>
-            <span className={`ml-0.5 text-xs ${typeFilter === 'prospect' ? 'text-blue-200' : 'text-gray-400'}`}>
+            <span className={`ml-0.5 text-xs ${typeFilter === 'prospect' ? 'text-blue-200' : 'text-muted'}`}>
               {typeCounts.prospect}
             </span>
           </button>
@@ -491,19 +491,19 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <button
             onClick={() => handleTypeFilterChange('lead')}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
-              typeFilter === 'lead' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              typeFilter === 'lead' ? 'bg-amber-600 text-white' : 'bg-surface text-secondary hover:bg-elevated'
             }`}
           >
             <Sparkles className="w-3 h-3" />
             Leads
-            <span className={`ml-0.5 text-xs ${typeFilter === 'lead' ? 'text-amber-200' : 'text-gray-400'}`}>
+            <span className={`ml-0.5 text-xs ${typeFilter === 'lead' ? 'text-amber-200' : 'text-muted'}`}>
               {typeCounts.lead}
             </span>
           </button>
 
           <button
             onClick={() => setShowContactTypesHelp(true)}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded transition-all"
+            className="p-1 text-muted hover:text-secondary rounded transition-all"
             title="Learn about contact types"
             aria-label="Learn about contact types"
           >
@@ -516,7 +516,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
               <button
                 onClick={() => setTemperatureFilter('all')}
                 className={`px-2 py-1 text-xs rounded-md font-medium transition-all ${
-                  temperatureFilter === 'all' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  temperatureFilter === 'all' ? 'bg-elevated text-primary' : 'bg-surface text-muted hover:bg-elevated'
                 }`}
               >
                 All Temp
@@ -526,7 +526,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 disabled={temperatureCounts.on_fire === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
                   temperatureFilter === 'on_fire' ? 'bg-orange-600 text-white' :
-                  temperatureCounts.on_fire === 0 ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                  temperatureCounts.on_fire === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-attentionSoft text-attention hover:bg-elevated'
                 }`}
               >
                 <Flame className="w-3 h-3" />
@@ -537,7 +537,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 disabled={temperatureCounts.hot === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
                   temperatureFilter === 'hot' ? 'bg-red-600 text-white' :
-                  temperatureCounts.hot === 0 ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-red-50 text-red-700 hover:bg-red-100'
+                  temperatureCounts.hot === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-dangerSoft text-danger hover:bg-elevated'
                 }`}
               >
                 <Thermometer className="w-3 h-3" />
@@ -548,8 +548,8 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 onClick={() => setTemperatureFilter('warm')}
                 disabled={temperatureCounts.warm === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
-                  temperatureFilter === 'warm' ? 'bg-yellow-600 text-white' :
-                  temperatureCounts.warm === 0 ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                  temperatureFilter === 'warm' ? 'bg-amber-700 text-white' :
+                  temperatureCounts.warm === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-warningSoft text-warning hover:bg-elevated'
                 }`}
               >
                 <Thermometer className="w-3 h-3" />
@@ -561,7 +561,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 disabled={temperatureCounts.cold === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
                   temperatureFilter === 'cold' ? 'bg-blue-600 text-white' :
-                  temperatureCounts.cold === 0 ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  temperatureCounts.cold === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-infoSoft text-info hover:bg-elevated'
                 }`}
               >
                 <Thermometer className="w-3 h-3" />
@@ -576,17 +576,17 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
       {loading && !searchLoading ? (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Loading contacts...</p>
+          <p className="mt-2 text-secondary">Loading contacts...</p>
         </div>
       ) : contacts.length === 0 && !searchLoading ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+        <div className="text-center py-12 bg-surface rounded-lg border-2 border-dashed border-strong">
+          <Users className="w-12 h-12 text-muted mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-primary mb-2">
             {searchQuery ? 'No contacts found' :
               temperatureFilter !== 'all' ? `No ${temperatureFilter.replace('_', ' ')} ${typeFilter === 'all' ? 'contacts' : typeFilter + 's'}` :
               typeFilter !== 'all' ? `No ${typeFilter}s yet` : 'No contacts yet'}
           </h3>
-          <p className="text-gray-600 mb-4">
+          <p className="text-secondary mb-4">
             {searchQuery ? 'Try adjusting your search terms' :
               temperatureFilter !== 'all' ? `No ${typeFilter === 'all' ? 'prospects or leads' : typeFilter + 's'} match the "${temperatureFilter.replace('_', ' ')}" temperature filter` :
               typeFilter !== 'all' ? `No ${typeFilter}s match your current filters` : 'Create your first contact to get started'}
@@ -602,34 +602,34 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-canvas rounded-lg border border-subtle overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
+                  <tr className="bg-surface border-b border-subtle">
                     {visibleColumns.name && (
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted uppercase tracking-wider">Name</th>
                     )}
                     {visibleColumns.phone && (
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Phone</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted uppercase tracking-wider hidden md:table-cell">Phone</th>
                     )}
                     {visibleColumns.email && (
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Email</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted uppercase tracking-wider hidden md:table-cell">Email</th>
                     )}
                     {visibleColumns.balance && (
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Balance</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted uppercase tracking-wider hidden sm:table-cell">Balance</th>
                     )}
                     {visibleColumns.lastContact && (
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Last Contact</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted uppercase tracking-wider hidden xl:table-cell">Last Contact</th>
                     )}
                     {visibleColumns.nextFollowUp && (
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Next Follow-up</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted uppercase tracking-wider hidden xl:table-cell">Next Follow-up</th>
                     )}
                     {visibleColumns.assignedRep && (
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Rep</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted uppercase tracking-wider hidden xl:table-cell">Rep</th>
                     )}
                     {visibleColumns.office && (
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Office</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted uppercase tracking-wider hidden xl:table-cell">Office</th>
                     )}
                     <th className="px-3 py-2 w-8"></th>
                   </tr>
@@ -637,11 +637,11 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 <tbody className="divide-y divide-gray-200">
                   {personContacts.length > 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-1 bg-gray-50 border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-surface border-b border-gray-100">
                         <div className="flex items-center gap-1.5">
-                          <Users className="w-3 h-3 text-gray-400" />
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">People</span>
-                          <span className="text-xs text-gray-400">({personContacts.length})</span>
+                          <Users className="w-3 h-3 text-muted" />
+                          <span className="text-xs font-semibold text-muted uppercase tracking-wider">People</span>
+                          <span className="text-xs text-muted">({personContacts.length})</span>
                         </div>
                       </td>
                     </tr>
@@ -650,17 +650,17 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <tr
                       key={contact.id}
                       onClick={() => selectContact(contact)}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="hover:bg-surface cursor-pointer transition-colors"
                     >
                       {visibleColumns.name && (
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="font-medium text-gray-900 text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
                                 {getDisplayName(contact)}
                               </span>
                               {contact.company_name && (
-                                <span className="text-xs text-gray-400 truncate hidden xl:inline max-w-[120px]" title={contact.company_name}>{contact.company_name}</span>
+                                <span className="text-xs text-muted truncate hidden xl:inline max-w-[120px]" title={contact.company_name}>{contact.company_name}</span>
                               )}
                               {(() => {
                                 const contactType = getContactType(contact);
@@ -753,40 +753,40 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       )}
                       {visibleColumns.lastContact && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-secondary">
                             {contact.last_contact_date ? new Date(contact.last_contact_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.last_contact_date).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.nextFollowUp && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-secondary">
                             {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.assignedRep && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-gray-300">—</span>}</span>
                         </td>
                       )}
                       {visibleColumns.office && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-gray-300">—</span>}</span>
                         </td>
                       )}
                       <td className="px-3 py-1.5 text-right w-8">
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 inline-block" />
+                        <ChevronRight className="w-3.5 h-3.5 text-muted inline-block" />
                       </td>
                     </tr>
                   ))}
                   {businessContacts.length > 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-1 bg-gray-50 border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-surface border-b border-gray-100">
                         <div className="flex items-center gap-1.5">
-                          <Building2 className="w-3 h-3 text-gray-400" />
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Businesses</span>
-                          <span className="text-xs text-gray-400">({businessContacts.length})</span>
+                          <Building2 className="w-3 h-3 text-muted" />
+                          <span className="text-xs font-semibold text-muted uppercase tracking-wider">Businesses</span>
+                          <span className="text-xs text-muted">({businessContacts.length})</span>
                         </div>
                       </td>
                     </tr>
@@ -795,13 +795,13 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <tr
                       key={contact.id}
                       onClick={() => selectContact(contact)}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="hover:bg-surface cursor-pointer transition-colors"
                     >
                       {visibleColumns.name && (
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="font-medium text-gray-900 text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
                                 {getDisplayName(contact)}
                               </span>
                               {(() => {
@@ -880,30 +880,30 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       )}
                       {visibleColumns.lastContact && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-secondary">
                             {contact.last_contact_date ? new Date(contact.last_contact_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.last_contact_date).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.nextFollowUp && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-secondary">
                             {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.assignedRep && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-gray-300">—</span>}</span>
                         </td>
                       )}
                       {visibleColumns.office && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-gray-600 truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-gray-300">—</span>}</span>
                         </td>
                       )}
                       <td className="px-3 py-1.5 text-right w-8">
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 inline-block" />
+                        <ChevronRight className="w-3.5 h-3.5 text-muted inline-block" />
                       </td>
                     </tr>
                   ))}
@@ -914,7 +914,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
 
           {contacts.length >= displayLimit && (
             <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="text-xs text-muted mb-2">
                 Showing first {contacts.length} contacts
                 {searchQuery ? ` matching "${searchQuery}"` : ''}
               </p>
@@ -924,7 +924,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                   setDisplayLimit(newLimit);
                   loadContacts(newLimit, searchQuery);
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors font-medium"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-surface text-secondary rounded-md hover:bg-elevated transition-colors font-medium"
               >
                 Load More
               </button>
@@ -953,17 +953,17 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
 function ContactTypesHelpModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-start">
+      <div className="bg-canvas rounded-lg w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-subtle flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Understanding Contact Types</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <h3 className="text-lg font-semibold text-primary">Understanding Contact Types</h3>
+            <p className="text-sm text-secondary mt-1">
               Learn the differences between Prospects, Leads, and Customers
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-muted hover:text-secondary transition-colors"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -1018,78 +1018,78 @@ function ContactTypesHelpModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-            <p className="text-sm font-semibold text-gray-800 mb-1">One status only — never both</p>
-            <p className="text-sm text-gray-600">
+          <div className="bg-surface border border-subtle rounded-xl p-4">
+            <p className="text-sm font-semibold text-primary mb-1">One status only — never both</p>
+            <p className="text-sm text-secondary">
               A contact is either a Prospect, a Lead, or a Customer. These are mutually exclusive stages. A contact cannot be a lead and a prospect at the same time.
             </p>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h4 className="font-semibold text-gray-900 mb-4">Typical Progression</h4>
+          <div className="border-t border-subtle pt-6">
+            <h4 className="font-semibold text-primary mb-4">Typical Progression</h4>
             <div className="flex items-center gap-2 justify-center flex-wrap">
               <div className="flex flex-col items-center">
                 <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-semibold text-sm border border-blue-200">
                   Prospect
                 </div>
-                <p className="text-xs text-gray-500 mt-1">You reach out</p>
+                <p className="text-xs text-muted mt-1">You reach out</p>
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <ArrowRight className="w-5 h-5 text-muted flex-shrink-0" />
               <div className="flex flex-col items-center">
                 <div className="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg font-semibold text-sm border border-amber-200">
                   Lead
                 </div>
-                <p className="text-xs text-gray-500 mt-1">They respond</p>
+                <p className="text-xs text-muted mt-1">They respond</p>
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <ArrowRight className="w-5 h-5 text-muted flex-shrink-0" />
               <div className="flex flex-col items-center">
                 <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold text-sm border border-green-200">
                   Customer
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Deal closes</p>
+                <p className="text-xs text-muted mt-1">Deal closes</p>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h4 className="font-semibold text-gray-900 mb-3">Quick Reference</h4>
+          <div className="border-t border-subtle pt-6">
+            <h4 className="font-semibold text-primary mb-3">Quick Reference</h4>
             <div className="space-y-3">
               <div className="flex gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
                 <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold">P</div>
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">Prospect</p>
-                  <p className="text-xs text-gray-600 mt-0.5">Cold call list, trade show card, referral not yet contacted, outbound campaign target</p>
+                  <p className="font-medium text-primary text-sm">Prospect</p>
+                  <p className="text-xs text-secondary mt-0.5">Cold call list, trade show card, referral not yet contacted, outbound campaign target</p>
                 </div>
               </div>
 
               <div className="flex gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
                 <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center text-xs font-bold">L</div>
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">Lead</p>
-                  <p className="text-xs text-gray-600 mt-0.5">Called in, filled out web form, responded to outreach, asked for a quote, referred by an existing customer</p>
+                  <p className="font-medium text-primary text-sm">Lead</p>
+                  <p className="text-xs text-secondary mt-0.5">Called in, filled out web form, responded to outreach, asked for a quote, referred by an existing customer</p>
                 </div>
               </div>
 
               <div className="flex gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
                 <div className="flex-shrink-0 w-7 h-7 rounded-full bg-green-200 text-green-700 flex items-center justify-center text-xs font-bold">C</div>
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">Customer</p>
-                  <p className="text-xs text-gray-600 mt-0.5">Signed proposal, paid deposit, active project, completed job, or repeat business</p>
+                  <p className="font-medium text-primary text-sm">Customer</p>
+                  <p className="text-xs text-secondary mt-0.5">Signed proposal, paid deposit, active project, completed job, or repeat business</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-4">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-sm text-gray-700">
+          <div className="border-t border-subtle pt-4">
+            <div className="bg-surface border border-subtle rounded-lg p-4">
+              <p className="text-sm text-secondary">
                 <span className="font-semibold">Temperature tracking</span> (On Fire, Hot, Warm, Cold) is available for both Prospects and Leads to help prioritize follow-ups. Customers do not use temperature.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end">
+        <div className="p-6 border-t border-subtle bg-surface flex justify-end">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"

@@ -8,8 +8,6 @@ import { DuplicateProposalModal } from './DuplicateProposalModal';
 import { CreateRevisionModal } from './CreateRevisionModal';
 import { ProposalVersionHistory } from './ProposalVersionHistory';
 import { ManualApprovalModal } from './ManualApprovalModal';
-import DepositReminderButton from './DepositReminderButton';
-import { RecordPaymentModal } from '../Invoices/RecordPaymentModal';
 import { ReactivateProposalModalEnhanced } from './ReactivateProposalModalEnhanced';
 import { DeclineProposalModal } from './DeclineProposalModal';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
@@ -59,8 +57,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [depositPaymentInvoice, setDepositPaymentInvoice] = useState<any>(null);
-  const [loadingDepositInvoice, setLoadingDepositInvoice] = useState<string | null>(null);
   const [pendingDepositSalesOrders, setPendingDepositSalesOrders] = useState<Record<string, string>>({});
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineModalMode, setDeclineModalMode] = useState<'decline' | 'cancel'>('decline');
@@ -488,34 +484,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     setOpenMenuId(null);
   }
 
-  async function handleRecordDepositPayment(proposal: any) {
-    setLoadingDepositInvoice(proposal.id);
-    try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('id, invoice_number, contact_id, total, amount_paid, amount_due')
-        .eq('proposal_id', proposal.id)
-        .eq('invoice_type', 'deposit')
-        .neq('status', 'paid')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setDepositPaymentInvoice(data);
-      } else {
-        alert('No unpaid deposit invoice found for this proposal. The deposit invoice may have already been paid or not yet created.');
-      }
-    } catch (err) {
-      console.error('Error fetching deposit invoice:', err);
-      alert('Failed to load deposit invoice. Please try again.');
-    } finally {
-      setLoadingDepositInvoice(null);
-    }
-  }
-
   async function handleViewActivity(proposal: Proposal) {
     try {
       const { data, error } = await supabase.rpc('get_proposal_activity_summary', {
@@ -557,52 +525,52 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   function getStatusIcon(status: string) {
     switch (status) {
       case 'designing':
-        return <FileEdit size={18} className="text-amber-400" title="Being Designed" />;
+        return <FileEdit size={18} className="text-warning" title="Being Designed" />;
       case 'ready_to_submit':
-        return <ThumbsUp size={18} className="text-cyan-400" title="Ready to Submit" />;
+        return <ThumbsUp size={18} className="text-info" title="Ready to Submit" />;
       case 'sent':
-        return <Send size={18} className="text-blue-400" title="Submitted to Portal" />;
+        return <Send size={18} className="text-info" title="Submitted to Portal" />;
       case 'viewed':
         return <Eye size={18} className="text-purple-400" />;
       case 'approved':
-        return <CheckCircle size={18} className="text-green-400" />;
+        return <CheckCircle size={18} className="text-success" />;
       case 'approved_pending_action':
-        return <AlertCircle size={18} className="text-yellow-400" title="Approved - Pending PO/Deposit" />;
+        return <AlertCircle size={18} className="text-warning" title="Approved - Pending PO/Deposit" />;
       case 'declined':
-        return <XCircle size={18} className="text-red-400" />;
+        return <XCircle size={18} className="text-danger" />;
       case 'expired':
-        return <Clock size={18} className="text-orange-400" title="Expired" />;
+        return <Clock size={18} className="text-attention" title="Expired" />;
       case 'archived':
-        return <Archive size={18} className="text-gray-400" title="Archived" />;
+        return <Archive size={18} className="text-muted" title="Archived" />;
       default:
-        return <FileText size={18} className="text-gray-400" />;
+        return <FileText size={18} className="text-muted" />;
     }
   }
 
   function getStatusColor(status: string) {
     switch (status) {
       case 'designing':
-        return 'bg-amber-900 text-amber-300';
+        return 'bg-warningSoft text-warning';
       case 'ready_to_submit':
-        return 'bg-cyan-900 text-cyan-300';
+        return 'bg-infoSoft text-info';
       case 'sent':
-        return 'bg-blue-900 text-blue-300';
+        return 'bg-infoSoft text-info';
       case 'portal':
-        return 'bg-blue-900 text-blue-300';
+        return 'bg-infoSoft text-info';
       case 'approved':
-        return 'bg-green-900 text-green-300';
+        return 'bg-successSoft text-success';
       case 'approved_pending_action':
-        return 'bg-yellow-900 text-yellow-300';
+        return 'bg-warningSoft text-warning';
       case 'declined':
-        return 'bg-red-900 text-red-300';
+        return 'bg-dangerSoft text-danger';
       case 'cancelled':
-        return 'bg-gray-700 text-gray-400';
+        return 'bg-elevated text-muted';
       case 'expired':
-        return 'bg-orange-900 text-orange-300';
+        return 'bg-attentionSoft text-attention';
       case 'archived':
-        return 'bg-gray-700 text-gray-400';
+        return 'bg-elevated text-muted';
       default:
-        return 'bg-gray-700 text-gray-300';
+        return 'bg-elevated text-secondary';
     }
   }
 
@@ -684,7 +652,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       if (days < STALE_DAYS) return null;
       return {
         label: `Stale ${days}d`,
-        className: 'bg-amber-900/70 text-amber-300 border border-amber-800',
+        className: 'bg-warningSoft text-warning border border-warningLine',
         title: `Not updated in ${days} days — needs attention or cleanup`,
       };
     }
@@ -693,9 +661,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     if (!activeStatuses.includes(proposal.status)) return null;
     const days = getProposalAgeDays(proposal);
     if (days < 14) return null;
-    if (days >= 60) return { label: `${days}d`, className: 'bg-red-900/70 text-red-300 border border-red-800', title: `${days} days old — needs follow-up` };
-    if (days >= 30) return { label: `${days}d`, className: 'bg-orange-900/70 text-orange-300 border border-orange-800', title: `${days} days old — needs follow-up` };
-    return { label: `${days}d`, className: 'bg-yellow-900/70 text-yellow-300 border border-yellow-800', title: `${days} days old — needs follow-up` };
+    if (days >= 60) return { label: `${days}d`, className: 'bg-dangerSoft text-danger border border-danger', title: `${days} days old — needs follow-up` };
+    if (days >= 30) return { label: `${days}d`, className: 'bg-attentionSoft text-attention border border-attention', title: `${days} days old — needs follow-up` };
+    return { label: `${days}d`, className: 'bg-warningSoft text-warning border border-warningLine', title: `${days} days old — needs follow-up` };
   }
 
   function getLastViewedAt(proposal: any): Date | null {
@@ -736,14 +704,14 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     return (
       <div className="space-y-1">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="p-3 bg-gray-800 border border-gray-700 rounded-lg animate-pulse">
+          <div key={i} className="p-3 bg-surface border border-subtle rounded-lg animate-pulse">
             <div className="flex items-center gap-3">
-              <div className="w-5 h-5 bg-gray-700 rounded"></div>
+              <div className="w-5 h-5 bg-elevated rounded"></div>
               <div className="flex-1">
-                <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                <div className="h-4 bg-elevated rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-elevated rounded w-1/2"></div>
               </div>
-              <div className="w-24 h-6 bg-gray-700 rounded"></div>
+              <div className="w-24 h-6 bg-elevated rounded"></div>
             </div>
           </div>
         ))}
@@ -753,10 +721,10 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
   if (authLoading) {
     return (
-      <div className="h-full flex flex-col bg-gray-900">
-        <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-4 sm:px-6 py-4">
-          <div className="h-6 bg-gray-700 rounded w-32 mb-4 animate-pulse"></div>
-          <div className="h-10 bg-gray-700 rounded animate-pulse"></div>
+      <div className="h-full flex flex-col bg-canvas">
+        <div className="flex-shrink-0 border-b border-subtle bg-surface px-4 sm:px-6 py-4">
+          <div className="h-6 bg-elevated rounded w-32 mb-4 animate-pulse"></div>
+          <div className="h-10 bg-elevated rounded animate-pulse"></div>
         </div>
         <div className="flex-1 px-3 sm:px-6 py-4">
           <LoadingSkeleton />
@@ -768,12 +736,12 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   // Show error state with retry button
   if (error && !loading) {
     return (
-      <div className="h-full flex flex-col bg-gray-900">
+      <div className="h-full flex flex-col bg-canvas">
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center max-w-md">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">Failed to Load Proposals</h3>
-            <p className="text-gray-400 mb-6">{error}</p>
+            <h3 className="text-lg font-semibold text-primary mb-2">Failed to Load Proposals</h3>
+            <p className="text-muted mb-6">{error}</p>
             <button
               onClick={() => {
                 setError(null);
@@ -796,32 +764,32 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col bg-canvas">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800">
+      <div className="flex-shrink-0 border-b border-subtle bg-surface">
         <div className="px-4 sm:px-6 py-4">
           {/* Mobile: Title on first row, everything else below */}
           <div className="sm:hidden space-y-2.5">
             <div className="flex items-center justify-between gap-2">
-              <h1 className="text-lg font-bold text-white">Proposals</h1>
+              <h1 className="text-lg font-bold text-primary">Proposals</h1>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => onNavigateToSalesOrders?.()}
-                  className="p-2.5 min-h-[44px] min-w-[44px] bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white rounded-lg flex items-center justify-center transition-colors"
+                  className="p-2.5 min-h-[44px] min-w-[44px] bg-elevated hover:bg-strong/25 active:bg-strong/30 text-primary rounded-lg flex items-center justify-center transition-colors"
                   title="Sales Orders"
                 >
                   <ShoppingCart size={16} />
                 </button>
                 <button
                   onClick={() => onNavigateToSalesStats?.()}
-                  className="p-2.5 min-h-[44px] min-w-[44px] bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white rounded-lg flex items-center justify-center transition-colors"
+                  className="p-2.5 min-h-[44px] min-w-[44px] bg-elevated hover:bg-strong/25 active:bg-strong/30 text-primary rounded-lg flex items-center justify-center transition-colors"
                   title="My Sales Stats"
                 >
                   <BarChart2 size={16} />
                 </button>
                 <button
                   onClick={() => onOpenVideoLibrary?.()}
-                  className="p-2.5 min-h-[44px] min-w-[44px] bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white rounded-lg flex items-center justify-center transition-colors"
+                  className="p-2.5 min-h-[44px] min-w-[44px] bg-elevated hover:bg-strong/25 active:bg-strong/30 text-primary rounded-lg flex items-center justify-center transition-colors"
                   title="Video Library"
                 >
                   <Film size={16} />
@@ -837,19 +805,19 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             </div>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={16} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search..."
-                  className="w-full pl-9 pr-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+                  className="w-full pl-9 pr-3 py-2.5 bg-canvas border border-subtle rounded-lg text-primary text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                 />
               </div>
               <div className="relative">
                 <button
                   onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  className="filter-button px-3 py-2.5 bg-gray-900 border border-gray-700 hover:bg-gray-800 active:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 min-h-[44px]"
+                  className="filter-button px-3 py-2.5 bg-canvas border border-subtle hover:bg-surface active:bg-elevated text-primary rounded-lg text-sm font-medium transition-colors flex items-center gap-2 min-h-[44px]"
                 >
                   <Filter size={16} />
                   {getActiveFilterCount() > 0 && (
@@ -861,13 +829,13 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                 {/* Filter Panel Dropdown - shared for mobile and desktop */}
                 {showFilterPanel && (
-                  <div className="filter-panel absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                  <div className="filter-panel absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:w-80 bg-surface border border-subtle rounded-lg shadow-xl z-50">
                     {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-gray-700">
-                      <h3 className="text-sm font-semibold text-white">Filter Proposals</h3>
+                    <div className="flex items-center justify-between p-4 border-b border-subtle">
+                      <h3 className="text-sm font-semibold text-primary">Filter Proposals</h3>
                       <button
                         onClick={() => setShowFilterPanel(false)}
-                        className="text-gray-400 hover:text-white transition-colors"
+                        className="text-muted hover:text-primary transition-colors"
                       >
                         <X size={18} />
                       </button>
@@ -877,11 +845,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
                       {/* Status Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Status</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Status</label>
                         <select
                           value={filterStatus}
                           onChange={(e) => setFilterStatus(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="all">All Status</option>
                           <option value="designing">Designing</option>
@@ -897,11 +865,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                       {/* Expiration Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Expiration</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Expiration</label>
                         <select
                           value={showExpired}
                           onChange={(e) => setShowExpired(e.target.value as 'all' | 'active' | 'expired')}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="all">All</option>
                           <option value="active">Active Only</option>
@@ -911,7 +879,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                       {/* Sort */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Sort By</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Sort By</label>
                         <select
                           value={`${sortField}-${sortDirection}`}
                           onChange={(e) => {
@@ -919,7 +887,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             setSortField(field as SortField);
                             setSortDirection(direction as SortDirection);
                           }}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="created_at-desc">Newest First</option>
                           <option value="created_at-asc">Oldest First</option>
@@ -934,7 +902,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                       {/* Visibility Options */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Visibility</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Visibility</label>
                         <div className="space-y-2">
                           <label className="flex items-center gap-2 cursor-pointer group">
                             <input
@@ -945,9 +913,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setHideDeclined(newValue);
                                 savePreference('proposals_hide_declined', newValue);
                               }}
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                              className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-300 group-hover:text-white">Hide Declined Proposals</span>
+                            <span className="text-sm text-secondary group-hover:text-primary">Hide Declined Proposals</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer group">
                             <input
@@ -958,9 +926,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setHideArchived(newValue);
                                 savePreference('proposals_hide_archived', newValue);
                               }}
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                              className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-300 group-hover:text-white">Hide Archived Proposals</span>
+                            <span className="text-sm text-secondary group-hover:text-primary">Hide Archived Proposals</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer group">
                             <input
@@ -971,9 +939,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setHideApproved(newValue);
                                 savePreference('proposals_hide_approved', newValue);
                               }}
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                              className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-300 group-hover:text-white">Hide Approved Proposals</span>
+                            <span className="text-sm text-secondary group-hover:text-primary">Hide Approved Proposals</span>
                           </label>
                         </div>
                       </div>
@@ -981,11 +949,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {/* Sales Rep Filter — admin / manager / sales_manager only */}
                       {isAdminOrManager && salesReps.length > 0 && (
                         <div>
-                          <label className="block text-xs font-medium text-gray-400 mb-2">Sales Rep</label>
+                          <label className="block text-xs font-medium text-muted mb-2">Sales Rep</label>
                           <select
                             value={selectedRepId ?? ''}
                             onChange={(e) => setSelectedRepId(e.target.value || null)}
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm mb-3"
+                            className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm mb-3"
                           >
                             <option value="">All Reps</option>
                             {salesReps.map(rep => (
@@ -999,7 +967,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 border-t border-gray-700 flex items-center justify-between">
+                    <div className="p-4 border-t border-subtle flex items-center justify-between">
                       <button
                         onClick={() => {
                           setFilterStatus('all');
@@ -1013,7 +981,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           savePreference('proposals_hide_archived', false);
                           savePreference('proposals_hide_approved', true);
                         }}
-                        className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                        className="px-3 py-1.5 text-sm text-muted hover:text-primary transition-colors"
                       >
                         Clear All
                       </button>
@@ -1031,28 +999,28 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => window.open('/proposals-fullscreen', '_blank', 'width=1400,height=900')}
-                className="px-2 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
+                className="px-2 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
                 title="Pop out proposals"
               >
                 <Maximize2 size={16} />
               </button>
               <button
                 onClick={() => onNavigateToSalesOrders?.()}
-                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
+                className="px-3 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
                 title="Sales Orders"
               >
                 <ShoppingCart size={16} />
               </button>
               <button
                 onClick={() => onNavigateToSalesStats?.()}
-                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
+                className="px-3 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
                 title="My Sales Stats"
               >
                 <BarChart2 size={16} />
               </button>
               <button
                 onClick={() => onOpenVideoLibrary?.()}
-                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
+                className="px-3 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
                 title="Video Library"
               >
                 <Film size={16} />
@@ -1069,23 +1037,23 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
           {/* Desktop: Everything on one row */}
           <div className="hidden sm:flex items-center justify-between gap-3">
-            <h1 className="text-xl font-bold text-white whitespace-nowrap">Proposals</h1>
+            <h1 className="text-xl font-bold text-primary whitespace-nowrap">Proposals</h1>
 
             <div className="flex items-center gap-2 flex-1 max-w-md">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={16} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search proposals..."
-                  className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-9 pr-3 py-2 bg-canvas border border-subtle rounded-lg text-primary text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="relative">
                 <button
                   onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  className="filter-button px-3 py-2 bg-gray-900 border border-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
+                  className="filter-button px-3 py-2 bg-canvas border border-subtle hover:bg-surface text-primary rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
                 >
                   <Filter size={16} />
                   <span>Filters</span>
@@ -1098,13 +1066,13 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                 {/* Filter Panel Dropdown - shared */}
                 {showFilterPanel && (
-                  <div className="filter-panel absolute right-0 top-full mt-2 w-screen max-w-[320px] sm:w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                  <div className="filter-panel absolute right-0 top-full mt-2 w-screen max-w-[320px] sm:w-80 bg-surface border border-subtle rounded-lg shadow-xl z-50">
                     {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-gray-700">
-                      <h3 className="text-sm font-semibold text-white">Filter Proposals</h3>
+                    <div className="flex items-center justify-between p-4 border-b border-subtle">
+                      <h3 className="text-sm font-semibold text-primary">Filter Proposals</h3>
                       <button
                         onClick={() => setShowFilterPanel(false)}
-                        className="text-gray-400 hover:text-white transition-colors"
+                        className="text-muted hover:text-primary transition-colors"
                       >
                         <X size={18} />
                       </button>
@@ -1114,11 +1082,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
                       {/* Status Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Status</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Status</label>
                         <select
                           value={filterStatus}
                           onChange={(e) => setFilterStatus(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="all">All Status</option>
                           <option value="designing">Designing</option>
@@ -1134,11 +1102,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                       {/* Expiration Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Expiration</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Expiration</label>
                         <select
                           value={showExpired}
                           onChange={(e) => setShowExpired(e.target.value as 'all' | 'active' | 'expired')}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="all">All</option>
                           <option value="active">Active Only</option>
@@ -1148,7 +1116,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                       {/* Sort */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Sort By</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Sort By</label>
                         <select
                           value={`${sortField}-${sortDirection}`}
                           onChange={(e) => {
@@ -1156,7 +1124,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             setSortField(field as SortField);
                             setSortDirection(direction as SortDirection);
                           }}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="created_at-desc">Newest First</option>
                           <option value="created_at-asc">Oldest First</option>
@@ -1171,7 +1139,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                       {/* Visibility Options */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Visibility</label>
+                        <label className="block text-xs font-medium text-muted mb-2">Visibility</label>
                         <div className="space-y-2">
                           <label className="flex items-center gap-2 cursor-pointer group">
                             <input
@@ -1182,9 +1150,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setHideDeclined(newValue);
                                 savePreference('proposals_hide_declined', newValue);
                               }}
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                              className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-300 group-hover:text-white">Hide Declined Proposals</span>
+                            <span className="text-sm text-secondary group-hover:text-primary">Hide Declined Proposals</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer group">
                             <input
@@ -1195,9 +1163,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setHideArchived(newValue);
                                 savePreference('proposals_hide_archived', newValue);
                               }}
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                              className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-300 group-hover:text-white">Hide Archived Proposals</span>
+                            <span className="text-sm text-secondary group-hover:text-primary">Hide Archived Proposals</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer group">
                             <input
@@ -1208,9 +1176,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setHideApproved(newValue);
                                 savePreference('proposals_hide_approved', newValue);
                               }}
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                              className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-300 group-hover:text-white">Hide Approved Proposals</span>
+                            <span className="text-sm text-secondary group-hover:text-primary">Hide Approved Proposals</span>
                           </label>
                         </div>
                       </div>
@@ -1218,11 +1186,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {/* Sales Rep Filter — admin / manager / sales_manager only */}
                       {isAdminOrManager && salesReps.length > 0 && (
                         <div>
-                          <label className="block text-xs font-medium text-gray-400 mb-2">Sales Rep</label>
+                          <label className="block text-xs font-medium text-muted mb-2">Sales Rep</label>
                           <select
                             value={selectedRepId ?? ''}
                             onChange={(e) => setSelectedRepId(e.target.value || null)}
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm mb-3"
+                            className="w-full px-3 py-2 bg-canvas border border-subtle text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm mb-3"
                           >
                             <option value="">All Reps</option>
                             {salesReps.map(rep => (
@@ -1236,7 +1204,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 border-t border-gray-700 flex items-center justify-between">
+                    <div className="p-4 border-t border-subtle flex items-center justify-between">
                       <button
                         onClick={() => {
                           setFilterStatus('all');
@@ -1250,7 +1218,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           savePreference('proposals_hide_archived', false);
                           savePreference('proposals_hide_approved', true);
                         }}
-                        className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                        className="px-3 py-1.5 text-sm text-muted hover:text-primary transition-colors"
                       >
                         Clear All
                       </button>
@@ -1269,14 +1237,14 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             <div className="flex items-center gap-2">
               <button
                 onClick={() => window.open('/proposals-fullscreen', '_blank', 'width=1400,height=900')}
-                className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="p-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg transition-colors"
                 title="Pop out proposals"
               >
                 <Maximize2 size={16} />
               </button>
               <button
                 onClick={() => onNavigateToSalesOrders?.()}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
+                className="px-4 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
                 title="Sales Orders"
               >
                 <ShoppingCart size={18} />
@@ -1284,7 +1252,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
               </button>
               <button
                 onClick={() => onNavigateToSalesStats?.()}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
+                className="px-4 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
                 title="My Sales Stats"
               >
                 <BarChart2 size={18} />
@@ -1292,7 +1260,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
               </button>
               <button
                 onClick={() => onOpenVideoLibrary?.()}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
+                className="px-4 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
                 title="Video Library"
               >
                 <Film size={18} />
@@ -1312,20 +1280,33 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       {/* Compact Results Count */}
       {!loading && (
-        <div className="flex-shrink-0 px-3 sm:px-6 py-1.5 bg-gray-850 border-b border-gray-700 flex items-center justify-between">
-          <span className="text-xs text-gray-400">
-            Showing {totalCount > 0 ? startIndex + 1 : 0}-{endIndex} of {totalCount} {totalCount === 1 ? 'proposal' : 'proposals'}
-            {searchQuery && ` matching "${searchQuery}"`}
-          </span>
+        <div className="flex-shrink-0 px-3 sm:px-6 py-1.5 bg-canvas border-b border-subtle flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+            <span className="text-xs text-muted whitespace-nowrap">
+              Showing {totalCount > 0 ? startIndex + 1 : 0}-{endIndex} of {totalCount} {totalCount === 1 ? 'proposal' : 'proposals'}
+              {searchQuery && ` matching "${searchQuery}"`}
+            </span>
+            {pendingDeposits.length > 0 && (
+              <button
+                type="button"
+                aria-expanded={showPendingDeposits}
+                onClick={() => setShowPendingDeposits(!showPendingDeposits)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-warning hover:underline whitespace-nowrap"
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+                {pendingDeposits.length} Awaiting Deposit
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline text-xs text-gray-400">Per page:</span>
+            <span className="hidden sm:inline text-xs text-muted">Per page:</span>
             <select
               value={itemsPerPage}
               onChange={(e) => {
                 setItemsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="text-xs bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-xs bg-elevated border border-strong text-primary rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -1336,82 +1317,44 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       )}
 
       {/* Pending Deposits Alert Section */}
-      {pendingDeposits.length > 0 && (
-        <div className="flex-shrink-0 px-3 sm:px-6 py-2 bg-yellow-900/20 border-b border-yellow-800/30">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-              <span className="text-xs font-semibold text-yellow-400">
-                {pendingDeposits.length} Awaiting Deposit
-              </span>
-            </div>
-            <button
-              onClick={() => setShowPendingDeposits(!showPendingDeposits)}
-              className="text-xs text-yellow-400 hover:text-yellow-300 font-medium whitespace-nowrap py-1 px-2 -mr-1"
-            >
-              {showPendingDeposits ? 'Hide' : 'Show'}
-            </button>
-          </div>
-
-          {showPendingDeposits && (
-            <div className="mt-1.5 space-y-0">
+      {showPendingDeposits && pendingDeposits.length > 0 && (
+        <div className="flex-shrink-0 px-3 sm:px-6 bg-warningSoft border-b border-warningLine/60">
+          <div className="space-y-0">
               {pendingDeposits.map(proposal => (
-                <div key={proposal.id} className="flex items-center gap-2 py-2 border-t border-yellow-800/20">
-                  <button
-                    onClick={() => {
-                      const salesOrderId = pendingDepositSalesOrders[proposal.id];
-                      if (salesOrderId && onSelectSalesOrder) {
-                        onSelectSalesOrder(salesOrderId);
-                      } else {
-                        onSelectProposal(proposal.id);
-                      }
-                    }}
-                    className="text-xs font-medium text-yellow-300 hover:text-yellow-200 active:text-yellow-100 flex items-center gap-1 min-w-0 flex-1 py-1"
-                    title={pendingDepositSalesOrders[proposal.id] ? 'Open Sales Order' : 'Open Proposal'}
-                  >
-                    <span className="flex flex-col items-start min-w-0">
-                      <span className="text-sm font-semibold text-yellow-200 truncate max-w-full leading-tight">
-                        {proposal.contacts?.full_name || 'Unknown'}
-                      </span>
-                      <span className="text-xs text-yellow-400/70 font-normal truncate max-w-full leading-tight flex items-center gap-1">
-                        {proposal.proposal_number}{proposal.title ? ` — ${proposal.title}` : ''}
-                        {pendingDepositSalesOrders[proposal.id] && (
-                          <ExternalLink size={9} className="opacity-60 flex-shrink-0" />
-                        )}
-                      </span>
+                <div key={proposal.id} className="py-2 border-t border-warningLine/60 first:border-t-0">
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <button
+                        onClick={() => {
+                          const salesOrderId = pendingDepositSalesOrders[proposal.id];
+                          if (salesOrderId && onSelectSalesOrder) onSelectSalesOrder(salesOrderId);
+                          else onSelectProposal(proposal.id);
+                        }}
+                        className="flex flex-col items-start min-w-0 max-w-full text-left hover:underline"
+                        title={pendingDepositSalesOrders[proposal.id] ? 'Open Sales Order' : 'Open Proposal'}
+                      >
+                        <span className="customer-link text-sm font-semibold truncate max-w-full leading-tight">
+                          {proposal.contacts?.full_name || 'Unknown'}
+                        </span>
+                        <span className="text-xs text-warning font-normal truncate max-w-full leading-tight flex items-center gap-1">
+                          {proposal.proposal_number}{proposal.title ? ` — ${proposal.title}` : ''}
+                          {pendingDepositSalesOrders[proposal.id] && <ExternalLink size={9} className="opacity-60 flex-shrink-0" />}
+                        </span>
+                      </button>
+                    </div>
+                    <span className="text-xs text-warning font-semibold flex-shrink-0 flex items-center gap-0.5 whitespace-nowrap">
+                      <DollarSign size={10} />
+                      {proposal.deposit_amount_due?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
-                  </button>
-                  <span className="text-xs text-yellow-400 font-semibold flex-shrink-0 flex items-center gap-0.5 whitespace-nowrap">
-                    <DollarSign size={10} />
-                    {proposal.deposit_amount_due?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </span>
-                  {proposal.approval_completed_at && (
-                    <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:inline">
-                      {new Date(proposal.approval_completed_at).toLocaleDateString()}
-                    </span>
-                  )}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => handleRecordDepositPayment(proposal)}
-                      disabled={loadingDepositInvoice === proposal.id}
-                      className="flex items-center justify-center w-8 h-8 bg-green-700 hover:bg-green-600 active:bg-green-800 disabled:opacity-50 text-white rounded-lg transition-colors flex-shrink-0"
-                      title={loadingDepositInvoice === proposal.id ? 'Loading...' : 'Record deposit payment'}
-                    >
-                      <DollarSign size={14} />
-                    </button>
-                    <DepositReminderButton
-                      proposalId={proposal.id}
-                      proposalNumber={proposal.proposal_number}
-                      depositAmount={proposal.deposit_amount_due || 0}
-                      reminderCount={proposal.deposit_reminder_count || 0}
-                      lastReminderSent={proposal.last_deposit_reminder_sent_at}
-                      customerName={proposal.contacts?.full_name}
-                    />
+                    {proposal.approval_completed_at && (
+                      <span className="text-xs text-muted flex-shrink-0 hidden sm:inline">
+                        {new Date(proposal.approval_completed_at).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
-            </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -1422,7 +1365,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         ) : totalCount === 0 ? (
           <div className="text-center py-12">
             <FileText size={48} className="mx-auto text-gray-600 mb-4" />
-            <p className="text-gray-400 mb-4">
+            <p className="text-muted mb-4">
               {searchQuery
                 ? `No proposals matching "${searchQuery}"`
                 : filterStatus === 'all'
@@ -1445,12 +1388,12 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             {proposals.map(proposal => (
             <div
               key={proposal.id}
-              className={`relative p-3 sm:p-3.5 bg-gray-800 border rounded-lg hover:bg-gray-750 transition-colors overflow-visible ${
+              className={`relative p-3 sm:p-3.5 bg-surface border rounded-lg hover:bg-elevated transition-colors overflow-visible ${
                 isExpired(proposal)
                   ? 'border-red-900/50 bg-red-950/5'
                   : isStale(proposal)
                   ? 'border-amber-900/40 bg-amber-950/5'
-                  : 'border-gray-700'
+                  : 'border-subtle'
               } ${openMenuId === proposal.id ? 'z-[100]' : 'z-0'}`}
             >
               {/* Mobile: Stacked Layout */}
@@ -1467,17 +1410,17 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         {(proposal.contacts as any)?.id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
-                            className="text-sm font-bold text-blue-400 hover:text-blue-300 leading-snug truncate min-w-0 flex-1 text-left transition-colors"
+                            className="text-sm font-bold customer-link leading-snug truncate min-w-0 flex-1 text-left transition-colors"
                           >
                             {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
                           </button>
                         ) : (
-                          <p className="text-sm font-bold text-white leading-snug truncate min-w-0 flex-1">
+                          <p className="text-sm font-bold text-primary leading-snug truncate min-w-0 flex-1">
                             {proposal.contacts?.full_name || (proposal.contacts as any)?.contact_name || 'No Customer'}
                           </p>
                         )}
                         {(proposal.revision_count && proposal.revision_count > 1) && (
-                          <span className="flex-shrink-0 px-1.5 h-4 bg-blue-900 text-blue-200 text-[10px] font-medium rounded flex items-center">
+                          <span className="flex-shrink-0 px-1.5 h-4 bg-infoSoft text-info text-[10px] font-medium rounded flex items-center">
                             R:{proposal.revision_count}
                           </span>
                         )}
@@ -1496,19 +1439,19 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       </div>
                       {/* Title row */}
                       <div className="min-w-0 mb-0.5">
-                        <p className="text-xs text-gray-300 truncate leading-snug">{getDisplayTitle(proposal)}</p>
+                        <p className="text-xs text-secondary truncate leading-snug">{getDisplayTitle(proposal)}</p>
                       </div>
                       {/* Bill-To badge */}
                       {proposal.bill_to_contact_id && proposal.bill_to_contact && (
                         <div className="flex items-center gap-1 mb-0.5">
-                          <span className="text-[10px] text-amber-400 font-medium truncate max-w-[200px] flex items-center gap-1">
+                          <span className="text-[10px] text-warning font-medium truncate max-w-[200px] flex items-center gap-1">
                             <Receipt size={9} className="flex-shrink-0" />
                             Billed to: {(proposal.bill_to_contact as any).company_name || (proposal.bill_to_contact as any).full_name}
                           </span>
                         </div>
                       )}
                       {/* Meta row */}
-                      <div className="text-xs text-gray-500 flex items-center flex-wrap gap-x-2 gap-y-0.5">
+                      <div className="text-xs text-muted flex items-center flex-wrap gap-x-2 gap-y-0.5">
                         <span className="font-mono">{proposal.proposal_number}</span>
                         {proposal.profiles?.full_name && (
                           <span className="truncate max-w-[120px]">{proposal.profiles.full_name}</span>
@@ -1521,7 +1464,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           </span>
                         )}
                         {proposal.expires_at && (proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'declined' || proposal.status === 'expired') && (
-                          <span className={`flex items-center gap-0.5 ${isExpired(proposal) ? 'text-red-400' : ''}`}>
+                          <span className={`flex items-center gap-0.5 ${isExpired(proposal) ? 'text-danger' : ''}`}>
                             <Clock size={9} className="flex-shrink-0" />
                             {formatDate(proposal.expires_at)}
                           </span>
@@ -1530,16 +1473,16 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     </div>
                   </div>
                 </button>
-                <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-700/60 min-w-0">
+                <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-subtle/60 min-w-0">
                   <div className="flex items-center gap-1 flex-wrap min-w-0 flex-1">
                     {/* Portal visibility pill */}
                     {(proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'declined' || proposal.status === 'expired') && (
                       proposal.is_portal_visible ? (
-                        <span className="h-5 px-1.5 bg-green-900/50 text-green-300 text-[10px] font-medium rounded flex items-center gap-0.5 whitespace-nowrap" title="Visible on portal">
+                        <span className="h-5 px-1.5 bg-successSoft text-success text-[10px] font-medium rounded flex items-center gap-0.5 whitespace-nowrap" title="Visible on portal">
                           <Globe size={9} />
                         </span>
                       ) : (
-                        <span className="h-5 px-1.5 bg-gray-700 text-gray-400 text-[10px] font-medium rounded flex items-center gap-0.5 whitespace-nowrap" title="Hidden from portal">
+                        <span className="h-5 px-1.5 bg-elevated text-muted text-[10px] font-medium rounded flex items-center gap-0.5 whitespace-nowrap" title="Hidden from portal">
                           <EyeOff size={9} />
                         </span>
                       )
@@ -1560,14 +1503,14 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     })()}
                     {/* View count badge */}
                     {getViewCount(proposal) > 0 && (
-                      <span className="h-5 px-1.5 rounded text-[10px] font-medium whitespace-nowrap bg-blue-900/50 text-blue-300 flex items-center gap-1">
+                      <span className="h-5 px-1.5 rounded text-[10px] font-medium whitespace-nowrap bg-infoSoft text-info flex items-center gap-1">
                         <Eye size={9} />
                         {getViewCount(proposal)}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <div className="text-sm font-bold text-white whitespace-nowrap">
+                    <div className="text-sm font-bold text-primary whitespace-nowrap">
                       ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                     <div className="relative">
@@ -1577,13 +1520,13 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           setMenuOpenAbove(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 320);
                           setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
                         }}
-                        className="menu-button p-2.5 min-w-[44px] min-h-[44px] text-gray-400 hover:text-white hover:bg-gray-700 active:bg-gray-600 rounded-lg transition-colors flex items-center justify-center"
+                        className="menu-button p-2.5 min-w-[44px] min-h-[44px] text-muted hover:text-primary hover:bg-elevated active:bg-strong/30 rounded-lg transition-colors flex items-center justify-center"
                         data-menu-id={proposal.id}
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
                       {openMenuId === proposal.id && (
-                        <div className={`menu-dropdown absolute right-0 w-52 max-w-[calc(100vw-1rem)] bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-[200] max-h-[80vh] overflow-y-auto ${menuOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                        <div className={`menu-dropdown absolute right-0 w-52 max-w-[calc(100vw-1rem)] bg-elevated border border-strong rounded-lg shadow-xl z-[200] max-h-[80vh] overflow-y-auto ${menuOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                           {proposal.status === 'expired' && (
                             <button
                               onClick={(e) => {
@@ -1592,7 +1535,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setShowReactivateModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-orange-400 hover:bg-gray-600 hover:text-orange-300 transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RotateCcw className="w-4 h-4 flex-shrink-0" />
                               Reactivate Proposal
@@ -1604,7 +1547,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleRefreshProposal(proposal.id);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-amber-400 hover:bg-gray-600 hover:text-amber-300 transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RefreshCw className="w-4 h-4 flex-shrink-0" />
                               Mark as Active
@@ -1618,7 +1561,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setShowManualApprovalModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-green-400 hover:bg-gray-600 hover:text-green-300 transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-success hover:bg-strong/25 hover:text-success transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <ThumbsUp className="w-4 h-4 flex-shrink-0" />
                               Manual Approve
@@ -1630,7 +1573,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleRecallProposal(proposal.id, proposal.status);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-amber-400 hover:bg-gray-600 hover:text-amber-300 transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RotateCcw className="w-4 h-4 flex-shrink-0" />
                               Recall from Portal
@@ -1645,7 +1588,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setShowDeclineModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-gray-600 hover:text-red-300 transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-danger hover:bg-strong/25 hover:text-danger transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <XCircle className="w-4 h-4 flex-shrink-0" />
                               Mark as Declined
@@ -1660,7 +1603,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 setShowDeclineModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-gray-400 hover:bg-gray-600 hover:text-gray-300 transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-muted hover:bg-strong/25 hover:text-secondary transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <Ban className="w-4 h-4 flex-shrink-0" />
                               Cancel Proposal
@@ -1672,7 +1615,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleViewActivity(proposal);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-gray-600 hover:text-blue-300 transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-info hover:bg-strong/25 hover:text-info transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <Activity className="w-4 h-4 flex-shrink-0" />
                               Proposal Activity
@@ -1683,7 +1626,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handlePopOutProposal(proposal.id);
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                            className="w-full px-4 py-3 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2.5 border-b border-strong"
                           >
                             <Maximize2 className="w-4 h-4 flex-shrink-0" />
                             Pop Out
@@ -1695,7 +1638,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowDuplicateModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                            className="w-full px-4 py-3 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2.5 border-b border-strong"
                           >
                             <Copy className="w-4 h-4 flex-shrink-0" />
                             Duplicate
@@ -1707,7 +1650,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowVersionHistory(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                            className="w-full px-4 py-3 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2.5 border-b border-strong"
                           >
                             <History className="w-4 h-4 flex-shrink-0" />
                             Version History
@@ -1718,7 +1661,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleUnarchiveProposal(proposal);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <ArchiveRestore className="w-4 h-4 flex-shrink-0" />
                               Unarchive
@@ -1729,7 +1672,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                                 e.stopPropagation();
                                 handleArchiveProposal(proposal);
                               }}
-                              className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2.5 border-b border-gray-600"
+                              className="w-full px-4 py-3 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <Archive className="w-4 h-4 flex-shrink-0" />
                               Archive
@@ -1741,7 +1684,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               handleDeleteProposal(proposal.id);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-gray-600 hover:text-red-300 transition-colors flex items-center gap-2.5 rounded-b-lg"
+                            className="w-full px-4 py-3 text-left text-sm text-danger hover:bg-strong/25 hover:text-danger transition-colors flex items-center gap-2.5 rounded-b-lg"
                           >
                             <Trash2 className="w-4 h-4 flex-shrink-0" />
                             Delete
@@ -1766,19 +1709,19 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {(proposal.contacts as any)?.id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
-                          className="text-sm font-bold text-blue-400 hover:text-blue-300 flex-shrink-0 max-w-[35%] truncate text-left transition-colors"
+                          className="text-sm font-bold customer-link flex-shrink-0 max-w-[35%] truncate text-left transition-colors"
                         >
                           {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
                         </button>
                       ) : (
-                        <span className="text-sm font-bold text-white flex-shrink-0 max-w-[35%] truncate">
+                        <span className="text-sm font-bold text-primary flex-shrink-0 max-w-[35%] truncate">
                           {proposal.contacts?.full_name || (proposal.contacts as any)?.contact_name || 'No Customer'}
                         </span>
                       )}
-                      <span className="text-gray-500 flex-shrink-0 text-xs">—</span>
-                      <h3 className="text-sm text-gray-300 truncate flex-1 min-w-0">{getDisplayTitle(proposal)}</h3>
+                      <span className="text-muted flex-shrink-0 text-xs">—</span>
+                      <h3 className="text-sm text-secondary truncate flex-1 min-w-0">{getDisplayTitle(proposal)}</h3>
                       {(proposal.revision_count && proposal.revision_count > 1) && (
-                        <span className="px-1.5 py-0.5 bg-blue-900 text-blue-200 text-[10px] font-medium rounded whitespace-nowrap flex-shrink-0">
+                        <span className="px-1.5 py-0.5 bg-infoSoft text-info text-[10px] font-medium rounded whitespace-nowrap flex-shrink-0">
                           R:{proposal.revision_count}
                         </span>
                       )}
@@ -1794,19 +1737,19 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             e.stopPropagation();
                             handleViewActivity(proposal);
                           }}
-                          className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer flex-shrink-0"
+                          className="px-2 py-0.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium rounded flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer flex-shrink-0"
                         >
                           <Bell size={12} />
                           New Activity
                         </button>
                       )}
                     </div>
-                    <div className="text-xs text-gray-400 flex items-center gap-2 overflow-hidden">
-                      <span className="whitespace-nowrap font-mono text-gray-500 text-[11px]">{proposal.proposal_number}</span>
+                    <div className="text-xs text-muted flex items-center gap-2 overflow-hidden">
+                      <span className="whitespace-nowrap font-mono text-muted text-[11px]">{proposal.proposal_number}</span>
                       {proposal.bill_to_contact_id && proposal.bill_to_contact && (
                         <>
                           <span className="flex-shrink-0">•</span>
-                          <span className="whitespace-nowrap flex-shrink-0 flex items-center gap-1 text-amber-400">
+                          <span className="whitespace-nowrap flex-shrink-0 flex items-center gap-1 text-warning">
                             <Receipt size={10} />
                             Billed to: {(proposal.bill_to_contact as any).company_name || (proposal.bill_to_contact as any).full_name}
                           </span>
@@ -1832,7 +1775,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       {proposal.expires_at && (proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'declined' || proposal.status === 'expired') && (
                         <>
                           <span className="flex-shrink-0">•</span>
-                          <span className={`whitespace-nowrap flex-shrink-0 flex items-center gap-1 ${isExpired(proposal) ? 'text-red-400' : ''}`}>
+                          <span className={`whitespace-nowrap flex-shrink-0 flex items-center gap-1 ${isExpired(proposal) ? 'text-danger' : ''}`}>
                             <Clock size={10} />
                             Expires: {formatDate(proposal.expires_at)}
                           </span>
@@ -1847,7 +1790,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   {/* Status + aging badges — fixed width so price never shifts */}
                   <div className="w-40 flex justify-end items-center gap-1.5">
                     {getViewCount(proposal) > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap bg-blue-900/50 text-blue-300 flex items-center gap-0.5 flex-shrink-0">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap bg-infoSoft text-info flex items-center gap-0.5 flex-shrink-0">
                         <Eye size={9} />
                         {getViewCount(proposal)}
                       </span>
@@ -1868,7 +1811,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   </div>
                   {/* Price — fixed width */}
                   <div className="w-24 text-right">
-                    <div className="text-base font-bold text-white whitespace-nowrap">
+                    <div className="text-base font-bold text-primary whitespace-nowrap">
                       ${proposal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
@@ -1879,13 +1822,13 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         setMenuOpenAbove(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 320);
                         setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
                       }}
-                      className="menu-button p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                      className="menu-button p-1.5 text-muted hover:text-primary hover:bg-elevated rounded transition-colors"
                       data-menu-id={proposal.id}
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
                     {openMenuId === proposal.id && (
-                      <div className={`menu-dropdown absolute right-0 w-52 max-w-[calc(100vw-1rem)] bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-[200] max-h-[80vh] overflow-y-auto ${menuOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                      <div className={`menu-dropdown absolute right-0 w-52 max-w-[calc(100vw-1rem)] bg-elevated border border-strong rounded-lg shadow-xl z-[200] max-h-[80vh] overflow-y-auto ${menuOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                         {proposal.status === 'expired' && (
                           <button
                             onClick={(e) => {
@@ -1894,7 +1837,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowReactivateModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-orange-400 hover:bg-gray-600 hover:text-orange-300 transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Reactivate Proposal
@@ -1906,7 +1849,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleRefreshProposal(proposal.id);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-amber-400 hover:bg-gray-600 hover:text-amber-300 transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
                             Mark as Active
@@ -1920,7 +1863,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowManualApprovalModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-green-400 hover:bg-gray-600 hover:text-green-300 transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-success hover:bg-strong/25 hover:text-success transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <ThumbsUp className="w-3.5 h-3.5" />
                             Manual Approve
@@ -1932,7 +1875,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleRecallProposal(proposal.id, proposal.status);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-amber-400 hover:bg-gray-600 hover:text-amber-300 transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-warning hover:bg-strong/25 hover:text-warning transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Recall from Portal
@@ -1947,7 +1890,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowDeclineModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-600 hover:text-red-300 transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-strong/25 hover:text-danger transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             Mark as Declined
@@ -1962,7 +1905,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               setShowDeclineModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-400 hover:bg-gray-600 hover:text-gray-300 transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-muted hover:bg-strong/25 hover:text-secondary transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <Ban className="w-3.5 h-3.5" />
                             Cancel Proposal
@@ -1974,7 +1917,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleViewActivity(proposal);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-gray-600 hover:text-blue-300 transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-info hover:bg-strong/25 hover:text-info transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <Activity className="w-3.5 h-3.5" />
                             Proposal Activity
@@ -1985,7 +1928,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             e.stopPropagation();
                             handlePopOutProposal(proposal.id);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2 border-b border-gray-600"
+                          className="w-full px-3 py-2 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2 border-b border-strong"
                         >
                           <Maximize2 className="w-3.5 h-3.5" />
                           Pop Out
@@ -1997,7 +1940,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             setShowDuplicateModal(true);
                             setOpenMenuId(null);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2 border-b border-gray-600"
+                          className="w-full px-3 py-2 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2 border-b border-strong"
                         >
                           <Copy className="w-3.5 h-3.5" />
                           Duplicate
@@ -2009,7 +1952,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             setShowVersionHistory(true);
                             setOpenMenuId(null);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2 border-b border-gray-600"
+                          className="w-full px-3 py-2 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2 border-b border-strong"
                         >
                           <History className="w-3.5 h-3.5" />
                           Version History
@@ -2020,7 +1963,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleUnarchiveProposal(proposal);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <ArchiveRestore className="w-3.5 h-3.5" />
                             Unarchive
@@ -2031,7 +1974,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               e.stopPropagation();
                               handleArchiveProposal(proposal);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white transition-colors flex items-center gap-2 border-b border-gray-600"
+                            className="w-full px-3 py-2 text-left text-sm text-secondary hover:bg-strong/25 hover:text-primary transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <Archive className="w-3.5 h-3.5" />
                             Archive
@@ -2042,7 +1985,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             e.stopPropagation();
                             handleDeleteProposal(proposal);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors flex items-center gap-2"
+                          className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-dangerSoft/30 hover:text-danger transition-colors flex items-center gap-2"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           Delete
@@ -2060,19 +2003,19 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       {/* Pagination Controls */}
       {!loading && totalCount > 0 && totalPages > 1 && (
-        <div className="flex-shrink-0 px-2 sm:px-6 py-3 border-t border-gray-700 bg-gray-800">
+        <div className="flex-shrink-0 px-2 sm:px-6 py-3 border-t border-subtle bg-surface">
           <div className="flex items-center justify-center gap-1 sm:gap-2">
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="hidden sm:block px-2 sm:px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded text-xs sm:text-sm font-medium transition-colors"
+              className="hidden sm:block px-2 sm:px-3 py-1.5 bg-elevated hover:bg-strong/25 disabled:bg-surface disabled:text-gray-600 disabled:cursor-not-allowed text-primary rounded text-xs sm:text-sm font-medium transition-colors"
             >
               First
             </button>
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+              className="p-1.5 bg-elevated hover:bg-strong/25 disabled:bg-surface disabled:text-gray-600 disabled:cursor-not-allowed text-primary rounded transition-colors"
             >
               <ChevronLeft size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
@@ -2097,7 +2040,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     className={`px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${
                       currentPage === pageNum
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        : 'bg-elevated hover:bg-strong/25 text-secondary'
                     }`}
                   >
                     {pageNum}
@@ -2109,20 +2052,20 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+              className="p-1.5 bg-elevated hover:bg-strong/25 disabled:bg-surface disabled:text-gray-600 disabled:cursor-not-allowed text-primary rounded transition-colors"
             >
               <ChevronRight size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="hidden sm:block px-2 sm:px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded text-xs sm:text-sm font-medium transition-colors"
+              className="hidden sm:block px-2 sm:px-3 py-1.5 bg-elevated hover:bg-strong/25 disabled:bg-surface disabled:text-gray-600 disabled:cursor-not-allowed text-primary rounded text-xs sm:text-sm font-medium transition-colors"
             >
               Last
             </button>
           </div>
           <div className="text-center mt-2">
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted">
               Page {currentPage} of {totalPages}
             </span>
           </div>
@@ -2212,18 +2155,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         />
       )}
 
-      {depositPaymentInvoice && (
-        <RecordPaymentModal
-          invoice={depositPaymentInvoice}
-          onClose={() => setDepositPaymentInvoice(null)}
-          onSuccess={() => {
-            setDepositPaymentInvoice(null);
-            loadPendingDeposits();
-            loadProposals();
-          }}
-        />
-      )}
-
       {showDeclineModal && selectedProposal && (
         <DeclineProposalModal
           proposalId={selectedProposal.id}
@@ -2266,16 +2197,16 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       {showActivityModal && selectedProposal && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg shadow-2xl w-full max-w-full sm:max-w-2xl border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
+          <div className="bg-surface rounded-lg shadow-2xl w-full max-w-full sm:max-w-2xl border border-subtle">
+            <div className="p-6 border-b border-subtle">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Activity className="text-blue-400" size={24} />
+                  <Activity className="text-info" size={24} />
                   <div>
-                    <h2 className="text-xl font-bold text-white">
+                    <h2 className="text-xl font-bold text-primary">
                       Customer Activity
                     </h2>
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-muted">
                       Proposal {selectedProposal.proposal_number}
                     </p>
                   </div>
@@ -2287,7 +2218,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     setActivityData(null);
                     setActivityTab('summary');
                   }}
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-muted hover:text-primary transition-colors"
                 >
                   <XCircle size={24} />
                 </button>
@@ -2295,13 +2226,13 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
               <div className="flex gap-1 mt-4">
                 <button
                   onClick={() => setActivityTab('summary')}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activityTab === 'summary' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activityTab === 'summary' ? 'bg-blue-600 text-white' : 'text-muted hover:text-primary hover:bg-elevated'}`}
                 >
                   Summary
                 </button>
                 <button
                   onClick={() => setActivityTab('timeline')}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activityTab === 'timeline' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activityTab === 'timeline' ? 'bg-blue-600 text-white' : 'text-muted hover:text-primary hover:bg-elevated'}`}
                 >
                   Full Timeline
                 </button>
@@ -2315,33 +2246,33 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                 <>
                   {/* Summary Stats */}
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Total Views</div>
-                      <div className="text-2xl font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Total Views</div>
+                      <div className="text-2xl font-bold text-primary">
                         {activityData.total_views || 0}
                       </div>
                     </div>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Unique Viewers</div>
-                      <div className="text-2xl font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Unique Viewers</div>
+                      <div className="text-2xl font-bold text-primary">
                         {activityData.unique_viewers || 0}
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-xs text-muted mt-1">
                         {activityData.unique_viewers === 1 ? 'IP address' : 'IP addresses'}
                       </div>
                     </div>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Total Time</div>
-                      <div className="text-2xl font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Total Time</div>
+                      <div className="text-2xl font-bold text-primary">
                         {activityData.total_time_seconds
                           ? `${Math.floor(activityData.total_time_seconds / 60)}m ${activityData.total_time_seconds % 60}s`
                           : '0m 0s'
                         }
                       </div>
                     </div>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Last Viewed</div>
-                      <div className="text-sm font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Last Viewed</div>
+                      <div className="text-sm font-bold text-primary">
                         {activityData.last_viewed_at
                           ? new Date(activityData.last_viewed_at).toLocaleDateString('en-US', {
                               month: 'short',
@@ -2359,39 +2290,39 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   {(activityData.device_breakdown || activityData.browser_breakdown || activityData.os_breakdown) && (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {activityData.device_breakdown && Object.keys(activityData.device_breakdown).length > 0 && (
-                        <div className="bg-gray-700 p-4 rounded-lg">
-                          <div className="text-gray-400 text-xs mb-2 uppercase tracking-wide">Devices</div>
+                        <div className="bg-elevated p-4 rounded-lg">
+                          <div className="text-muted text-xs mb-2 uppercase tracking-wide">Devices</div>
                           <div className="space-y-1">
                             {Object.entries(activityData.device_breakdown).map(([device, count]: [string, any]) => (
                               <div key={device} className="flex items-center justify-between text-sm">
-                                <span className="text-white capitalize">{device}</span>
-                                <span className="text-gray-400">{count}</span>
+                                <span className="text-primary capitalize">{device}</span>
+                                <span className="text-muted">{count}</span>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
                       {activityData.browser_breakdown && Object.keys(activityData.browser_breakdown).length > 0 && (
-                        <div className="bg-gray-700 p-4 rounded-lg">
-                          <div className="text-gray-400 text-xs mb-2 uppercase tracking-wide">Browsers</div>
+                        <div className="bg-elevated p-4 rounded-lg">
+                          <div className="text-muted text-xs mb-2 uppercase tracking-wide">Browsers</div>
                           <div className="space-y-1">
                             {Object.entries(activityData.browser_breakdown).map(([browser, count]: [string, any]) => (
                               <div key={browser} className="flex items-center justify-between text-sm">
-                                <span className="text-white">{browser}</span>
-                                <span className="text-gray-400">{count}</span>
+                                <span className="text-primary">{browser}</span>
+                                <span className="text-muted">{count}</span>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
                       {activityData.os_breakdown && Object.keys(activityData.os_breakdown).length > 0 && (
-                        <div className="bg-gray-700 p-4 rounded-lg">
-                          <div className="text-gray-400 text-xs mb-2 uppercase tracking-wide">Operating Systems</div>
+                        <div className="bg-elevated p-4 rounded-lg">
+                          <div className="text-muted text-xs mb-2 uppercase tracking-wide">Operating Systems</div>
                           <div className="space-y-1">
                             {Object.entries(activityData.os_breakdown).map(([os, count]: [string, any]) => (
                               <div key={os} className="flex items-center justify-between text-sm">
-                                <span className="text-white">{os}</span>
-                                <span className="text-gray-400">{count}</span>
+                                <span className="text-primary">{os}</span>
+                                <span className="text-muted">{count}</span>
                               </div>
                             ))}
                           </div>
@@ -2403,22 +2334,22 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   {/* Unique IP Addresses */}
                   {activityData.unique_ips && activityData.unique_ips.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                      <h3 className="text-sm font-semibold text-secondary mb-3 uppercase tracking-wide">
                         Viewer Locations
                       </h3>
                       <div className="space-y-2">
                         {activityData.unique_ips.map((ipInfo: any, index: number) => (
                           <div
                             key={index}
-                            className="bg-gray-700 p-3 rounded-lg"
+                            className="bg-elevated p-3 rounded-lg"
                           >
                             <div className="flex items-center justify-between mb-1">
-                              <div className="font-mono text-sm text-blue-400">{ipInfo.ip}</div>
-                              <div className="text-xs text-gray-400">
+                              <div className="font-mono text-sm text-info">{ipInfo.ip}</div>
+                              <div className="text-xs text-muted">
                                 {ipInfo.views} {ipInfo.views === 1 ? 'view' : 'views'}
                               </div>
                             </div>
-                            <div className="flex items-center gap-4 text-xs text-gray-400">
+                            <div className="flex items-center gap-4 text-xs text-muted">
                               {ipInfo.deviceType && (
                                 <span className="capitalize">{ipInfo.deviceType}</span>
                               )}
@@ -2444,31 +2375,31 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   {/* Activity Timeline */}
                   {activityData.activity_timeline && activityData.activity_timeline.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                      <h3 className="text-sm font-semibold text-secondary mb-3 uppercase tracking-wide">
                         Activity Timeline
                       </h3>
                       <div className="space-y-2">
                         {activityData.activity_timeline.map((activity: any, index: number) => (
                           <div
                             key={index}
-                            className="bg-gray-700 p-3 rounded-lg"
+                            className="bg-elevated p-3 rounded-lg"
                           >
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-3">
-                                {activity.type === 'viewed' && <Eye className="text-blue-400" size={16} />}
-                                {activity.type === 'downloaded' && <FileText className="text-green-400" size={16} />}
-                                {activity.type === 'accepted' && <CheckCircle className="text-green-400" size={16} />}
-                                {activity.type === 'declined' && <XCircle className="text-red-400" size={16} />}
+                                {activity.type === 'viewed' && <Eye className="text-info" size={16} />}
+                                {activity.type === 'downloaded' && <FileText className="text-success" size={16} />}
+                                {activity.type === 'accepted' && <CheckCircle className="text-success" size={16} />}
+                                {activity.type === 'declined' && <XCircle className="text-danger" size={16} />}
                                 <div>
-                                  <div className="text-sm text-white capitalize">{activity.type}</div>
+                                  <div className="text-sm text-primary capitalize">{activity.type}</div>
                                   {activity.duration > 0 && (
-                                    <div className="text-xs text-gray-400">
+                                    <div className="text-xs text-muted">
                                       {Math.floor(activity.duration / 60)}m {activity.duration % 60}s
                                     </div>
                                   )}
                                 </div>
                               </div>
-                              <div className="text-xs text-gray-400">
+                              <div className="text-xs text-muted">
                                 {new Date(activity.created_at).toLocaleDateString('en-US', {
                                   month: 'short',
                                   day: 'numeric',
@@ -2478,9 +2409,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               </div>
                             </div>
                             {(activity.ip_address || activity.deviceType || activity.browser) && (
-                              <div className="flex items-center gap-3 text-xs text-gray-400 mt-2 pl-7">
+                              <div className="flex items-center gap-3 text-xs text-muted mt-2 pl-7">
                                 {activity.ip_address && (
-                                  <span className="font-mono text-blue-400">{activity.ip_address}</span>
+                                  <span className="font-mono text-info">{activity.ip_address}</span>
                                 )}
                                 {activity.deviceType && (
                                   <span className="capitalize">{activity.deviceType}</span>
@@ -2496,7 +2427,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   )}
                 </>
               ) : (
-                <div className="text-center py-12 text-gray-400">
+                <div className="text-center py-12 text-muted">
                   <Activity className="mx-auto mb-3 text-gray-600" size={48} />
                   <p>No activity recorded yet</p>
                   <p className="text-sm mt-2">Customer hasn't viewed this proposal</p>
@@ -2504,7 +2435,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-700">
+            <div className="p-6 border-t border-subtle">
               <button
                 onClick={() => {
                   setShowActivityModal(false);
@@ -2512,7 +2443,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   setActivityData(null);
                   setActivityTab('summary');
                 }}
-                className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="w-full py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg transition-colors"
               >
                 Close
               </button>

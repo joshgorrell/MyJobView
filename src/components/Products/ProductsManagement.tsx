@@ -179,7 +179,7 @@ export default function ProductsManagement() {
       ]);
 
       if (mfgData.data) setManufacturers(mfgData.data);
-      if (vendorData.data) setVendors(vendorData.data);
+      if (vendorData.data) setVendors(vendorData.data.map((v: any) => ({ id: v.id, name: v.vendor_name })));
       if (phaseData.data) setPhases(phaseData.data);
     } catch (error) {
       console.error('Error loading filter options:', error);
@@ -246,9 +246,10 @@ export default function ProductsManagement() {
       if (error) throw error;
 
       loadProducts();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting product:', error);
-      alert('Failed to delete product');
+      const msg = error?.message || 'Failed to delete product';
+      alert(msg.includes('violates') ? 'This product is used in existing records and cannot be deleted. Please remove it from those records first.' : msg);
     }
   }
 

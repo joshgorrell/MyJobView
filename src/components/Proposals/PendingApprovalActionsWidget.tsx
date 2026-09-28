@@ -235,7 +235,7 @@ export default function PendingApprovalActionsWidget() {
                       {proposal.contacts?.id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId(proposal.contacts.id); }}
-                          className="text-blue-600 hover:text-blue-800 hover:underline text-left font-medium transition-colors"
+                          className="customer-link text-left font-medium transition-colors"
                         >
                           {proposal.contacts.full_name || 'Unknown Customer'}
                         </button>

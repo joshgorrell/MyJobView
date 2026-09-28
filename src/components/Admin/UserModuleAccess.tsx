@@ -31,7 +31,7 @@ interface ModuleOverride {
   id: string;
   user_id: string;
   module_id: string;
-  override_type: 'grant' | 'deny';
+  override_type: 'grant' | 'revoke';
 }
 
 interface RoleModuleAccess {
@@ -46,6 +46,7 @@ interface GroupedModules {
 export function UserModuleAccess({ userId, userName, userRoleId, onClose }: UserModuleAccessProps) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [modules, setModules] = useState<GroupedModules>({});
+  const [allModules, setAllModules] = useState<Module[]>([]);
   const [roleAccess, setRoleAccess] = useState<Map<string, boolean>>(new Map());
   const [overrides, setOverrides] = useState<Map<string, ModuleOverride>>(new Map());
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
@@ -84,6 +85,7 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
         grouped[module.department_id].push(module);
       });
       setModules(grouped);
+      setAllModules(moduleData || []);
 
       if (userRoleId) {
         const { data: roleAccessData, error: roleError } = await supabase
@@ -132,59 +134,94 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
   }
 
   async function handleToggleAccess(moduleId: string) {
-    const currentOverride = overrides.get(moduleId);
-    const roleHasAccess = roleAccess.get(moduleId) ?? false;
+    const module = allModules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    // Find all copies of this module across every department (same module_key)
+    const siblings = allModules.filter(m => m.module_key === module.module_key);
+    const siblingIds = siblings.map(m => m.id);
+
+    // Determine current effective access across all copies
+    const currentAccess = getEffectiveAccess(moduleId);
+    const newAccess = !currentAccess;
+
+    // Determine the role default across all copies (true if any copy has role access)
+    const roleHasAccess = siblings.some(s => roleAccess.get(s.id) ?? false);
 
     try {
-      if (currentOverride) {
-        // Toggle: grant → deny or deny → grant
-        const currentAccess = currentOverride.override_type === 'grant';
-        const newAccess = !currentAccess;
-
-        if (newAccess === roleHasAccess) {
-          // New value matches role default — remove the override entirely
+      if (newAccess === roleHasAccess) {
+        // New value matches role default — remove all overrides for this module_key
+        const overridesToDelete = siblingIds.filter(id => overrides.has(id));
+        if (overridesToDelete.length > 0) {
           const { error } = await supabase
             .from('user_permission_overrides')
             .delete()
-            .eq('id', currentOverride.id);
+            .eq('user_id', userId)
+            .in('module_id', overridesToDelete);
 
           if (error) throw error;
+        }
 
-          const newOverrides = new Map(overrides);
-          newOverrides.delete(moduleId);
-          setOverrides(newOverrides);
-        } else {
-          const newOverrideType: 'grant' | 'deny' = newAccess ? 'grant' : 'deny';
+        const newOverrides = new Map(overrides);
+        overridesToDelete.forEach(id => newOverrides.delete(id));
+        setOverrides(newOverrides);
+      } else {
+        const newOverrideType: 'grant' | 'revoke' = newAccess ? 'grant' : 'revoke';
+
+        // Separate siblings into those that already have an override and those that don't
+        const toUpdate = siblings.filter(s => overrides.has(s.id));
+        const toInsert = siblings.filter(s => !overrides.has(s.id));
+
+        // Update existing overrides
+        if (toUpdate.length > 0) {
           const { error } = await supabase
             .from('user_permission_overrides')
             .update({ override_type: newOverrideType })
-            .eq('id', currentOverride.id);
+            .eq('user_id', userId)
+            .in('module_id', toUpdate.map(s => s.id));
+
+          if (error) throw error;
+        }
+
+        // Insert new overrides for copies that don't have one yet
+        if (toInsert.length > 0) {
+          const { data, error } = await supabase
+            .from('user_permission_overrides')
+            .insert(
+              toInsert.map(s => ({
+                user_id: userId,
+                module_id: s.id,
+                override_type: newOverrideType,
+              }))
+            )
+            .select();
 
           if (error) throw error;
 
+          // Add inserted overrides to the map
           const newOverrides = new Map(overrides);
-          newOverrides.set(moduleId, { ...currentOverride, override_type: newOverrideType });
+          (data || []).forEach((o: ModuleOverride) => {
+            newOverrides.set(o.module_id, o);
+          });
+          // Update existing overrides in the map
+          toUpdate.forEach(s => {
+            const existing = newOverrides.get(s.id);
+            if (existing) {
+              newOverrides.set(s.id, { ...existing, override_type: newOverrideType });
+            }
+          });
+          setOverrides(newOverrides);
+        } else {
+          // Only updates — reflect them in the map
+          const newOverrides = new Map(overrides);
+          toUpdate.forEach(s => {
+            const existing = newOverrides.get(s.id);
+            if (existing) {
+              newOverrides.set(s.id, { ...existing, override_type: newOverrideType });
+            }
+          });
           setOverrides(newOverrides);
         }
-      } else {
-        // No override yet — create one that flips the role default
-        const newOverrideType: 'grant' | 'deny' = !roleHasAccess ? 'grant' : 'deny';
-
-        const { data, error } = await supabase
-          .from('user_permission_overrides')
-          .insert({
-            user_id: userId,
-            module_id: moduleId,
-            override_type: newOverrideType
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        const newOverrides = new Map(overrides);
-        newOverrides.set(moduleId, data);
-        setOverrides(newOverrides);
       }
 
       showMessage('success', 'Module access updated successfully');
@@ -195,15 +232,45 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
   }
 
   function getEffectiveAccess(moduleId: string): boolean {
-    const override = overrides.get(moduleId);
-    if (override) {
-      return override.override_type === 'grant';
+    const module = allModules.find(m => m.id === moduleId);
+    if (!module) return false;
+
+    // Unify across all copies sharing the same module_key
+    const siblings = allModules.filter(m => m.module_key === module.module_key);
+
+    // If any sibling has an override, the most permissive override wins
+    const overriddenSibling = siblings.find(s => overrides.has(s.id));
+    if (overriddenSibling) {
+      return overrides.get(overriddenSibling.id)!.override_type === 'grant';
     }
-    return roleAccess.get(moduleId) ?? false;
+
+    // Otherwise use the most permissive role default across all copies
+    return siblings.some(s => roleAccess.get(s.id) ?? false);
   }
 
   function hasOverride(moduleId: string): boolean {
-    return overrides.has(moduleId);
+    const module = allModules.find(m => m.id === moduleId);
+    if (!module) return false;
+    // Show override badge if any copy sharing this module_key has an override
+    return allModules
+      .filter(m => m.module_key === module.module_key)
+      .some(m => overrides.has(m.id));
+  }
+
+  function getRoleDefault(moduleId: string): boolean {
+    const module = allModules.find(m => m.id === moduleId);
+    if (!module) return false;
+    const siblings = allModules.filter(m => m.module_key === module.module_key);
+    return siblings.some(s => roleAccess.get(s.id) ?? false);
+  }
+
+  function getSharedDepartments(moduleId: string): string[] {
+    const module = allModules.find(m => m.id === moduleId);
+    if (!module) return [];
+    const siblings = allModules.filter(m => m.module_key === module.module_key);
+    return departments
+      .filter(d => siblings.some(s => s.department_id === d.id))
+      .map(d => d.display_name);
   }
 
   function toggleDepartment(deptId: string) {
@@ -263,6 +330,7 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
                   <li>Users inherit module access from their role by default</li>
                   <li>Override specific modules to grant or restrict access</li>
                   <li>Overridden modules are highlighted with a yellow badge</li>
+                  <li>Shared pages (appearing in multiple departments) are synced automatically — toggling one copy toggles all</li>
                 </ul>
               </div>
             </div>
@@ -303,7 +371,9 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
                       {deptModules.map((module) => {
                         const hasAccess = getEffectiveAccess(module.id);
                         const isOverridden = hasOverride(module.id);
-                        const roleHasAccess = roleAccess.get(module.id) ?? false;
+                        const roleHasAccess = getRoleDefault(module.id);
+                        const sharedDepts = getSharedDepartments(module.id);
+                        const isShared = sharedDepts.length > 1;
 
                         return (
                           <div
@@ -326,6 +396,11 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
                                         Override
                                       </span>
                                     )}
+                                    {isShared && (
+                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                        Shared
+                                      </span>
+                                    )}
                                   </div>
                                   {module.description && (
                                     <p className="text-xs text-gray-600 mt-0.5">{module.description}</p>
@@ -333,6 +408,11 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
                                   <p className="text-xs text-gray-500 mt-1">
                                     Role default: {roleHasAccess ? 'Has access' : 'No access'}
                                   </p>
+                                  {isShared && (
+                                    <p className="text-xs text-blue-600 mt-0.5">
+                                      Also in: {sharedDepts.filter(d => d !== dept.display_name).join(', ')}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
 

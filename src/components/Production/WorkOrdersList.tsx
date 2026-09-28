@@ -523,7 +523,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
                     <span>•</span>
                     <span>{wo.project?.name}</span>
                     <span>•</span>
-                    <span>{wo.project?.customer_name}</span>
+                    <span className="customer-link">{wo.project?.customer_name}</span>
                   </div>
 
                   {wo.description && (

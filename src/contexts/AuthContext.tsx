@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   companySettings: CompanySettings | null;
+  setProfileAvatar: (url: string | null) => void;
   loading: boolean;
   isPasswordRecovery: boolean;
   isPortalUser: boolean;
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const setProfileAvatar = (url: string | null) => setProfile(current => current ? { ...current, avatar_url: url } : current);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -39,14 +41,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
+    // Wrap getSession in a timeout so a hanging session fetch doesn't
+    // leave the app on the loading screen indefinitely.
+    const sessionTimeout = setTimeout(() => {
+      console.error('Session initialization timed out after 15 seconds');
+      setUser(null);
+      setProfile(null);
+      setCompanySettings(null);
+      setLoading(false);
+      setLoadingProfile(false);
+    }, 15000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(sessionTimeout);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          loadProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        clearTimeout(sessionTimeout);
+        console.error('Session initialization error:', error);
+        setUser(null);
+        setProfile(null);
+        setCompanySettings(null);
         setLoading(false);
-      }
-    });
+        setLoadingProfile(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -424,7 +448,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, companySettings, loading, isPasswordRecovery, isPortalUser, signIn, signUp, signOut, resetPassword, resendConfirmation, updatePassword }}>
+    <AuthContext.Provider value={{ user, profile, companySettings, setProfileAvatar, loading, isPasswordRecovery, isPortalUser, signIn, signUp, signOut, resetPassword, resendConfirmation, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

@@ -617,7 +617,7 @@ export function ServiceRequestQueue() {
                       {request.contact_id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
-                          className="font-semibold text-white text-base leading-tight hover:text-blue-300 transition-colors text-left"
+                          className="customer-link font-semibold text-base leading-tight transition-colors text-left"
                         >
                           {request.customer_name}
                         </button>

@@ -28,6 +28,7 @@ interface JobPhoto {
 
 interface JobPhotosGalleryProps {
   initialShowUpload?: boolean;
+  modalOnly?: boolean;
   onClose?: () => void;
 }
 
@@ -153,7 +154,7 @@ function PaparazziRequestsView() {
     );
   };
 
-  if (loading) {
+  if (loading && !modalOnly) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-gray-500">Loading requests...</div>
@@ -200,7 +201,7 @@ function PaparazziRequestsView() {
 
       {filteredRequests.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <Camera className="w-16 h-16 text-muted mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No requests found</h3>
           <p className="text-gray-600">
             {filterStatus === 'all'
@@ -274,7 +275,7 @@ function PaparazziRequestsView() {
               <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Request Details</h3>
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="text-gray-400 hover:text-gray-600 ml-2 flex-shrink-0"
+                className="text-muted hover:text-gray-600 ml-2 flex-shrink-0"
               >
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
@@ -335,7 +336,7 @@ function PaparazziRequestsView() {
                   </button>
                   <button
                     onClick={() => updateRequestStatus(selectedRequest.id, 'cancelled')}
-                    className="flex-1 px-4 py-2.5 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                    className="flex-1 px-4 py-2.5 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-elevated transition-colors font-medium"
                   >
                     Cancel Request
                   </button>
@@ -361,7 +362,7 @@ function PaparazziRequestsView() {
   );
 }
 
-export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhotosGalleryProps = {}) {
+export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false, onClose }: JobPhotosGalleryProps = {}) {
   const { user, profile } = useAuth();
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -928,7 +929,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
       }
     });
 
-  if (loading) {
+  if (loading && !modalOnly) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Loading photos...</div>
@@ -938,7 +939,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+      <div className={modalOnly ? "hidden" : "bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6"}>
         <div className="flex flex-col gap-4 mb-6">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Job Photos & Videos</h2>
@@ -1004,7 +1005,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
         <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 mb-6">
           <div className="flex-1 min-w-full sm:min-w-[200px]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
               <input
                 type="text"
                 value={searchTerm}
@@ -1052,7 +1053,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
 
         {filteredAndSortedPhotos.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-lg">
-            <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <Camera className="w-16 h-16 text-muted mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No photos found</h3>
             <p className="text-gray-600 mb-4">Upload job photos to earn points and improve documentation</p>
             <button
@@ -1115,7 +1116,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
                         {photo.caption}
                       </div>
                     )}
-                    <div className="text-xs text-gray-300 flex items-center gap-1">
+                    <div className="text-xs text-secondary flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {photo.technician_name || 'Unknown'}
                     </div>
@@ -1188,23 +1189,24 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
             setShowUploadModal(false);
             setPhotoCaption('');
             setSelectedPaparazziRequestId('');
+            if (modalOnly) onClose?.();
           }}
-          maxWidth="sm:max-w-lg"
+
         >
           <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
 
             <div className="p-3 bg-blue-950/40 rounded-lg border border-blue-700/50">
-              <div className="flex items-center gap-2 text-blue-300 mb-1">
+              <div className="flex items-center gap-2 text-info mb-1">
                 <Award className="w-4 h-4" />
                 <span className="font-medium text-sm">Earn {photoPoints} {photoPoints === 1 ? 'Point' : 'Points'} Per Photo!</span>
               </div>
-              <p className="text-xs text-blue-400">
+              <p className="text-xs text-info">
                 Help improve documentation by uploading job photos
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 Caption *
               </label>
               <input
@@ -1212,23 +1214,23 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
                 value={photoCaption}
                 onChange={(e) => setPhotoCaption(e.target.value)}
                 placeholder="Describe what's in the photo..."
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-500"
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder:text-muted"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Caption will be applied to all media uploaded together
               </p>
             </div>
 
             {paparazziRequests.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-secondary mb-1">
                   Link to Paparazzi Request (Optional)
                 </label>
                 <select
                   value={selectedPaparazziRequestId}
                   onChange={(e) => setSelectedPaparazziRequestId(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-800 border border-blue-600/50 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                  className="w-full px-3 py-2.5 bg-surface border border-blue-600/50 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
                 >
                   <option value="">No request selected</option>
                   {paparazziRequests.map((request) => (
@@ -1240,14 +1242,14 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-blue-400 mt-1">
+                <p className="text-xs text-info mt-1">
                   Photos will be linked to this request and the requester will be notified
                 </p>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-secondary mb-1">
                 Contact (Optional)
               </label>
               <select
@@ -1256,7 +1258,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
                   setSelectedContactId(e.target.value);
                   loadProjectsForContact(e.target.value);
                 }}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
               >
                 <option value="">No contact selected</option>
                 {contacts.map((contact) => (
@@ -1269,13 +1271,13 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
 
             {selectedContactId && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-secondary mb-1">
                   Project (Optional)
                 </label>
                 <select
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+                  className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
                 >
                   <option value="">No project selected</option>
                   {projects.map((project) => (
@@ -1287,7 +1289,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
               </div>
             )}
 
-            <div className={`border border-dashed rounded-lg p-8 text-center transition-colors ${!photoCaption.trim() ? 'border-gray-700 opacity-60' : 'border-blue-500/60 hover:border-blue-400'}`}>
+            <div className={`border border-dashed rounded-lg p-8 text-center transition-colors ${!photoCaption.trim() ? 'border-subtle opacity-60' : 'border-blue-500/60 hover:border-blue-400'}`}>
               <input
                 type="file"
                 multiple
@@ -1304,12 +1306,12 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
                 {uploading ? (
                   <>
                     <div className="animate-spin w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full mb-3" />
-                    <span className="text-sm text-gray-300">Uploading...</span>
+                    <span className="text-sm text-secondary">Uploading...</span>
                   </>
                 ) : (
                   <>
                     <Upload className="w-10 h-10 text-gray-500 mb-3" />
-                    <span className="text-sm font-medium text-gray-200 mb-1">
+                    <span className="text-sm font-medium text-primary mb-1">
                       {photoCaption.trim() ? 'Click to upload photos or videos' : 'Enter a caption first'}
                     </span>
                     <span className="text-xs text-gray-500">
@@ -1451,7 +1453,7 @@ export function JobPhotosGallery({ initialShowUpload = false, onClose }: JobPhot
                   setSelectedProjectId('');
                   setProjects([]);
                 }}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                className="p-2 text-muted hover:text-gray-600 rounded-lg hover:bg-gray-100"
               >
                 <X className="w-5 h-5" />
               </button>

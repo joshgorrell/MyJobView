@@ -3,9 +3,10 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
+import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { MessageTicker } from './components/Layout/MessageTicker';
 import { DepartmentSidebar } from './components/Layout/DepartmentSidebar';
-import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
 import { PlatformFooter } from './components/Layout/PlatformFooter';
 import { OfflineIndicator } from './components/Offline/OfflineIndicator';
 import BugReportModal from './components/Shared/BugReportModal';
@@ -173,7 +174,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
-  const { footerDepartments, getUserModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
+  const { footerDepartments, getUserModules, starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -216,6 +217,18 @@ function AppContent() {
     const saved = localStorage.getItem('departmentSidebarPinned');
     return saved === 'true';
   });
+  const [bookmarksVisible, setBookmarksVisible] = useState(true);
+  useEffect(() => {
+    if (!profile?.id) return;
+    setBookmarksVisible(localStorage.getItem(`mjv-bookmarks-visible-${profile.id}`) !== 'false');
+  }, [profile?.id]);
+  const toggleBookmarks = () => {
+    if (!profile?.id) return;
+    setBookmarksVisible(current => {
+      localStorage.setItem(`mjv-bookmarks-visible-${profile.id}`, String(!current));
+      return !current;
+    });
+  };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [newPassword, setNewPassword] = useState('');
@@ -814,7 +827,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col overflow-hidden">
+    <div className="workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>
@@ -827,10 +840,7 @@ function AppContent() {
               setShowTaskForm(true);
               setActiveTab('tasks');
             }}
-            onCreateJobMedia={() => {
-              setShowJobMediaUpload(true);
-              setActiveTab('job_photos');
-            }}
+            onCreateJobMedia={() => setShowJobMediaUpload(true)}
             onCreateProjectTime={['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role) ? () => setShowAddProjectTime(true) : undefined}
             onLeadClick={(leadId) => setSelectedLeadId(leadId)}
             onTaskClick={(taskId) => {
@@ -867,22 +877,21 @@ function AppContent() {
           onToggle={toggleSidebar}
           isPinned={sidebarPinned}
           onPinToggle={toggleSidebarPin}
+          bookmarksVisible={bookmarksVisible}
+          onBookmarksToggle={toggleBookmarks}
         />
       )}
 
-      <div className={`flex-1 overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+      <div className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+        {!isStandalone && bookmarksVisible && starredModules.length > 0 && (
+          <div className="border-b border-subtle bg-canvas px-3 sm:px-4 lg:px-5 py-1.5">
+            <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
+          </div>
+        )}
         <main
-          className={`h-full overflow-y-auto ${isStandalone ? 'w-full' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8'}`}
+          className={`min-h-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
         >
-          {!isStandalone && (
-            <div className="hidden sm:block mb-6">
-              <div className="border-b border-purple-500/30 pb-3">
-                <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
-              </div>
-            </div>
-          )}
-
         <Suspense fallback={<LoadingFallback />}>
           {activeTab === 'time' && <DailyClock key={activeTab} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
@@ -968,7 +977,6 @@ function AppContent() {
           {activeTab === 'job_photos' && checkModuleAccess('job_photos') && (
             <JobPhotosGallery
               key={activeTab}
-              initialShowUpload={showJobMediaUpload}
               onClose={() => setShowJobMediaUpload(false)}
             />
           )}
@@ -1093,7 +1101,7 @@ function AppContent() {
 
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-canvas text-primary rounded-xl shadow-sm border border-subtle p-4 sm:p-6">
                 <UserPreferences />
               </div>
             </div>
@@ -1227,6 +1235,14 @@ function AppContent() {
         <PlatformFooter />
       )}
 
+      {showJobMediaUpload && (
+        <JobPhotosGallery
+          modalOnly
+          initialShowUpload
+          onClose={() => setShowJobMediaUpload(false)}
+        />
+      )}
+
       {showAddProjectTime && (
         <Suspense fallback={null}>
           <AddProjectTimeModal
@@ -1291,7 +1307,7 @@ function AppContent() {
           icon={<MessageSquare className="w-5 h-5 text-white" />}
           accentColor="from-teal-600 to-cyan-700"
           onClose={() => setShowMessageForm(false)}
-          maxWidth="sm:max-w-md"
+
         >
           <div className="p-4 sm:p-6 space-y-5">
             <p className="text-gray-400 text-sm leading-relaxed">
@@ -1404,9 +1420,11 @@ function App() {
     <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
-          <DepartmentProvider>
-            <AppContent />
-          </DepartmentProvider>
+          <ThemeProvider>
+            <DepartmentProvider>
+              <AppContent />
+            </DepartmentProvider>
+          </ThemeProvider>
         </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
