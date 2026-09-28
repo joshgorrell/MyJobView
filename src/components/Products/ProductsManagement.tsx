@@ -169,12 +169,12 @@ export default function ProductsManagement() {
     try {
       const [mfgData, vendorData, phaseData] = await Promise.all([
         supabase.from('manufacturers').select('id, name').order('name'),
-        supabase.from('vendors').select('id, name').order('name'),
+        supabase.from('vendors').select('id, vendor_name').order('vendor_name'),
         supabase.from('labor_phases').select('id, name').order('name')
       ]);
 
       if (mfgData.data) setManufacturers(mfgData.data);
-      if (vendorData.data) setVendors(vendorData.data);
+      if (vendorData.data) setVendors(vendorData.data.map((v: any) => ({ id: v.id, name: v.vendor_name })));
       if (phaseData.data) setPhases(phaseData.data);
     } catch (error) {
       console.error('Error loading filter options:', error);
