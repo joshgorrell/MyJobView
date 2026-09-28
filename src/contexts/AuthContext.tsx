@@ -41,14 +41,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
+    // Wrap getSession in a timeout so a hanging session fetch doesn't
+    // leave the app on the loading screen indefinitely.
+    const sessionTimeout = setTimeout(() => {
+      console.error('Session initialization timed out after 15 seconds');
+      setUser(null);
+      setProfile(null);
+      setCompanySettings(null);
+      setLoading(false);
+      setLoadingProfile(false);
+    }, 15000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(sessionTimeout);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          loadProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        clearTimeout(sessionTimeout);
+        console.error('Session initialization error:', error);
+        setUser(null);
+        setProfile(null);
+        setCompanySettings(null);
         setLoading(false);
-      }
-    });
+        setLoadingProfile(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
