@@ -31,7 +31,7 @@ interface ModuleOverride {
   id: string;
   user_id: string;
   module_id: string;
-  override_type: 'grant' | 'deny';
+  override_type: 'grant' | 'revoke';
 }
 
 interface RoleModuleAccess {
@@ -154,7 +154,7 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
           newOverrides.delete(moduleId);
           setOverrides(newOverrides);
         } else {
-          const newOverrideType: 'grant' | 'deny' = newAccess ? 'grant' : 'deny';
+          const newOverrideType: 'grant' | 'revoke' = newAccess ? 'grant' : 'revoke';
           const { error } = await supabase
             .from('user_permission_overrides')
             .update({ override_type: newOverrideType })
@@ -168,7 +168,7 @@ export function UserModuleAccess({ userId, userName, userRoleId, onClose }: User
         }
       } else {
         // No override yet — create one that flips the role default
-        const newOverrideType: 'grant' | 'deny' = !roleHasAccess ? 'grant' : 'deny';
+        const newOverrideType: 'grant' | 'revoke' = !roleHasAccess ? 'grant' : 'revoke';
 
         const { data, error } = await supabase
           .from('user_permission_overrides')
