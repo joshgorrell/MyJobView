@@ -331,12 +331,12 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
                   <p className="text-xs text-gray-500 mb-3">Select all that apply</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { key: 'monitored_alarm', label: 'Monitored Alarm' },
-                      { key: 'testing_inspection', label: 'Testing & Inspection' },
-                      { key: 'service_agreement', label: 'Service Agreement' },
+                      { key: 'dial_up', label: 'Dial-Up' },
+                      { key: 'telguard', label: 'Telguard' },
+                      { key: 'alarmnet', label: 'Alarmnet' },
+                      { key: 'alarm_com', label: 'Alarm.com' },
                       { key: 'video_monitoring', label: 'Video / CCTV' },
                       { key: 'access_control', label: 'Access Control' },
-                      { key: 'other', label: 'Other' },
                     ].map(svc => {
                       const checked = formData.accountServices.includes(svc.key);
                       return (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { X, Search, Save, User, Mail, DollarSign, Calendar } from 'lucide-react';
+import { X, Search, Save, User, Mail, DollarSign, Calendar, Wrench } from 'lucide-react';
 
 interface Contact {
   id: string;
@@ -39,6 +39,8 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>(contract.account_type || '');
   const [accountServices, setAccountServices] = useState<string[]>(contract.account_services || []);
   const [accountNumber, setAccountNumber] = useState(contract.account_number || '');
+  const [installationDate, setInstallationDate] = useState(contract.installation_date || '');
+  const [serviceAccountNumbers, setServiceAccountNumbers] = useState<Record<string, string>>(contract.service_account_numbers || {});
   const [notes, setNotes] = useState(contract.notes || '');
   const [emailOverride, setEmailOverride] = useState(contract.email_override || '');
   const [searchTerm, setSearchTerm] = useState('');
@@ -163,6 +165,8 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           account_type: accountType || null,
           account_services: accountServices,
           account_number: accountNumber.trim() || null,
+          installation_date: installationDate || null,
+          service_account_numbers: serviceAccountNumbers,
           notes: notes.trim() || null,
           updated_at: new Date().toISOString()
         })
@@ -430,12 +434,12 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Account Services</label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { value: 'monitored_alarm', label: 'Monitored Alarm' },
-                  { value: 'testing_inspection', label: 'Testing & Inspection' },
-                  { value: 'service_agreement', label: 'Service Agreement' },
+                  { value: 'dial_up', label: 'Dial-Up' },
+                  { value: 'telguard', label: 'Telguard' },
+                  { value: 'alarmnet', label: 'Alarmnet' },
+                  { value: 'alarm_com', label: 'Alarm.com' },
                   { value: 'video_monitoring', label: 'Video / CCTV' },
                   { value: 'access_control', label: 'Access Control' },
-                  { value: 'other', label: 'Other' },
                 ].map(svc => (
                   <label key={svc.value} className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -466,6 +470,79 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+          </div>
+
+          {/* Installation Details */}
+          <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3 sm:space-y-4">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-amber-600" />
+              <h3 className="text-xs sm:text-sm font-semibold text-gray-800">Installation Details</h3>
+              <span className="text-xs text-amber-600">Enter after system is installed</span>
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Installation Date</label>
+              <input
+                type="date"
+                value={installationDate}
+                onChange={(e) => setInstallationDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            {accountServices.filter(s => ['dial_up', 'telguard', 'alarmnet', 'alarm_com'].includes(s)).length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers</label>
+                {accountServices.includes('dial_up') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.dial_up || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, dial_up: e.target.value }))}
+                      placeholder="e.g. 12345"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+                {accountServices.includes('telguard') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.telguard || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, telguard: e.target.value }))}
+                      placeholder="e.g. TG67890"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+                {accountServices.includes('alarmnet') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.alarmnet || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarmnet: e.target.value }))}
+                      placeholder="e.g. AN111"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+                {accountServices.includes('alarm_com') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.alarm_com || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarm_com: e.target.value }))}
+                      placeholder="e.g. AC222"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Renewal Term */}

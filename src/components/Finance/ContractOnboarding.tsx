@@ -22,6 +22,8 @@ interface Contract {
   notes: string;
   account_type: string | null;
   account_services: string[] | null;
+  installation_date: string | null;
+  service_account_numbers: Record<string, string> | null;
 }
 
 interface StatusColumn {
@@ -144,6 +146,28 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   }
 
   const unclassifiedCount = contracts.filter(c => c.status === 'active' && !c.account_type).length;
+
+  const SERVICES_NEEDING_ACCOUNT_NUMBERS = ['dial_up', 'telguard', 'alarmnet', 'alarm_com'];
+
+  function getMissingDataItems(contract: Contract): string[] {
+    if (contract.status !== 'active') return [];
+    const missing: string[] = [];
+    if (!contract.installation_date) missing.push('Installation Date');
+    const services = contract.account_services || [];
+    const acctNums = contract.service_account_numbers || {};
+    SERVICES_NEEDING_ACCOUNT_NUMBERS.forEach(svc => {
+      if (services.includes(svc) && !acctNums[svc]) {
+        const labels: Record<string, string> = {
+          dial_up: 'Monitoring Account Number',
+          telguard: 'Telguard Account Number',
+          alarmnet: 'Alarmnet Account Number',
+          alarm_com: 'Alarm.com Account Number',
+        };
+        missing.push(labels[svc]);
+      }
+    });
+    return missing;
+  }
 
   async function handleApproveContract(contract: Contract) {
     try {
@@ -421,6 +445,16 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
                             <div className="flex items-center gap-2 text-sm text-blue-600">
                               <Calendar className="w-4 h-4 flex-shrink-0" />
                               <span>Activated {formatDate(contract.activated_at)}</span>
+                            </div>
+                          )}
+
+                          {getMissingDataItems(contract).length > 0 && (
+                            <div className="flex items-start gap-2 text-sm text-amber-700">
+                              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-semibold">Missing data:</span>{' '}
+                                {getMissingDataItems(contract).join(', ')}
+                              </div>
                             </div>
                           )}
 

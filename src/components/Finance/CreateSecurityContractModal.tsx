@@ -69,7 +69,6 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   const [termMonths, setTermMonths] = useState<number>(36);
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>('');
   const [accountServices, setAccountServices] = useState<string[]>([]);
-  const [accountNumber, setAccountNumber] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [notes, setNotes] = useState('');
   const [emailOverride, setEmailOverride] = useState('');
@@ -327,7 +326,6 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
           cancellation_notice_days: 30,
           account_type: accountType || null,
           account_services: accountServices,
-          account_number: accountNumber.trim() || null,
           notes,
           email_override: emailOverride || null
         })
@@ -439,228 +437,6 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                   {templates.find(t => t.id === selectedTemplate)?.description}
                 </p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sales Order (Optional)
-              </label>
-              <select
-                value={selectedSalesOrder}
-                onChange={(e) => setSelectedSalesOrder(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">None - No linked sales order</option>
-                {filteredSalesOrders.map((order) => (
-                  <option key={order.id} value={order.id}>
-                    {order.order_number}
-                  </option>
-                ))}
-              </select>
-              {selectedContact && filteredSalesOrders.length === 0 && (
-                <p className="mt-2 text-sm text-gray-500">
-                  No sales orders found for this customer
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Agreement Term <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {[12, 24, 36, 48, 60].map((months) => (
-                  <button
-                    key={months}
-                    type="button"
-                    onClick={() => setTermMonths(months)}
-                    className={`px-2 sm:px-4 py-3 text-center rounded-lg border-2 transition-all ${
-                      termMonths === months
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                    }`}
-                  >
-                    {months}<br/>
-                    <span className="text-xs">months</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Account Classification */}
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
-              <h3 className="text-sm font-semibold text-gray-800">Account Classification</h3>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
-                <div className="flex gap-3">
-                  {(['residential', 'commercial'] as const).map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setAccountType(type)}
-                      className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium capitalize transition-all ${
-                        accountType === type
-                          ? 'border-blue-600 bg-blue-50 text-blue-700'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Services</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: 'monitored_alarm', label: 'Monitored Alarm' },
-                    { value: 'testing_inspection', label: 'Testing & Inspection' },
-                    { value: 'service_agreement', label: 'Service Agreement' },
-                    { value: 'video_monitoring', label: 'Video / CCTV' },
-                    { value: 'access_control', label: 'Access Control' },
-                    { value: 'other', label: 'Other' },
-                  ].map(svc => (
-                    <label key={svc.value} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={accountServices.includes(svc.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setAccountServices(prev => [...prev, svc.value]);
-                          } else {
-                            setAccountServices(prev => prev.filter(s => s !== svc.value));
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 rounded"
-                      />
-                      <span className="text-sm text-gray-700">{svc.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number (Optional)</label>
-                <input
-                  type="text"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  placeholder="e.g. 12345"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Renewal Term
-              </label>
-              <p className="text-sm text-gray-700">Automatically renews month-to-month after the initial term. Cancellation after the initial term requires 30 days' notice.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Monitoring Services
-              </label>
-              <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
-                {monitoringServices.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    No monitoring services available
-                  </div>
-                ) : (
-                  Object.entries(
-                    monitoringServices.reduce((acc, service) => {
-                      const category = service.category || 'Other';
-                      if (!acc[category]) acc[category] = [];
-                      acc[category].push(service);
-                      return acc;
-                    }, {} as Record<string, MonitoringService[]>)
-                  ).map(([category, services]) => (
-                    <div key={category}>
-                      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 font-semibold text-sm text-gray-700">
-                        {category}
-                      </div>
-                      {services.map((service) => (
-                        <label
-                          key={service.id}
-                          className={`flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                            selectedServices.includes(service.id) ? 'bg-blue-50' : ''
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedServices.includes(service.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedServices([...selectedServices, service.id]);
-                              } else {
-                                setSelectedServices(selectedServices.filter(id => id !== service.id));
-                              }
-                            }}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="font-medium text-gray-900">{service.name}</div>
-                              <div className="text-sm font-semibold text-blue-600">
-                                ${service.monthly_price.toFixed(2)}/mo
-                              </div>
-                            </div>
-                            {service.description && (
-                              <div className="text-sm text-gray-600 mt-1">{service.description}</div>
-                            )}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  ))
-                )}
-              </div>
-              {selectedServices.length > 0 && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-700">
-                      Calculated Monthly Price ({selectedServices.length} service{selectedServices.length !== 1 ? 's' : ''})
-                    </span>
-                    <span className="text-lg font-bold text-blue-700">
-                      ${calculatedMonthlyPrice.toFixed(2)}/mo
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Price Override (Optional)
-              </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={priceOverride}
-                  onChange={(e) => setPriceOverride(e.target.value)}
-                  placeholder="Leave blank to use calculated price"
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              {priceOverride && (
-                <p className="mt-2 text-sm text-amber-600">
-                  Override active: ${parseFloat(priceOverride).toFixed(2)}/mo will be used instead of calculated price
-                </p>
-              )}
-              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-900">Final Monthly Price</span>
-                  <span className="text-xl font-bold text-green-700">
-                    ${finalMonthlyPrice.toFixed(2)}/mo
-                  </span>
-                </div>
-              </div>
             </div>
 
             <div>
@@ -1012,6 +788,218 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                   </div>
                 </div>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sales Order (Optional)
+              </label>
+              <select
+                value={selectedSalesOrder}
+                onChange={(e) => setSelectedSalesOrder(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">None - No linked sales order</option>
+                {filteredSalesOrders.map((order) => (
+                  <option key={order.id} value={order.id}>
+                    {order.order_number}
+                  </option>
+                ))}
+              </select>
+              {selectedContact && filteredSalesOrders.length === 0 && (
+                <p className="mt-2 text-sm text-gray-500">
+                  No sales orders found for this customer
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Agreement Term <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {[12, 24, 36, 48, 60].map((months) => (
+                  <button
+                    key={months}
+                    type="button"
+                    onClick={() => setTermMonths(months)}
+                    className={`px-2 sm:px-4 py-3 text-center rounded-lg border-2 transition-all ${
+                      termMonths === months
+                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    {months}<br/>
+                    <span className="text-xs">months</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Account Classification */}
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
+              <h3 className="text-sm font-semibold text-gray-800">Account Classification</h3>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
+                <div className="flex gap-3">
+                  {(['residential', 'commercial'] as const).map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setAccountType(type)}
+                      className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium capitalize transition-all ${
+                        accountType === type
+                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Account Services</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'dial_up', label: 'Dial-Up' },
+                    { value: 'telguard', label: 'Telguard' },
+                    { value: 'alarmnet', label: 'Alarmnet' },
+                    { value: 'alarm_com', label: 'Alarm.com' },
+                    { value: 'video_monitoring', label: 'Video / CCTV' },
+                    { value: 'access_control', label: 'Access Control' },
+                  ].map(svc => (
+                    <label key={svc.value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={accountServices.includes(svc.value)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAccountServices(prev => [...prev, svc.value]);
+                          } else {
+                            setAccountServices(prev => prev.filter(s => s !== svc.value));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded"
+                      />
+                      <span className="text-sm text-gray-700">{svc.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Renewal Term
+              </label>
+              <p className="text-sm text-gray-700">Automatically renews month-to-month after the initial term. Cancellation after the initial term requires 30 days' notice.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Monitoring Services
+              </label>
+              <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
+                {monitoringServices.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    No monitoring services available
+                  </div>
+                ) : (
+                  Object.entries(
+                    monitoringServices.reduce((acc, service) => {
+                      const category = service.category || 'Other';
+                      if (!acc[category]) acc[category] = [];
+                      acc[category].push(service);
+                      return acc;
+                    }, {} as Record<string, MonitoringService[]>)
+                  ).map(([category, services]) => (
+                    <div key={category}>
+                      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 font-semibold text-sm text-gray-700">
+                        {category}
+                      </div>
+                      {services.map((service) => (
+                        <label
+                          key={service.id}
+                          className={`flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            selectedServices.includes(service.id) ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedServices.includes(service.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedServices([...selectedServices, service.id]);
+                              } else {
+                                setSelectedServices(selectedServices.filter(id => id !== service.id));
+                              }
+                            }}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <div className="font-medium text-gray-900">{service.name}</div>
+                              <div className="text-sm font-semibold text-blue-600">
+                                ${service.monthly_price.toFixed(2)}/mo
+                              </div>
+                            </div>
+                            {service.description && (
+                              <div className="text-sm text-gray-600 mt-1">{service.description}</div>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
+              {selectedServices.length > 0 && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-gray-700">
+                      Calculated Monthly Price ({selectedServices.length} service{selectedServices.length !== 1 ? 's' : ''})
+                    </span>
+                    <span className="text-lg font-bold text-blue-700">
+                      ${calculatedMonthlyPrice.toFixed(2)}/mo
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Price Override (Optional)
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={priceOverride}
+                  onChange={(e) => setPriceOverride(e.target.value)}
+                  placeholder="Leave blank to use calculated price"
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {priceOverride && (
+                <p className="mt-2 text-sm text-amber-600">
+                  Override active: ${parseFloat(priceOverride).toFixed(2)}/mo will be used instead of calculated price
+                </p>
+              )}
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-900">Final Monthly Price</span>
+                  <span className="text-xl font-bold text-green-700">
+                    ${finalMonthlyPrice.toFixed(2)}/mo
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div>
