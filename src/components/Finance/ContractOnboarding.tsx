@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload, Shield } from 'lucide-react';
+import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload, Shield, ArrowRight } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
 import SecurityAccountStats from './SecurityAccountStats';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -33,7 +33,7 @@ interface StatusColumn {
   borderColor: string;
 }
 
-export default function ContractOnboarding({ onNavigateToImport }: { onNavigateToImport?: () => void }) {
+export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnboarding }: { onNavigateToImport?: () => void; onNavigateToOnboarding?: () => void }) {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -222,6 +222,12 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
           </h1>
           <p className="text-gray-300 mt-1">Alarm monitoring contract onboarding, approval, and activation</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        {onNavigateToOnboarding && (
+          <button onClick={onNavigateToOnboarding} className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium">
+            <ArrowRight className="w-4 h-4" /> Start Onboarding
+          </button>
+        )}
         {onNavigateToImport && (
           <button
             onClick={onNavigateToImport}
@@ -231,6 +237,7 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
             Import Contracts
           </button>
         )}
+        </div>
       </div>
 
       <div className="flex gap-1 mb-6 bg-white/10 rounded-lg p-1 w-fit">

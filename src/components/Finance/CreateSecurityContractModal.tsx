@@ -51,10 +51,11 @@ interface AIPrefill {
 interface CreateSecurityContractModalProps {
   onClose: () => void;
   onSuccess: () => void;
+  onPaperCreated?: (contract: { id: string }) => void;
   prefill?: AIPrefill;
 }
 
-export default function CreateSecurityContractModal({ onClose, onSuccess, prefill }: CreateSecurityContractModalProps) {
+export default function CreateSecurityContractModal({ onClose, onSuccess, onPaperCreated, prefill }: CreateSecurityContractModalProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [monitoringServices, setMonitoringServices] = useState<MonitoringService[]>([]);
@@ -352,7 +353,8 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, prefil
         if (servicesError) throw servicesError;
       }
 
-      onSuccess();
+      if (onPaperCreated) onPaperCreated(contractData);
+      else onSuccess();
     } catch (error: any) {
       console.error('Error creating contract:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
@@ -383,7 +385,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, prefil
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Create Security Agreement</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Start Paper Onboarding' : 'Create Security Agreement'}</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
@@ -1052,7 +1054,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, prefil
                 disabled={saving}
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? 'Creating...' : 'Create Agreement'}
+                {saving ? 'Creating...' : onPaperCreated ? 'Continue to Onboarding Form' : 'Create Agreement'}
               </button>
             </div>
           </form>

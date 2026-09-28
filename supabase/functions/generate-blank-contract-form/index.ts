@@ -26,15 +26,30 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
+        global: { headers: { Authorization: authHeader } },
         auth: {
           persistSession: false,
         },
       }
     );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const { data: contract, error: contractError } = await supabaseClient
       .from('security_contracts')
@@ -314,7 +329,7 @@ Deno.serve(async (req: Request) => {
         <div class="signature-section">
           <div class="section-header">Terms and Conditions</div>
           <div class="terms">
-            ${contract.template?.content || 'Standard terms and conditions apply.'}
+            ${(contract.template?.contract_terms || 'Terms and conditions unavailable.').replaceAll('[term]', `${contract.term_months || ''} months`)}
           </div>
 
           <div style="margin-top: 50px;">
