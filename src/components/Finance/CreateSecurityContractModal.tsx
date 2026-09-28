@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, Search, Plus, User } from 'lucide-react';
+import { X, Search, Plus, Wrench } from 'lucide-react';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
 
 interface Template {
@@ -75,8 +75,10 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [contactSearchLoading, setContactSearchLoading] = useState(false);
-  const [mode, setMode] = useState<'select' | 'create'>('select');
+  const [showNewContactForm, setShowNewContactForm] = useState(false);
   const [showContactEdit, setShowContactEdit] = useState(false);
+  const [installationDate, setInstallationDate] = useState('');
+  const [serviceAccountNumbers, setServiceAccountNumbers] = useState<Record<string, string>>({});
 
   const [contactEdits, setContactEdits] = useState({
     first_name: '',
@@ -137,13 +139,13 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   }, [searchTerm]);
 
   useEffect(() => {
-    if (selectedContact && mode === 'select') {
+    if (selectedContact) {
       loadSelectedContact(selectedContact);
     } else {
       setSelectedContactData(null);
       setShowContactEdit(false);
     }
-  }, [selectedContact, mode]);
+  }, [selectedContact]);
 
   const filteredSalesOrders = selectedContact
     ? salesOrders.filter(order => order.contact_id === selectedContact)
@@ -260,7 +262,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
       let contactId = selectedContact;
 
-      if (mode === 'create') {
+      if (showNewContactForm && !selectedContact) {
         const { data: contactData, error: contactError } = await supabase
           .from('contacts')
           .insert({
@@ -279,7 +281,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
         if (contactError) throw contactError;
         contactId = contactData.id;
-      } else if (mode === 'select' && selectedContactData) {
+      } else if (selectedContactData) {
         const hasChanges =
           contactEdits.first_name !== (selectedContactData.first_name || '') ||
           contactEdits.last_name !== (selectedContactData.last_name || '') ||
@@ -326,6 +328,8 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
           cancellation_notice_days: 30,
           account_type: accountType || null,
           account_services: accountServices,
+          installation_date: installationDate || null,
+          service_account_numbers: Object.keys(serviceAccountNumbers).length > 0 ? serviceAccountNumbers : null,
           notes,
           email_override: emailOverride || null
         })
@@ -440,218 +444,102 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
             </div>
 
             <div>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                <label className="block text-sm font-medium text-gray-700">
-                  Customer <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMode('select')}
-                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
-                      mode === 'select'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <User className="w-4 h-4 flex-shrink-0" />
-                    <span>Select Existing</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode('create')}
-                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
-                      mode === 'create'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <Plus className="w-4 h-4 flex-shrink-0" />
-                    <span>Add New</span>
-                  </button>
-                </div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer <span className="text-red-500">*</span>
+              </label>
+
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    if (selectedContact) {
+                      setSelectedContact('');
+                    }
+                    if (showNewContactForm) {
+                      setShowNewContactForm(false);
+                    }
+                  }}
+                  placeholder="Type a name or email to search..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
-              {mode === 'select' ? (
-                <>
-                  <div className="relative mb-2">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Type a name or email to search..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
-                    {contactSearchLoading ? (
-                      <div className="p-4 text-center text-gray-500">Searching...</div>
-                    ) : filteredContacts.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">
-                        {searchTerm.trim() ? `No contacts found matching "${searchTerm}"` : 'Start typing to search all contacts'}
+              <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
+                {contactSearchLoading ? (
+                  <div className="p-4 text-center text-gray-500">Searching...</div>
+                ) : filteredContacts.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    {searchTerm.trim() ? (
+                      <div>
+                        <p>No contacts found matching "{searchTerm}"</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewContactForm(true)}
+                          className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add "{searchTerm}" as a new customer
+                        </button>
                       </div>
                     ) : (
-                      filteredContacts.map((contact) => {
-                        const displayName = contact.full_name ||
-                          [contact.first_name, contact.last_name].filter(Boolean).join(' ') ||
-                          contact.email ||
-                          'Unknown';
-                        return (
-                          <label
-                            key={contact.id}
-                            className={`flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                              selectedContact === contact.id ? 'bg-blue-50' : ''
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="contact"
-                              value={contact.id}
-                              checked={selectedContact === contact.id}
-                              onChange={(e) => setSelectedContact(e.target.value)}
-                              className="mt-1"
-                              required={mode === 'select'}
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">{displayName}</div>
-                              {contact.company_name && (
-                                <div className="text-xs text-gray-500">{contact.company_name}</div>
-                              )}
-                              <div className="text-sm text-gray-600">{contact.email}</div>
-                              <div className="text-sm text-gray-500">{contact.phone}</div>
-                              {contact.street_address && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {contact.street_address}, {contact.city}, {contact.state} {contact.zip_code}
-                                </div>
-                              )}
-                            </div>
-                          </label>
-                        );
-                      })
+                      'Start typing to search all contacts'
                     )}
                   </div>
-
-                  {showContactEdit && selectedContactData && (
-                    <div className="mt-4 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3 sm:space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-1 mb-3">
-                        <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Review & Edit Customer Information</h3>
-                        <span className="text-xs text-blue-600">Make any necessary changes below</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                          <input
-                            type="text"
-                            value={contactEdits.first_name}
-                            onChange={(e) => setContactEdits({ ...contactEdits, first_name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                          />
+                ) : (
+                  filteredContacts.map((contact) => {
+                    const displayName = contact.full_name ||
+                      [contact.first_name, contact.last_name].filter(Boolean).join(' ') ||
+                      contact.email ||
+                      'Unknown';
+                    return (
+                      <button
+                        type="button"
+                        key={contact.id}
+                        onClick={() => {
+                          setSelectedContact(contact.id);
+                          setShowNewContactForm(false);
+                        }}
+                        className={`w-full text-left flex items-start gap-3 p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
+                          selectedContact === contact.id ? 'bg-blue-100 border-blue-200' : 'bg-white'
+                        }`}
+                      >
+                        <div className={`mt-1 w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                          selectedContact === contact.id ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                        }`} />
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{displayName}</div>
+                          {contact.company_name && (
+                            <div className="text-xs text-gray-500">{contact.company_name}</div>
+                          )}
+                          <div className="text-sm text-gray-600">{contact.email}</div>
+                          <div className="text-sm text-gray-500">{contact.phone}</div>
+                          {contact.street_address && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {contact.street_address}, {contact.city}, {contact.state} {contact.zip_code}
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                          <input
-                            type="text"
-                            value={contactEdits.last_name}
-                            onChange={(e) => setContactEdits({ ...contactEdits, last_name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                          />
-                        </div>
-                      </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-                        <input
-                          type="text"
-                          value={contactEdits.company_name}
-                          onChange={(e) => setContactEdits({ ...contactEdits, company_name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                          <input
-                            type="email"
-                            value={contactEdits.email}
-                            onChange={(e) => setContactEdits({ ...contactEdits, email: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                          <input
-                            type="tel"
-                            value={contactEdits.phone}
-                            onChange={(e) => setContactEdits({ ...contactEdits, phone: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
-                        <AddressAutocomplete
-                          value={contactEdits.street_address}
-                          onChange={(address, components) => {
-                            try {
-                              if (components) {
-                                setContactEdits(prev => ({
-                                  ...prev,
-                                  street_address: address,
-                                  city: components.city || prev.city,
-                                  state: components.state || prev.state,
-                                  zip_code: components.zip || prev.zip_code
-                                }));
-                              } else {
-                                setContactEdits(prev => ({ ...prev, street_address: address }));
-                              }
-                            } catch (error) {
-                              console.error('Error updating contact address:', error);
-                            }
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                          <input
-                            type="text"
-                            value={contactEdits.city}
-                            onChange={(e) => setContactEdits({ ...contactEdits, city: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                          <input
-                            type="text"
-                            value={contactEdits.state}
-                            onChange={(e) => setContactEdits({ ...contactEdits, state: e.target.value })}
-                            maxLength={2}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
-                        <input
-                          type="text"
-                          value={contactEdits.zip_code}
-                          onChange={(e) => setContactEdits({ ...contactEdits, zip_code: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="space-y-3 sm:space-y-4">
+              {showNewContactForm && (
+                <div className="mt-3 p-3 sm:p-4 bg-gray-50 border border-gray-300 rounded-lg space-y-3 sm:space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">New Customer</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewContactForm(false)}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -662,7 +550,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                         value={newContact.first_name}
                         onChange={(e) => setNewContact({ ...newContact, first_name: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={mode === 'create'}
+                        required={showNewContactForm && !selectedContact}
                       />
                     </div>
                     <div>
@@ -674,15 +562,12 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                         value={newContact.last_name}
                         onChange={(e) => setNewContact({ ...newContact, last_name: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={mode === 'create'}
+                        required={showNewContactForm && !selectedContact}
                       />
                     </div>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Company Name (Optional)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name (Optional)</label>
                     <input
                       type="text"
                       value={newContact.company_name}
@@ -690,7 +575,6 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                     />
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -701,7 +585,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                         value={newContact.email}
                         onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={mode === 'create'}
+                        required={showNewContactForm && !selectedContact}
                       />
                     </div>
                     <div>
@@ -713,11 +597,10 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                         value={newContact.phone}
                         onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={mode === 'create'}
+                        required={showNewContactForm && !selectedContact}
                       />
                     </div>
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Street Address <span className="text-red-500">*</span>
@@ -742,10 +625,9 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      required={mode === 'create'}
+                      required={showNewContactForm && !selectedContact}
                     />
                   </div>
-
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -756,7 +638,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                         value={newContact.city}
                         onChange={(e) => setNewContact({ ...newContact, city: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={mode === 'create'}
+                        required={showNewContactForm && !selectedContact}
                       />
                     </div>
                     <div>
@@ -769,11 +651,10 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                         onChange={(e) => setNewContact({ ...newContact, state: e.target.value })}
                         maxLength={2}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={mode === 'create'}
+                        required={showNewContactForm && !selectedContact}
                       />
                     </div>
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       ZIP Code <span className="text-red-500">*</span>
@@ -783,7 +664,125 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                       value={newContact.zip_code}
                       onChange={(e) => setNewContact({ ...newContact, zip_code: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      required={mode === 'create'}
+                      required={showNewContactForm && !selectedContact}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {showContactEdit && selectedContactData && (
+                <div className="mt-4 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3 sm:space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-1 mb-3">
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Review & Edit Customer Information</h3>
+                    <span className="text-xs text-blue-600">Make any necessary changes below</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                      <input
+                        type="text"
+                        value={contactEdits.first_name}
+                        onChange={(e) => setContactEdits({ ...contactEdits, first_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                      <input
+                        type="text"
+                        value={contactEdits.last_name}
+                        onChange={(e) => setContactEdits({ ...contactEdits, last_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                    <input
+                      type="text"
+                      value={contactEdits.company_name}
+                      onChange={(e) => setContactEdits({ ...contactEdits, company_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={contactEdits.email}
+                        onChange={(e) => setContactEdits({ ...contactEdits, email: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={contactEdits.phone}
+                        onChange={(e) => setContactEdits({ ...contactEdits, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                    <AddressAutocomplete
+                      value={contactEdits.street_address}
+                      onChange={(address, components) => {
+                        try {
+                          if (components) {
+                            setContactEdits(prev => ({
+                              ...prev,
+                              street_address: address,
+                              city: components.city || prev.city,
+                              state: components.state || prev.state,
+                              zip_code: components.zip || prev.zip_code
+                            }));
+                          } else {
+                            setContactEdits(prev => ({ ...prev, street_address: address }));
+                          }
+                        } catch (error) {
+                          console.error('Error updating contact address:', error);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                      <input
+                        type="text"
+                        value={contactEdits.city}
+                        onChange={(e) => setContactEdits({ ...contactEdits, city: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                      <input
+                        type="text"
+                        value={contactEdits.state}
+                        onChange={(e) => setContactEdits({ ...contactEdits, state: e.target.value })}
+                        maxLength={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+                    <input
+                      type="text"
+                      value={contactEdits.zip_code}
+                      onChange={(e) => setContactEdits({ ...contactEdits, zip_code: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                     />
                   </div>
                 </div>
@@ -890,6 +889,79 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                 </div>
               </div>
 
+            </div>
+
+            {/* Installation Details */}
+            <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-amber-600" />
+                <h3 className="text-xs sm:text-sm font-semibold text-gray-800">Installation Details</h3>
+                <span className="text-xs text-amber-600">Optional -- fill in now or after the system is installed</span>
+              </div>
+
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Installation Date</label>
+                <input
+                  type="date"
+                  value={installationDate}
+                  onChange={(e) => setInstallationDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {accountServices.filter(s => ['dial_up', 'telguard', 'alarmnet', 'alarm_com'].includes(s)).length > 0 && (
+                <div className="space-y-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers</label>
+                  {accountServices.includes('dial_up') && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
+                      <input
+                        type="text"
+                        value={serviceAccountNumbers.dial_up || ''}
+                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, dial_up: e.target.value }))}
+                        placeholder="e.g. 12345"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  )}
+                  {accountServices.includes('telguard') && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number</label>
+                      <input
+                        type="text"
+                        value={serviceAccountNumbers.telguard || ''}
+                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, telguard: e.target.value }))}
+                        placeholder="e.g. TG67890"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  )}
+                  {accountServices.includes('alarmnet') && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number</label>
+                      <input
+                        type="text"
+                        value={serviceAccountNumbers.alarmnet || ''}
+                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarmnet: e.target.value }))}
+                        placeholder="e.g. AN111"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  )}
+                  {accountServices.includes('alarm_com') && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number</label>
+                      <input
+                        type="text"
+                        value={serviceAccountNumbers.alarm_com || ''}
+                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarm_com: e.target.value }))}
+                        placeholder="e.g. AC222"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
