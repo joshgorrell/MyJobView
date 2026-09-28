@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { ProductUsageHistory } from './ProductUsageHistory';
 import { useAuth } from '../../contexts/AuthContext';
 import ProductDetailPanel, { type ProductDetailPanelData } from './ProductDetailPanel';
+import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 
 interface ProductDetailModalProps {
   productId: string;
@@ -27,7 +28,7 @@ export function ProductDetailModal({ productId, onClose, onEdit }: ProductDetail
     try {
       const { data: p, error } = await supabase
         .from('products')
-        .select('*, manufacturers(name), labor_phases(name, default_price)')
+        .select('*, manufacturers(name), labor_phases(name, default_price), catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
         .eq('id', productId)
         .single();
 
@@ -56,17 +57,19 @@ export function ProductDetailModal({ productId, onClose, onEdit }: ProductDetail
         updatedBy: updatedByName,
       });
 
+      const taxonomy = catalogTaxonomy(p);
       setPanelData({
         productId: p.id,
-        productName: p.manufacturer_model_number || p.name || '',
+        productName: p.name || p.manufacturer_model_number || '',
         sku: p.sku || null,
         upc: p.upc || null,
-        category: p.category || null,
-        subcategory: p.subcategory || null,
+        category: taxonomy.categoryName || null,
+        subcategory: taxonomy.subcategoryName || null,
         inventoryType: p.inventory_type || null,
         itemColor: p.item_color || null,
         itemSize: p.item_size || null,
         manufacturerName: p.manufacturers?.name || null,
+        vendorName: taxonomy.vendorName || null,
         imageUrl: p.image_url || p.thumbnail_url || null,
         manufacturerUrl: p.manufacturer_url || null,
         supplierUrl: p.supplier_url || null,

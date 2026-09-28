@@ -142,7 +142,10 @@ export function SalesOrderProductDetailModal({
           image_url, thumbnail_url, manufacturer_url, supplier_url,
           datasheet_url, installation_video_url, description,
           default_labor_hours, labor_phase_id,
-          manufacturers(name), labor_phases(name, default_price)
+          manufacturers(name), labor_phases(name, default_price),
+          catalog_category:product_categories!products_category_id_fkey(name),
+          catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name),
+          default_vendor:vendors!products_default_vendor_id_fkey(vendor_name), vendor
         `)
         .eq('id', lineItem.product_id)
         .maybeSingle();
@@ -193,22 +196,26 @@ export function SalesOrderProductDetailModal({
 
       const mfr = Array.isArray(p.manufacturers) ? p.manufacturers[0] ?? null : p.manufacturers;
       const lp = Array.isArray(p.labor_phases) ? p.labor_phases[0] ?? null : p.labor_phases;
+      const catalogCategory = Array.isArray(p.catalog_category) ? p.catalog_category[0] : p.catalog_category;
+      const catalogSubcategory = Array.isArray(p.catalog_subcategory) ? p.catalog_subcategory[0] : p.catalog_subcategory;
+      const defaultVendor = Array.isArray(p.default_vendor) ? p.default_vendor[0] : p.default_vendor;
 
-      setProductName(p.manufacturer_model_number || p.name || lineItem.description);
-      setCategory(p.category || null);
-      setSubcategory(null);
+      setProductName(p.name || p.manufacturer_model_number || lineItem.description);
+      setCategory(catalogCategory?.name || p.category || null);
+      setSubcategory(catalogSubcategory?.name || null);
 
       setPanelData({
         productId: p.id,
-        productName: p.manufacturer_model_number || p.name || '',
+        productName: p.name || p.manufacturer_model_number || '',
         sku: p.sku || null,
         upc: p.upc || null,
-        category: p.category || null,
-        subcategory: null,
+        category: catalogCategory?.name || p.category || null,
+        subcategory: catalogSubcategory?.name || null,
         inventoryType: p.inventory_type || null,
         itemColor: p.item_color || null,
         itemSize: null,
         manufacturerName: mfr?.name || null,
+        vendorName: defaultVendor?.vendor_name || p.vendor || null,
         imageUrl: p.image_url || p.thumbnail_url || null,
         manufacturerUrl: p.manufacturer_url || null,
         supplierUrl: p.supplier_url || null,

@@ -15,6 +15,7 @@ export interface ProductDetailPanelData {
   itemColor: string | null;
   itemSize: string | null;
   manufacturerName: string | null;
+  vendorName?: string | null;
   imageUrl: string | null;
   manufacturerUrl: string | null;
   supplierUrl: string | null;
@@ -161,6 +162,7 @@ export default function ProductDetailPanel({
               <Package className="w-3 h-3" /> Product Info
             </div>
             {data.manufacturerName && <InfoRow label="Mfr" value={data.manufacturerName} />}
+            {data.vendorName && <InfoRow label="Vendor" value={data.vendorName} />}
             {data.sku && <InfoRow label="SKU" value={data.sku} />}
             {data.upc && <InfoRow label="UPC" value={data.upc} />}
             {data.msrp && data.msrp > 0 && <InfoRow label="MSRP" value={formatCurrency(data.msrp)} />}

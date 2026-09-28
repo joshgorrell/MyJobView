@@ -6,6 +6,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { RemoveLineItemDialog } from './RemoveLineItemDialog';
 import { computeTaxTotals, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
 import { TaxRulesBadge } from '../Shared/TaxRulesBadge';
+import ProductSelector from '../Proposals/ProductSelector';
+import type { Product as CatalogProduct } from '../../lib/types';
 
 interface LineItem {
   id?: string;
@@ -55,6 +57,8 @@ interface Product {
   name: string;
   description: string;
   retail_price: number;
+  unit_price?: number;
+  our_price?: number;
   item_type?: string;
 }
 
@@ -90,6 +94,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
   const [loading, setLoading] = useState(false);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [browseProductIndex, setBrowseProductIndex] = useState<number | null>(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<string>(initialSalesOrderId || '');
   const [proposalSettings, setProposalSettings] = useState<ProposalSettings>({});
   const [showModifiers, setShowModifiers] = useState(false);
@@ -415,13 +420,13 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
     setLineItems(updated);
   }
 
-  async function selectProduct(index: number, productId: string) {
-    const product = products.find(p => p.id === productId);
+  async function selectProduct(index: number, productId: string, selected?: Product) {
+    const product = selected || products.find(p => p.id === productId);
     if (!product) return;
 
     const updated = [...lineItems];
     const qty = updated[index].new_quantity || 1;
-    const unitPrice = product.retail_price;
+    const unitPrice = Number(product.retail_price ?? product.our_price ?? product.unit_price ?? 0);
     const newTotal = qty * unitPrice;
 
     updated[index] = {
@@ -1205,6 +1210,9 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                                     </option>
                                   ))}
                                 </select>
+                                <button type="button" onClick={() => setBrowseProductIndex(index)} className="mt-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                                  Browse by category, subcategory, or vendor
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1766,6 +1774,13 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
           onRemovePrimaryOnly={() => removeItemAndReindex(removeDialogIndex, 'primary_only')}
         />
       )}
+      {browseProductIndex !== null && <ProductSelector showCreateActions={false} priceField="retail_price"
+        onClose={() => setBrowseProductIndex(null)}
+        onSelect={(product: CatalogProduct | null) => {
+          const index = browseProductIndex;
+          setBrowseProductIndex(null);
+          if (product && index !== null) void selectProduct(index, product.id, product as unknown as Product);
+        }} />}
     </div>
   );
 }

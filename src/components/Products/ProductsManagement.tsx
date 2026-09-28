@@ -11,6 +11,9 @@ import { ProductDetailModal } from './ProductDetailModal';
 import ProductsGridView from './ProductsGridView';
 import PackagesListView from './PackagesListView';
 import ConfirmModal from '../ui/ConfirmModal';
+import { catalogTaxonomy, type CatalogTaxonomy } from './CatalogTaxonomyFilters';
+
+type CatalogProduct = Product & CatalogTaxonomy & { category_id?: string | null; subcategory_id?: string | null; default_vendor_id?: string | null };
 
 export default function ProductsManagement() {
   const { profile, loading: authLoading } = useAuth();
@@ -18,8 +21,8 @@ export default function ProductsManagement() {
 
   console.log('ProductsManagement canEdit:', canEdit, 'profile:', profile, 'authLoading:', authLoading);
   const [activeTab, setActiveTab] = useState<'products' | 'packages' | 'monitoring'>('products');
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   // Persist form visibility state so it reopens when returning to this module
   const [showForm, setShowForm] = useState(() => {
@@ -37,6 +40,7 @@ export default function ProductsManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterSubcategory, setFilterSubcategory] = useState<string>('all');
   const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
   const [filterVendor, setFilterVendor] = useState<string>('all');
   const [filterPhase, setFilterPhase] = useState<string>('all');
@@ -130,7 +134,7 @@ export default function ProductsManagement() {
 
   useEffect(() => {
     filterProducts();
-  }, [products, searchTerm, filterType, filterCategory, filterManufacturer, filterVendor, filterPhase]);
+  }, [products, searchTerm, filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase]);
 
   async function loadProducts() {
     if (!profile) {
@@ -145,7 +149,7 @@ export default function ProductsManagement() {
 
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
         .order('vendor', { nullsFirst: false })
         .order('sku', { nullsFirst: false });
 
@@ -153,7 +157,7 @@ export default function ProductsManagement() {
 
       if (error) throw error;
 
-      setProducts(data || []);
+      setProducts((data || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as CatalogProduct[]);
       console.log('ProductsManagement: Products loaded successfully');
     } catch (error) {
       console.error('Error loading products:', error);
@@ -169,7 +173,7 @@ export default function ProductsManagement() {
     try {
       const [mfgData, vendorData, phaseData] = await Promise.all([
         supabase.from('manufacturers').select('id, name').order('name'),
-        supabase.from('vendors').select('id, name').order('name'),
+        supabase.from('vendors').select('id, vendor_name').order('vendor_name'),
         supabase.from('labor_phases').select('id, name').order('name')
       ]);
 
@@ -187,9 +191,12 @@ export default function ProductsManagement() {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(p =>
+        (p.name?.toLowerCase().includes(search)) ||
         (p.manufacturer_model_number?.toLowerCase().includes(search)) ||
         (p.sku?.toLowerCase().includes(search)) ||
-        (p.category?.toLowerCase().includes(search))
+        p.categoryName.toLowerCase().includes(search) ||
+        p.subcategoryName.toLowerCase().includes(search) ||
+        p.vendorName.toLowerCase().includes(search)
       );
     }
 
@@ -198,8 +205,9 @@ export default function ProductsManagement() {
     }
 
     if (filterCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === filterCategory);
+      filtered = filtered.filter(p => p.categoryName === filterCategory);
     }
+    if (filterSubcategory !== 'all') filtered = filtered.filter(p => p.subcategoryName === filterSubcategory);
 
     if (filterManufacturer !== 'all') {
       filtered = filtered.filter(p => p.manufacturer_id === filterManufacturer);
@@ -214,8 +222,8 @@ export default function ProductsManagement() {
     }
 
     filtered.sort((a, b) => {
-      const va = (a.vendor || '').toLowerCase();
-      const vb = (b.vendor || '').toLowerCase();
+      const va = a.vendorName.toLowerCase();
+      const vb = b.vendorName.toLowerCase();
       if (va !== vb) return va < vb ? -1 : 1;
       const sa = (a.sku || '').toLowerCase();
       const sb = (b.sku || '').toLowerCase();
@@ -271,7 +279,9 @@ export default function ProductsManagement() {
     );
   }
 
-  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+  const categories = Array.from(new Set(products.map(p => p.categoryName).filter(Boolean))).sort();
+  const subcategories = Array.from(new Set(products.filter(p => filterCategory === 'all' || p.categoryName === filterCategory)
+    .map(p => p.subcategoryName).filter(Boolean))).sort();
 
   return (
     <div className="space-y-6">
@@ -403,16 +413,16 @@ export default function ProductsManagement() {
           <button
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors ${
-              filterType !== 'all' || filterCategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all'
+              filterType !== 'all' || filterCategory !== 'all' || filterSubcategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all'
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-750'
             }`}
           >
             <Filter size={16} />
             Filters
-            {(filterType !== 'all' || filterCategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all') && (
+            {(filterType !== 'all' || filterCategory !== 'all' || filterSubcategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all') && (
               <span className="bg-white text-blue-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {[filterType, filterCategory, filterManufacturer, filterVendor, filterPhase].filter(f => f !== 'all').length}
+                {[filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase].filter(f => f !== 'all').length}
               </span>
             )}
           </button>
@@ -474,13 +484,24 @@ export default function ProductsManagement() {
               <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
               <select
                 value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
+                onChange={(e) => { setFilterCategory(e.target.value); setFilterSubcategory('all'); }}
                 className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
               >
                 <option value="all">All Categories</option>
                 {categories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
+              </select>
+            </div>
+          )}
+
+          {subcategories.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Subcategory</label>
+              <select value={filterSubcategory} onChange={e => setFilterSubcategory(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <option value="all">All Subcategories</option>
+                {subcategories.map(name => <option key={name} value={name}>{name}</option>)}
               </select>
             </div>
           )}
@@ -511,7 +532,7 @@ export default function ProductsManagement() {
               >
                 <option value="all">All Vendors</option>
                 {vendors.map(vendor => (
-                  <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+                  <option key={vendor.id} value={vendor.id}>{vendor.vendor_name}</option>
                 ))}
               </select>
             </div>
@@ -550,6 +571,7 @@ export default function ProductsManagement() {
               onClick={() => {
                 setFilterType('all');
                 setFilterCategory('all');
+                setFilterSubcategory('all');
                 setFilterManufacturer('all');
                 setFilterVendor('all');
                 setFilterPhase('all');
@@ -736,9 +758,9 @@ export default function ProductsManagement() {
                         )}
                       </td>
                       <td className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2">
-                        {product.vendor && (
+                        {product.vendorName && (
                           <div className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-wide font-medium truncate">
-                            {product.vendor}
+                            {product.vendorName}
                           </div>
                         )}
                         <div className="font-mono font-medium text-white truncate lg:whitespace-normal">
@@ -752,6 +774,11 @@ export default function ProductsManagement() {
                         <div className="truncate">
                           {truncatedDescription}
                         </div>
+                        {(product.categoryName || product.subcategoryName) && (
+                          <div className="truncate text-[9px] sm:text-[10px] text-gray-400">
+                            {[product.categoryName, product.subcategoryName].filter(Boolean).join(' / ')}
+                          </div>
+                        )}
                       </td>
                       <td className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2 text-right text-white font-medium">
                         ${price.toFixed(2)}

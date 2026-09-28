@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, Search, Package, Clock } from 'lucide-react';
+import { CatalogTaxonomyFilters, catalogTaxonomy, type CatalogTaxonomy } from '../Products/CatalogTaxonomyFilters';
 
-interface Product {
+interface Product extends CatalogTaxonomy {
   id: string;
   sku: string;
   name: string;
@@ -34,8 +35,9 @@ export default function InvoiceCatalogBrowser({
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [selectedVendor, setSelectedVendor] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'recent' | 'margin'>('name');
@@ -47,7 +49,7 @@ export default function InvoiceCatalogBrowser({
 
   useEffect(() => {
     filterAndSortProducts();
-  }, [searchQuery, selectedCategory, products, sortBy]);
+  }, [searchQuery, selectedCategory, selectedSubcategory, selectedVendor, products, sortBy]);
 
   async function loadProducts() {
     try {
@@ -55,19 +57,14 @@ export default function InvoiceCatalogBrowser({
 
       const { data, error } = await supabase
         .from('products')
-        .select('id, sku, name, description, our_price, cost, unit, is_taxable, category, manufacturer_model_number')
+        .select('id, sku, name, description, our_price, cost, unit, is_taxable, category, vendor, manufacturer_model_number, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
         .eq('company_id', profile?.company_id)
         .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
 
-      setProducts(data || []);
-
-      const uniqueCategories = Array.from(
-        new Set((data || []).map(p => p.category).filter(Boolean))
-      ) as string[];
-      setCategories(uniqueCategories);
+      setProducts((data || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as Product[]);
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
@@ -90,11 +87,11 @@ export default function InvoiceCatalogBrowser({
 
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('id, sku, name, description, our_price, cost, unit, is_taxable, category, manufacturer_model_number')
+          .select('id, sku, name, description, our_price, cost, unit, is_taxable, category, vendor, manufacturer_model_number, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
           .in('id', productIds);
 
         if (productError) throw productError;
-        setRecentProducts(productData || []);
+        setRecentProducts((productData || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as Product[]);
       }
     } catch (error) {
       console.error('Error loading recent products:', error);
@@ -104,9 +101,9 @@ export default function InvoiceCatalogBrowser({
   function filterAndSortProducts() {
     let filtered = products;
 
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === selectedCategory);
-    }
+    if (selectedCategory) filtered = filtered.filter(p => p.categoryName === selectedCategory);
+    if (selectedSubcategory) filtered = filtered.filter(p => p.subcategoryName === selectedSubcategory);
+    if (selectedVendor) filtered = filtered.filter(p => p.vendorName === selectedVendor);
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -114,7 +111,9 @@ export default function InvoiceCatalogBrowser({
         p.name?.toLowerCase().includes(query) ||
         p.description?.toLowerCase().includes(query) ||
         p.sku?.toLowerCase().includes(query) ||
-        p.manufacturer_model_number?.toLowerCase().includes(query)
+        p.manufacturer_model_number?.toLowerCase().includes(query) ||
+        p.categoryName.toLowerCase().includes(query) || p.subcategoryName.toLowerCase().includes(query) ||
+        p.vendorName.toLowerCase().includes(query)
       );
     }
 
@@ -202,31 +201,8 @@ export default function InvoiceCatalogBrowser({
             </select>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                selectedCategory === 'all'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              All
-            </button>
-            {categories.map(category => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                  selectedCategory === category
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
+          <CatalogTaxonomyFilters products={products} category={selectedCategory} subcategory={selectedSubcategory} vendor={selectedVendor}
+            onCategory={setSelectedCategory} onSubcategory={setSelectedSubcategory} onVendor={setSelectedVendor} />
 
           {multiSelect && selectedProducts.size > 0 && (
             <div className="flex justify-between items-center bg-blue-900 bg-opacity-30 border border-blue-700 rounded-lg px-4 py-2">
@@ -241,7 +217,7 @@ export default function InvoiceCatalogBrowser({
           )}
         </div>
 
-        {recentProducts.length > 0 && !searchQuery && selectedCategory === 'all' && (
+        {recentProducts.length > 0 && !searchQuery && !selectedCategory && !selectedSubcategory && !selectedVendor && (
           <div className="px-6 py-4 border-b border-gray-700">
             <div className="flex items-center gap-2 mb-3">
               <Clock size={18} className="text-blue-400" />
@@ -262,6 +238,7 @@ export default function InvoiceCatalogBrowser({
                     <span className="text-sm font-medium text-white truncate">{product.name}</span>
                     <span className="text-sm font-bold text-green-400 ml-2">${product.our_price?.toFixed(2) || '0.00'}</span>
                   </div>
+                  <div className="text-xs text-gray-400 truncate">{[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}</div>
                   {product.cost && (
                     <div className="text-xs text-gray-400">
                       Cost: ${product.cost.toFixed(2)} ({calculateMargin(product).toFixed(0)}% margin)
@@ -317,9 +294,9 @@ export default function InvoiceCatalogBrowser({
                       {product.description && (
                         <div className="text-sm text-gray-500 line-clamp-2">{product.description}</div>
                       )}
-                      {product.category && (
+                      {(product.categoryName || product.subcategoryName || product.vendorName) && (
                         <span className="inline-block mt-2 px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded">
-                          {product.category}
+                          {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
                         </span>
                       )}
                     </div>

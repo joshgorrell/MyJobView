@@ -4,19 +4,25 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Product } from '../../lib/types';
 import { X, Search, Plus, Package } from 'lucide-react';
 import SinglePageProductForm from '../Products/SinglePageProductForm';
+import { CatalogTaxonomyFilters, catalogTaxonomy, type CatalogTaxonomy } from '../Products/CatalogTaxonomyFilters';
+
+type BrowsableProduct = Product & CatalogTaxonomy;
 
 interface ProductSelectorProps {
   onSelect: (product: Product | null, customData?: Partial<Product>) => void;
   onClose: () => void;
+  showCreateActions?: boolean;
+  priceField?: 'unit_price' | 'retail_price';
 }
 
-export default function ProductSelector({ onSelect, onClose }: ProductSelectorProps) {
+export default function ProductSelector({ onSelect, onClose, showCreateActions = true, priceField = 'unit_price' }: ProductSelectorProps) {
   const { profile } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<BrowsableProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<BrowsableProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [selectedVendor, setSelectedVendor] = useState('');
   const [loading, setLoading] = useState(true);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [showNewProductForm, setShowNewProductForm] = useState(false);
@@ -34,7 +40,7 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
 
   useEffect(() => {
     filterProducts();
-  }, [searchQuery, selectedCategory, products]);
+  }, [searchQuery, selectedCategory, selectedSubcategory, selectedVendor, products]);
 
   async function loadProducts() {
     try {
@@ -42,19 +48,16 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
 
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
         .eq('company_id', profile?.company_id)
         .eq('is_active', true)
         .order('sku');
 
       if (error) throw error;
 
-      setProducts(data || []);
-
-      const uniqueCategories = Array.from(
-        new Set((data || []).map(p => p.category).filter(Boolean))
-      ) as string[];
-      setCategories(uniqueCategories);
+      const loaded = (data || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as BrowsableProduct[];
+      setProducts(loaded);
+      return loaded;
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
@@ -65,16 +68,17 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
   function filterProducts() {
     let filtered = products;
 
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === selectedCategory);
-    }
+    if (selectedCategory) filtered = filtered.filter(p => p.categoryName === selectedCategory);
+    if (selectedSubcategory) filtered = filtered.filter(p => p.subcategoryName === selectedSubcategory);
+    if (selectedVendor) filtered = filtered.filter(p => p.vendorName === selectedVendor);
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(query) ||
         p.description?.toLowerCase().includes(query) ||
-        p.sku?.toLowerCase().includes(query)
+        p.sku?.toLowerCase().includes(query) || p.categoryName.toLowerCase().includes(query) ||
+        p.subcategoryName.toLowerCase().includes(query) || p.vendorName.toLowerCase().includes(query)
       );
     }
 
@@ -92,9 +96,9 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
 
   async function handleProductCreated(productData: any) {
     setShowNewProductForm(false);
-    await loadProducts();
+    const loaded = await loadProducts();
     if (productData?.id) {
-      const product = products.find(p => p.id === productData.id);
+      const product = loaded?.find(p => p.id === productData.id);
       if (product) {
         onSelect(product);
       }
@@ -130,33 +134,10 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
                 />
               </div>
 
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                <button
-                  onClick={() => setSelectedCategory('all')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                    selectedCategory === 'all'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  All
-                </button>
-                {categories.map(category => (
-                  <button
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                      selectedCategory === category
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
+              <CatalogTaxonomyFilters products={products} category={selectedCategory} subcategory={selectedSubcategory} vendor={selectedVendor}
+                onCategory={setSelectedCategory} onSubcategory={setSelectedSubcategory} onVendor={setSelectedVendor} />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {showCreateActions && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   onClick={() => setShowNewProductForm(true)}
                   className="py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2"
@@ -171,7 +152,7 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
                   <Plus size={20} />
                   Add Custom Item
                 </button>
-              </div>
+              </div>}
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
@@ -190,6 +171,9 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
                       className="text-left p-4 bg-gray-900 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
                     >
                       <div className="font-semibold text-white mb-1">{product.name}</div>
+                      {(product.categoryName || product.subcategoryName || product.vendorName) && <div className="text-xs text-blue-200 mb-1">
+                        {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
+                      </div>}
                       {product.description && (
                         <div className="text-sm text-gray-400 mb-2 line-clamp-2">
                           {product.description}
@@ -201,14 +185,9 @@ export default function ProductSelector({ onSelect, onClose }: ProductSelectorPr
                           <span>{product.unit}</span>
                         </div>
                         <div className="text-lg font-bold text-white">
-                          ${product.unit_price.toFixed(2)}
+                          ${Number(priceField === 'retail_price' ? (product as any).retail_price ?? product.our_price ?? product.unit_price : product.unit_price).toFixed(2)}
                         </div>
                       </div>
-                      {product.category && (
-                        <div className="mt-2 inline-block px-2 py-1 bg-gray-800 text-xs text-gray-300 rounded">
-                          {product.category}
-                        </div>
-                      )}
                     </button>
                   ))}
                 </div>
