@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
+import { TenantProvider, useTenant } from './contexts/TenantContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
 import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
@@ -479,11 +480,20 @@ function AppContent() {
     '/portal/membership',
     '/portal/signup',
     '/security-onboarding',
+    '/onboarding',
+    '/login',
+    '/punchlist',
+    '/proposals',
+    '/vip-membership',
+    '/contact',
+    '/membership',
+    '/signup',
   ];
 
   const isPortalAllowedPath =
     PORTAL_ALLOWED_PATHS.includes(currentPath) ||
-    currentPath.startsWith('/portal/proposals/');
+    currentPath.startsWith('/portal/proposals/') ||
+    currentPath.startsWith('/proposals/');
 
   if (isPortalUser && user && !isPortalAllowedPath) {
     // If the user is navigating to the root path (/) they are trying to reach
@@ -496,42 +506,30 @@ function AppContent() {
       return <LoadingFallback />;
     }
     // For all other non-portal paths redirect back to the portal.
-    window.location.replace('/portal/punchlist');
+    window.location.replace('/punchlist');
     return <LoadingFallback />;
   }
   // --- END PORTAL USER ISOLATION ---
 
   // Portal & public routes — must come AFTER the portal isolation guard above
-  if (currentPath === '/portal/membership') {
+  if (currentPath === '/security-onboarding' || currentPath === '/onboarding') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <PublicVIPMembership />
+        <SecurityOnboardingPortal token={token || undefined} />
       </Suspense>
     );
   }
 
-  if (currentPath === '/portal/signup') {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PortalSignup />
-      </Suspense>
-    );
-  }
-
-  if (currentPath === '/portal') {
+  // --- CLEAN SUBDOMAIN ROUTES (mirror the /portal/* routes for dealer subdomains) ---
+  if (currentPath === '/login' || currentPath === '/portal') {
     const portalTokenParam = new URLSearchParams(window.location.search).get('portal_token');
-
-    // If a real customer is arriving via an invite link, clear any stale admin
-    // impersonation state so the token verification flow runs correctly.
     if (portalTokenParam) {
       localStorage.removeItem('admin_impersonating_contact');
       localStorage.removeItem('admin_impersonating_name');
     }
-
-    // Check if we have impersonation data (use localStorage for cross-tab compatibility)
     const impersonatingContactId = localStorage.getItem('admin_impersonating_contact');
-
-    // If admin is impersonating a customer, show the portal dashboard
     if (impersonatingContactId) {
       return (
         <Suspense fallback={<LoadingFallback />}>
@@ -539,8 +537,6 @@ function AppContent() {
         </Suspense>
       );
     }
-
-    // Otherwise show the customer login page
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalLogin />
@@ -548,7 +544,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/punchlist') {
+  if (currentPath === '/punchlist' || currentPath === '/portal/punchlist') {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalModuleGuard moduleKey="portal_tasks_enabled">
@@ -558,7 +554,8 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
+  if (currentPath === '/proposals' || currentPath.startsWith('/proposals/') ||
+      currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalModuleGuard moduleKey="portal_proposals_enabled">
@@ -568,7 +565,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/vip-membership') {
+  if (currentPath === '/vip-membership' || currentPath === '/portal/vip-membership') {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalVIPMembership />
@@ -576,12 +573,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/vip-benefits') {
-    window.location.replace('/portal/vip-membership');
-    return null;
-  }
-
-  if (currentPath === '/portal/contact') {
+  if (currentPath === '/contact' || currentPath === '/portal/contact') {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalContactUs />
@@ -589,14 +581,25 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/security-onboarding') {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+  if (currentPath === '/membership' || currentPath === '/portal/membership') {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <SecurityOnboardingPortal token={token || undefined} />
+        <PublicVIPMembership />
       </Suspense>
     );
+  }
+
+  if (currentPath === '/signup' || currentPath === '/portal/signup') {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <PortalSignup />
+      </Suspense>
+    );
+  }
+
+  if (currentPath === '/portal/vip-benefits') {
+    window.location.replace('/vip-membership');
+    return null;
   }
 
   // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
@@ -1421,9 +1424,11 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <ThemeProvider>
-            <DepartmentProvider>
-              <AppContent />
-            </DepartmentProvider>
+            <TenantProvider>
+              <DepartmentProvider>
+                <AppContent />
+              </DepartmentProvider>
+            </TenantProvider>
           </ThemeProvider>
         </AuthProvider>
       </ToastProvider>

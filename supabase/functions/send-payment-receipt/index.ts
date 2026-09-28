@@ -46,7 +46,9 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const portalUrl = settings.portal_url || '';
+    const portalUrl = settings.subdomain
+      ? `https://${settings.subdomain}.myjobview.com`
+      : (settings.portal_url || '');
 
     // ── Bulk mode ──────────────────────────────────────────────────────────────
     if (body.bulkMode) {

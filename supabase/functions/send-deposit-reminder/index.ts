@@ -108,6 +108,12 @@ Deno.serve(async (req: Request) => {
       .select('company_name, company_email, from_email, from_name, reply_to_email, portal_url, twilio_account_sid, twilio_auth_token, twilio_phone_number')
       .maybeSingle();
 
+    const { data: orgData } = await supabaseClient
+      .from('organizations')
+      .select('subdomain')
+      .limit(1)
+      .maybeSingle();
+
     const customerEmail = proposal.contacts?.email;
     const customerPhone = proposal.contacts?.phone;
     const customerName = proposal.contacts?.contact_name ||
@@ -117,7 +123,10 @@ Deno.serve(async (req: Request) => {
     const companyName = settings?.company_name || 'Your Company';
     // portal_url already contains the full portal base path (e.g. "https://app.example.com/portal")
     // so we only append /proposals/:id — never add /portal again
-    const portalBase = (settings?.portal_url || Deno.env.get('FRONTEND_URL') || 'https://yourapp.com').replace(/\/+$/, '');
+    const subdomain = orgData?.subdomain || null;
+    const portalBase = subdomain
+      ? `https://${subdomain}.myjobview.com`
+      : (settings?.portal_url || Deno.env.get('FRONTEND_URL') || 'https://yourapp.com').replace(/\/+$/, '');
     const proposalUrl = `${portalBase}/proposals/${proposal.id}`;
 
     // Try to generate a one-click magic link so the customer lands directly on the

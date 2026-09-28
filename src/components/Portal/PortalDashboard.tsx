@@ -13,6 +13,7 @@ import PortalMessages from './PortalMessages';
 import { PortalVIPServices } from './PortalVIPServices';
 import { PortalPunchlist } from './PortalPunchlist';
 import { PortalSalesOrders } from './PortalSalesOrders';
+import { useTenant } from '../../contexts/TenantContext';
 
 interface DashboardStats {
   activeProposals: number;
@@ -48,6 +49,9 @@ interface PortalDashboardProps {
 }
 
 export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboardProps = {}) {
+  const { tenant } = useTenant();
+  const dealerName = tenant?.organizationName || 'Electronic Life';
+  const dealerLogo = tenant?.logoUrl;
   const [currentView, setCurrentView] = useState<string>(defaultModule);
   const [stats, setStats] = useState<DashboardStats>({
     activeProposals: 0,
@@ -324,7 +328,11 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-5"></div>
-          <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-10 object-contain mx-auto mb-3 opacity-60" />
+          {dealerLogo ? (
+            <img src={dealerLogo} alt={dealerName} className="h-10 object-contain mx-auto mb-3 opacity-60" />
+          ) : (
+            <p className="text-lg font-bold text-gray-400 mb-3">{dealerName}</p>
+          )}
           <p className="text-gray-500 text-sm font-medium">Loading your portal...</p>
         </div>
       </div>
@@ -355,11 +363,15 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
                   <span className="hidden sm:inline text-sm font-medium">Dashboard</span>
                 </button>
               )}
-              <img
-                src="/el_logo_color_(2).png"
-                alt="Electronic Life"
-                className="h-8 sm:h-10 object-contain"
-              />
+              {dealerLogo ? (
+                <img
+                  src={dealerLogo}
+                  alt={dealerName}
+                  className="h-8 sm:h-10 object-contain"
+                />
+              ) : (
+                <span className="text-white font-bold text-lg">{dealerName}</span>
+              )}
               <div className="hidden sm:block border-l border-white/20 pl-4">
                 <p className="text-white font-semibold text-sm leading-tight">Customer Portal</p>
                 <p className="text-blue-300 text-xs">{contactName || 'Welcome back'}</p>

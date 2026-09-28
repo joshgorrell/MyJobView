@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Building2, Building, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw } from 'lucide-react';
+import { Building2, Building, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw, Check, AlertCircle, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { CompanySettings as CompanySettingsType, CompanyOffice } from '../../lib/types';
 import { TIMEZONE_OPTIONS, clearTimezoneCache } from '../../lib/timezoneUtils';
+import { validateSubdomain } from '../../lib/subdomainConfig';
 import ConfirmModal from '../ui/ConfirmModal';
 
 export function CompanySettings() {
@@ -74,6 +75,14 @@ export function CompanySettings() {
   const [billingChangeEffective, setBillingChangeEffective] = useState<'immediate' | 'next_cycle'>('next_cycle');
   const [defaultAutoRenew, setDefaultAutoRenew] = useState(true);
   const [gracePeriodDays, setGracePeriodDays] = useState(0);
+
+  const [subdomain, setSubdomain] = useState('');
+  const [originalSubdomain, setOriginalSubdomain] = useState('');
+  const [subdomainChecking, setSubdomainChecking] = useState(false);
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [subdomainError, setSubdomainError] = useState<string | null>(null);
+  const [subdomainSaved, setSubdomainSaved] = useState(false);
+  const subdomainCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
@@ -185,6 +194,8 @@ export function CompanySettings() {
         setOrgId(data.id);
         setHeaderLogoUrl(data.header_logo_url || '');
         setFooterLogoUrl(data.footer_logo_url || '');
+        setSubdomain(data.subdomain || '');
+        setOriginalSubdomain(data.subdomain || '');
       }
     } catch (error) {
       console.error('Error loading organization:', error);
@@ -761,6 +772,160 @@ export function CompanySettings() {
           <p className="text-xs text-gray-500 mt-1">
             The URL where your customers access the portal. Used in email links and notifications.
           </p>
+        </div>
+
+        <div className="border-t border-gray-200 pt-4 space-y-3">
+          <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            Customer Portal Subdomain
+          </h4>
+          <p className="text-sm text-gray-500">
+            Claim a unique web address for your customer portal. Your customers will access
+            your portal at <span className="font-semibold text-gray-700">yourname.myjobview.com</span>.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Subdomain
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={subdomain}
+                onChange={(e) => {
+                  const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                  setSubdomain(val);
+                  setSubdomainSaved(false);
+                  setSubdomainAvailable(null);
+                  setSubdomainError(null);
+                  if (subdomainCheckTimeoutRef.current) clearTimeout(subdomainCheckTimeoutRef.current);
+                  if (!val || val === originalSubdomain) {
+                    setSubdomainAvailable(null);
+                    return;
+                  }
+                  const validation = validateSubdomain(val);
+                  if (!validation.valid) {
+                    setSubdomainError(validation.error || 'Invalid subdomain');
+                    setSubdomainAvailable(false);
+                    return;
+                  }
+                  subdomainCheckTimeoutRef.current = setTimeout(async () => {
+                    setSubdomainChecking(true);
+                    try {
+                      const { data, error: checkError } = await supabase
+                        .from('organizations')
+                        .select('id')
+                        .eq('subdomain', val)
+                        .maybeSingle();
+                      if (checkError) throw checkError;
+                      setSubdomainAvailable(!data);
+                    } catch {
+                      setSubdomainAvailable(null);
+                      setSubdomainError('Could not check availability. Please try again.');
+                    } finally {
+                      setSubdomainChecking(false);
+                    }
+                  }, 500);
+                }}
+                placeholder="yourname"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent lowercase"
+              />
+              <span className="text-gray-500 font-medium text-sm whitespace-nowrap">.myjobview.com</span>
+            </div>
+            {subdomain && subdomain !== originalSubdomain && (
+              <div className="mt-2">
+                {subdomainChecking && (
+                  <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                    <Loader className="w-3.5 h-3.5 animate-spin" />
+                    Checking availability...
+                  </p>
+                )}
+                {!subdomainChecking && subdomainAvailable === true && !subdomainError && (
+                  <p className="text-sm text-green-600 flex items-center gap-1.5">
+                    <Check className="w-4 h-4" />
+                    Available! Your portal will be at <span className="font-semibold">{subdomain}.myjobview.com</span>
+                  </p>
+                )}
+                {!subdomainChecking && subdomainAvailable === false && !subdomainError && (
+                  <p className="text-sm text-red-600 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    This subdomain is already taken.
+                  </p>
+                )}
+                {subdomainError && (
+                  <p className="text-sm text-red-600 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    {subdomainError}
+                  </p>
+                )}
+              </div>
+            )}
+            {subdomain && subdomain === originalSubdomain && originalSubdomain && (
+              <p className="text-sm text-gray-500 mt-2">
+                This is your current subdomain. Your portal is at <span className="font-semibold">{subdomain}.myjobview.com</span>
+              </p>
+            )}
+            {subdomainSaved && (
+              <p className="text-sm text-green-600 flex items-center gap-1.5 mt-2">
+                <Check className="w-4 h-4" />
+                Subdomain saved! Your portal is at <span className="font-semibold">{subdomain}.myjobview.com</span>
+              </p>
+            )}
+          </div>
+          <button
+            onClick={async () => {
+              if (!orgId) return;
+              const trimmed = subdomain.trim().toLowerCase();
+              if (!trimmed) {
+                setSubdomainError('Subdomain is required');
+                return;
+              }
+              if (trimmed === originalSubdomain) return;
+              const validation = validateSubdomain(trimmed);
+              if (!validation.valid) {
+                setSubdomainError(validation.error || 'Invalid subdomain');
+                return;
+              }
+              setSaving(true);
+              try {
+                const { data: existing } = await supabase
+                  .from('organizations')
+                  .select('id')
+                  .eq('subdomain', trimmed)
+                  .maybeSingle();
+                if (existing) {
+                  setSubdomainAvailable(false);
+                  setSubdomainError('This subdomain is already taken.');
+                  setSaving(false);
+                  return;
+                }
+                const { error: updateError } = await supabase
+                  .from('organizations')
+                  .update({ subdomain: trimmed, updated_at: new Date().toISOString() })
+                  .eq('id', orgId);
+                if (updateError) throw updateError;
+                await supabase.from('subdomain_changes').insert({
+                  organization_id: orgId,
+                  old_subdomain: originalSubdomain || null,
+                  new_subdomain: trimmed,
+                  changed_by: (await supabase.auth.getUser()).data.user?.id,
+                });
+                setOriginalSubdomain(trimmed);
+                setSubdomainSaved(true);
+                setSubdomainAvailable(null);
+                setSubdomainError(null);
+              } catch (err) {
+                console.error('Error saving subdomain:', err);
+                setSubdomainError('Failed to save subdomain. Please try again.');
+              } finally {
+                setSaving(false);
+              }
+            }}
+            disabled={saving || !subdomain || subdomain === originalSubdomain || subdomainAvailable === false || !!subdomainError}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save Subdomain'}
+          </button>
         </div>
 
         <div>

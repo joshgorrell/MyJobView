@@ -80,6 +80,12 @@ Deno.serve(async (req: Request) => {
       .select('company_name, company_email, company_phone, from_email, from_name, reply_to_email, portal_url')
       .maybeSingle();
 
+    const { data: orgData } = await supabaseClient
+      .from('organizations')
+      .select('subdomain')
+      .limit(1)
+      .maybeSingle();
+
     // Use override email if provided, otherwise fall back to contact email
     const recipientEmail = toEmail || proposal.contacts?.email;
     if (!recipientEmail && !skipNotification) {
@@ -93,7 +99,10 @@ Deno.serve(async (req: Request) => {
       `${proposal.contacts?.first_name || ''} ${proposal.contacts?.last_name || ''}`.trim() ||
       'Valued Customer';
 
-    const portalUrl = settings?.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`;
+    const subdomain = orgData?.subdomain || null;
+    const portalUrl = subdomain
+      ? `https://${subdomain}.myjobview.com`
+      : (settings?.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`);
     const proposalUrl = `${portalUrl}/proposals/${proposal.id}`;
 
     const { data: emailTemplate } = await supabaseClient

@@ -43,6 +43,12 @@ Deno.serve(async (req: Request) => {
       .select('company_name, from_email, from_name, reply_to_email, portal_url')
       .maybeSingle();
 
+    const { data: orgData } = await supabaseAdmin
+      .from('organizations')
+      .select('subdomain')
+      .limit(1)
+      .maybeSingle();
+
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
       return new Response(
@@ -61,7 +67,10 @@ Deno.serve(async (req: Request) => {
 
     const fromName = settings?.from_name || settings?.company_name || 'Your Company';
     const replyTo = settings?.reply_to_email || fromEmail;
-    const portalUrl = settings?.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`;
+    const subdomain = orgData?.subdomain || null;
+    const portalUrl = subdomain
+      ? `https://${subdomain}.myjobview.com`
+      : (settings?.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`);
     const proposalUrl = payloadProposalUrl || `${portalUrl}/proposals/${proposalId}`;
 
     const subject = `New question on Proposal ${proposalNumber || ''}`;

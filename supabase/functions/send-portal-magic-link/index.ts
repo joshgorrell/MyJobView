@@ -312,7 +312,16 @@ Deno.serve(async (req: Request) => {
       .select('portal_url, from_email, from_name, company_name')
       .maybeSingle();
 
-    const frontendUrl = settingsForUrl?.portal_url || Deno.env.get('FRONTEND_URL') || '';
+    const { data: orgData } = await supabaseAdmin
+      .from('organizations')
+      .select('subdomain')
+      .limit(1)
+      .maybeSingle();
+
+    const subdomain = orgData?.subdomain || null;
+    const frontendUrl = subdomain
+      ? `https://${subdomain}.myjobview.com`
+      : (settingsForUrl?.portal_url || Deno.env.get('FRONTEND_URL') || '');
 
     // Use caller-supplied redirect if provided, otherwise route based on detected access context
     const destinationPath = requestedRedirect || context.destinationPath;

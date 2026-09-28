@@ -21,7 +21,7 @@ export async function getEmailTemplate(templateType: string, supabaseUrl: string
 export async function getCompanySettings(supabaseUrl: string, supabaseKey: string) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const [settingsRes, officesRes] = await Promise.all([
+  const [settingsRes, officesRes, orgRes] = await Promise.all([
     supabase
       .from('company_settings')
       .select('company_name, company_email, company_logo_url, from_email, from_name, reply_to_email, app_url, portal_url')
@@ -32,6 +32,11 @@ export async function getCompanySettings(supabaseUrl: string, supabaseKey: strin
       .not('phone', 'is', null)
       .neq('phone', '')
       .order('display_order'),
+    supabase
+      .from('organizations')
+      .select('subdomain')
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const offices: { office_name: string; phone: string }[] = officesRes.data || [];
@@ -51,8 +56,21 @@ export async function getCompanySettings(supabaseUrl: string, supabaseKey: strin
     reply_to_email: s?.reply_to_email || fromEmail,
     app_url: s?.app_url || null,
     portal_url: s?.portal_url || null,
+    subdomain: orgRes.data?.subdomain || null,
     offices,
   };
+}
+
+export function buildPortalBaseUrl(subdomain: string | null, portalUrl: string | null, appUrl: string | null, supabaseUrl: string | undefined): string {
+  if (subdomain) {
+    return `https://${subdomain}.myjobview.com`;
+  }
+  if (portalUrl) return portalUrl.replace(/\/$/, '');
+  if (appUrl) return appUrl.replace(/\/$/, '') + '/portal';
+  if (supabaseUrl) {
+    return supabaseUrl.replace('.supabase.co', '.app') + '/portal';
+  }
+  return 'https://your-portal-url.com/portal';
 }
 
 export function replacePlaceholders(text: string, placeholders: Record<string, string>): string {

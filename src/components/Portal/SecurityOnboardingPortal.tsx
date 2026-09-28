@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Shield, CheckCircle, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 import OnboardingWizard from './OnboardingWizard';
+import { useTenant } from '../../contexts/TenantContext';
 
 interface SecurityOnboardingPortalProps {
   token?: string;
 }
 
 export default function SecurityOnboardingPortal({ token: propToken }: SecurityOnboardingPortalProps) {
+  const { tenant } = useTenant();
+  const dealerName = tenant?.organizationName || 'Electronic Life';
+  const dealerLogo = tenant?.logoUrl;
   const urlParams = new URLSearchParams(window.location.search);
   const urlToken = urlParams.get('token');
   const initialToken = propToken || urlToken || null;
@@ -80,10 +84,14 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
     <div className="min-h-screen bg-slate-50">
       <div className="bg-[#0f2347] py-4 px-4 sm:px-6 shadow-md">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-8 sm:h-10 object-contain" />
+          {dealerLogo ? (
+            <img src={dealerLogo} alt={dealerName} className="h-8 sm:h-10 object-contain" />
+          ) : (
+            <span className="text-white font-bold text-lg">{dealerName}</span>
+          )}
           <div className="border-l border-white/20 pl-3">
             <p className="text-white font-semibold text-sm leading-tight">Security Agreement</p>
-            <p className="text-blue-300 text-xs">Electronic Life</p>
+            <p className="text-blue-300 text-xs">{dealerName}</p>
           </div>
         </div>
       </div>
@@ -118,7 +126,7 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
           <p className="text-gray-500 text-center mb-6 text-sm sm:text-base leading-relaxed">{error}</p>
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
             <p className="text-sm text-gray-600 text-center leading-relaxed">
-              If you believe this is an error, please contact Electronic Life for assistance.
+              If you believe this is an error, please contact {dealerName} for assistance.
             </p>
           </div>
         </div>
@@ -178,7 +186,11 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src="/el_logo_color_(2).png" alt="Electronic Life" className="h-8 sm:h-10 object-contain" />
+              {dealerLogo ? (
+                <img src={dealerLogo} alt={dealerName} className="h-8 sm:h-10 object-contain" />
+              ) : (
+                <span className="text-white font-bold text-lg">{dealerName}</span>
+              )}
               <div className="border-l border-white/20 pl-3">
                 <p className="text-white font-semibold text-sm leading-tight">Security Agreement Onboarding</p>
                 <p className="text-blue-300 text-xs">Complete your monitoring agreement below</p>

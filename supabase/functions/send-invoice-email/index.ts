@@ -210,7 +210,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const portalUrl = settings.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`;
+    const portalUrl = settings.subdomain
+      ? `https://${settings.subdomain}.myjobview.com`
+      : (settings.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`);
     const invoiceUrl = `${portalUrl}/invoices/${invoice.id}`;
 
     const dueDate = new Date(invoice.due_date);
