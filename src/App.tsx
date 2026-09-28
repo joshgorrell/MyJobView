@@ -21,6 +21,7 @@ import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { supabase } from './lib/supabase';
+import ProductsManagement from './components/Products/ProductsManagement';
 
 // Lazy load components
 const ContactForm = lazy(() => import('./components/Contacts/ContactForm').then(m => ({ default: m.ContactForm })));
@@ -68,7 +69,6 @@ const JobPhotosGallery = lazy(() => import('./components/Production/JobPhotosGal
 const TechStats = lazy(() => import('./components/Production/TechStats').then(m => ({ default: m.TechStats })));
 const InventoryDashboard = lazy(() => import('./components/Inventory/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
 const PurchaseOrders = lazy(() => import('./components/Inventory/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
-const ProductsManagement = lazy(() => import('./components/Products/ProductsManagement'));
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
 const AppointmentsCalendar = lazy(() => import('./components/Appointments/AppointmentsCalendar').then(m => ({ default: m.AppointmentsCalendar })));
 const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopout').then(m => ({ default: m.CalendarPopout })));
