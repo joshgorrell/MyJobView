@@ -60,6 +60,8 @@ interface ProductDetailPanelProps {
   previewImageUrl?: string | null;
   imagePasted?: boolean;
   onImageSelect?: (file: File) => void;
+  onRequestImage?: () => void;
+  showIdentity?: boolean;
   onChange?: (field: keyof ProductDetailPanelData, value: any) => void;
 }
 
@@ -85,6 +87,8 @@ export default function ProductDetailPanel({
   previewImageUrl,
   imagePasted,
   onImageSelect,
+  onRequestImage,
+  showIdentity = true,
   onChange,
 }: ProductDetailPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -122,7 +126,7 @@ export default function ProductDetailPanel({
               <img
                 src={displayImage}
                 alt={data.productName}
-                className={`w-full h-28 sm:h-36 lg:h-36 object-cover rounded-lg border border-gray-200 shadow-sm ${isEdit && data.productId ? 'cursor-pointer' : ''}`}
+                className={`w-full h-28 sm:h-36 lg:h-36 object-contain bg-white rounded-lg border border-gray-200 shadow-sm ${isEdit && data.productId ? 'cursor-pointer' : ''}`}
                 onClick={() => isEdit && data.productId && fileInputRef.current?.click()}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f3f4f6" width="200" height="200"/%3E%3C/svg%3E';
@@ -142,14 +146,21 @@ export default function ProductDetailPanel({
                   <Pencil className="w-3 h-3 text-gray-600" />
                 </button>
               )}
+              {!isEdit && onRequestImage && <button type="button" onClick={onRequestImage}
+                className="absolute bottom-1 right-1 rounded-md bg-white border border-gray-200 shadow px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50">
+                Change photo
+              </button>}
             </div>
           ) : (
             <div
-              onClick={() => isEdit && data.productId && fileInputRef.current?.click()}
-              className={`w-full h-28 sm:h-36 lg:h-36 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 ${isEdit && data.productId ? 'cursor-pointer hover:border-gray-400 hover:bg-gray-50' : ''} transition-all`}
+              role={onRequestImage || (isEdit && data.productId) ? 'button' : undefined}
+              tabIndex={onRequestImage || (isEdit && data.productId) ? 0 : undefined}
+              onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && (onRequestImage || isEdit)) { e.preventDefault(); if (onRequestImage) onRequestImage(); else fileInputRef.current?.click(); } }}
+              onClick={() => onRequestImage ? onRequestImage() : isEdit && data.productId && fileInputRef.current?.click()}
+              className={`w-full h-28 sm:h-36 lg:h-36 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 ${onRequestImage || (isEdit && data.productId) ? 'cursor-pointer hover:border-blue-400 hover:bg-blue-50' : ''} transition-all`}
             >
               <Upload className="w-6 h-6 mb-1" />
-              <span className="text-xs">No image</span>
+              <span className="text-xs">{onRequestImage ? 'Add photo' : 'No image'}</span>
               {isEdit && <span className="text-xs text-gray-400">Click to upload</span>}
             </div>
           )}
@@ -242,7 +253,7 @@ export default function ProductDetailPanel({
       {/* CENTER: Product name, description, pricing, labor */}
       <div className="flex-1 flex flex-col gap-2 min-w-0">
         {/* Name + category strip */}
-        <div>
+        {showIdentity && <div>
           <div className="flex items-start gap-2">
             {data.category && (
               <div className="flex items-center gap-1 text-xs text-gray-500 shrink-0 mt-0.5">
@@ -253,7 +264,7 @@ export default function ProductDetailPanel({
           </div>
           <h3 className="text-sm font-bold text-gray-900 leading-tight mt-0.5">{data.productName}</h3>
 
-        </div>
+        </div>}
 
         {/* Qty + Unit (edit only) */}
         {isEdit && (
