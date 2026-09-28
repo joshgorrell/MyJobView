@@ -50,7 +50,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   });
 
   const statusColumns: StatusColumn[] = [
-    { key: 'pending_approval', label: 'Completed', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
+    { key: 'pending_approval', label: 'Awaiting Approval', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
     { key: 'active', label: 'Active', icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
     { key: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' }
   ];
@@ -182,12 +182,12 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
 
       if (error) throw error;
 
-      alert('Contract approved and activated successfully!');
+      alert('Security contract approved and activated successfully!');
       loadContracts();
       loadCancellationStats();
     } catch (error) {
       console.error('Error approving contract:', error);
-      alert('Failed to approve contract');
+      alert('Failed to approve security contract');
     }
   }
 
@@ -217,7 +217,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading contracts...</p>
+          <p className="text-gray-600">Loading security contracts...</p>
         </div>
       </div>
     );
@@ -242,14 +242,14 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Shield className="w-6 h-6 text-blue-400" />
-            Monitoring Contract Onboarding
+            Security Contract Management
           </h1>
-          <p className="text-gray-300 mt-1">Alarm monitoring contract onboarding, approval, and activation</p>
+          <p className="text-gray-300 mt-1">Review, approve, activate, and manage security monitoring contracts</p>
         </div>
         <div className="flex flex-wrap gap-2">
         {onNavigateToOnboarding && (
           <button onClick={onNavigateToOnboarding} className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium">
-            <ArrowRight className="w-4 h-4" /> Start Onboarding
+            <ArrowRight className="w-4 h-4" /> Create New Contract
           </button>
         )}
         {onNavigateToImport && (
@@ -258,7 +258,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             <Upload className="w-4 h-4" />
-            Import Contracts
+            Import Security Contracts
           </button>
         )}
         </div>
@@ -274,7 +274,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
           }`}
         >
           <List className="w-4 h-4" />
-          Contracts
+          Security Contracts
         </button>
         <button
           onClick={() => setActiveTab('stats')}
@@ -377,7 +377,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
                 {columnContracts.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Icon className={`w-12 h-12 ${column.color} opacity-50 mx-auto mb-2`} />
-                    <p className="font-medium">No contracts</p>
+                    <p className="font-medium">No security contracts</p>
                   </div>
                 ) : (
                   columnContracts.map((contract) => {
@@ -524,8 +524,8 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
       </>}
       <ConfirmModal
         isOpen={confirmApproveContract !== null}
-        title="Approve Contract"
-        message="Approve this contract and activate recurring billing?"
+        title="Approve Security Contract"
+        message="Approve this security contract and activate recurring billing?"
         variant="neutral"
         confirmLabel="Approve & Activate"
         onConfirm={() => {
