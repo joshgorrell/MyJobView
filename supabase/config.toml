@@ -84,3 +84,6 @@ verify_jwt = false
 
 [functions.taxjar-lookup]
 verify_jwt = true
+
+[functions.generate-blank-contract-form]
+verify_jwt = true
