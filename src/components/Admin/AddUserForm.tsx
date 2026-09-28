@@ -39,6 +39,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     email_leads: false,
     can_view_prospects: true,
     can_view_all_tasks: true,
+    can_view_all_messages: false,
     can_view_all_pipeline: true,
     can_edit_contact_assignments: false,
     can_edit_products: true,
@@ -177,6 +178,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
             email_leads: formData.email_leads,
             can_view_prospects: formData.can_view_prospects,
             can_view_all_tasks: formData.can_view_all_tasks,
+            can_view_all_messages: formData.can_view_all_messages,
             can_view_all_pipeline: formData.can_view_all_pipeline,
             can_edit_contact_assignments: formData.can_edit_contact_assignments,
             can_edit_products: formData.can_edit_products,
@@ -494,6 +496,14 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                   Allow user to see all company tasks (if disabled, user can only see their own tasks)
                 </p>
               </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={formData.can_view_all_messages}
+                onChange={(e) => setFormData({ ...formData, can_view_all_messages: e.target.checked })}
+                className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500" />
+              <div className="flex-1"><span className="text-sm font-medium text-white">View All Company Conversations</span>
+                <p className="text-xs text-gray-400 mt-1">For executive oversight, including customers and jobs not assigned to this user.</p></div>
             </label>
 
             <label className="flex items-start gap-3 cursor-pointer">
