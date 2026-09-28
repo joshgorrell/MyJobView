@@ -39,6 +39,7 @@
 .flow-summary{display:flex;align-items:center;gap:8px;min-width:0}
 .flow-icon{flex-shrink:0;color:var(--flow-secondary)}
 .flow-icon--work,.flow-icon--service{color:#0d9488}.flow-icon--sales{color:#a855f7}.flow-icon--materials{color:#d97706}.flow-icon--scheduling{color:#3b82f6}.flow-icon--financial{color:#16a34a}
+.flow-icon--communication{color:#7c3aed}.flow-mention{display:inline-flex;align-items:center;margin-left:8px;padding:2px 7px;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:11px;white-space:nowrap}
 .flow-actor{font-size:12px;color:var(--flow-secondary)}
 .flow-detail{background:var(--flow-muted);padding:14px 54px 16px;border-bottom:1px solid var(--flow-line)}
 .flow-detail>p{margin:5px 0;color:var(--flow-secondary)}.flow-detail p.flow-detail-body{white-space:pre-wrap;color:var(--flow-text);margin:12px 0;overflow-wrap:anywhere}.flow-detail small{color:var(--flow-secondary)}
