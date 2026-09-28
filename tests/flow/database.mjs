@@ -153,6 +153,7 @@ const relatedComms = await list({category:'communication',my_work:true});
 assert.ok(relatedComms.some(e=>e.source_table==='tasks' && e.source_id===uid(110)),'Assigned customer tasks appear');
 assert.ok(relatedComms.some(e=>e.source_table==='task_comments' && e.task_id===uid(110) && e.preview?.includes('Parts arrived')),'Task comments preview and open their parent task');
 assert.ok(relatedComms.some(e=>e.source_table==='discussion_posts' && e.mentioned_user_ids.includes(colleague)),'Discussion mentions are highlighted');
+assert.equal((await db.query("SELECT count(*)::int AS count FROM notifications WHERE user_id=$1 AND type='discussion_post_mention'",[colleague])).rows[0].count,1,'Discussion mentions notify with a direct post link');
 await asUser(outsider);
 assert.equal((await list({category:'communication'})).length,0,'Another dealer cannot see the thread');
 console.log('PASS: related conversation, mention routing, context link, no body snapshot, and tenant isolation.');
