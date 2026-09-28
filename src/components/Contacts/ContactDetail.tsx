@@ -1,3 +1,4 @@
+import Flow from '../Flow/Flow';
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Mail, Phone, Building2, Tag, Calendar, User, TrendingUp, CreditCard as Edit2, Save, X, Trash2, AlertCircle, Camera, Image as ImageIcon, MapPin, CheckCircle2, MessageSquare, Hash, Users, Send, Shield, Eye, DollarSign, Clock, FileText, Wrench, ListTodo, Plus, Video, Receipt, Target, Sparkles, UserCheck, RefreshCw, Flame, Thermometer, ExternalLink, Navigation, Zap } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -118,7 +119,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   const [connections, setConnections] = useState<Connection[]>([]);
   const [sendingPortalInvite, setSendingPortalInvite] = useState(false);
   const [portalAccessEnabled, setPortalAccessEnabled] = useState((contact as any).portal_access_enabled || false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow'>('overview');
   const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
@@ -1233,6 +1234,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
         <div className="border-b border-gray-200 overflow-x-auto">
           <div className="flex gap-1 px-4 sm:px-6 min-w-max">
+            <button onClick={() => setActiveTab('flow')} className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 ${activeTab === 'flow' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600'}`}>Flow</button>
             <button
               onClick={() => setActiveTab('overview')}
               className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation whitespace-nowrap ${
@@ -1304,7 +1306,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         </div>
 
         <div className="p-4 sm:p-6">
-          {activeTab === 'overview' ? (
+          {activeTab === 'flow' ? (<Flow contactId={contact.id} />) : activeTab === 'overview' ? (
             <div className="space-y-4">
               {/* Quick Actions */}
               <div className="pb-3 border-b border-gray-200">

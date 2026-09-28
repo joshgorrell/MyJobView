@@ -1,3 +1,4 @@
+import Flow from '../Flow/Flow';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -178,7 +179,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [jobCompletion, setJobCompletion] = useState<JobCompletion | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'materials' | 'time' | 'parts' | 'photos' | 'completion' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'materials' | 'time' | 'parts' | 'photos' | 'completion' | 'history' | 'flow'>('overview');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [showPartRequestForm, setShowPartRequestForm] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
@@ -645,6 +646,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const canComplete = workOrder.status !== 'completed' && isAssignedTech && !jobCompletion;
 
   const tabs = [
+    { id: 'flow', label: 'Flow', icon: History },
     { id: 'overview', label: 'Overview', icon: FileText },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
@@ -936,6 +938,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       {/* Tab Content */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
 
+        {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
         {/* Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
