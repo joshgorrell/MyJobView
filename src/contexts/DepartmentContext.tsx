@@ -195,6 +195,25 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
       // Use user starred if available, otherwise use defaults
       const starredSource = userStarred.length > 0 ? userStarred : defaultStarred;
+
+      // Identify orphaned starred entries the user no longer has access to
+      const orphanedIds = userStarred
+        .filter(s => !s.module || !checkAccess(s.module.module_key))
+        .map(s => (s as any).module?.id)
+        .filter(Boolean) as string[];
+
+      // Clean up orphaned entries in the background so the DB count stays in sync
+      if (orphanedIds.length > 0) {
+        supabase
+          .from('user_starred_modules')
+          .delete()
+          .eq('user_id', profile.id)
+          .in('module_id', orphanedIds)
+          .then(({ error }) => {
+            if (error) console.error('Error cleaning up orphaned starred modules:', error);
+          });
+      }
+
       const starred = starredSource
         .filter(s => s.module && checkAccess(s.module.module_key))
         .slice(0, 6)
@@ -329,28 +348,17 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
         throw new Error('This module is already starred');
       }
 
-      // Get current count of starred modules
-      const { count } = await supabase
-        .from('user_starred_modules')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', profile.id);
-
-      // Check if user already has 6 starred items (maximum allowed)
-      if (count && count >= 6) {
+      // Check against the accessible starred count (what the user actually sees)
+      // This avoids counting orphaned entries for modules the user lost access to
+      if (starredModules.length >= 6) {
         throw new Error('You can only star up to 6 modules. Please unstar another module first.');
       }
 
       // If order not provided, find the first available order slot (1-6)
+      // Use the accessible starredModules state so orphaned entries don't block slots
       let starOrder = order;
       if (!starOrder) {
-        // Get all used orders
-        const { data: usedOrdersData } = await supabase
-          .from('user_starred_modules')
-          .select('star_order')
-          .eq('user_id', profile.id);
-
-        const usedOrders = new Set((usedOrdersData || []).map(sm => sm.star_order));
-
+        const usedOrders = new Set(starredModules.map(sm => sm.star_order));
         for (let i = 1; i <= 6; i++) {
           if (!usedOrders.has(i)) {
             starOrder = i;
