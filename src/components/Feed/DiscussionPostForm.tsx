@@ -161,28 +161,6 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         }
       }
 
-      if (userMentions.length > 0) {
-        const { data: usersWithPreferences } = await supabase
-          .from('profiles')
-          .select('id, notify_on_mention')
-          .in('id', userMentions);
-
-        const usersToNotify = (usersWithPreferences || [])
-          .filter(u => u.notify_on_mention !== false)
-          .map(u => u.id);
-
-        if (usersToNotify.length > 0) {
-          const notifications = usersToNotify.map((userId: string) => ({
-            user_id: userId,
-            type: 'mention',
-            title: 'You were mentioned',
-            body: `${profile.full_name} mentioned you in a discussion`,
-          }));
-
-          await supabase.from('notifications').insert(notifications);
-        }
-      }
-
       setContent('');
       setPostType(null);
       setReminderDate('');
