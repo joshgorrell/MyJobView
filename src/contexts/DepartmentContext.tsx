@@ -161,36 +161,56 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       );
       setAdminModuleIdSet(adminModuleIds);
 
-      // Build role-based module access map
+      // Build a lookup from module_key to all module rows sharing that key.
+      // The same page (e.g. "invoices") can appear under multiple departments with
+      // different row IDs — access must be unified across all copies.
+      const modulesByKey = new Map<string, DepartmentModule[]>();
+      mods.forEach(m => {
+        const list = modulesByKey.get(m.module_key);
+        if (list) list.push(m);
+        else modulesByKey.set(m.module_key, [m]);
+      });
+
+      // Build role-based module access map keyed by module_id
       const roleModAccessMap = new Map<string, boolean>();
       roleModAccessResult.data?.forEach(item => {
         roleModAccessMap.set(item.module_id, item.has_access);
       });
       setModuleRoleAccess(roleModAccessMap);
 
-      // Build user-specific permission overrides map
+      // Build user-specific permission overrides map keyed by module_id
       const userModAccessMap = new Map<string, boolean>();
       userOverrideResult.data?.forEach(item => {
         userModAccessMap.set(item.module_id, item.override_type === 'grant');
       });
       setModuleUserOverrides(userModAccessMap);
 
+      // Unified access check: a module is accessible if ANY copy sharing the
+      // same module_key has an override or role grant that says "yes".
+      const checkModuleAccess = (mod: DepartmentModule): boolean => {
+        const siblings = modulesByKey.get(mod.module_key) || [mod];
+        // If any sibling has a user override, the most permissive override wins
+        const overriddenSibling = siblings.find(s => userModAccessMap.has(s.id));
+        if (overriddenSibling) return userModAccessMap.get(overriddenSibling.id) || false;
+        // Admin sees everything (unless they have overrides)
+        if (profile.role === 'admin') return true;
+        // If any sibling has a role grant, use the most permissive
+        const grantedSibling = siblings.find(s => roleModAccessMap.has(s.id));
+        if (grantedSibling) return roleModAccessMap.get(grantedSibling.id) || false;
+        // Admin-department modules default to denied for non-admin roles
+        if (siblings.some(s => adminModuleIds.has(s.id))) return false;
+        return false;
+      };
+
       // Process starred modules (data already loaded in parallel)
       const userStarred = userStarredResult.data || [];
       const defaultStarred = defaultStarredResult.data || [];
 
-      // Helper to check access inline
+      // Helper to check access inline (unified across all copies by module_key)
       const checkAccess = (moduleKey: string) => {
         const mod = mods.find(m => m.module_key === moduleKey);
         if (!mod) return false;
-        // Check user override FIRST (even for admins)
-        if (userModAccessMap.has(mod.id)) return userModAccessMap.get(mod.id);
-        // Admin sees everything (unless they have overrides)
-        if (profile.role === 'admin') return true;
-        if (roleModAccessMap.has(mod.id)) return roleModAccessMap.get(mod.id);
-        // Admin-department modules default to denied for non-admin roles
-        if (adminModuleIds.has(mod.id)) return false;
-        return false; // Deny by default — access requires an explicit role grant
+        return checkModuleAccess(mod);
       };
 
       // Use user starred if available, otherwise use defaults
@@ -228,20 +248,8 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
       // Calculate accessible departments - only show departments with at least one accessible module
       const accessible = depts.filter(dept => {
-        // Check if department has any accessible modules
         const deptModules = mods.filter(m => m.department_id === dept.id);
-        const hasAccessibleModule = deptModules.some(mod => {
-          // Check for user override FIRST (even for admins)
-          if (userModAccessMap.has(mod.id)) return userModAccessMap.get(mod.id);
-          // Admin sees all (unless they have overrides)
-          if (profile.role === 'admin') return true;
-          // Check role-based access
-          if (roleModAccessMap.has(mod.id)) return roleModAccessMap.get(mod.id);
-          // Admin-department modules default to denied for non-admin roles
-          if (adminModuleIds.has(mod.id)) return false;
-          return false; // Deny by default — access requires an explicit role grant
-        });
-        return hasAccessibleModule;
+        return deptModules.some(mod => checkModuleAccess(mod));
       });
 
       setUserDepartments(accessible);
@@ -251,14 +259,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       // Load quick access suggestions (calculate after maps are set)
       const suggestions = mods.filter(m => {
         if (!m.is_quick_access) return false;
-        // Check user override FIRST (even for admins)
-        if (userModAccessMap.has(m.id)) return userModAccessMap.get(m.id);
-        // Admin sees all (unless they have overrides)
-        if (profile.role === 'admin') return true;
-        if (roleModAccessMap.has(m.id)) return roleModAccessMap.get(m.id);
-        // Admin-department modules default to denied for non-admin roles
-        if (adminModuleIds.has(m.id)) return false;
-        return false; // Deny by default — access requires an explicit role grant
+        return checkModuleAccess(m);
       });
       setQuickAccessSuggestions(suggestions);
     } catch (error) {
@@ -271,25 +272,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   function getUserModules(departmentId: string): DepartmentModule[] {
     return modules.filter(mod => {
       if (mod.department_id !== departmentId) return false;
-
-      // Check for user override FIRST (takes priority even for admins)
-      if (moduleUserOverrides.has(mod.id)) {
-        return moduleUserOverrides.get(mod.id);
-      }
-
-      // Admin sees all modules (unless they have user overrides)
-      if (profile?.role === 'admin') return true;
-
-      // Check role-based access
-      if (moduleRoleAccess.has(mod.id)) {
-        return moduleRoleAccess.get(mod.id);
-      }
-
-      // Admin-department modules default to denied for non-admin roles
-      if (adminModuleIdSet.has(mod.id)) return false;
-
-      // Deny by default — access requires an explicit role grant
-      return false;
+      return hasModuleAccess(mod);
     });
   }
 
@@ -311,21 +294,26 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       : moduleKey;
     if (!mod) return false;
 
-    // Check for user override FIRST (takes priority even for admins)
-    if (moduleUserOverrides.has(mod.id)) {
-      return moduleUserOverrides.get(mod.id) || false;
+    // Find all copies of this module across every department (same module_key)
+    const siblings = modules.filter(m => m.module_key === mod.module_key);
+
+    // If any sibling has a user override, the most permissive override wins
+    const overriddenSibling = siblings.find(s => moduleUserOverrides.has(s.id));
+    if (overriddenSibling) {
+      return moduleUserOverrides.get(overriddenSibling.id) || false;
     }
 
-    // Admin sees everything (unless they have user overrides)
+    // Admin sees everything (unless they have overrides)
     if (profile?.role === 'admin') return true;
 
-    // Check role-based access
-    if (moduleRoleAccess.has(mod.id)) {
-      return moduleRoleAccess.get(mod.id) || false;
+    // If any sibling has a role grant, use the most permissive
+    const grantedSibling = siblings.find(s => moduleRoleAccess.has(s.id));
+    if (grantedSibling) {
+      return moduleRoleAccess.get(grantedSibling.id) || false;
     }
 
     // Admin-department modules default to denied for non-admin roles
-    if (adminModuleIdSet.has(mod.id)) return false;
+    if (siblings.some(s => adminModuleIdSet.has(s.id))) return false;
 
     // Deny by default — access requires an explicit role grant
     return false;
