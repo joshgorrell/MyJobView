@@ -313,6 +313,7 @@ function SendAgreementDialog({
 
 export default function SecurityOnboarding({ onNavigateToContracts, canAccessContractManagement }: SecurityOnboardingProps = {}) {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createPaperOnboarding, setCreatePaperOnboarding] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -609,14 +610,20 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
             </button>
           )}
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg text-sm sm:text-base font-medium whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span className="hidden xs:inline">Start New Agreement</span>
-          <span className="xs:hidden">New Agreement</span>
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }}
+            className="flex items-center gap-2 px-4 py-3 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium"
+          >
+            <Printer className="w-4 h-4" /> Paper Onboarding
+          </button>
+          <button
+            onClick={() => { setCreatePaperOnboarding(false); setShowCreateModal(true); }}
+            className="flex items-center gap-2 px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+          >
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> New Online Agreement
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -843,6 +850,12 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
       {showCreateModal && (
         <CreateSecurityContractModal
           onClose={() => setShowCreateModal(false)}
+          onPaperCreated={createPaperOnboarding ? (contract) => {
+            setShowCreateModal(false);
+            setContractForManualEntry(contract as Contract);
+            setShowManualEntry(true);
+            loadContracts(false);
+          } : undefined}
           onSuccess={() => {
             setShowCreateModal(false);
             loadContracts(false);
