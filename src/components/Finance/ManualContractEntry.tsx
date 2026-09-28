@@ -11,6 +11,7 @@ interface ManualContractEntryProps {
 export default function ManualContractEntry({ contract, onClose, onComplete }: ManualContractEntryProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [paperSigned, setPaperSigned] = useState(false);
   const [contractData, setContractData] = useState<any>(null);
   const [formData, setFormData] = useState({
     propertyAddress: '',
@@ -115,6 +116,10 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   }
 
   async function handleSave() {
+    if (!paperSigned) {
+      alert('Confirm that the customer signed the paper agreement before completing onboarding.');
+      return;
+    }
     if (formData.emergencyContacts.length < 2) {
       alert('Please add at least 2 emergency contacts');
       return;
@@ -245,6 +250,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
           </div>
 
           <div className="p-6 space-y-6">
+            <p className="text-sm text-gray-700">Enter the completed paper form here and keep the signed original with the customer record.</p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <Printer className="w-5 h-5 text-blue-600 mt-0.5" />
@@ -556,7 +562,12 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
             </div>
           </div>
 
-          <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end gap-3">
+          <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 space-y-3">
+            <label className="flex items-start gap-2 text-sm text-gray-800">
+              <input type="checkbox" checked={paperSigned} onChange={e => setPaperSigned(e.target.checked)} className="mt-1" />
+              I have the customer's signed paper agreement and will retain it with their records.
+            </label>
+            <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
               className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -571,6 +582,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Contract Information'}
             </button>
+            </div>
           </div>
         </div>
       </div>
