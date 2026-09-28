@@ -190,8 +190,27 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
     }
   }
 
-  function handlePrintBlankForm() {
-    window.open(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-blank-contract-form?contractId=${contract.id}`, '_blank');
+  async function handlePrintBlankForm() {
+    const printTab = window.open('', '_blank');
+    if (!printTab) {
+      alert('Please allow popups to print this form.');
+      return;
+    }
+    printTab.document.write('<p>Preparing printable onboarding form...</p>');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Please sign in to print this form.');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-blank-contract-form?contractId=${encodeURIComponent(contract.id)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok) throw new Error('The printable form could not be loaded.');
+      printTab.document.open();
+      printTab.document.write(await response.text());
+      printTab.document.close();
+    } catch (error) {
+      printTab.close();
+      alert(error instanceof Error ? error.message : 'Could not print the form.');
+    }
   }
 
   if (loading) {
