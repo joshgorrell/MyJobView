@@ -235,9 +235,10 @@ export default function ProductsManagement() {
       if (error) throw error;
 
       loadProducts();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting product:', error);
-      alert('Failed to delete product');
+      const msg = error?.message || 'Failed to delete product';
+      alert(msg.includes('violates') ? 'This product is used in existing records and cannot be deleted. Please remove it from those records first.' : msg);
     }
   }
 
