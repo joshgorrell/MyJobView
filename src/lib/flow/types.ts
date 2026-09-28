@@ -16,6 +16,10 @@ export interface FlowEvent {
   details: string;
   source_table: string;
   source_id: string;
+  thread_id?: string | null;
+  task_id?: string | null;
+  mentioned_user_ids?: string[];
+  preview?: string | null;
   required_module: string;
   created_at: string;
   viewed: boolean;
@@ -26,11 +30,11 @@ export interface FlowFilters {
   contact_id?: string; project_id?: string; work_order_id?: string;
   office_id?: string; actor_id?: string; location_id?: string;
   category?: string; search?: string; since?: string; until?: string;
-  my_work?: boolean; new_only?: boolean;
+  my_work?: boolean; new_only?: boolean; mentions_only?: boolean;
 }
 export const FLOW_CATEGORIES: Record<string, string> = {
   work: 'Work', service: 'Service', sales: 'Sales', materials: 'Materials',
-  scheduling: 'Scheduling', customer: 'Customer', financial: 'Financial', update: 'Updates',
+  scheduling: 'Scheduling', customer: 'Customer', financial: 'Financial', update: 'Updates', communication: 'Conversations',
 };
 export function scopeFilters(scope: FlowScope): FlowFilters {
   return { contact_id: scope.contactId, project_id: scope.projectId, work_order_id: scope.workOrderId };
