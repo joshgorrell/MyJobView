@@ -34,7 +34,7 @@ INSERT INTO department_modules(module_key) SELECT unnest(ARRAY['contacts','proje
 INSERT INTO contacts(id,organization_id,full_name,assigned_to) VALUES ('${customer}','${org}','Jones Residence','${colleague}'),('${otherCustomer}','${otherOrg}','Other customer','${outsider}');
 INSERT INTO projects(id,organization_id,contact_id,name,project_number,assigned_pm) VALUES ('${project}','${org}','${customer}','Jones installation','P-100','${colleague}');
 `);
-const migration = await readFile(new URL('../../supabase/migrations/20260923224946_customer_job_flow.sql',import.meta.url),'utf8');
+const migration = await readFile(new URL('../../supabase/migrations/20260928183403_customer_job_flow.sql',import.meta.url),'utf8');
 await db.exec(migration);
 async function asUser(id) { await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${id}'; SET ROLE authenticated;`); }
 async function list(filters={}, before=null) { return (await db.query('SELECT * FROM get_flow_events($1,$2,50)',[JSON.stringify(filters),before])).rows.map(r=>r.get_flow_events); }
