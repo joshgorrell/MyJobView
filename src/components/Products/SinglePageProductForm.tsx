@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
+import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Category {
@@ -80,7 +80,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageSectionRef = useRef<HTMLDivElement>(null);
-  const [imageSuggestion, setImageSuggestion] = useState<string | null>(null);
+  const [imageSuggestions, setImageSuggestions] = useState<string[]>([]);
+  const [imageSuggestionIndex, setImageSuggestionIndex] = useState(0);
   const [checkingImage, setCheckingImage] = useState(false);
   const [showMissingImagePrompt, setShowMissingImagePrompt] = useState(false);
 
@@ -177,12 +178,14 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     const model = formData.manufacturer_model_number.trim();
     const organizationId = profile?.organization_id;
     if (!organizationId || !formData.manufacturer_id || model.length < 3 || formData.image_url || formData.item_type !== 'material') {
-      setImageSuggestion(null);
+      setImageSuggestions([]);
+      setImageSuggestionIndex(0);
       setCheckingImage(false);
       return;
     }
 
-    setImageSuggestion(null);
+    setImageSuggestions([]);
+    setImageSuggestionIndex(0);
     setCheckingImage(false);
     let cancelled = false;
     const timer = window.setTimeout(async () => {
@@ -193,11 +196,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         .eq('manufacturer_id', formData.manufacturer_id)
         .ilike('manufacturer_model_number', model)
         .not('image_url', 'is', null)
-        .limit(10);
+        .limit(20);
       if (cancelled) return;
       if (error) console.error('Could not check for an existing product photo:', error);
-      const match = data?.find(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.toLowerCase() && p.image_url?.trim());
-      setImageSuggestion(match?.image_url || null);
+      const matches = (data || [])
+        .filter(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.toLowerCase() && p.image_url?.trim())
+        .map(p => p.image_url.trim());
+      setImageSuggestions([...new Set(matches)]);
       setCheckingImage(false);
     }, 600);
 
@@ -1230,6 +1235,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     onClose();
   }
 
+  const suggestedImage = imageSuggestions[imageSuggestionIndex] || imageSuggestions[0];
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
       <div
@@ -1623,11 +1630,21 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </p>
                 )}
                 {checkingImage && !formData.image_url && <p className="text-xs text-gray-500">Checking the catalog for this model’s photo…</p>}
-                {imageSuggestion && !formData.image_url && (
+                {suggestedImage && !formData.image_url && (
                   <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-2">
-                    <img src={imageSuggestion} alt="Existing catalog photo for this model" className="w-14 h-14 rounded object-contain bg-white" />
-                    <div className="min-w-0 flex-1 text-xs text-blue-900">Photo found for this exact manufacturer and model in your catalog.</div>
-                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, image_url: imageSuggestion }))}
+                    <img src={suggestedImage} alt="Suggested catalog photo for this model" className="w-14 h-14 rounded object-contain bg-white"
+                      onError={() => { setImageSuggestions(current => current.filter(url => url !== suggestedImage)); setImageSuggestionIndex(0); }} />
+                    <div className="min-w-0 flex-1 text-xs text-blue-900">
+                      Photo found for this exact manufacturer and model in your catalog.
+                      {imageSuggestions.length > 1 && <div className="mt-1 flex items-center gap-1">
+                        <button type="button" aria-label="Previous suggested photo" onClick={() => setImageSuggestionIndex(index => (index - 1 + imageSuggestions.length) % imageSuggestions.length)}
+                          className="rounded p-1 hover:bg-blue-100"><ChevronLeft className="w-4 h-4" /></button>
+                        <span>{imageSuggestionIndex + 1} of {imageSuggestions.length}</span>
+                        <button type="button" aria-label="Next suggested photo" onClick={() => setImageSuggestionIndex(index => (index + 1) % imageSuggestions.length)}
+                          className="rounded p-1 hover:bg-blue-100"><ChevronRight className="w-4 h-4" /></button>
+                      </div>}
+                    </div>
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, image_url: suggestedImage }))}
                       className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">Use photo</button>
                   </div>
                 )}
