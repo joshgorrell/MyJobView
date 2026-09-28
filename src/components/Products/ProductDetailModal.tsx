@@ -86,7 +86,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
       let url = photoUrl.trim();
       if (photoFile) {
         const ext = photoFile.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
-        const path = `products/${profile.organization_id}/${productId}/${crypto.randomUUID()}.${ext}`;
+        const path = `products/${crypto.randomUUID()}.${ext}`;
         const { error } = await supabase.storage.from('product-images').upload(path, photoFile, { contentType: photoFile.type });
         if (error) throw error;
         url = supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
