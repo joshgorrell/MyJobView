@@ -13,7 +13,7 @@ import PackagesListView from './PackagesListView';
 import ConfirmModal from '../ui/ConfirmModal';
 import { catalogTaxonomy, type CatalogTaxonomy } from './CatalogTaxonomyFilters';
 
-type CatalogProduct = Product & CatalogTaxonomy & { category_id?: string | null; subcategory_id?: string | null; default_vendor_id?: string | null };
+type CatalogProduct = Product & CatalogTaxonomy & { category_id?: string | null; subcategory_id?: string | null; default_vendor_id?: string | null; image_url?: string | null };
 
 export default function ProductsManagement() {
   const { profile, loading: authLoading } = useAuth();
@@ -38,6 +38,7 @@ export default function ProductsManagement() {
     return saved || null;
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [showMissingPhotos, setShowMissingPhotos] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterSubcategory, setFilterSubcategory] = useState<string>('all');
@@ -134,7 +135,7 @@ export default function ProductsManagement() {
 
   useEffect(() => {
     filterProducts();
-  }, [products, searchTerm, filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase]);
+  }, [products, searchTerm, showMissingPhotos, filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase]);
 
   async function loadProducts() {
     if (!profile) {
@@ -187,6 +188,8 @@ export default function ProductsManagement() {
 
   function filterProducts() {
     let filtered = [...products];
+
+    if (showMissingPhotos) filtered = filtered.filter(p => !p.image_url?.trim());
 
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
@@ -280,6 +283,7 @@ export default function ProductsManagement() {
   }
 
   const categories = Array.from(new Set(products.map(p => p.categoryName).filter(Boolean))).sort();
+  const missingPhotoCount = products.filter(p => !p.image_url?.trim()).length;
   const subcategories = Array.from(new Set(products.filter(p => filterCategory === 'all' || p.categoryName === filterCategory)
     .map(p => p.subcategoryName).filter(Boolean))).sort();
 
@@ -375,6 +379,16 @@ export default function ProductsManagement() {
             className="w-full pl-9 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
         </div>
+
+        {activeTab === 'products' && missingPhotoCount > 0 && (
+          <button type="button" onClick={() => setShowMissingPhotos(value => !value)}
+            aria-pressed={showMissingPhotos}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${showMissingPhotos
+              ? 'border-amber-400 bg-amber-500 text-gray-950'
+              : 'border-amber-600/50 bg-gray-800 text-amber-300 hover:bg-gray-700'}`}>
+            Missing photos ({missingPhotoCount})
+          </button>
+        )}
 
         {/* View Toggle - Always visible */}
         <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
@@ -569,6 +583,7 @@ export default function ProductsManagement() {
           <div className="flex gap-2 pt-3 border-t border-gray-700">
             <button
               onClick={() => {
+                setShowMissingPhotos(false);
                 setFilterType('all');
                 setFilterCategory('all');
                 setFilterSubcategory('all');
