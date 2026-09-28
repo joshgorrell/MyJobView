@@ -79,6 +79,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   // Image handling
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageSectionRef = useRef<HTMLDivElement>(null);
+  const [imageSuggestion, setImageSuggestion] = useState<string | null>(null);
+  const [checkingImage, setCheckingImage] = useState(false);
+  const [showMissingImagePrompt, setShowMissingImagePrompt] = useState(false);
 
   // Auto-save key (needed early for scroll position tracking)
   const autoSaveKey = productId ? `product_edit_${productId}` : duplicateFromId ? `product_duplicate_${duplicateFromId}` : 'product_new';
@@ -167,6 +171,38 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     data: formData,
     enabled: true // Auto-save for all forms (new, edit, and duplicate)
   });
+
+  // Reuse an exact model photo already approved for this organization.
+  useEffect(() => {
+    const model = formData.manufacturer_model_number.trim();
+    const organizationId = profile?.organization_id;
+    if (!organizationId || !formData.manufacturer_id || model.length < 3 || formData.image_url || formData.item_type !== 'material') {
+      setImageSuggestion(null);
+      setCheckingImage(false);
+      return;
+    }
+
+    setImageSuggestion(null);
+    setCheckingImage(false);
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setCheckingImage(true);
+      const { data, error } = await supabase.from('products')
+        .select('id, manufacturer_model_number, image_url')
+        .eq('organization_id', organizationId)
+        .eq('manufacturer_id', formData.manufacturer_id)
+        .ilike('manufacturer_model_number', model)
+        .not('image_url', 'is', null)
+        .limit(10);
+      if (cancelled) return;
+      if (error) console.error('Could not check for an existing product photo:', error);
+      const match = data?.find(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.toLowerCase() && p.image_url?.trim());
+      setImageSuggestion(match?.image_url || null);
+      setCheckingImage(false);
+    }, 600);
+
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [profile?.organization_id, productId, formData.manufacturer_id, formData.manufacturer_model_number, formData.image_url, formData.item_type]);
 
   useEffect(() => {
     // Clean up old localStorage keys that might have invalid data
@@ -864,6 +900,15 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       return false;
     }
     return true;
+  }
+
+  function requestSave() {
+    if (!validateForm()) return;
+    if (formData.item_type === 'material' && !formData.image_url.trim()) {
+      setShowMissingImagePrompt(true);
+      return;
+    }
+    void handleSave();
   }
 
   async function handleSave() {
@@ -1567,11 +1612,25 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             )}
 
             {/* Product Image */}
-            <div>
+            <div ref={imageSectionRef}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product Image
               </label>
               <div className="space-y-2">
+                {!formData.image_url && formData.item_type === 'material' && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Add a product photo so this item is easy to recognize in the catalog and on documents.
+                  </p>
+                )}
+                {checkingImage && !formData.image_url && <p className="text-xs text-gray-500">Checking the catalog for this model’s photo…</p>}
+                {imageSuggestion && !formData.image_url && (
+                  <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-2">
+                    <img src={imageSuggestion} alt="Existing catalog photo for this model" className="w-14 h-14 rounded object-contain bg-white" />
+                    <div className="min-w-0 flex-1 text-xs text-blue-900">Photo found for this exact manufacturer and model in your catalog.</div>
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, image_url: imageSuggestion }))}
+                      className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">Use photo</button>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button
                     onClick={handleImageSearch}
@@ -2117,7 +2176,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={requestSave}
               disabled={saving}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
             >
@@ -2127,6 +2186,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </div>
         </div>
       </div>
+      <ConfirmModal isOpen={showMissingImagePrompt} title="Save without a product photo?"
+        message="This item will show a placeholder in the catalog and documents. Add a photo now, or save without one if no useful photo exists."
+        variant="warning" confirmLabel="Save without photo" cancelLabel="Add photo"
+        onConfirm={() => { setShowMissingImagePrompt(false); void handleSave(); }}
+        onCancel={() => { setShowMissingImagePrompt(false); imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />
     </div>
   );
 }
