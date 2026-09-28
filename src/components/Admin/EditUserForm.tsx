@@ -1092,35 +1092,39 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
               {!isEmployee ? (
                 <div className="space-y-3">
-                  {classification === 'unreviewed' && (
-                    <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span>This user has not been classified yet. Review and confirm their employment status.</span>
-                    </div>
-                  )}
                   {classification === 'non_employee' && (
                     <div className="flex items-center gap-2 p-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-xs">
                       <UserCircle className="w-4 h-4 flex-shrink-0" />
-                      <span>Confirmed as Non-Employee User. Payroll and timekeeping are not enabled.</span>
+                      <span>Classified as Non-Employee. Payroll and timekeeping are not enabled.</span>
+                    </div>
+                  )}
+                  {classification === 'unreviewed' && (
+                    <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>This legacy user has not been classified yet. Choose a classification below.</span>
                     </div>
                   )}
                   <p className="text-xs text-gray-400">
-                    Designate this person as an Employee to enable payroll and timekeeping, or confirm them as a Non-Employee User.
+                    {classification === 'non_employee'
+                      ? 'Change classification to enable payroll and timekeeping.'
+                      : 'Designate this person as an Employee to enable payroll and timekeeping, or confirm them as a Non-Employee.'}
                   </p>
                   <button
                     type="button"
                     onClick={() => { setIsEmployee(true); setShowEmployeeSetup(true); }}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                   >
-                    Make this person an Employee
+                    {classification === 'non_employee' ? 'Change to Employee' : 'Make this person an Employee'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowNonEmployeeConfirm(true)}
-                    className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
-                  >
-                    Confirm as Non-Employee User
-                  </button>
+                  {classification !== 'non_employee' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowNonEmployeeConfirm(true)}
+                      className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
+                    >
+                      Confirm as Non-Employee User
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">

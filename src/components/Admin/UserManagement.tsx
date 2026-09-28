@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, Briefcase, Lock, LayoutGrid as Layout, AlertCircle, UserCircle } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, Briefcase, Lock, LayoutGrid as Layout, AlertCircle, UserCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile } from '../../lib/types';
 import { formatDistanceToNow, formatRoleName } from '../../lib/utils';
 import { AddUserForm } from './AddUserForm';
+import type { CreatedUserData } from './AddUserForm';
 import { EditUserForm } from './EditUserForm';
 import { UserDepartmentAccess } from './UserDepartmentAccess';
 import { UserModuleAccess } from './UserModuleAccess';
+import { UserCreatedConfirmation } from './UserCreatedConfirmation';
 import { useToast } from '../Shared/Toast';
 
 interface EmployeeInfo {
@@ -24,6 +26,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [managingDepartmentUser, setManagingDepartmentUser] = useState<Profile | null>(null);
   const [managingModuleUser, setManagingModuleUser] = useState<Profile | null>(null);
+  const [createdUserData, setCreatedUserData] = useState<CreatedUserData | null>(null);
   const [employeeMap, setEmployeeMap] = useState<Map<string, EmployeeInfo>>(new Map());
   const [configReviewMap, setConfigReviewMap] = useState<Map<string, boolean>>(new Map());
 
@@ -199,22 +202,18 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         </button>
       </div>
 
-      {/* Employee Setup Required Section */}
+      {/* Needs Classification Section */}
       {(() => {
         const unclassified = users.filter(u => (u as any).employment_classification === 'unreviewed' || !(u as any).employment_classification);
-        const unreviewed = users.filter(u => {
-          const emp = employeeMap.get(u.id);
-          return (u as any).employment_classification === 'employee' && emp && !configReviewMap.get(emp.id);
-        });
-        if (unclassified.length === 0 && unreviewed.length === 0) return null;
+        if (unclassified.length === 0) return null;
         return (
           <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2 text-amber-800">
               <AlertCircle className="w-5 h-5" />
-              <h3 className="text-sm font-semibold">Employee Setup Required</h3>
+              <h3 className="text-sm font-semibold">Needs Classification</h3>
             </div>
             <p className="text-xs text-amber-700">
-              Review each person below and explicitly designate them as an Employee or Non-Employee User. Legacy fields and activity are suggestions only.
+              These users were created before classification was required. Designate each as an Employee or Non-Employee.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -222,9 +221,6 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">User</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Role</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Legacy Type</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Classification</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Configuration</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-amber-800 uppercase">Action</th>
                   </tr>
                 </thead>
@@ -233,11 +229,6 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                     <tr key={u.id} className="bg-white/50">
                       <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
                       <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
-                      <td className="px-3 py-2 text-gray-500">{(u as any).employment_type || '-'}</td>
-                      <td className="px-3 py-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Unreviewed</span>
-                      </td>
-                      <td className="px-3 py-2 text-gray-400 text-xs">No employee record</td>
                       <td className="px-3 py-2 text-right">
                         <button
                           onClick={() => setEditingUser(u)}
@@ -248,30 +239,53 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       </td>
                     </tr>
                   ))}
-                  {unreviewed.map(u => {
-                    const emp = employeeMap.get(u.id)!;
-                    return (
-                      <tr key={u.id} className="bg-white/50">
-                        <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
-                        <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
-                        <td className="px-3 py-2 text-gray-500">{(u as any).employment_type || '-'}</td>
-                        <td className="px-3 py-2">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Employee</span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">Needs review</span>
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <button
-                            onClick={() => setEditingUser(u)}
-                            className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-700 transition-colors"
-                          >
-                            Review
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Payroll Config Needs Review Section */}
+      {(() => {
+        const unreviewed = users.filter(u => {
+          const emp = employeeMap.get(u.id);
+          return (u as any).employment_classification === 'employee' && emp && !configReviewMap.get(emp.id);
+        });
+        if (unreviewed.length === 0) return null;
+        return (
+          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2 text-blue-800">
+              <Clock className="w-5 h-5" />
+              <h3 className="text-sm font-semibold">Payroll Config Needs Review</h3>
+            </div>
+            <p className="text-xs text-blue-700">
+              These employees have payroll configurations that need to be reviewed before payroll can be processed.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-blue-100 border-b border-blue-300">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">User</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Role</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-blue-800 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-blue-200">
+                  {unreviewed.map(u => (
+                    <tr key={u.id} className="bg-white/50">
+                      <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
+                      <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          onClick={() => setEditingUser(u)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+                        >
+                          Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -438,10 +452,30 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
       {showAddForm && (
         <AddUserForm
           onClose={() => setShowAddForm(false)}
-          onSuccess={() => {
+          onSuccess={(userData) => {
             setShowAddForm(false);
             loadUsers();
+            setCreatedUserData(userData);
           }}
+        />
+      )}
+
+      {createdUserData && (
+        <UserCreatedConfirmation
+          userData={createdUserData}
+          onEditDepartment={() => {
+            const user = users.find(u => u.id === createdUserData.userId);
+            if (user) {
+              setManagingDepartmentUser(user);
+            }
+          }}
+          onEditModules={() => {
+            const user = users.find(u => u.id === createdUserData.userId);
+            if (user) {
+              setManagingModuleUser(user);
+            }
+          }}
+          onClose={() => setCreatedUserData(null)}
         />
       )}
 
