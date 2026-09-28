@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, Briefcase, Lock, LayoutGrid as Layout, AlertCircle, UserCircle, Clock } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, AlertCircle, UserCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile } from '../../lib/types';
 import { formatDistanceToNow, formatRoleName } from '../../lib/utils';
 import { AddUserForm } from './AddUserForm';
 import type { CreatedUserData } from './AddUserForm';
 import { EditUserForm } from './EditUserForm';
-import { UserDepartmentAccess } from './UserDepartmentAccess';
-import { UserModuleAccess } from './UserModuleAccess';
 import { UserCreatedConfirmation } from './UserCreatedConfirmation';
 import { useToast } from '../Shared/Toast';
 
@@ -24,8 +22,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
-  const [managingDepartmentUser, setManagingDepartmentUser] = useState<Profile | null>(null);
-  const [managingModuleUser, setManagingModuleUser] = useState<Profile | null>(null);
+
   const [createdUserData, setCreatedUserData] = useState<CreatedUserData | null>(null);
   const [employeeMap, setEmployeeMap] = useState<Map<string, EmployeeInfo>>(new Map());
   const [configReviewMap, setConfigReviewMap] = useState<Map<string, boolean>>(new Map());
@@ -395,20 +392,6 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setManagingDepartmentUser(user)}
-                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                        title="Manage department access"
-                      >
-                        <Lock className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setManagingModuleUser(user)}
-                        className="p-1.5 text-cyan-600 hover:bg-cyan-50 rounded transition-colors"
-                        title="Manage page access"
-                      >
-                        <Layout className="w-4 h-4" />
-                      </button>
-                      <button
                         onClick={() => sendPasswordResetEmail(user.email, user.full_name)}
                         className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
                         title="Reset password"
@@ -466,13 +449,13 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
           onEditDepartment={() => {
             const user = users.find(u => u.id === createdUserData.userId);
             if (user) {
-              setManagingDepartmentUser(user);
+              setEditingUser(user);
             }
           }}
           onEditModules={() => {
             const user = users.find(u => u.id === createdUserData.userId);
             if (user) {
-              setManagingModuleUser(user);
+              setEditingUser(user);
             }
           }}
           onClose={() => setCreatedUserData(null)}
@@ -491,23 +474,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         />
       )}
 
-      {managingDepartmentUser && (
-        <UserDepartmentAccess
-          userId={managingDepartmentUser.id}
-          userName={managingDepartmentUser.full_name}
-          userRoleId={managingDepartmentUser.role_id}
-          onClose={() => setManagingDepartmentUser(null)}
-        />
-      )}
 
-      {managingModuleUser && (
-        <UserModuleAccess
-          userId={managingModuleUser.id}
-          userName={managingModuleUser.full_name}
-          userRoleId={managingModuleUser.role_id}
-          onClose={() => setManagingModuleUser(null)}
-        />
-      )}
     </div>
   );
 }
