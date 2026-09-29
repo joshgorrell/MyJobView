@@ -39,10 +39,10 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
    OR EXISTS (SELECT 1 FROM public.contacts c WHERE c.id=t.contact_id AND c.organization_id=t.organization_id AND c.assigned_to=p_user)
    OR EXISTS (SELECT 1 FROM public.proposals p WHERE p.id=t.proposal_id AND p.organization_id=t.organization_id AND p.created_by=p_user)
    OR EXISTS (SELECT 1 FROM public.projects p WHERE p.organization_id=t.organization_id
-       AND (p.id=t.context_id AND t.context_type='project' OR p.contact_id=t.contact_id)
+       AND (t.context_type='project' AND p.id=t.context_id OR t.context_type NOT IN ('project','work_order') AND p.contact_id=t.contact_id)
        AND p_user IN (p.assigned_pm,p.salesperson_id,p.designer_id))
    OR EXISTS (SELECT 1 FROM public.work_orders w WHERE w.organization_id=t.organization_id
-       AND (w.id=t.context_id AND t.context_type='work_order' OR w.contact_id=t.contact_id)
+       AND (t.context_type='work_order' AND w.id=t.context_id OR t.context_type NOT IN ('project','work_order') AND w.contact_id=t.contact_id)
        AND p_user IN (w.assigned_to,w.customer_sales_rep_id))
   )
  );
@@ -231,6 +231,13 @@ RETURNS SETOF jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS
  AND (nullif(p_filters->>'office_id','') IS NULL OR e.office_id=(p_filters->>'office_id')::uuid)
  AND (nullif(p_filters->>'actor_id','') IS NULL OR e.actor_id=(p_filters->>'actor_id')::uuid)
  AND (nullif(p_filters->>'category','') IS NULL OR e.category=p_filters->>'category')
+ AND (nullif(p_filters->>'kind','') IS NULL OR CASE p_filters->>'kind'
+  WHEN 'messages' THEN e.source_table='messages'
+  WHEN 'discussions' THEN e.source_table='discussion_posts'
+  WHEN 'tasks' THEN e.source_table IN ('tasks','task_comments')
+  WHEN 'updates' THEN e.category='update'
+  WHEN 'activity' THEN e.source_table NOT IN ('messages','discussion_posts','tasks','task_comments') AND e.category<>'update'
+  ELSE false END)
  AND (nullif(p_filters->>'since','') IS NULL OR e.created_at>=(p_filters->>'since')::timestamptz)
  AND (nullif(p_filters->>'until','') IS NULL OR e.created_at<(p_filters->>'until')::timestamptz)
  AND (NOT coalesce((p_filters->>'new_only')::boolean,false) OR v.event_id IS NULL)
@@ -244,18 +251,18 @@ RETURNS SETOF jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS
   OR (e.source_table='messages' AND EXISTS (
    SELECT 1 FROM public.message_threads t WHERE t.id=e.thread_id AND t.organization_id=e.organization_id
     AND (t.created_by=(SELECT auth.uid()) OR t.assigned_sales_rep_id=(SELECT auth.uid())
-     OR EXISTS (SELECT 1 FROM public.contacts c WHERE c.id=t.contact_id AND c.assigned_to=(SELECT auth.uid()))
+     OR (t.context_type NOT IN ('project','work_order') AND EXISTS (SELECT 1 FROM public.contacts c WHERE c.id=t.contact_id AND c.assigned_to=(SELECT auth.uid())))
      OR EXISTS (SELECT 1 FROM public.projects p WHERE p.organization_id=t.organization_id
-       AND (p.id=t.context_id AND t.context_type='project' OR p.contact_id=t.contact_id)
+       AND (t.context_type='project' AND p.id=t.context_id OR t.context_type NOT IN ('project','work_order') AND p.contact_id=t.contact_id)
        AND (SELECT auth.uid()) IN (p.assigned_pm,p.salesperson_id,p.designer_id))
      OR EXISTS (SELECT 1 FROM public.work_orders w WHERE w.organization_id=t.organization_id
-       AND (w.id=t.context_id AND t.context_type='work_order' OR w.contact_id=t.contact_id)
+       AND (t.context_type='work_order' AND w.id=t.context_id OR t.context_type NOT IN ('project','work_order') AND w.contact_id=t.contact_id)
        AND (SELECT auth.uid()) IN (w.assigned_to,w.customer_sales_rep_id))
      OR EXISTS (SELECT 1 FROM public.profiles me WHERE me.id=(SELECT auth.uid())
        AND me.role='service_manager' AND t.context_type IN ('work_order','service_request')))))
   OR EXISTS (SELECT 1 FROM public.projects p WHERE p.id=e.project_id AND p.organization_id=e.organization_id AND (SELECT auth.uid()) IN (p.assigned_pm,p.salesperson_id,p.designer_id))
   OR EXISTS (SELECT 1 FROM public.work_orders w WHERE w.organization_id=e.organization_id AND (w.id=e.work_order_id OR (e.project_id IS NOT NULL AND w.project_id=e.project_id)) AND (SELECT auth.uid()) IN (w.assigned_to,w.customer_sales_rep_id))
-  OR EXISTS (SELECT 1 FROM public.contacts c WHERE c.id=e.contact_id AND c.organization_id=e.organization_id AND c.assigned_to=(SELECT auth.uid()))
+  OR (e.project_id IS NULL AND e.work_order_id IS NULL AND EXISTS (SELECT 1 FROM public.contacts c WHERE c.id=e.contact_id AND c.organization_id=e.organization_id AND c.assigned_to=(SELECT auth.uid())))
  )
  ORDER BY e.id DESC LIMIT least(greatest(p_limit,1),100);
 $$;
