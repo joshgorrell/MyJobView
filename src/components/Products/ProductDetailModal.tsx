@@ -154,6 +154,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
       setPanelData({
         productId: p.id,
         productName: p.name || p.manufacturer_model_number || '',
+        modelNumber: p.manufacturer_model_number || null,
         sku: p.sku || null,
         upc: p.upc || null,
         category: taxonomy.categoryName || null,
