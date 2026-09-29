@@ -84,6 +84,3 @@ verify_jwt = false
 
 [functions.taxjar-lookup]
 verify_jwt = true
-
-[functions.product-image-suggestions]
-verify_jwt = true
