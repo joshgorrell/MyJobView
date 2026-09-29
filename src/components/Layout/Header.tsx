@@ -36,6 +36,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   const [expandedMobileItems, setExpandedMobileItems] = useState<Set<string>>(new Set());
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
 
   const loading = deptLoading;
@@ -70,13 +71,22 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
     async function loadOrgLogo() {
       if (!profile?.organization_id) return;
       try {
-        const { data } = await supabase
-          .from('organizations')
-          .select('header_logo_url')
-          .eq('id', profile.organization_id)
-          .maybeSingle();
-        if (data?.header_logo_url) {
-          setHeaderLogoUrl(data.header_logo_url);
+        const [orgRes, settingsRes] = await Promise.all([
+          supabase
+            .from('organizations')
+            .select('header_logo_url')
+            .eq('id', profile.organization_id)
+            .maybeSingle(),
+          supabase
+            .from('company_settings')
+            .select('company_logo_url')
+            .maybeSingle(),
+        ]);
+        if (orgRes.data?.header_logo_url) {
+          setHeaderLogoUrl(orgRes.data.header_logo_url);
+        }
+        if (settingsRes.data?.company_logo_url) {
+          setCompanyLogoUrl(settingsRes.data.company_logo_url);
         }
       } catch {
         // silently fall back to default logo
@@ -162,7 +172,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity"
             >
               <img
-                src={headerLogoUrl || '/el_logo_color_(2).png'}
+                src={headerLogoUrl || companyLogoUrl || '/el_logo_color_(2).png'}
                 alt="Logo"
                 className="h-8 max-w-[23vw] sm:max-w-none object-contain"
               />

@@ -13,7 +13,6 @@ export function CompanySettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadingHeaderLogo, setUploadingHeaderLogo] = useState(false);
   const [uploadingFooterLogo, setUploadingFooterLogo] = useState(false);
   const [geocodingOfficeId, setGeocodingOfficeId] = useState<string | null>(null);
   const geocodeTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
@@ -22,7 +21,6 @@ export function CompanySettings() {
   const [website, setWebsite] = useState('');
   const [portalUrl, setPortalUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
-  const [headerLogoUrl, setHeaderLogoUrl] = useState('');
   const [footerLogoUrl, setFooterLogoUrl] = useState('');
   const [orgId, setOrgId] = useState<string | null>(null);
   const [timezone, setTimezone] = useState('America/Chicago');
@@ -86,7 +84,6 @@ export function CompanySettings() {
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const headerLogoInputRef = useRef<HTMLInputElement>(null);
   const footerLogoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -182,7 +179,7 @@ export function CompanySettings() {
     try {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, timezone, header_logo_url, footer_logo_url, subdomain')
+        .select('id, timezone, footer_logo_url, subdomain')
         .limit(1)
         .maybeSingle();
 
@@ -190,7 +187,6 @@ export function CompanySettings() {
       if (data) {
         if (data.timezone) setTimezone(data.timezone);
         setOrgId(data.id);
-        setHeaderLogoUrl(data.header_logo_url || '');
         setFooterLogoUrl(data.footer_logo_url || '');
         setSubdomain(data.subdomain || '');
         setOriginalSubdomain(data.subdomain || '');
@@ -280,7 +276,7 @@ export function CompanySettings() {
 
   async function uploadBrandingLogo(
     file: File,
-    field: 'header_logo_url' | 'footer_logo_url',
+    field: 'footer_logo_url',
     currentUrl: string,
     setUrl: (url: string) => void,
     setUploading: (v: boolean) => void,
@@ -335,7 +331,7 @@ export function CompanySettings() {
   }
 
   function removeBrandingLogo(
-    field: 'header_logo_url' | 'footer_logo_url',
+    field: 'footer_logo_url',
     currentUrl: string,
     setUrl: (url: string) => void
   ) {
@@ -1087,51 +1083,9 @@ export function CompanySettings() {
             App Branding
           </h4>
           <p className="text-sm text-gray-500 -mt-3">
-            Upload your company logo for the header and footer. The MyJobView logo is used as a
-            placeholder until you upload your own.
+            The header automatically uses your Company Logo above. Upload a separate footer logo
+            here only if you want a different image in the bottom footer strip.
           </p>
-
-          {/* Header Logo */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Header Logo</label>
-            <p className="text-xs text-gray-500">Shown in the top navigation bar. Recommended: wide/horizontal format (e.g. 300x80px).</p>
-            {headerLogoUrl && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <img src={headerLogoUrl} alt="Header Logo" className="h-10 w-auto object-contain" />
-                <button
-                  onClick={() => removeBrandingLogo('header_logo_url', headerLogoUrl, setHeaderLogoUrl)}
-                  className="ml-auto p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Remove header logo"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            <input
-              ref={headerLogoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadBrandingLogo(file, 'header_logo_url', headerLogoUrl, setHeaderLogoUrl, setUploadingHeaderLogo, headerLogoInputRef);
-              }}
-              className="hidden"
-              id="header-logo-upload"
-            />
-            <label
-              htmlFor="header-logo-upload"
-              className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                uploadingHeaderLogo
-                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                  : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
-              }`}
-            >
-              <Upload className="w-4 h-4 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">
-                {uploadingHeaderLogo ? 'Uploading...' : headerLogoUrl ? 'Replace Header Logo' : 'Upload Header Logo'}
-              </span>
-            </label>
-          </div>
 
           {/* Footer Logo */}
           <div className="space-y-2">
