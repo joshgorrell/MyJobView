@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity } from 'lucide-react';
+import { FlowWaveIcon } from './FlowWaveIcon';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { PostFlowUpdate } from './PostFlowUpdate';
 import './flow.css';
@@ -16,7 +16,7 @@ export function QuickFlowUpdateModal({ onClose }: { onClose: () => void }) {
   return <QuickActionModal
     title="Flow Update"
     subtitle="Share a quick note without leaving this page"
-    icon={<Activity className="w-5 h-5 text-white" />}
+    icon={<FlowWaveIcon className="text-2xl" />}
     accentColor="from-cyan-600 to-blue-700"
     maxWidth="sm:max-w-xl"
     onClose={onClose}

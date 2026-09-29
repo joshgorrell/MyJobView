@@ -1,5 +1,6 @@
-import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock, Activity } from 'lucide-react';
+import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
+import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDepartments } from '../../contexts/DepartmentContext';
@@ -245,7 +246,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                     onClick={() => { onCreateFlowUpdate(); setShowCreateMenu(false); }}
                     className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
-                    <Activity className="w-4 h-4 text-cyan-400" />
+                    <FlowWaveIcon className="w-4 h-4 text-lg" />
                     <div><div className="font-medium">Flow Update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
                   </button>}
 
@@ -406,7 +407,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                             : 'text-secondary hover:bg-surface hover:text-primary'
                         }`}
                       >
-                        {renderIcon(module.icon, "w-4 h-4")}
+                        {module.module_key === 'feed' ? <FlowWaveIcon className="w-4 h-4 text-lg" /> : renderIcon(module.icon, "w-4 h-4")}
                         <span>{module.display_name}</span>
                       </button>
                     ))}
@@ -457,7 +458,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                     onClick={() => { onCreateFlowUpdate(); setMobileMenuOpen(false); }}
                     className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
-                    <Activity className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                    <FlowWaveIcon className="w-4 h-4 text-lg" />
                     <div><div className="text-sm font-medium">Flow Update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
                   </button>}
 
