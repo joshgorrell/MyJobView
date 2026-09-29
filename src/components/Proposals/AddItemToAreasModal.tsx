@@ -21,6 +21,7 @@ interface AddItemToAreasModalProps {
 }
 
 interface MasterProductFull extends Product {
+  manufacturer_model_number?: string | null;
   manufacturer?: { name: string } | null;
   vendor?: { vendor_name: string } | null;
   category?: { name: string } | null;
@@ -85,7 +86,9 @@ export default function AddItemToAreasModal({
   const [laborPhases, setLaborPhases] = useState<LaborPhaseOpt[]>([]);
   const [classes, setClasses] = useState<ProposalClass[]>([]);
   const [localRooms, setLocalRooms] = useState<ProposalRoom[]>(initialRooms);
-  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set(activeAreaId ? [activeAreaId] : []));
+  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(
+    new Set(activeAreaId ? [activeAreaId] : initialRooms.length === 1 ? [initialRooms[0].id] : [])
+  );
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
   const [roomLineItems, setRoomLineItems] = useState<Record<string, { product_id: string | null }[]>>({});
@@ -393,6 +396,7 @@ export default function AddItemToAreasModal({
   const panelData: ProductDetailPanelData | null = selectedProduct ? {
     productId: selectedProduct.id ?? null,
     productName: selectedProduct.name || '',
+    modelNumber: (selectedProduct as any).manufacturer_model_number || masterProduct?.manufacturer_model_number || null,
     sku: selectedProduct.sku || masterProduct?.sku || null,
     upc: (selectedProduct as any).upc ?? masterProduct?.upc ?? null,
     category: selectedTaxonomy?.categoryName || null,
@@ -526,6 +530,69 @@ export default function AddItemToAreasModal({
                 <ArrowLeft className="w-3.5 h-3.5" />Back to Search
               </button>
 
+              {/* Area Selection */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Copy className="w-4 h-4 text-gray-400" />Room / Area
+                  </h3>
+                  {selectedRooms.size > 0 && (
+                    <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+                      {selectedRooms.size} selected
+                    </span>
+                  )}
+                </div>
+                <div className="px-4 pb-4 space-y-3">
+                  {/* Create new area */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newAreaName}
+                      onChange={e => setNewAreaName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) handleCreateArea(); }}
+                      placeholder="Create new area..."
+                      className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-lg text-white transition-colors">
+                      {creatingArea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Area list */}
+                  <div className="space-y-1 max-h-36 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-2">
+                    {localRooms.map(room => {
+                      const isSelected = selectedRooms.has(room.id);
+                      const isActive = room.id === activeAreaId;
+                      const existingItems = roomLineItems[room.id];
+                      const isDuplicate = existingItems && selectedProduct && !String(selectedProduct.id).startsWith('null') &&
+                        existingItems.some(it => it.product_id === selectedProduct.id);
+                      return (
+                        <label key={room.id}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
+                          <input type="checkbox" checked={isSelected}
+                            onChange={() => toggleRoom(room.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
+                          <span className="text-xs text-gray-700 flex-1">{room.name}</span>
+                          {isDuplicate && (
+                            <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Already in area</span>
+                          )}
+                          {isActive && (
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
+                          )}
+                        </label>
+                      );
+                    })}
+                    {localRooms.length === 0 && (
+                      <div className="text-center py-3 text-gray-400 text-xs">
+                        No areas yet. Create one above, or leave unselected to add without an area.
+                      </div>
+                    )}
+                  </div>
+                  {localRooms.length > 0 && selectedRooms.size === 0 && <p className="text-xs text-amber-700">Select an area before adding this item.</p>}
+                </div>
+              </div>
+
               {/* Product Detail Panel — same component as Edit Item Details */}
               {panelData && (
                 <ProductDetailPanel
@@ -610,68 +677,6 @@ export default function AddItemToAreasModal({
                 </div>
               </div>
 
-              {/* Area Selection */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <Copy className="w-4 h-4 text-gray-400" />Add to Areas
-                  </h3>
-                  {selectedRooms.size > 0 && (
-                    <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-medium">
-                      {selectedRooms.size} selected
-                    </span>
-                  )}
-                </div>
-                <div className="px-4 pb-4 space-y-3">
-                  {/* Create new area */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newAreaName}
-                      onChange={e => setNewAreaName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) handleCreateArea(); }}
-                      placeholder="Create new area..."
-                      className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <button onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-lg text-white transition-colors">
-                      {creatingArea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {/* Area list */}
-                  <div className="space-y-1 max-h-36 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-2">
-                    {localRooms.map(room => {
-                      const isSelected = selectedRooms.has(room.id);
-                      const isActive = room.id === activeAreaId;
-                      const existingItems = roomLineItems[room.id];
-                      const isDuplicate = existingItems && selectedProduct && !String(selectedProduct.id).startsWith('null') &&
-                        existingItems.some(it => it.product_id === selectedProduct.id);
-                      return (
-                        <label key={room.id}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
-                          <input type="checkbox" checked={isSelected}
-                            onChange={() => toggleRoom(room.id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
-                          <span className="text-xs text-gray-700 flex-1">{room.name}</span>
-                          {isDuplicate && (
-                            <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Already in area</span>
-                          )}
-                          {isActive && (
-                            <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
-                          )}
-                        </label>
-                      );
-                    })}
-                    {localRooms.length === 0 && (
-                      <div className="text-center py-3 text-gray-400 text-xs">
-                        No areas yet. Create one above, or leave unselected to add without an area.
-                      </div>
-                    )}
-                  </div>
-                  {localRooms.length > 0 && selectedRooms.size === 0 && <p className="text-xs text-amber-700">Select an area before adding this item.</p>}
-                </div>
-              </div>
             </div>
           )}
         </div>
