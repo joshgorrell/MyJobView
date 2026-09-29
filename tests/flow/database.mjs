@@ -171,10 +171,13 @@ assert.equal((await list({kind:'discussions'})).filter(e=>e.source_table!=='disc
 await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${user}';
  INSERT INTO discussion_posts(id,organization_id,user_id,content,post_type,project_id)
  VALUES('${uid(113)}','${org}','${user}','Status for #Jones installation','general','${project}');
+ INSERT INTO discussion_posts(id,organization_id,user_id,content,post_type,parent_id)
+ VALUES('${uid(115)}','${org}','${user}','Reply on this job','general','${uid(113)}');
  INSERT INTO flow_updates(organization_id,project_id,body)
  VALUES('${org}','${project}','@jesse Can you confirm the schedule?');`);
 await asUser(colleague);
 assert.ok((await list({project_id:project,kind:'discussions'})).some(e=>e.source_id===uid(113)),'Chosen project is attached to its Flow');
+assert.ok((await list({project_id:project,kind:'discussions'})).some(e=>e.source_id===uid(115)),'Replies inherit the project destination');
 assert.ok((await list({project_id:project,mentions_only:true})).some(e=>e.source_table==='flow_updates'),'Flow update @handle is a direct mention');
 const mentionedUpdate=(await list({project_id:project,mentions_only:true})).find(e=>e.source_table==='flow_updates');
 assert.equal((await list({source_id:mentionedUpdate.source_id})).length,1,'Mention link selects the exact update');
