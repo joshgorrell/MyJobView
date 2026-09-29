@@ -1,3 +1,6 @@
+[functions.session-location]
+verify_jwt = true
+
 [functions.send-proposal-email]
 verify_jwt = true
 
