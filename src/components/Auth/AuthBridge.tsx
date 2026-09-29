@@ -25,8 +25,10 @@ export function AuthBridge() {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
-          const loginUrl = `https://myjobview.com/?redirect_to=${encodeURIComponent(returnTo)}`;
-          window.location.replace(loginUrl);
+          const loginUrl = new URL('https://myjobview.com/');
+          loginUrl.searchParams.set('redirect_to', returnTo);
+          loginUrl.searchParams.set('return_path', getReturnPath());
+          window.location.replace(loginUrl.toString());
           return;
         }
 

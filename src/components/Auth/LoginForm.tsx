@@ -27,7 +27,7 @@ export function LoginForm() {
       const portalToken = urlParams.get('portal_token');
       if (!portalToken) {
         setRedirectingToRoot(true);
-        window.location.replace(getRootAuthBridgeUrl(window.location.pathname + window.location.search));
+        window.location.replace(getRootAuthBridgeUrl(window.location.pathname));
       }
     }
   }, []);

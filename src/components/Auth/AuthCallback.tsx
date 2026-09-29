@@ -18,12 +18,12 @@ export function AuthCallback() {
       }
 
       try {
-        const { error: setError } = await supabase.auth.setSession({
+        const { error: sessionError } = await supabase.auth.setSession({
           access_token: tokens.accessToken,
           refresh_token: tokens.refreshToken,
         });
 
-        if (setError) throw setError;
+        if (sessionError) throw sessionError;
 
         window.location.hash = '';
         const returnPath = getReturnPath();

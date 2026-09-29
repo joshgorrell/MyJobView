@@ -231,9 +231,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get('redirect_to');
     if (redirectTo && isValidReturnHost(redirectTo)) {
+      const returnPath = urlParams.get('return_path') || '/';
       const bridgeUrl = new URL('/auth-bridge', window.location.origin);
       bridgeUrl.searchParams.set('return_to', redirectTo);
-      bridgeUrl.searchParams.set('path', window.location.pathname + window.location.search);
+      bridgeUrl.searchParams.set('path', returnPath);
       window.location.replace(bridgeUrl.toString());
     }
   }

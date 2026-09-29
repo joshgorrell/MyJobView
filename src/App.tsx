@@ -798,9 +798,10 @@ function AppContent() {
     // If already logged in on root domain with redirect_to, send to bridge
     const redirectParam = new URLSearchParams(window.location.search).get('redirect_to');
     if (user && redirectParam && isValidReturnHost(redirectParam)) {
+      const returnPath = new URLSearchParams(window.location.search).get('return_path') || window.location.pathname;
       const bridgeUrl = new URL('/auth-bridge', window.location.origin);
       bridgeUrl.searchParams.set('return_to', redirectParam);
-      bridgeUrl.searchParams.set('path', window.location.pathname + window.location.search);
+      bridgeUrl.searchParams.set('path', returnPath);
       window.location.replace(bridgeUrl.toString());
       return <LoadingFallback />;
     }
