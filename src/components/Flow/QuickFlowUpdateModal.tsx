@@ -1,0 +1,30 @@
+import { useEffect, useState } from 'react';
+import { Activity } from 'lucide-react';
+import { QuickActionModal } from '../Shared/QuickActionModal';
+import { PostFlowUpdate } from './PostFlowUpdate';
+import './flow.css';
+
+export function QuickFlowUpdateModal({ onClose }: { onClose: () => void }) {
+  const [posted, setPosted] = useState(false);
+
+  useEffect(() => {
+    if (!posted) return;
+    const timer = window.setTimeout(onClose, 1100);
+    return () => window.clearTimeout(timer);
+  }, [posted, onClose]);
+
+  return <QuickActionModal
+    title="Flow Update"
+    subtitle="Share a quick note without leaving this page"
+    icon={<Activity className="w-5 h-5 text-white" />}
+    accentColor="from-cyan-600 to-blue-700"
+    maxWidth="sm:max-w-xl"
+    onClose={onClose}
+    showSuccess={posted}
+    successMessage="Added to Flow"
+  >
+    <div className="flow flow--dark flow-quick-composer">
+      <PostFlowUpdate scope={{}} compact onClose={onClose} onPosted={() => setPosted(true)} />
+    </div>
+  </QuickActionModal>;
+}

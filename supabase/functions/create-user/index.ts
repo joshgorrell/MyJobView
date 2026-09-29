@@ -24,6 +24,15 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get('Authorization')!;
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
+    if (!token) throw new Error('Authentication is required');
+    const { data: requester, error: authError } = await supabaseClient.auth.getUser(token);
+    if (authError || !requester.user) throw new Error('Authentication is required');
+    const { data: requesterProfile } = await supabaseClient.from('profiles')
+      .select('role, organization_id').eq('id', requester.user.id).single();
+    if (requesterProfile?.role !== 'admin' || !requesterProfile.organization_id) {
+      throw new Error('Only an organization admin can create users');
+    }
 
     const {
       email,
@@ -38,6 +47,7 @@ serve(async (req) => {
       can_view_prospects,
       can_create_purchase_orders,
       can_view_all_tasks,
+      can_view_all_messages,
       can_view_all_pipeline,
       can_edit_contact_assignments,
       can_edit_products,
@@ -122,6 +132,7 @@ serve(async (req) => {
       can_view_prospects: can_view_prospects ?? false,
       can_create_purchase_orders: can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(role || 'sales'),
       can_view_all_tasks: can_view_all_tasks ?? true,
+      can_view_all_messages: can_view_all_messages ?? false,
       can_view_all_pipeline: can_view_all_pipeline ?? true,
       can_edit_contact_assignments: can_edit_contact_assignments ?? false,
       can_edit_products: can_edit_products ?? true,

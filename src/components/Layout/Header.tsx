@@ -1,4 +1,4 @@
-import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
+import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock, Activity } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +12,7 @@ interface HeaderProps {
   onCreateContact: () => void;
   onCreateLead: () => void;
   onCreateMessage: () => void;
+  onCreateFlowUpdate?: () => void;
   onCreateServiceRequest: () => void;
   onCreateTask: () => void;
   onCreateJobMedia?: () => void;
@@ -28,7 +29,7 @@ interface HeaderProps {
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
   const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
@@ -197,7 +198,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
               </button>
 
               {showCreateMenu && (
-                <div className="absolute top-full right-0 mt-2 w-56 bg-canvas border border-purple-500/30 rounded-lg shadow-xl overflow-hidden z-50">
+                <div className="absolute top-full right-0 mt-2 w-56 max-h-[70vh] overflow-y-auto bg-canvas border border-purple-500/30 rounded-lg shadow-xl z-50">
                   <button
                     onClick={() => {
                       onCreateContact();
@@ -239,6 +240,14 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                       <div className="text-xs text-muted">Start a conversation</div>
                     </div>
                   </button>
+
+                  {onCreateFlowUpdate && <button
+                    onClick={() => { onCreateFlowUpdate(); setShowCreateMenu(false); }}
+                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
+                  >
+                    <Activity className="w-4 h-4 text-cyan-400" />
+                    <div><div className="font-medium">Flow Update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                  </button>}
 
                   <button
                     onClick={() => {
@@ -443,6 +452,14 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                       <div className="text-xs text-muted">Start a conversation</div>
                     </div>
                   </button>
+
+                  {onCreateFlowUpdate && <button
+                    onClick={() => { onCreateFlowUpdate(); setMobileMenuOpen(false); }}
+                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
+                  >
+                    <Activity className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                    <div><div className="text-sm font-medium">Flow Update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                  </button>}
 
                   <button
                     onClick={() => { onCreateServiceRequest(); setMobileMenuOpen(false); }}

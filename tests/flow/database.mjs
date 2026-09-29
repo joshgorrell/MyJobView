@@ -94,4 +94,97 @@ for(const source of ['work_orders','projects','service_requests','change_orders'
 await db.exec(`INSERT INTO department_modules(module_key) VALUES('invoices'); INSERT INTO role_module_access SELECT '${uid(80)}',id,true FROM department_modules WHERE module_key='invoices' AND id NOT IN (SELECT module_id FROM role_module_access);`);
 await asUser(colleague); assert.equal((await list({category:'financial'})).length,0,'Revocation wins across duplicate module keys');
 console.log('PASS: source events, standalone service, shared scopes, concise transitions, My Work, personal views, pagination, atomicity, tenant isolation, forgery prevention, module overrides, restricted notes, and target search.');
+await db.exec(`RESET ROLE;
+ ALTER TABLE profiles ADD COLUMN contact_id uuid; ALTER TABLE profiles ADD COLUMN username text;
+ ALTER TABLE contacts ADD COLUMN portal_user_id uuid;
+ ALTER TABLE proposals ADD COLUMN created_by uuid;
+ CREATE TABLE message_threads(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,proposal_id uuid,context_type text,context_id uuid,created_by uuid,assigned_sales_rep_id uuid,visibility text DEFAULT 'public');
+ CREATE TABLE messages(id uuid PRIMARY KEY,organization_id uuid,thread_id uuid,author_id uuid,author_name text,author_type text,body text,is_internal boolean,created_at timestamptz DEFAULT now());
+ CREATE TABLE notifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid,user_id uuid,type text,title text,body text,related_id uuid,is_read boolean);
+ CREATE TABLE tasks(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,user_id uuid,assigned_to uuid,title text,status text,created_at timestamptz DEFAULT now());
+ CREATE TABLE task_comments(id uuid PRIMARY KEY,organization_id uuid,task_id uuid,user_id uuid,content text,created_at timestamptz DEFAULT now());
+ CREATE TABLE discussion_posts(id uuid PRIMARY KEY,organization_id uuid,user_id uuid,assigned_to uuid,content text,mentions text[] DEFAULT '{}',is_private boolean DEFAULT false,post_type text,parent_id uuid,created_at timestamptz DEFAULT now());
+ ALTER TABLE message_threads ENABLE ROW LEVEL SECURITY; ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ GRANT SELECT ON message_threads,messages,notifications,tasks,task_comments,discussion_posts TO authenticated;
+ UPDATE profiles SET role='sales',username='jg' WHERE id='${user}';
+ UPDATE profiles SET username='jesse' WHERE id='${colleague}';
+ INSERT INTO profiles(id,organization_id,full_name,role,username) VALUES('${uid(13)}','${org}','Unrelated rep','sales','rep');
+ INSERT INTO department_modules(module_key) VALUES('messages'),('tasks'),('feed');
+ INSERT INTO role_module_access SELECT '${uid(80)}',id,true FROM department_modules WHERE module_key IN ('messages','tasks','feed');
+ INSERT INTO message_threads(id,organization_id,contact_id,proposal_id,context_type,context_id,created_by,assigned_sales_rep_id)
+ VALUES('${uid(100)}','${org}','${customer}',null,'project','${project}','${colleague}','${user}');
+ INSERT INTO message_threads(id,organization_id,contact_id,proposal_id,context_type,context_id,created_by,assigned_sales_rep_id)
+ VALUES('${uid(101)}','${otherOrg}','${otherCustomer}',null,'contact','${otherCustomer}','${outsider}',null);
+`);
+const communications = await readFile(new URL('../../supabase/migrations/20260928200000_my_flow_customer_conversations.sql',import.meta.url),'utf8');
+await db.exec(communications);
+await asUser(user);
+await db.exec('RESET ROLE;');
+await db.exec(`INSERT INTO messages(id,organization_id,thread_id,author_id,author_name,author_type,body,is_internal)
+ VALUES('${uid(102)}','${org}','${uid(100)}','${user}','Josh','staff','Right @Jesse! Please check this.',true)`);
+await asUser(user);
+const mentioned = await list({mentions_only:true,my_work:true});
+assert.equal(mentioned.length,0,'The author is not mentioned by their own message');
+await asUser(colleague);
+const jesseMentions = await list({mentions_only:true,my_work:true});
+assert.equal(jesseMentions.length,1,'An exact handle highlights the conversation for its recipient');
+assert.equal(jesseMentions[0].thread_id,uid(100));
+assert.equal(jesseMentions[0].details,'Open the conversation to read the message in context.');
+assert.equal((await db.query('SELECT count(*)::int AS count FROM notifications WHERE user_id=$1',[colleague])).rows[0].count,1);
+await asUser(uid(13));
+assert.equal((await list({category:'communication'})).length,0,'A rep outside this customer cannot read its Flow conversation');
+assert.equal((await db.query('SELECT count(*)::int AS count FROM messages')).rows[0].count,0,'The thread RLS also hides message bodies');
+await assert.rejects(db.exec(`UPDATE profiles SET can_view_all_messages=true WHERE id='${uid(13)}'`),
+  /Only an organization admin/, 'A user cannot grant themselves executive access');
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub='';`);
+await db.exec(`UPDATE profiles SET can_view_all_messages=true WHERE id='${uid(13)}'`);
+await asUser(uid(13));
+assert.equal((await list({category:'communication'})).length,1,'Explicit executive access covers company conversations');
+assert.equal((await list({category:'communication',my_work:true})).length,0,'Executive oversight does not turn every thread into personal work');
+assert.equal((await list({kind:'messages'})).length,1,'Messages category includes its conversation');
+assert.equal((await list({kind:'tasks'})).length,0,'Tasks filter excludes messages');
+assert.equal((await list({kind:'activity'})).length,0,'Executive message access does not grant unrelated activity modules');
+
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${user}';
+ INSERT INTO tasks(id,organization_id,contact_id,user_id,assigned_to,title,status)
+ VALUES('${uid(110)}','${org}','${customer}','${user}','${colleague}','Check rack','pending');
+ INSERT INTO task_comments(id,organization_id,task_id,user_id,content)
+ VALUES('${uid(111)}','${org}','${uid(110)}','${user}','Parts arrived for @jesse');
+ INSERT INTO discussion_posts(id,organization_id,user_id,assigned_to,content,post_type)
+ VALUES('${uid(112)}','${org}','${user}','${colleague}','Right @jesse?','question');`);
+await asUser(colleague);
+const relatedComms = await list({category:'communication',my_work:true});
+assert.ok(relatedComms.some(e=>e.source_table==='tasks' && e.source_id===uid(110)),'Assigned customer tasks appear');
+assert.ok(relatedComms.some(e=>e.source_table==='task_comments' && e.task_id===uid(110) && e.preview?.includes('Parts arrived')),'Task comments preview and open their parent task');
+assert.ok(relatedComms.some(e=>e.source_table==='discussion_posts' && e.mentioned_user_ids.includes(colleague)),'Discussion mentions are highlighted');
+assert.equal((await db.query("SELECT count(*)::int AS count FROM notifications WHERE user_id=$1 AND type='discussion_post_mention'",[colleague])).rows[0].count,1,'Discussion mentions notify with a direct post link');
+
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub=''; UPDATE contacts SET assigned_to='${user}' WHERE id='${customer}';
+ INSERT INTO projects(id,organization_id,contact_id,name,project_number,salesperson_id,status)
+ VALUES('${uid(31)}','${org}','${customer}','Other rep project','P-101','${colleague}','draft');`);
+await asUser(colleague);
+await db.exec(`UPDATE projects SET status='active' WHERE id='${uid(31)}'`);
+await asUser(user);
+assert.ok(!(await list({my_work:true})).some(e=>e.project_id===uid(31)),'Customer owner does not inherit another rep project activity');
+assert.ok(!(await list()).some(e=>e.project_id===uid(31)),'All Activity still respects project module access');
+assert.equal((await list({kind:'discussions'})).filter(e=>e.source_table!=='discussion_posts').length,0,'Discussion filter is exact');
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${user}';
+ INSERT INTO discussion_posts(id,organization_id,user_id,content,post_type,project_id)
+ VALUES('${uid(113)}','${org}','${user}','Status for #Jones installation','general','${project}');
+ INSERT INTO discussion_posts(id,organization_id,user_id,content,post_type,parent_id)
+ VALUES('${uid(115)}','${org}','${user}','Reply on this job','general','${uid(113)}');
+ INSERT INTO flow_updates(organization_id,project_id,body)
+ VALUES('${org}','${project}','@jesse Can you confirm the schedule?');`);
+await asUser(colleague);
+assert.ok((await list({project_id:project,kind:'discussions'})).some(e=>e.source_id===uid(113)),'Chosen project is attached to its Flow');
+assert.ok((await list({project_id:project,kind:'discussions'})).some(e=>e.source_id===uid(115)),'Replies inherit the project destination');
+assert.ok((await list({project_id:project,mentions_only:true})).some(e=>e.source_table==='flow_updates'),'Flow update @handle is a direct mention');
+const mentionedUpdate=(await list({project_id:project,mentions_only:true})).find(e=>e.source_table==='flow_updates');
+assert.equal((await list({source_id:mentionedUpdate.source_id})).length,1,'Mention link selects the exact update');
+assert.equal((await db.query("SELECT count(*)::int AS count FROM notifications WHERE user_id=$1 AND type='flow_update_mention'",[colleague])).rows[0].count,1,'Flow update mention notifies once');
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${user}';`);
+await rejects(`INSERT INTO discussion_posts(id,organization_id,user_id,content,post_type,project_id) VALUES('${uid(114)}','${org}','${user}','Wrong dealer','general','${uid(999)}')`,'Invalid project tag rejected');
+await asUser(outsider);
+assert.equal((await list({category:'communication'})).length,0,'Another dealer cannot see the thread');
+console.log('PASS: related conversation, mention routing, context link, no body snapshot, and tenant isolation.');
 await db.close();

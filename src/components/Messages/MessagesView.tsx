@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Plus, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { insertFlowTag, useFlowTags, TagChoice } from '../Flow/useFlowTags';
 
 interface EnrichedThread {
   id: string;
@@ -115,12 +116,23 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
   const [selectedThread, setSelectedThread] = useState<EnrichedThread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [messageCursor, setMessageCursor] = useState(0);
+  const [mentionHighlight, setMentionHighlight] = useState(0);
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+  const { tag: messageTag, choices: messageChoices } = useFlowTags(newMessage, messageCursor, profile?.organization_id);
   const [showNewThread, setShowNewThread] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'customer' | 'proposals' | 'internal'>('all');
   const [isInternal, setIsInternal] = useState(false);
+  const staffChoices = messageTag?.symbol === '@' && isInternal ? messageChoices.filter(c => c.kind === 'person') : [];
+  function chooseMessageMention(choice: TagChoice) {
+    if (!messageTag || choice.kind !== 'person') return;
+    const inserted = insertFlowTag(newMessage, messageCursor, messageTag.start, choice);
+    setNewMessage(inserted.text); setMessageCursor(inserted.cursor); setMentionHighlight(0);
+    requestAnimationFrame(() => { messageInput.current?.focus(); messageInput.current?.setSelectionRange(inserted.cursor, inserted.cursor); });
+  }
   const [uploading, setUploading] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -136,7 +148,6 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager';
 
   const loadThreads = useCallback(async () => {
     if (!profile?.organization_id) {
@@ -155,9 +166,8 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
         .eq('organization_id', profile.organization_id)
         .order('last_message_at', { ascending: false });
 
-      if (!isPrivileged && profile?.id) {
-        query = query.or(`assigned_sales_rep_id.eq.${profile.id},created_by.eq.${profile.id}`);
-      }
+      // Row-level security resolves customer, project, service, and executive access.
+      // Filtering here by the assigned sales rep would hide a rep's other customer threads.
 
       const { data: threadsData, error } = await query;
       if (error) throw error;
@@ -260,7 +270,7 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
     } finally {
       setLoading(false);
     }
-  }, [profile?.id, profile?.organization_id, isPrivileged]);
+  }, [profile?.id, profile?.organization_id]);
 
   async function loadContacts() {
     const { data } = await supabase
@@ -927,6 +937,7 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
                     e.target.value = '';
                   }}
                 />
+                {staffChoices.length > 0 && <div className="mb-2 max-h-40 overflow-auto rounded border border-blue-200 bg-white" role="listbox" aria-label="Mention teammates">{staffChoices.map((choice, index) => <button key={choice.id} type="button" role="option" aria-selected={index === mentionHighlight} onClick={() => chooseMessageMention(choice)} className={`block w-full px-3 py-2 text-left text-sm ${index === mentionHighlight ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}>@{choice.kind === 'person' ? choice.username : ''} · {choice.label}</button>)}</div>}
                 <div className="flex gap-2 items-end">
                   <button
                     type="button"
@@ -938,15 +949,19 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
                     {uploading ? <Loader className="w-4 h-4 animate-spin text-gray-500" /> : <ImagePlus className="w-4 h-4 text-gray-500" />}
                   </button>
                   <textarea
+                    ref={messageInput}
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => { setNewMessage(e.target.value); setMessageCursor(e.target.selectionStart); setMentionHighlight(0); }}
+                    onSelect={e => setMessageCursor(e.currentTarget.selectionStart)}
                     onKeyDown={(e) => {
+                      if (staffChoices.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); setMentionHighlight(i => (i + (e.key === 'ArrowDown' ? 1 : staffChoices.length - 1)) % staffChoices.length); return; }
+                      if (staffChoices.length && (e.key === 'Enter' || e.key === 'Tab')) { e.preventDefault(); chooseMessageMention(staffChoices[Math.min(mentionHighlight, staffChoices.length - 1)]); return; }
                       if (e.key === 'Enter' && !e.shiftKey && window.innerWidth >= 640) {
                         e.preventDefault();
                         handleSendMessage();
                       }
                     }}
-                    placeholder="Type your message..."
+                    placeholder={isInternal ? 'Internal note… Type @ to mention a teammate' : 'Type your message…'}
                     rows={2}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
                   />

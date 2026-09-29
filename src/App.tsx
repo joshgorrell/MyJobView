@@ -33,6 +33,7 @@ const LeadForm = lazy(() => import('./components/Leads/LeadForm').then(m => ({ d
 const LeadsHistory = lazy(() => import('./components/Feed/LeadsHistory').then(m => ({ default: m.LeadsHistory })));
 const ServiceRequestForm = lazy(() => import('./components/Service/ServiceRequestForm').then(m => ({ default: m.ServiceRequestForm })));
 const MasterFeed = lazy(() => import('./components/Feed/MasterFeed').then(m => ({ default: m.MasterFeed })));
+const QuickFlowUpdateModal = lazy(() => import('./components/Flow/QuickFlowUpdateModal').then(m => ({ default: m.QuickFlowUpdateModal })));
 const FishbowlView = lazy(() => import('./components/Fishbowl/FishbowlView').then(m => ({ default: m.FishbowlView })));
 const BusinessCardPage = lazy(() => import('./components/BusinessCard/BusinessCardPage').then(m => ({ default: m.BusinessCardPage })));
 const MyCardView = lazy(() => import('./components/BusinessCard/MyCardView').then(m => ({ default: m.MyCardView })));
@@ -180,6 +181,7 @@ function AppContent() {
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showMessageForm, setShowMessageForm] = useState(false);
+  const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
@@ -838,6 +840,7 @@ function AppContent() {
             onCreateContact={() => setShowContactForm(true)}
             onCreateLead={() => setShowLeadForm(true)}
             onCreateMessage={() => setShowMessageForm(true)}
+            onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
             onCreateServiceRequest={() => setShowServiceRequestForm(true)}
             onCreateTask={() => {
               setShowTaskForm(true);
@@ -1342,6 +1345,12 @@ function AppContent() {
             </div>
           </div>
         </QuickActionModal>
+      )}
+
+      {showFlowUpdate && (
+        <Suspense fallback={null}>
+          <QuickFlowUpdateModal onClose={() => setShowFlowUpdate(false)} />
+        </Suspense>
       )}
 
       {selectedLeadId && (

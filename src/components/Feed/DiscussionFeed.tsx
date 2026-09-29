@@ -13,9 +13,10 @@ interface DiscussionFeedProps {
   onHashtagClick?: (hashtag: string) => void;
   showOnlyMentions?: boolean;
   searchQuery?: string;
+  focusPostId?: string | null;
 }
 
-export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, showOnlyMentions, searchQuery }: DiscussionFeedProps) {
+export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, showOnlyMentions, searchQuery, focusPostId }: DiscussionFeedProps) {
   const { profile } = useAuth();
   const [posts, setPosts] = useState<DiscussionPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,12 +48,17 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       supabase.removeChannel(channel);
     };
-  }, [profile, selectedHashtag, showOnlyMentions, searchQuery]);
+  }, [profile, selectedHashtag, showOnlyMentions, searchQuery, focusPostId]);
 
   async function loadPosts() {
     if (!profile) return;
 
     try {
+      let rootPostId = focusPostId;
+      if (focusPostId) {
+        const { data: focused } = await supabase.from('discussion_posts').select('parent_id').eq('id', focusPostId).maybeSingle();
+        rootPostId = focused?.parent_id || focusPostId;
+      }
       let query = supabase
         .from('discussion_posts')
         .select(`
@@ -78,15 +84,17 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
         `)
         .is('parent_id', null);
 
-      if (selectedHashtag) {
+      if (rootPostId) query = query.eq('id', rootPostId);
+
+      if (!rootPostId && selectedHashtag) {
         query = query.contains('hashtags', [selectedHashtag]);
       }
 
-      if (showOnlyMentions) {
+      if (!rootPostId && showOnlyMentions) {
         query = query.contains('mentions', [profile.id]);
       }
 
-      if (searchQuery && searchQuery.trim()) {
+      if (!rootPostId && searchQuery && searchQuery.trim()) {
         const trimmedQuery = searchQuery.trim();
 
         if (trimmedQuery.startsWith('@')) {
