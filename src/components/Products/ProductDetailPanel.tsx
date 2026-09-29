@@ -113,13 +113,13 @@ export default function ProductDetailPanel({
   const marginBg = margin >= 30 ? 'bg-emerald-50 border-emerald-200' : margin >= 15 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[10rem_minmax(0,1fr)] gap-4">
       {isEdit && (
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       )}
 
       {/* TOP / LEFT: Image + Product Identity */}
-      <div className="w-full lg:w-40 lg:shrink-0 flex flex-row lg:flex-col gap-3">
+      <div className="w-full lg:row-span-2 flex flex-row lg:flex-col gap-3">
         {/* Image */}
         <div className="relative group w-28 sm:w-36 lg:w-full shrink-0">
           {displayImage ? (
@@ -253,7 +253,7 @@ export default function ProductDetailPanel({
       </div>
 
       {/* CENTER: Product name, description, pricing, labor */}
-      <div className="flex-1 flex flex-col gap-2 min-w-0">
+      <div className="flex flex-col gap-2 min-w-0 lg:col-start-2">
         {/* Name + category strip */}
         {showIdentity && <div>
           <div className="flex items-start gap-2">
@@ -444,7 +444,7 @@ export default function ProductDetailPanel({
       </div>
 
       {/* RIGHT / BOTTOM: Financials + edit options */}
-      <div className="w-full lg:w-36 lg:shrink-0 flex flex-row lg:flex-col gap-2">
+      <div className="w-full flex flex-col sm:flex-row gap-2 lg:col-start-2">
         {/* Financial summary */}
         <div className={`rounded-lg border p-2 flex-1 lg:flex-none ${marginBg}`}>
           <div className="text-xs font-semibold text-gray-700 mb-1.5">Financials</div>
