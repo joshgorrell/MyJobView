@@ -220,11 +220,15 @@ export default function AddItemToAreasModal({
   }
 
   async function handleProductCreated(productData: any) {
-    setShowNewProductForm(false);
     const refreshedProducts = await loadAll();
     if (productData?.id) {
       const product = refreshedProducts.find(p => p.id === productData.id);
-      if (product) handleProductSelect(product);
+      if (product) {
+        handleProductSelect(product);
+        setShowNewProductForm(false);
+      } else {
+        alert('The product was saved, but could not be loaded into this proposal. Close and reopen Add Item to try again.');
+      }
     }
   }
 
@@ -501,19 +505,22 @@ export default function AddItemToAreasModal({
               <CatalogTaxonomyFilters theme="light" products={products} category={selectedCategory} subcategory={selectedSubcategory} vendor={selectedVendor}
                 onCategory={setSelectedCategory} onSubcategory={setSelectedSubcategory} onVendor={setSelectedVendor} />
 
-              <button
-                onClick={() => setShowNewProductForm(true)}
-                className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-colors shadow-sm"
-              >
-                <Plus className="w-4 h-4" />Create New Product
-              </button>
+              {canEditProducts && (
+                <button
+                  onClick={() => setShowNewProductForm(true)}
+                  className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />Create New Catalog Product
+                </button>
+              )}
 
               <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto bg-white">
                 {loading ? (
                   <div className="p-8 text-center text-gray-400 text-sm">Loading products...</div>
                 ) : filteredProducts.length === 0 ? (
                   <div className="p-8 text-center text-gray-400 text-sm">
-                    {searchQuery ? 'No products match your search' : 'No products available'}
+                    <p>{searchQuery ? 'No products match your search.' : 'No products available.'}</p>
+                    {canEditProducts && <p className="mt-2">Create a catalog product above, then finish adding it to this proposal.</p>}
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
