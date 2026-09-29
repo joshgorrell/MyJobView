@@ -24,6 +24,7 @@ import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { supabase } from './lib/supabase';
 import ProductsManagement from './components/Products/ProductsManagement';
+import { isValidReturnHost } from './lib/crossDomainAuth';
 
 // Lazy load components
 const ContactForm = lazy(() => import('./components/Contacts/ContactForm').then(m => ({ default: m.ContactForm })));
@@ -109,6 +110,8 @@ const SecurityOnboarding = lazy(() => import('./components/Finance/SecurityOnboa
 const FinanceDashboard = lazy(() => import('./components/Finance/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })));
 const SecurityOnboardingPortal = lazy(() => import('./components/Portal/SecurityOnboardingPortal'));
 const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m => ({ default: m.PortalLogin })));
+const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => ({ default: m.AuthBridge })));
+const AuthCallback = lazy(() => import('./components/Auth/AuthCallback').then(m => ({ default: m.AuthCallback })));
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
 const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxInstructions').then(m => ({ default: m.default })));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
@@ -406,7 +409,7 @@ function AppContent() {
     localStorage.setItem('activeTab', activeTab);
 
     // Skip URL manipulation for standalone routes that don't use tab-based navigation
-    const standaloneRoutes = ['/kiosk', '/portal', '/business-card', '/public', '/eula', '/privacy'];
+    const standaloneRoutes = ['/kiosk', '/portal', '/business-card', '/public', '/eula', '/privacy', '/auth-bridge', '/auth-callback'];
     if (standaloneRoutes.some(r => currentPath.startsWith(r))) return;
 
     // Update URL to persist state across refreshes
@@ -542,6 +545,27 @@ function AppContent() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <SecurityOnboardingPortal token={token || undefined} />
+      </Suspense>
+    );
+  }
+
+  // --- CROSS-DOMAIN AUTH BRIDGE ---
+  // On the root domain, /auth-bridge checks for a session and redirects back to
+  // the dealer subdomain with a short-lived token transfer via URL fragment.
+  if (currentPath === '/auth-bridge') {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <AuthBridge />
+      </Suspense>
+    );
+  }
+
+  // On a dealer subdomain, /auth-callback receives the transferred session and
+  // establishes it in this origin's localStorage.
+  if (currentPath === '/auth-callback') {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <AuthCallback />
       </Suspense>
     );
   }
@@ -771,6 +795,15 @@ function AppContent() {
   }
 
   if (!user || !profile) {
+    // If already logged in on root domain with redirect_to, send to bridge
+    const redirectParam = new URLSearchParams(window.location.search).get('redirect_to');
+    if (user && redirectParam && isValidReturnHost(redirectParam)) {
+      const bridgeUrl = new URL('/auth-bridge', window.location.origin);
+      bridgeUrl.searchParams.set('return_to', redirectParam);
+      bridgeUrl.searchParams.set('path', window.location.pathname + window.location.search);
+      window.location.replace(bridgeUrl.toString());
+      return <LoadingFallback />;
+    }
     if (isPasswordRecovery) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">

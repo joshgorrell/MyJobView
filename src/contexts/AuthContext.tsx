@@ -3,6 +3,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
+import { isValidReturnHost } from '../lib/crossDomainAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -225,6 +226,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'This usually means browser storage is blocked.\n\n' +
         'Please enable cookies and site data in your browser settings.'
       );
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectTo = urlParams.get('redirect_to');
+    if (redirectTo && isValidReturnHost(redirectTo)) {
+      const bridgeUrl = new URL('/auth-bridge', window.location.origin);
+      bridgeUrl.searchParams.set('return_to', redirectTo);
+      bridgeUrl.searchParams.set('path', window.location.pathname + window.location.search);
+      window.location.replace(bridgeUrl.toString());
     }
   }
 

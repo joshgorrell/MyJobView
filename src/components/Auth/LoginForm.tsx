@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BrowserDiagnostics } from '../Shared/BrowserDiagnostics';
+import { isDealerSubdomain, getRootAuthBridgeUrl, isValidReturnHost } from '../../lib/crossDomainAuth';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -13,6 +14,23 @@ export function LoginForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { signIn, signUp, resetPassword, resendConfirmation } = useAuth();
+  const [redirectingToRoot, setRedirectingToRoot] = useState(false);
+  const [returnToDealer, setReturnToDealer] = useState<string | null>(null);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirect = urlParams.get('redirect_to');
+    if (redirect && isValidReturnHost(redirect)) {
+      setReturnToDealer(redirect);
+    }
+    if (isDealerSubdomain() && !isForgotPassword && !isSignUp) {
+      const portalToken = urlParams.get('portal_token');
+      if (!portalToken) {
+        setRedirectingToRoot(true);
+        window.location.replace(getRootAuthBridgeUrl(window.location.pathname + window.location.search));
+      }
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,6 +76,17 @@ export function LoginForm() {
     }
   }
 
+  if (redirectingToRoot) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-4"></div>
+          <p className="text-gray-300 text-lg">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
@@ -71,6 +100,11 @@ export function LoginForm() {
           <p className="text-gray-300">
             {isForgotPassword ? 'Reset your password' : isSignUp ? 'Create your account' : 'Sign in to your account'}
           </p>
+          {returnToDealer && !isForgotPassword && !isSignUp && (
+            <p className="text-blue-300 text-sm mt-2">
+              You will be redirected back to {returnToDealer} after signing in.
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
