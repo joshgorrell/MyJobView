@@ -83,6 +83,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const [imageSuggestions, setImageSuggestions] = useState<string[]>([]);
   const [imageSuggestionIndex, setImageSuggestionIndex] = useState(0);
   const [checkingImage, setCheckingImage] = useState(false);
+  const [imageSuggestionStatus, setImageSuggestionStatus] = useState('');
   const autoSelectedImage = useRef<{ modelKey: string; url: string } | null>(null);
   const [showMissingImagePrompt, setShowMissingImagePrompt] = useState(false);
 
@@ -174,7 +175,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     enabled: true // Auto-save for all forms (new, edit, and duplicate)
   });
 
-  // Reuse an exact model photo already approved for this organization.
+  // Look up a new model online, after the user has stopped typing.
   useEffect(() => {
     const model = formData.manufacturer_model_number.trim();
     const modelKey = `${formData.manufacturer_id}:${model.toLowerCase()}`;
@@ -183,34 +184,29 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       setFormData(current => current.image_url === previousUrl ? { ...current, image_url: '' } : current);
       autoSelectedImage.current = null;
     }
-    const organizationId = profile?.organization_id;
-    if (!organizationId || !formData.manufacturer_id || model.length < 3 || formData.item_type !== 'material') {
+    const manufacturer = manufacturers.find(item => item.id === formData.manufacturer_id)?.name;
+    if (!manufacturer || model.length < 3 || formData.item_type !== 'material' || productId) {
       setImageSuggestions([]);
       setImageSuggestionIndex(0);
       setCheckingImage(false);
+      setImageSuggestionStatus('');
       return;
     }
 
     setImageSuggestions([]);
     setImageSuggestionIndex(0);
     setCheckingImage(false);
+    setImageSuggestionStatus('');
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setCheckingImage(true);
-      const { data, error } = await supabase.from('products')
-        .select('id, manufacturer_model_number, image_url')
-        .eq('organization_id', organizationId)
-        .eq('manufacturer_id', formData.manufacturer_id)
-        .ilike('manufacturer_model_number', model)
-        .not('image_url', 'is', null)
-        .limit(20);
+      const { data, error } = await supabase.functions.invoke('product-image-suggestions', {
+        body: { manufacturer, model },
+      });
       if (cancelled) return;
-      if (error) console.error('Could not check for an existing product photo:', error);
-      const matches = (data || [])
-        .filter(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.toLowerCase() && p.image_url?.trim())
-        .map(p => p.image_url.trim());
-      const urls = [...new Set(matches)];
+      const urls: string[] = !error && Array.isArray(data?.images) ? data.images : [];
       setImageSuggestions(urls);
+      setImageSuggestionStatus(error ? 'unavailable' : data?.status || 'unavailable');
       // Fill the thumbnail only if the person has not chosen a photo already.
       if (urls.length) setFormData(current => {
         if (current.image_url) return current;
@@ -221,7 +217,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     }, 600);
 
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [profile?.organization_id, productId, formData.manufacturer_id, formData.manufacturer_model_number, formData.item_type]);
+  }, [productId, manufacturers, formData.manufacturer_id, formData.manufacturer_model_number, formData.item_type]);
 
   useEffect(() => {
     // Clean up old localStorage keys that might have invalid data
@@ -1643,7 +1639,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     Add a product photo so this item is easy to recognize in the catalog and on documents.
                   </p>
                 )}
-                {checkingImage && !formData.image_url && <p className="text-xs text-gray-500">Checking the catalog for this model’s photo…</p>}
+                {checkingImage && <p className="text-xs text-gray-500">Finding photos online for this make and model…</p>}
+                {!checkingImage && !suggestedImage && imageSuggestionStatus === 'no_match' && <p className="text-xs text-gray-600">No verified photo found for this model. You can paste or upload one below.</p>}
+                {!checkingImage && !suggestedImage && imageSuggestionStatus === 'not_configured' && <p className="text-xs text-gray-600">Online photo suggestions are not connected yet. You can paste or upload a photo.</p>}
+                {!checkingImage && !suggestedImage && imageSuggestionStatus === 'unavailable' && <p className="text-xs text-gray-600">Photo lookup is unavailable. You can paste or upload a photo.</p>}
                 {suggestedImage && (
                   <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-2">
                     <img src={suggestedImage} alt="Suggested catalog photo for this model" className="w-14 h-14 rounded object-contain bg-white"
@@ -1653,7 +1652,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                         setFormData(current => current.image_url === suggestedImage ? { ...current, image_url: '' } : current);
                       }} />
                     <div className="min-w-0 flex-1 text-xs text-blue-900">
-                      Photo found for this exact manufacturer and model in your catalog.
+                      Suggested photo for this exact make and model. Check that it shows the correct product.
                       {imageSuggestions.length > 1 && <div className="mt-1 flex items-center gap-1">
                         <button type="button" aria-label="Previous suggested photo" onClick={() => setImageSuggestionIndex(index => { const next = (index - 1 + imageSuggestions.length) % imageSuggestions.length; autoSelectedImage.current = { modelKey: `${formData.manufacturer_id}:${formData.manufacturer_model_number.trim().toLowerCase()}`, url: imageSuggestions[next] }; setFormData(prev => ({ ...prev, image_url: imageSuggestions[next] })); return next; })}
                           className="rounded p-1 hover:bg-blue-100"><ChevronLeft className="w-4 h-4" /></button>
@@ -1665,6 +1664,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     <span className="shrink-0 text-xs font-medium text-blue-700">{formData.image_url === suggestedImage ? 'Selected' : 'Preview'}</span>
                   </div>
                 )}
+                {imageSuggestions.length > 0 && <p className="text-xs text-gray-500">Product photo: <a href="https://icecat.biz" target="_blank" rel="noopener noreferrer" className="underline">Specs Icecat</a>. Image information is provided as is; confirm the model and rights before use.</p>}
                 <div className="flex gap-2">
                   <button
                     onClick={handleImageSearch}
