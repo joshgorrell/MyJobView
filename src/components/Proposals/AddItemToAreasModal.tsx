@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Package, Plus, Check, Loader2, Copy, ArrowLeft, Search } from 'lucide-react';
+import { X, Package, Plus, Check, Loader2, Copy, ArrowLeft, Search, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
@@ -94,6 +94,8 @@ export default function AddItemToAreasModal({
   );
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
+  const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
+  const [editingAreaName, setEditingAreaName] = useState('');
   const [roomLineItems, setRoomLineItems] = useState<Record<string, { product_id: string | null }[]>>({});
   const [showNewProductForm, setShowNewProductForm] = useState(false);
   const [pendingAccessories, setPendingAccessories] = useState<PendingAccessory[]>([]);
@@ -251,6 +253,25 @@ export default function AddItemToAreasModal({
       setNewAreaName('');
     } catch (err: any) {
       alert('Failed to create area: ' + err.message);
+    } finally {
+      setCreatingArea(false);
+    }
+  }
+
+  async function handleRenameArea() {
+    if (!editingAreaId || !editingAreaName.trim()) return;
+    setCreatingArea(true);
+    try {
+      const { error } = await supabase.from('proposal_rooms').update({ name: editingAreaName.trim() })
+        .eq('id', editingAreaId).eq('proposal_id', proposalId);
+      if (error) throw error;
+      const updated = localRooms.map(room => room.id === editingAreaId ? { ...room, name: editingAreaName.trim() } : room);
+      setLocalRooms(updated);
+      onRoomsUpdate?.(updated);
+      setEditingAreaId(null);
+      setEditingAreaName('');
+    } catch (err: any) {
+      alert('Failed to rename area: ' + err.message);
     } finally {
       setCreatingArea(false);
     }
@@ -573,19 +594,33 @@ export default function AddItemToAreasModal({
                       const isDuplicate = existingItems && selectedProduct && !String(selectedProduct.id).startsWith('null') &&
                         existingItems.some(it => it.product_id === selectedProduct.id);
                       return (
-                        <label key={room.id}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
-                          <input type="checkbox" checked={isSelected}
-                            onChange={() => toggleRoom(room.id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
-                          <span className="text-xs text-gray-700 flex-1">{room.name}</span>
+                        <div key={room.id} className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
+                          <label className="flex items-center gap-2 min-w-0 cursor-pointer">
+                            <input type="checkbox" checked={isSelected}
+                              onChange={() => toggleRoom(room.id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
+                            {editingAreaId !== room.id && <span className="text-xs text-gray-700 truncate">{room.name}</span>}
+                          </label>
+                          {editingAreaId === room.id && (
+                              <input type="text" value={editingAreaName} autoFocus
+                                onChange={event => setEditingAreaName(event.target.value)}
+                                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void handleRenameArea(); } }}
+                                className="flex-1 min-w-0 px-2 py-1 text-xs border border-blue-300 rounded bg-white" />
+                          )}
                           {isDuplicate && (
                             <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Already in area</span>
                           )}
                           {isActive && (
                             <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
                           )}
-                        </label>
+                          {editingAreaId === room.id ? (
+                            <button type="button" onClick={() => void handleRenameArea()} disabled={creatingArea || !editingAreaName.trim()}
+                              aria-label={`Save ${room.name} area name`} className="p-1 text-blue-700 disabled:opacity-40"><Check className="w-3.5 h-3.5" /></button>
+                          ) : (
+                            <button type="button" onClick={() => { setEditingAreaId(room.id); setEditingAreaName(room.name); }}
+                              aria-label={`Rename ${room.name} area`} className="p-1 text-gray-500 hover:text-blue-700"><Pencil className="w-3.5 h-3.5" /></button>
+                          )}
+                        </div>
                       );
                     })}
                     {localRooms.length === 0 && (
