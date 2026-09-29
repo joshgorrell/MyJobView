@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { resolveMentions, parseHashtags } from '../../lib/username';
 import { offlineSupabaseInsert } from '../../lib/offlineSupport';
+import { FlowTarget } from '../../lib/flow/types';
+import { insertFlowTag, useFlowTags } from '../Flow/useFlowTags';
 
 interface DiscussionPostFormProps {
   onSuccess: () => void;
@@ -21,13 +23,17 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<Array<{ type: 'user' | 'lead'; username: string; name: string; id: string }>>([]);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [route, setRoute] = useState<FlowTarget | null>(null);
+  const [routeToken, setRouteToken] = useState('');
+  const [highlight, setHighlight] = useState(0);
+  const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const text = content.slice(0, cursorPosition);
     const match = text.match(/@(\w*)$/);
 
-    if (match) {
+    if (match && !tag?.symbol?.includes('#')) {
       const search = match[1].toLowerCase();
       loadSuggestions(search);
     } else {
@@ -91,6 +97,24 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
     }, 0);
   }
 
+  function chooseRoute(choice: FlowTarget) {
+    if (!tag) return;
+    const inserted = insertFlowTag(content, cursorPosition, tag.start, choice);
+    setContent(inserted.text); setCursorPosition(inserted.cursor); setRoute(choice); setRouteToken(inserted.text.slice(tag.start, inserted.cursor).trim()); setHighlight(0);
+    requestAnimationFrame(() => { textareaRef.current?.focus(); textareaRef.current?.setSelectionRange(inserted.cursor, inserted.cursor); });
+  }
+  function handleTagKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    const options = tag?.symbol === '#' ? choices.filter(c => c.kind !== 'person') : [];
+    if (tag?.symbol === '@' && showSuggestions && suggestions.length) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setHighlight(i => (i + (e.key === 'ArrowDown' ? 1 : suggestions.length - 1)) % suggestions.length); }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); selectSuggestion(suggestions[Math.min(highlight, suggestions.length - 1)].username); setHighlight(0); }
+      if (e.key === 'Escape') { e.preventDefault(); setShowSuggestions(false); }
+      return;
+    }
+    if (tag?.symbol !== '#' || !options.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setHighlight(i => (i + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length); }
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chooseRoute(options[Math.min(highlight, options.length - 1)] as FlowTarget); }
+  }
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!content.trim() || !profile || !postType) return;
@@ -120,6 +144,9 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         reminder_date: reminderDate ? new Date(reminderDate).toISOString() : null,
         assigned_to: (postType === 'task' || postType === 'question') ? assignedToId : null,
         is_private: isPrivate,
+        contact_id: route?.kind === 'contact' ? route.id : null,
+        project_id: route?.kind === 'project' ? route.id : null,
+        work_order_id: route?.kind === 'work_order' ? route.id : null,
       };
 
       const postResult = await offlineSupabaseInsert('discussion_posts', postData);
@@ -161,7 +188,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         }
       }
 
-      setContent('');
+      setContent(''); setRoute(null); setRouteToken('');
       setPostType(null);
       setReminderDate('');
       setShowReminder(false);
@@ -244,7 +271,8 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
       <textarea
         ref={textareaRef}
         value={content}
-        onChange={(e) => setContent(e.target.value)}
+        onChange={(e) => { setContent(e.target.value); setCursorPosition(e.target.selectionStart); if (routeToken && !e.target.value.includes(routeToken)) { setRoute(null); setRouteToken(''); } setHighlight(0); }}
+        onKeyDown={handleTagKey}
         onSelect={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         onClick={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         onKeyUp={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
@@ -253,6 +281,8 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
       />
 
+      {tag?.symbol === '#' && <div className="flow flow-tag-results" role="listbox" aria-label="Matching customers and jobs">{choices.filter(c => c.kind !== 'person').map((choice, index) => <button type="button" role="option" aria-selected={index === highlight} key={`${choice.kind}:${choice.id}`} onClick={() => chooseRoute(choice as FlowTarget)}>{choice.label} · {choice.kind.replace('_', ' ')}</button>)}</div>}
+      {route && <p className="text-sm text-blue-700 my-2">Posting to {route.label} <button type="button" onClick={() => { setRoute(null); setRouteToken(''); }}>Remove</button></p>}
       <div className="mt-3 space-y-2">
         <div className="flex items-center gap-2">
           <input
@@ -300,7 +330,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
               key={`${suggestion.type}-${suggestion.id}`}
               type="button"
               onClick={() => selectSuggestion(suggestion.username)}
-              className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 transition-colors"
+              className={`w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 transition-colors ${index === highlight ? 'bg-blue-50' : ''}`}
             >
               <span className="font-mono text-sm text-blue-600">@{suggestion.username}</span>
               <span className="text-gray-700">{suggestion.name}</span>
