@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { FlowScope, FlowTarget, targetScope } from '../../lib/flow/types';
 import { FlowTargetPicker } from './FlowTargetPicker';
 
-export function PostFlowUpdate({ scope, onClose, onPosted }: { scope: FlowScope; onClose: () => void; onPosted: () => void }) {
+export function PostFlowUpdate({ scope, onClose, onPosted, compact = false }: { scope: FlowScope; onClose: () => void; onPosted: () => void; compact?: boolean }) {
   const { profile } = useAuth();
   const [target, setTarget] = useState<FlowTarget | null>(null);
   const [body, setBody] = useState('');
@@ -28,14 +28,15 @@ export function PostFlowUpdate({ scope, onClose, onPosted }: { scope: FlowScope;
     onPosted();
   }
   return <form className="flow-composer" onSubmit={submit}>
-    <div className="flow-composer-heading"><strong>Post an update</strong><button type="button" onClick={onClose} aria-label="Close update"><X size={16} /></button></div>
-    {!hasContext && <FlowTargetPicker onSelect={setTarget} />}
+    {!compact && <div className="flow-composer-heading"><strong>Post an update</strong><button type="button" onClick={onClose} aria-label="Close update"><X size={16} /></button></div>}
+    {compact && <textarea aria-label="Update" placeholder="What happened? For example: I saw Steve Brown today and he asked about the Event Center schedule." value={body} maxLength={4000} rows={3} onChange={e => setBody(e.target.value)} autoFocus />}
+    {!hasContext && <div className="flow-quick-target"><strong>Link to a customer or job</strong><FlowTargetPicker onSelect={setTarget} /></div>}
     {target && <p className="flow-target-label">{target.label} <button type="button" onClick={() => setTarget(null)}>Change</button></p>}
     <label>Type <select value={type} onChange={e => setType(e.target.value)}>
       <option value="update">General update</option><option value="working_issue">Working issue</option><option value="customer_contact">Customer contact</option>
       <option value="material_issue">Material issue</option><option value="scheduling_issue">Scheduling issue</option><option value="resolved">Issue resolved</option>
     </select></label>
-    <textarea aria-label="Update" placeholder="What does the team need to know?" value={body} maxLength={4000} rows={3} onChange={e => setBody(e.target.value)} />
+    {!compact && <textarea aria-label="Update" placeholder="What does the team need to know?" value={body} maxLength={4000} rows={3} onChange={e => setBody(e.target.value)} />}
     <div className="flow-composer-footer"><span>Visible to employees with access to this record.</span><button className="flow-primary" disabled={saving || !hasContext || !body.trim()}>{saving ? 'Posting…' : 'Post update'}</button></div>
     {error && <p role="alert" className="flow-error">{error}</p>}
   </form>;
