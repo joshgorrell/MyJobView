@@ -249,7 +249,7 @@ export default function AddItemToAreasModal({
       const updated = [...localRooms, data as ProposalRoom];
       setLocalRooms(updated);
       if (onRoomsUpdate) onRoomsUpdate(updated);
-      setSelectedRooms(prev => new Set([...prev, data.id]));
+      setSelectedRooms(new Set([data.id]));
       setNewAreaName('');
     } catch (err: any) {
       alert('Failed to create area: ' + err.message);
@@ -562,11 +562,19 @@ export default function AddItemToAreasModal({
                   <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                     <Copy className="w-4 h-4 text-gray-400" />Room / Area
                   </h3>
-                  {selectedRooms.size > 0 && (
-                    <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-medium">
-                      {selectedRooms.size} selected
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{selectedRooms.size} selected</span>
+                    <button type="button" onClick={() => setSelectedRooms(new Set(localRooms.map(room => room.id)))}
+                      disabled={localRooms.length === 0 || selectedRooms.size === localRooms.length}
+                      className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed">
+                      Select all
+                    </button>
+                    <button type="button" onClick={() => setSelectedRooms(new Set())}
+                      disabled={selectedRooms.size === 0}
+                      className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed">
+                      Clear
+                    </button>
+                  </div>
                 </div>
                 <div className="px-4 pb-4 space-y-3">
                   {/* Create new area */}
@@ -575,11 +583,11 @@ export default function AddItemToAreasModal({
                       type="text"
                       value={newAreaName}
                       onChange={e => setNewAreaName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) handleCreateArea(); }}
+                      onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) { e.preventDefault(); void handleCreateArea(); } }}
                       placeholder="Create new area..."
                       className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     />
-                    <button onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea}
+                    <button type="button" onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea} aria-label="Create area"
                       className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-lg text-white transition-colors">
                       {creatingArea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     </button>
