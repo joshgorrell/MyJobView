@@ -1387,6 +1387,77 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               )}
             </div>
 
+            {/* Product Image */}
+            <div ref={imageSectionRef}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product Image
+              </label>
+              <div className="space-y-2">
+                {!formData.image_url && formData.item_type === 'material' && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Add a product photo so this item is easy to recognize in the catalog and on documents.
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleImageSearch}
+                    disabled={!formData.manufacturer_id || !formData.manufacturer_model_number}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    <Search className="w-4 h-4" />
+                    Search Image
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
+                <input
+                  type="url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                  placeholder="Or paste image URL here"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+                <p className="text-xs text-gray-500">
+                  Search opens Google Images. Right-click image → "Copy image address" → Paste URL above. Or paste image directly (Ctrl+V)
+                </p>
+                {formData.image_url && (
+                  <div className="relative inline-block">
+                    <div className="relative w-32 h-32 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+                      <img
+                        src={formData.image_url}
+                        alt="Product preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('Failed to load image:', formData.image_url);
+                          e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">No Image</text></svg>';
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* SKU */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1578,76 +1649,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               </div>
             )}
 
-            {/* Product Image */}
-            <div ref={imageSectionRef}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Image
-              </label>
-              <div className="space-y-2">
-                {!formData.image_url && formData.item_type === 'material' && (
-                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    Add a product photo so this item is easy to recognize in the catalog and on documents.
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleImageSearch}
-                    disabled={!formData.manufacturer_id || !formData.manufacturer_model_number}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
-                  >
-                    <Search className="w-4 h-4" />
-                    Search Image
-                  </button>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImage}
-                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </div>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                  placeholder="Or paste image URL here"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-                <p className="text-xs text-gray-500">
-                  Search opens Google Images. Right-click image → "Copy image address" → Paste URL above. Or paste image directly (Ctrl+V)
-                </p>
-                {formData.image_url && (
-                  <div className="relative inline-block">
-                    <div className="relative w-32 h-32 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50">
-                      <img
-                        src={formData.image_url}
-                        alt="Product preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.error('Failed to load image:', formData.image_url);
-                          e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">No Image</text></svg>';
-                        }}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* PRICING */}
