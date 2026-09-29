@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, CreditCard as Edit } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, CreditCard as Edit, Search, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ProductUsageHistory } from './ProductUsageHistory';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,15 +10,106 @@ interface ProductDetailModalProps {
   productId: string;
   onClose: () => void;
   onEdit?: () => void;
+  onSaved?: () => void;
 }
 
-export function ProductDetailModal({ productId, onClose, onEdit }: ProductDetailModalProps) {
+export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: ProductDetailModalProps) {
   const { profile } = useAuth();
   const canEdit = profile?.can_edit_products ?? false;
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'details' | 'history'>('details');
   const [auditInfo, setAuditInfo] = useState<{ createdAt: string; createdBy: string; updatedAt: string; updatedBy: string } | null>(null);
+  const [manufacturerId, setManufacturerId] = useState<string | null>(null);
+  const [model, setModel] = useState('');
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [checking, setChecking] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!photoFile) { setPreviewUrl(''); return; }
+    const url = URL.createObjectURL(photoFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
+
+  useEffect(() => {
+    if (!photoOpen) return;
+    setPhotoError('');
+    setPhotoUrl('');
+    setPhotoFile(null);
+    setSuggestions([]);
+    setSuggestionIndex(0);
+    if (!profile?.organization_id || !manufacturerId || model.trim().length < 3) return;
+    let cancelled = false;
+    setChecking(true);
+    supabase.from('products')
+      .select('id, manufacturer_model_number, image_url')
+      .eq('organization_id', profile.organization_id)
+      .eq('manufacturer_id', manufacturerId)
+      .ilike('manufacturer_model_number', model.trim())
+      .not('image_url', 'is', null)
+      .limit(20)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) setPhotoError('Could not check your catalog for matching photos.');
+        else setSuggestions([...new Set((data || [])
+          .filter(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.trim().toLowerCase() && p.image_url?.trim())
+          .map(p => p.image_url!.trim()))]);
+        setChecking(false);
+      });
+    return () => { cancelled = true; };
+  }, [photoOpen, profile?.organization_id, manufacturerId, model, productId]);
+
+  function selectFile(file: File) {
+    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) {
+      setPhotoError('Choose an image file under 10 MB.');
+      return;
+    }
+    setPhotoError('');
+    setPhotoFile(file);
+    setPhotoUrl('');
+  }
+
+  async function savePhoto() {
+    if (!canEdit || !profile?.organization_id || savingPhoto) return;
+    setPhotoError('');
+    setSavingPhoto(true);
+    try {
+      let url = photoUrl.trim();
+      if (photoFile) {
+        const ext = photoFile.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+        const path = `products/${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage.from('product-images').upload(path, photoFile, { contentType: photoFile.type });
+        if (error) throw error;
+        url = supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+      } else {
+        const parsed = new URL(url);
+        if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Enter a valid image URL.');
+      }
+      const { data, error } = await supabase.from('products')
+        .update({ image_url: url })
+        .eq('id', productId)
+        .eq('organization_id', profile.organization_id)
+        .select('id')
+        .single();
+      if (error || !data) throw error || new Error('Could not save this product photo.');
+      setPanelData(current => current && ({ ...current, imageUrl: url }));
+      setPhotoOpen(false);
+      onSaved?.();
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Could not save this product photo.');
+    } finally {
+      setSavingPhoto(false);
+    }
+  }
 
   useEffect(() => {
     loadProduct();
@@ -58,9 +149,12 @@ export function ProductDetailModal({ productId, onClose, onEdit }: ProductDetail
       });
 
       const taxonomy = catalogTaxonomy(p);
+      setManufacturerId(p.manufacturer_id || null);
+      setModel(p.manufacturer_model_number || '');
       setPanelData({
         productId: p.id,
         productName: p.name || p.manufacturer_model_number || '',
+        modelNumber: p.manufacturer_model_number || null,
         sku: p.sku || null,
         upc: p.upc || null,
         category: taxonomy.categoryName || null,
@@ -152,7 +246,46 @@ export function ProductDetailModal({ productId, onClose, onEdit }: ProductDetail
         <div className="flex-1 overflow-y-auto p-4">
           {activeTab === 'details' ? (
             <>
-              <ProductDetailPanel mode="view" data={panelData} />
+              <ProductDetailPanel mode="view" data={panelData} showIdentity={false}
+                onRequestImage={canEdit ? () => setPhotoOpen(true) : undefined} />
+              {photoOpen && canEdit && (
+                <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3" onPaste={e => {
+                  const file = Array.from(e.clipboardData.files).find(item => item.type.startsWith('image/'));
+                  if (file) { e.preventDefault(); selectFile(file); }
+                }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div><h3 className="text-sm font-semibold text-gray-900">Product photo</h3>
+                      <p className="text-xs text-gray-600">Choose a match, search for one, paste an image or URL, or upload a file.</p></div>
+                    <button type="button" onClick={() => setPhotoOpen(false)} aria-label="Close photo editor" className="p-1 rounded hover:bg-blue-100"><X size={16} /></button>
+                  </div>
+                  {checking && <p className="text-xs text-gray-600">Checking your catalog for this exact model…</p>}
+                  {!checking && suggestions.length > 0 && <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white p-2">
+                    <img src={suggestions[suggestionIndex]} alt="Suggested product" className="h-16 w-16 object-contain rounded bg-gray-50"
+                      onError={() => { setSuggestions(current => current.filter(url => url !== suggestions[suggestionIndex])); setSuggestionIndex(0); }} />
+                    <div className="flex-1 text-xs text-gray-700">Photo from the same make and model in your catalog.
+                      {suggestions.length > 1 && <div className="flex items-center gap-1 mt-1">
+                        <button type="button" aria-label="Previous photo" onClick={() => setSuggestionIndex(i => (i - 1 + suggestions.length) % suggestions.length)}><ChevronLeft size={17} /></button>
+                        <span>{suggestionIndex + 1} of {suggestions.length}</span>
+                        <button type="button" aria-label="Next photo" onClick={() => setSuggestionIndex(i => (i + 1) % suggestions.length)}><ChevronRight size={17} /></button>
+                      </div>}
+                    </div>
+                    <button type="button" onClick={() => { setPhotoFile(null); setPhotoUrl(suggestions[suggestionIndex]); }} className="text-xs font-medium text-blue-700 hover:underline">Use this</button>
+                  </div>}
+                  {!checking && !suggestions.length && manufacturerId && model && <p className="text-xs text-gray-600">No matching photo in your catalog yet. Search the web or add your own.</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" disabled={!panelData.manufacturerName || !model} onClick={() => window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${panelData.manufacturerName} ${model}`)}`, '_blank', 'noopener,noreferrer')}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Search size={14} /> Search images</button>
+                    <button type="button" onClick={() => photoInputRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"><Upload size={14} /> Upload</button>
+                    <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) selectFile(file); e.target.value = ''; }} />
+                  </div>
+                  <input type="url" aria-label="Image URL" value={photoUrl} onChange={e => { setPhotoUrl(e.target.value); setPhotoFile(null); }} placeholder="Paste image address here" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-500">Image search opens a new tab. Copy the image address and paste it here, or paste an image directly into this box.</p>
+                  {(previewUrl || photoUrl) && <img src={previewUrl || photoUrl} alt="Selected photo preview" className="h-28 max-w-full rounded-lg border border-gray-200 bg-white object-contain" onError={() => setPhotoError('This image could not be previewed. Check the address or choose another image.')} />}
+                  {photoError && <p role="alert" className="text-xs text-red-700">{photoError}</p>}
+                  <div className="flex justify-end gap-2"><button type="button" onClick={() => setPhotoOpen(false)} className="px-3 py-2 text-xs text-gray-600">Cancel</button>
+                    <button type="button" disabled={(!photoFile && !photoUrl.trim()) || savingPhoto} onClick={savePhoto} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-50 hover:bg-blue-700">{savingPhoto ? 'Saving…' : 'Save photo'}</button></div>
+                </div>
+              )}
               {auditInfo && (
                 <div className="mt-3 pt-3 border-t border-gray-100 flex gap-6 text-xs text-gray-400">
                   <span>Created {new Date(auditInfo.createdAt).toLocaleDateString()} by {auditInfo.createdBy}</span>

@@ -88,6 +88,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
         setPanelData({
           productId: item.product_id || null,
           productName: product?.name || item.description || '',
+          modelNumber: product?.manufacturer_model_number || null,
           sku: product?.sku || null,
           upc: product?.upc || null,
           category: taxonomy?.categoryName || null,

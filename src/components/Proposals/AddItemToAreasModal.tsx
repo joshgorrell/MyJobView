@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Package, Plus, Check, Loader2, Copy, ArrowLeft, Search } from 'lucide-react';
+import { X, Package, Plus, Check, Loader2, Copy, ArrowLeft, Search, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
@@ -15,12 +15,14 @@ interface AddItemToAreasModalProps {
   proposalId: string;
   rooms: ProposalRoom[];
   activeAreaId?: string;
+  defaultAreaIds?: string[];
   onClose: () => void;
   onItemsAdded: () => void;
   onRoomsUpdate?: (rooms: ProposalRoom[]) => void;
 }
 
 interface MasterProductFull extends Product {
+  manufacturer_model_number?: string | null;
   manufacturer?: { name: string } | null;
   vendor?: { vendor_name: string } | null;
   category?: { name: string } | null;
@@ -64,6 +66,7 @@ export default function AddItemToAreasModal({
   proposalId,
   rooms: initialRooms,
   activeAreaId,
+  defaultAreaIds,
   onClose,
   onItemsAdded,
   onRoomsUpdate,
@@ -85,9 +88,14 @@ export default function AddItemToAreasModal({
   const [laborPhases, setLaborPhases] = useState<LaborPhaseOpt[]>([]);
   const [classes, setClasses] = useState<ProposalClass[]>([]);
   const [localRooms, setLocalRooms] = useState<ProposalRoom[]>(initialRooms);
-  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set(activeAreaId ? [activeAreaId] : []));
+  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(
+    new Set(defaultAreaIds?.length ? defaultAreaIds.filter(id => initialRooms.some(room => room.id === id))
+      : activeAreaId ? [activeAreaId] : initialRooms.length === 1 ? [initialRooms[0].id] : [])
+  );
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
+  const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
+  const [editingAreaName, setEditingAreaName] = useState('');
   const [roomLineItems, setRoomLineItems] = useState<Record<string, { product_id: string | null }[]>>({});
   const [showNewProductForm, setShowNewProductForm] = useState(false);
   const [pendingAccessories, setPendingAccessories] = useState<PendingAccessory[]>([]);
@@ -132,7 +140,8 @@ export default function AddItemToAreasModal({
       supabase.from('proposal_classes').select('id, name, color').eq('is_active', true).order('name'),
       supabase.from('proposal_line_items').select('room_id, product_id').eq('proposal_id', proposalId).is('parent_item_id', null),
     ]);
-    if (prodsRes.data) setProducts(prodsRes.data.map(p => ({ ...p, ...catalogTaxonomy(p) })) as (Product & CatalogTaxonomy)[]);
+    const loadedProducts = (prodsRes.data || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as (Product & CatalogTaxonomy)[];
+    if (prodsRes.data) setProducts(loadedProducts);
     if (phasesRes.data) setLaborPhases(phasesRes.data);
     if (classesRes.data) setClasses(classesRes.data);
     if (itemsRes.data) {
@@ -145,6 +154,7 @@ export default function AddItemToAreasModal({
       setRoomLineItems(byRoom);
     }
     setLoading(false);
+    return loadedProducts;
   }
 
   async function loadMasterProduct(productId: string) {
@@ -173,6 +183,7 @@ export default function AddItemToAreasModal({
     const q = searchQuery.toLowerCase();
     return (
       p.sku?.toLowerCase().includes(q) ||
+      (p as any).manufacturer_model_number?.toLowerCase().includes(q) ||
       p.name?.toLowerCase().includes(q) ||
       p.description?.toLowerCase().includes(q) ||
       p.categoryName.toLowerCase().includes(q) || p.subcategoryName.toLowerCase().includes(q) ||
@@ -209,11 +220,15 @@ export default function AddItemToAreasModal({
   }
 
   async function handleProductCreated(productData: any) {
-    setShowNewProductForm(false);
-    await loadAll();
+    const refreshedProducts = await loadAll();
     if (productData?.id) {
-      const product = products.find(p => p.id === productData.id);
-      if (product) handleProductSelect(product);
+      const product = refreshedProducts.find(p => p.id === productData.id);
+      if (product) {
+        handleProductSelect(product);
+        setShowNewProductForm(false);
+      } else {
+        alert('The product was saved, but could not be loaded into this proposal. Close and reopen Add Item to try again.');
+      }
     }
   }
 
@@ -238,10 +253,29 @@ export default function AddItemToAreasModal({
       const updated = [...localRooms, data as ProposalRoom];
       setLocalRooms(updated);
       if (onRoomsUpdate) onRoomsUpdate(updated);
-      setSelectedRooms(prev => new Set([...prev, data.id]));
+      setSelectedRooms(new Set([data.id]));
       setNewAreaName('');
     } catch (err: any) {
       alert('Failed to create area: ' + err.message);
+    } finally {
+      setCreatingArea(false);
+    }
+  }
+
+  async function handleRenameArea() {
+    if (!editingAreaId || !editingAreaName.trim()) return;
+    setCreatingArea(true);
+    try {
+      const { error } = await supabase.from('proposal_rooms').update({ name: editingAreaName.trim() })
+        .eq('id', editingAreaId).eq('proposal_id', proposalId);
+      if (error) throw error;
+      const updated = localRooms.map(room => room.id === editingAreaId ? { ...room, name: editingAreaName.trim() } : room);
+      setLocalRooms(updated);
+      onRoomsUpdate?.(updated);
+      setEditingAreaId(null);
+      setEditingAreaName('');
+    } catch (err: any) {
+      alert('Failed to rename area: ' + err.message);
     } finally {
       setCreatingArea(false);
     }
@@ -302,6 +336,10 @@ export default function AddItemToAreasModal({
 
   async function handleSave() {
     if (!selectedProduct) { alert('Please select a product'); return; }
+    if (localRooms.length > 0 && selectedRooms.size === 0) {
+      alert('Select the room or area for this item before adding it.');
+      return;
+    }
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
       alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
       return;
@@ -388,6 +426,7 @@ export default function AddItemToAreasModal({
   const panelData: ProductDetailPanelData | null = selectedProduct ? {
     productId: selectedProduct.id ?? null,
     productName: selectedProduct.name || '',
+    modelNumber: (selectedProduct as any).manufacturer_model_number || masterProduct?.manufacturer_model_number || null,
     sku: selectedProduct.sku || masterProduct?.sku || null,
     upc: (selectedProduct as any).upc ?? masterProduct?.upc ?? null,
     category: selectedTaxonomy?.categoryName || null,
@@ -456,7 +495,7 @@ export default function AddItemToAreasModal({
                     type="text"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search by name, SKU, or description..."
+                    placeholder="Search model #, speaker type, name, SKU..."
                     className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     autoFocus
                   />
@@ -466,19 +505,22 @@ export default function AddItemToAreasModal({
               <CatalogTaxonomyFilters theme="light" products={products} category={selectedCategory} subcategory={selectedSubcategory} vendor={selectedVendor}
                 onCategory={setSelectedCategory} onSubcategory={setSelectedSubcategory} onVendor={setSelectedVendor} />
 
-              <button
-                onClick={() => setShowNewProductForm(true)}
-                className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-colors shadow-sm"
-              >
-                <Plus className="w-4 h-4" />Create New Product
-              </button>
+              {canEditProducts && (
+                <button
+                  onClick={() => setShowNewProductForm(true)}
+                  className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />Create New Catalog Product
+                </button>
+              )}
 
               <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto bg-white">
                 {loading ? (
                   <div className="p-8 text-center text-gray-400 text-sm">Loading products...</div>
                 ) : filteredProducts.length === 0 ? (
                   <div className="p-8 text-center text-gray-400 text-sm">
-                    {searchQuery ? 'No products match your search' : 'No products available'}
+                    <p>{searchQuery ? 'No products match your search.' : 'No products available.'}</p>
+                    {canEditProducts && <p className="mt-2">Create a catalog product above, then finish adding it to this proposal.</p>}
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
@@ -494,7 +536,9 @@ export default function AddItemToAreasModal({
                           {(product.categoryName || product.subcategoryName || product.vendorName) && <div className="text-xs text-blue-700 mt-0.5">
                             {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
                           </div>}
-                          {product.sku && <div className="text-xs text-gray-500 mt-0.5 font-mono">SKU: {product.sku}</div>}
+                          <div className="text-xs text-gray-500 mt-0.5 font-mono">
+                            {[(product as any).manufacturer_model_number && `Model: ${(product as any).manufacturer_model_number}`, product.sku && `SKU: ${product.sku}`].filter(Boolean).join(' · ')}
+                          </div>
                           {product.description && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</div>}
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -518,6 +562,91 @@ export default function AddItemToAreasModal({
               >
                 <ArrowLeft className="w-3.5 h-3.5" />Back to Search
               </button>
+
+              {/* Area Selection */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Copy className="w-4 h-4 text-gray-400" />Room / Area
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{selectedRooms.size} selected</span>
+                    <button type="button" onClick={() => setSelectedRooms(new Set(localRooms.map(room => room.id)))}
+                      disabled={localRooms.length === 0 || selectedRooms.size === localRooms.length}
+                      className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed">
+                      Select all
+                    </button>
+                    <button type="button" onClick={() => setSelectedRooms(new Set())}
+                      disabled={selectedRooms.size === 0}
+                      className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed">
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="px-4 pb-4 space-y-3">
+                  {/* Create new area */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newAreaName}
+                      onChange={e => setNewAreaName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) { e.preventDefault(); void handleCreateArea(); } }}
+                      placeholder="Create new area..."
+                      className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button type="button" onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea} aria-label="Create area"
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-lg text-white transition-colors">
+                      {creatingArea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Area list */}
+                  <div className="space-y-1 max-h-36 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-2">
+                    {localRooms.map(room => {
+                      const isSelected = selectedRooms.has(room.id);
+                      const isActive = room.id === activeAreaId;
+                      const existingItems = roomLineItems[room.id];
+                      const isDuplicate = existingItems && selectedProduct && !String(selectedProduct.id).startsWith('null') &&
+                        existingItems.some(it => it.product_id === selectedProduct.id);
+                      return (
+                        <div key={room.id} className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
+                          <label className="flex items-center gap-2 min-w-0 cursor-pointer">
+                            <input type="checkbox" checked={isSelected}
+                              onChange={() => toggleRoom(room.id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
+                            {editingAreaId !== room.id && <span className="text-xs text-gray-700 truncate">{room.name}</span>}
+                          </label>
+                          {editingAreaId === room.id && (
+                              <input type="text" value={editingAreaName} autoFocus
+                                onChange={event => setEditingAreaName(event.target.value)}
+                                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void handleRenameArea(); } }}
+                                className="flex-1 min-w-0 px-2 py-1 text-xs border border-blue-300 rounded bg-white" />
+                          )}
+                          {isDuplicate && (
+                            <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Already in area</span>
+                          )}
+                          {isActive && (
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
+                          )}
+                          {editingAreaId === room.id ? (
+                            <button type="button" onClick={() => void handleRenameArea()} disabled={creatingArea || !editingAreaName.trim()}
+                              aria-label={`Save ${room.name} area name`} className="p-1 text-blue-700 disabled:opacity-40"><Check className="w-3.5 h-3.5" /></button>
+                          ) : (
+                            <button type="button" onClick={() => { setEditingAreaId(room.id); setEditingAreaName(room.name); }}
+                              aria-label={`Rename ${room.name} area`} className="p-1 text-gray-500 hover:text-blue-700"><Pencil className="w-3.5 h-3.5" /></button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {localRooms.length === 0 && (
+                      <div className="text-center py-3 text-gray-400 text-xs">
+                        No areas yet. Create one above, or leave unselected to add without an area.
+                      </div>
+                    )}
+                  </div>
+                  {localRooms.length > 0 && selectedRooms.size === 0 && <p className="text-xs text-amber-700">Select an area before adding this item.</p>}
+                </div>
+              </div>
 
               {/* Product Detail Panel — same component as Edit Item Details */}
               {panelData && (
@@ -603,67 +732,6 @@ export default function AddItemToAreasModal({
                 </div>
               </div>
 
-              {/* Area Selection */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <Copy className="w-4 h-4 text-gray-400" />Add to Areas
-                  </h3>
-                  {selectedRooms.size > 0 && (
-                    <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-medium">
-                      {selectedRooms.size} selected
-                    </span>
-                  )}
-                </div>
-                <div className="px-4 pb-4 space-y-3">
-                  {/* Create new area */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newAreaName}
-                      onChange={e => setNewAreaName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && newAreaName.trim()) handleCreateArea(); }}
-                      placeholder="Create new area..."
-                      className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <button onClick={handleCreateArea} disabled={!newAreaName.trim() || creatingArea}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-lg text-white transition-colors">
-                      {creatingArea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {/* Area list */}
-                  <div className="space-y-1 max-h-36 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-2">
-                    {localRooms.map(room => {
-                      const isSelected = selectedRooms.has(room.id);
-                      const isActive = room.id === activeAreaId;
-                      const existingItems = roomLineItems[room.id];
-                      const isDuplicate = existingItems && selectedProduct && !String(selectedProduct.id).startsWith('null') &&
-                        existingItems.some(it => it.product_id === selectedProduct.id);
-                      return (
-                        <label key={room.id}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
-                          <input type="checkbox" checked={isSelected}
-                            onChange={() => toggleRoom(room.id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
-                          <span className="text-xs text-gray-700 flex-1">{room.name}</span>
-                          {isDuplicate && (
-                            <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Already in area</span>
-                          )}
-                          {isActive && (
-                            <span className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded">Active</span>
-                          )}
-                        </label>
-                      );
-                    })}
-                    {localRooms.length === 0 && (
-                      <div className="text-center py-3 text-gray-400 text-xs">
-                        No areas yet. Create one above, or leave unselected to add without an area.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>
@@ -691,7 +759,7 @@ export default function AddItemToAreasModal({
             {selectedProduct && (
               <button
                 onClick={handleSave}
-                disabled={saving || saved}
+                disabled={saving || saved || (localRooms.length > 0 && selectedRooms.size === 0)}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
                   saved ? 'bg-green-600 text-white'
                     : saving ? 'bg-blue-400 text-white cursor-not-allowed'

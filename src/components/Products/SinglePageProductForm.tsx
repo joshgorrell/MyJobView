@@ -48,6 +48,8 @@ interface ProductFormProps {
 
 }
 
+interface SuggestedPhoto { url: string; description: string }
+
 export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave }: ProductFormProps) {
   const { profile } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -80,10 +82,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageSectionRef = useRef<HTMLDivElement>(null);
-  const [imageSuggestions, setImageSuggestions] = useState<string[]>([]);
-  const [imageSuggestionIndex, setImageSuggestionIndex] = useState(0);
-  const [checkingImage, setCheckingImage] = useState(false);
   const [showMissingImagePrompt, setShowMissingImagePrompt] = useState(false);
+  const [suggestedPhotos, setSuggestedPhotos] = useState<SuggestedPhoto[]>([]);
+  const [suggestedPhotoIndex, setSuggestedPhotoIndex] = useState(0);
+  const [searchingPhotos, setSearchingPhotos] = useState(false);
+  const [photoSearchMessage, setPhotoSearchMessage] = useState('');
 
   // Auto-save key (needed early for scroll position tracking)
   const autoSaveKey = productId ? `product_edit_${productId}` : duplicateFromId ? `product_duplicate_${duplicateFromId}` : 'product_new';
@@ -166,48 +169,44 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     installation_video_url: ''
   });
 
+  const selectedManufacturerName = manufacturers.find(m => m.id === formData.manufacturer_id)?.name;
+  useEffect(() => {
+    if (productId || duplicateFromId || formData.item_type !== 'material' || formData.image_url ||
+      !selectedManufacturerName || formData.manufacturer_model_number.trim().length < 3) {
+      setSuggestedPhotos([]);
+      setSuggestedPhotoIndex(0);
+      setSearchingPhotos(false);
+      setPhotoSearchMessage('');
+      return;
+    }
+    let cancelled = false;
+    setSuggestedPhotos([]);
+    setSuggestedPhotoIndex(0);
+    setPhotoSearchMessage('');
+    const timer = window.setTimeout(async () => {
+      setSearchingPhotos(true);
+      const { data, error } = await supabase.functions.invoke('suggest-product-images', {
+        body: { manufacturer: selectedManufacturerName, model: formData.manufacturer_model_number.trim() },
+      });
+      if (cancelled) return;
+      setSearchingPhotos(false);
+      if (error || data?.error) setPhotoSearchMessage('Photo suggestions are unavailable. Search, paste, or upload a photo.');
+      else if (data?.unavailable) setPhotoSearchMessage('Photo suggestions are not configured. Search, paste, or upload a photo.');
+      else {
+        const photos = Array.isArray(data?.images) ? data.images as SuggestedPhoto[] : [];
+        setSuggestedPhotos(photos);
+        if (!photos.length) setPhotoSearchMessage('No matching photos found. Search, paste, or upload a photo.');
+      }
+    }, 700);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [productId, duplicateFromId, formData.item_type, formData.image_url, formData.manufacturer_model_number, selectedManufacturerName]);
+
   // Auto-save hook
   const { restoreSavedData, clearSavedData } = useAutoSave({
     key: autoSaveKey,
     data: formData,
     enabled: true // Auto-save for all forms (new, edit, and duplicate)
   });
-
-  // Reuse an exact model photo already approved for this organization.
-  useEffect(() => {
-    const model = formData.manufacturer_model_number.trim();
-    const organizationId = profile?.organization_id;
-    if (!organizationId || !formData.manufacturer_id || model.length < 3 || formData.image_url || formData.item_type !== 'material') {
-      setImageSuggestions([]);
-      setImageSuggestionIndex(0);
-      setCheckingImage(false);
-      return;
-    }
-
-    setImageSuggestions([]);
-    setImageSuggestionIndex(0);
-    setCheckingImage(false);
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      setCheckingImage(true);
-      const { data, error } = await supabase.from('products')
-        .select('id, manufacturer_model_number, image_url')
-        .eq('organization_id', organizationId)
-        .eq('manufacturer_id', formData.manufacturer_id)
-        .ilike('manufacturer_model_number', model)
-        .not('image_url', 'is', null)
-        .limit(20);
-      if (cancelled) return;
-      if (error) console.error('Could not check for an existing product photo:', error);
-      const matches = (data || [])
-        .filter(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.toLowerCase() && p.image_url?.trim())
-        .map(p => p.image_url.trim());
-      setImageSuggestions([...new Set(matches)]);
-      setCheckingImage(false);
-    }, 600);
-
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [profile?.organization_id, productId, formData.manufacturer_id, formData.manufacturer_model_number, formData.image_url, formData.item_type]);
 
   useEffect(() => {
     // Clean up old localStorage keys that might have invalid data
@@ -1235,7 +1234,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     onClose();
   }
 
-  const suggestedImage = imageSuggestions[imageSuggestionIndex] || imageSuggestions[0];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
@@ -1425,6 +1423,100 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               {errors.model && (
                 <p className="text-sm text-red-600 mt-1">{errors.model}</p>
               )}
+            </div>
+
+            {/* Product Image */}
+            <div ref={imageSectionRef}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product Image
+              </label>
+              <div className="space-y-2">
+                {!formData.image_url && formData.item_type === 'material' && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Add a product photo so this item is easy to recognize in the catalog and on documents.
+                  </p>
+                )}
+                {searchingPhotos && <p className="text-xs text-gray-600 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />Finding photos for this make and model…</p>}
+                {!searchingPhotos && photoSearchMessage && <p className="text-xs text-gray-600">{photoSearchMessage}</p>}
+                {suggestedPhotos.length > 0 && !formData.image_url && (() => {
+                  const photo = suggestedPhotos[suggestedPhotoIndex];
+                  return <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <img src={photo.url} alt="Suggested product photo" className="w-20 h-20 rounded bg-white object-contain"
+                      onError={() => { setSuggestedPhotos(current => current.filter(item => item.url !== photo.url)); setSuggestedPhotoIndex(0); }} />
+                    <div className="flex-1 min-w-[140px]">
+                      <p className="text-xs font-medium text-blue-900">Suggested photo {suggestedPhotoIndex + 1} of {suggestedPhotos.length}</p>
+                      <p className="text-xs text-gray-700 line-clamp-2">{photo.description || 'Verify the model before using this image.'}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button type="button" aria-label="Previous suggested photo" disabled={suggestedPhotos.length < 2}
+                        onClick={() => setSuggestedPhotoIndex(index => (index - 1 + suggestedPhotos.length) % suggestedPhotos.length)}
+                        className="rounded p-1 hover:bg-blue-100 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+                      <button type="button" aria-label="Next suggested photo" disabled={suggestedPhotos.length < 2}
+                        onClick={() => setSuggestedPhotoIndex(index => (index + 1) % suggestedPhotos.length)}
+                        className="rounded p-1 hover:bg-blue-100 disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+                    </div>
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, image_url: photo.url }))}
+                      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">Use photo</button>
+                  </div>;
+                })()}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleImageSearch}
+                    disabled={!formData.manufacturer_id || !formData.manufacturer_model_number}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    <Search className="w-4 h-4" />
+                    Search Image
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
+                <input
+                  type="url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                  placeholder="Or paste image URL here"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+                <p className="text-xs text-gray-500">
+                  Search opens Google Images. Right-click image → "Copy image address" → Paste URL above. Or paste image directly (Ctrl+V)
+                </p>
+                {formData.image_url && (
+                  <div className="relative inline-block">
+                    <div className="relative w-32 h-32 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+                      <img
+                        src={formData.image_url}
+                        alt="Product preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('Failed to load image:', formData.image_url);
+                          e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">No Image</text></svg>';
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* SKU */}
@@ -1618,95 +1710,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               </div>
             )}
 
-            {/* Product Image */}
-            <div ref={imageSectionRef}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Image
-              </label>
-              <div className="space-y-2">
-                {!formData.image_url && formData.item_type === 'material' && (
-                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    Add a product photo so this item is easy to recognize in the catalog and on documents.
-                  </p>
-                )}
-                {checkingImage && !formData.image_url && <p className="text-xs text-gray-500">Checking the catalog for this model’s photo…</p>}
-                {suggestedImage && !formData.image_url && (
-                  <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-2">
-                    <img src={suggestedImage} alt="Suggested catalog photo for this model" className="w-14 h-14 rounded object-contain bg-white"
-                      onError={() => { setImageSuggestions(current => current.filter(url => url !== suggestedImage)); setImageSuggestionIndex(0); }} />
-                    <div className="min-w-0 flex-1 text-xs text-blue-900">
-                      Photo found for this exact manufacturer and model in your catalog.
-                      {imageSuggestions.length > 1 && <div className="mt-1 flex items-center gap-1">
-                        <button type="button" aria-label="Previous suggested photo" onClick={() => setImageSuggestionIndex(index => (index - 1 + imageSuggestions.length) % imageSuggestions.length)}
-                          className="rounded p-1 hover:bg-blue-100"><ChevronLeft className="w-4 h-4" /></button>
-                        <span>{imageSuggestionIndex + 1} of {imageSuggestions.length}</span>
-                        <button type="button" aria-label="Next suggested photo" onClick={() => setImageSuggestionIndex(index => (index + 1) % imageSuggestions.length)}
-                          className="rounded p-1 hover:bg-blue-100"><ChevronRight className="w-4 h-4" /></button>
-                      </div>}
-                    </div>
-                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, image_url: suggestedImage }))}
-                      className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">Use photo</button>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleImageSearch}
-                    disabled={!formData.manufacturer_id || !formData.manufacturer_model_number}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
-                  >
-                    <Search className="w-4 h-4" />
-                    Search Image
-                  </button>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImage}
-                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </div>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                  placeholder="Or paste image URL here"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-                <p className="text-xs text-gray-500">
-                  Search opens Google Images. Right-click image → "Copy image address" → Paste URL above. Or paste image directly (Ctrl+V)
-                </p>
-                {formData.image_url && (
-                  <div className="relative inline-block">
-                    <div className="relative w-32 h-32 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50">
-                      <img
-                        src={formData.image_url}
-                        alt="Product preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.error('Failed to load image:', formData.image_url);
-                          e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">No Image</text></svg>';
-                        }}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* PRICING */}

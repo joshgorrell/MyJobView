@@ -73,6 +73,9 @@ verify_jwt = true
 [functions.quickbooks-create-invoice]
 verify_jwt = true
 
+[functions.suggest-product-images]
+verify_jwt = true
+
 [functions.quickbooks-sync-contact]
 verify_jwt = true
 

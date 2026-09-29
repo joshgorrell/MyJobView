@@ -207,6 +207,7 @@ export function SalesOrderProductDetailModal({
       setPanelData({
         productId: p.id,
         productName: p.name || p.manufacturer_model_number || '',
+        modelNumber: p.manufacturer_model_number || null,
         sku: p.sku || null,
         upc: p.upc || null,
         category: catalogCategory?.name || p.category || null,

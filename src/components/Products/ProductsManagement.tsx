@@ -892,6 +892,7 @@ export default function ProductsManagement() {
       {viewingProductId && (
         <ProductDetailModal
           productId={viewingProductId}
+          onSaved={loadProducts}
           onClose={() => setViewingProductId(null)}
           onEdit={() => {
             setEditingProductId(viewingProductId);

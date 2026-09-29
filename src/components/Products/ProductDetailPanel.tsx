@@ -7,6 +7,7 @@ import {
 export interface ProductDetailPanelData {
   productId: string | null;
   productName: string;
+  modelNumber?: string | null;
   sku: string | null;
   upc: string | null;
   category: string | null;
@@ -60,6 +61,8 @@ interface ProductDetailPanelProps {
   previewImageUrl?: string | null;
   imagePasted?: boolean;
   onImageSelect?: (file: File) => void;
+  onRequestImage?: () => void;
+  showIdentity?: boolean;
   onChange?: (field: keyof ProductDetailPanelData, value: any) => void;
 }
 
@@ -85,6 +88,8 @@ export default function ProductDetailPanel({
   previewImageUrl,
   imagePasted,
   onImageSelect,
+  onRequestImage,
+  showIdentity = true,
   onChange,
 }: ProductDetailPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,13 +113,13 @@ export default function ProductDetailPanel({
   const marginBg = margin >= 30 ? 'bg-emerald-50 border-emerald-200' : margin >= 15 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[10rem_minmax(0,1fr)] gap-4">
       {isEdit && (
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       )}
 
       {/* TOP / LEFT: Image + Product Identity */}
-      <div className="w-full lg:w-40 lg:shrink-0 flex flex-row lg:flex-col gap-3">
+      <div className="w-full lg:row-span-2 flex flex-row lg:flex-col gap-3">
         {/* Image */}
         <div className="relative group w-28 sm:w-36 lg:w-full shrink-0">
           {displayImage ? (
@@ -122,7 +127,7 @@ export default function ProductDetailPanel({
               <img
                 src={displayImage}
                 alt={data.productName}
-                className={`w-full h-28 sm:h-36 lg:h-36 object-cover rounded-lg border border-gray-200 shadow-sm ${isEdit && data.productId ? 'cursor-pointer' : ''}`}
+                className={`w-full h-28 sm:h-36 lg:h-36 object-contain bg-white rounded-lg border border-gray-200 shadow-sm ${isEdit && data.productId ? 'cursor-pointer' : ''}`}
                 onClick={() => isEdit && data.productId && fileInputRef.current?.click()}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f3f4f6" width="200" height="200"/%3E%3C/svg%3E';
@@ -142,14 +147,21 @@ export default function ProductDetailPanel({
                   <Pencil className="w-3 h-3 text-gray-600" />
                 </button>
               )}
+              {!isEdit && onRequestImage && <button type="button" onClick={onRequestImage}
+                className="absolute bottom-1 right-1 rounded-md bg-white border border-gray-200 shadow px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50">
+                Change photo
+              </button>}
             </div>
           ) : (
             <div
-              onClick={() => isEdit && data.productId && fileInputRef.current?.click()}
-              className={`w-full h-28 sm:h-36 lg:h-36 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 ${isEdit && data.productId ? 'cursor-pointer hover:border-gray-400 hover:bg-gray-50' : ''} transition-all`}
+              role={onRequestImage || (isEdit && data.productId) ? 'button' : undefined}
+              tabIndex={onRequestImage || (isEdit && data.productId) ? 0 : undefined}
+              onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && (onRequestImage || isEdit)) { e.preventDefault(); if (onRequestImage) onRequestImage(); else fileInputRef.current?.click(); } }}
+              onClick={() => onRequestImage ? onRequestImage() : isEdit && data.productId && fileInputRef.current?.click()}
+              className={`w-full h-28 sm:h-36 lg:h-36 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 ${onRequestImage || (isEdit && data.productId) ? 'cursor-pointer hover:border-blue-400 hover:bg-blue-50' : ''} transition-all`}
             >
               <Upload className="w-6 h-6 mb-1" />
-              <span className="text-xs">No image</span>
+              <span className="text-xs">{onRequestImage ? 'Add photo' : 'No image'}</span>
               {isEdit && <span className="text-xs text-gray-400">Click to upload</span>}
             </div>
           )}
@@ -162,8 +174,9 @@ export default function ProductDetailPanel({
               <Package className="w-3 h-3" /> Product Info
             </div>
             {data.manufacturerName && <InfoRow label="Mfr" value={data.manufacturerName} />}
+            {data.modelNumber && <InfoRow label="Model" value={data.modelNumber} />}
             {data.vendorName && <InfoRow label="Vendor" value={data.vendorName} />}
-            {data.sku && <InfoRow label="SKU" value={data.sku} />}
+            {data.sku && data.sku !== data.modelNumber && <InfoRow label="SKU" value={data.sku} />}
             {data.upc && <InfoRow label="UPC" value={data.upc} />}
             {data.msrp && data.msrp > 0 && <InfoRow label="MSRP" value={formatCurrency(data.msrp)} />}
             {data.itemColor && (
@@ -240,9 +253,9 @@ export default function ProductDetailPanel({
       </div>
 
       {/* CENTER: Product name, description, pricing, labor */}
-      <div className="flex-1 flex flex-col gap-2 min-w-0">
+      <div className="flex flex-col gap-2 min-w-0 lg:col-start-2">
         {/* Name + category strip */}
-        <div>
+        {showIdentity && <div>
           <div className="flex items-start gap-2">
             {data.category && (
               <div className="flex items-center gap-1 text-xs text-gray-500 shrink-0 mt-0.5">
@@ -253,7 +266,7 @@ export default function ProductDetailPanel({
           </div>
           <h3 className="text-sm font-bold text-gray-900 leading-tight mt-0.5">{data.productName}</h3>
 
-        </div>
+        </div>}
 
         {/* Qty + Unit (edit only) */}
         {isEdit && (
@@ -308,7 +321,7 @@ export default function ProductDetailPanel({
               )}
             </div>
             <div>
-              <label className="block text-xs text-blue-700 mb-0.5">Unit Price</label>
+              <label className="block text-xs text-blue-700 mb-0.5">Sales Price</label>
               {isEdit ? (
                 <div className="relative">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -431,7 +444,7 @@ export default function ProductDetailPanel({
       </div>
 
       {/* RIGHT / BOTTOM: Financials + edit options */}
-      <div className="w-full lg:w-36 lg:shrink-0 flex flex-row lg:flex-col gap-2">
+      <div className="w-full flex flex-col sm:flex-row gap-2 lg:col-start-2">
         {/* Financial summary */}
         <div className={`rounded-lg border p-2 flex-1 lg:flex-none ${marginBg}`}>
           <div className="text-xs font-semibold text-gray-700 mb-1.5">Financials</div>
