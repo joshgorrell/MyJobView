@@ -15,6 +15,7 @@ interface AddItemToAreasModalProps {
   proposalId: string;
   rooms: ProposalRoom[];
   activeAreaId?: string;
+  defaultAreaIds?: string[];
   onClose: () => void;
   onItemsAdded: () => void;
   onRoomsUpdate?: (rooms: ProposalRoom[]) => void;
@@ -65,6 +66,7 @@ export default function AddItemToAreasModal({
   proposalId,
   rooms: initialRooms,
   activeAreaId,
+  defaultAreaIds,
   onClose,
   onItemsAdded,
   onRoomsUpdate,
@@ -87,7 +89,8 @@ export default function AddItemToAreasModal({
   const [classes, setClasses] = useState<ProposalClass[]>([]);
   const [localRooms, setLocalRooms] = useState<ProposalRoom[]>(initialRooms);
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(
-    new Set(activeAreaId ? [activeAreaId] : initialRooms.length === 1 ? [initialRooms[0].id] : [])
+    new Set(defaultAreaIds?.length ? defaultAreaIds.filter(id => initialRooms.some(room => room.id === id))
+      : activeAreaId ? [activeAreaId] : initialRooms.length === 1 ? [initialRooms[0].id] : [])
   );
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
@@ -135,7 +138,8 @@ export default function AddItemToAreasModal({
       supabase.from('proposal_classes').select('id, name, color').eq('is_active', true).order('name'),
       supabase.from('proposal_line_items').select('room_id, product_id').eq('proposal_id', proposalId).is('parent_item_id', null),
     ]);
-    if (prodsRes.data) setProducts(prodsRes.data.map(p => ({ ...p, ...catalogTaxonomy(p) })) as (Product & CatalogTaxonomy)[]);
+    const loadedProducts = (prodsRes.data || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as (Product & CatalogTaxonomy)[];
+    if (prodsRes.data) setProducts(loadedProducts);
     if (phasesRes.data) setLaborPhases(phasesRes.data);
     if (classesRes.data) setClasses(classesRes.data);
     if (itemsRes.data) {
@@ -148,6 +152,7 @@ export default function AddItemToAreasModal({
       setRoomLineItems(byRoom);
     }
     setLoading(false);
+    return loadedProducts;
   }
 
   async function loadMasterProduct(productId: string) {
@@ -214,9 +219,9 @@ export default function AddItemToAreasModal({
 
   async function handleProductCreated(productData: any) {
     setShowNewProductForm(false);
-    await loadAll();
+    const refreshedProducts = await loadAll();
     if (productData?.id) {
-      const product = products.find(p => p.id === productData.id);
+      const product = refreshedProducts.find(p => p.id === productData.id);
       if (product) handleProductSelect(product);
     }
   }
