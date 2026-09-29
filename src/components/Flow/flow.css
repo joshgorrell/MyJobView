@@ -58,3 +58,6 @@
 @media(max-width:640px){.flow-list-meta{font-size:11px;padding-inline:12px;gap:4px}.flow-list-meta button{white-space:nowrap;font-size:11px;padding-inline:5px}.flow .flow-read-toggle{width:30px}}
 
 .flow-kind select{min-height:32px;font-weight:600}.flow-kind-label{display:inline-block;margin-right:7px;color:var(--flow-accent);font-size:11px;white-space:nowrap}.flow--dark .flow-kind-label{color:#93c5fd}
+
+.flow-tag-results{display:flex;flex-direction:column;max-height:180px;overflow:auto;border:1px solid var(--flow-line);border-radius:7px;background:var(--flow-bg);margin:4px 0 10px}.flow-tag-results button{justify-content:flex-start;text-align:left;border-radius:0}.flow-tag-results span{padding:9px;color:var(--flow-secondary)}
+.flow-tag-results button[aria-selected=true]{background:var(--flow-new);color:var(--flow-accent);font-weight:600}
