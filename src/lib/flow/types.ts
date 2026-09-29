@@ -30,7 +30,7 @@ export interface FlowTarget { kind: 'contact' | 'project' | 'work_order'; id: st
 export interface FlowFilters {
   contact_id?: string; project_id?: string; work_order_id?: string;
   office_id?: string; actor_id?: string; location_id?: string;
-  category?: string; kind?: string; search?: string; since?: string; until?: string;
+  category?: string; kind?: string; source_id?: string; search?: string; since?: string; until?: string;
   my_work?: boolean; new_only?: boolean; mentions_only?: boolean;
 }
 export const FLOW_CATEGORIES: Record<string, string> = {
