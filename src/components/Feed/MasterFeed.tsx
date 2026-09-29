@@ -190,7 +190,7 @@ export function MasterFeed({ onLeadClick }: MasterFeedProps) {
   const [view, setView] = useState<'flow' | 'discussions'>(focusPostId ? 'discussions' : 'flow');
   return <div className="space-y-3">
     <div className="flex gap-2" aria-label="Feed view">
-      <button onClick={() => setView('flow')} aria-pressed={view === 'flow'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'flow' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>My Flow</button>
+      <button onClick={() => setView('flow')} aria-pressed={view === 'flow'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'flow' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>Flow</button>
       <button onClick={() => setView('discussions')} aria-pressed={view === 'discussions'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'discussions' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>Discussions</button>
     </div>
     {view === 'flow' ? <Flow /> : <LegacyDiscussionFeed onLeadClick={onLeadClick} focusPostId={focusPostId} />}
