@@ -4,7 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
-import { mountGoogleProductImageSearch, searchGoogleProductImages, stopGoogleProductImageSearch, type GoogleProductImage } from './googleProductImageSearch';
 
 interface Category {
   id: string;
@@ -82,13 +81,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageSectionRef = useRef<HTMLDivElement>(null);
   const [showMissingImagePrompt, setShowMissingImagePrompt] = useState(false);
-  const [suggestedPhotos, setSuggestedPhotos] = useState<GoogleProductImage[]>([]);
-  const [suggestedPhotoIndex, setSuggestedPhotoIndex] = useState(0);
-  const [searchingPhotos, setSearchingPhotos] = useState(false);
-  const [photoSearchMessage, setPhotoSearchMessage] = useState('');
-  const [googlePhotosReady, setGooglePhotosReady] = useState(false);
-  const expectedPhotoQuery = useRef('');
-  const googleSearchId = useRef(`product-photo-search-${crypto.randomUUID()}`);
 
   // Auto-save key (needed early for scroll position tracking)
   const autoSaveKey = productId ? `product_edit_${productId}` : duplicateFromId ? `product_duplicate_${duplicateFromId}` : 'product_new';
@@ -170,50 +162,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     datasheet_url: '',
     installation_video_url: ''
   });
-
-  const selectedManufacturerName = manufacturers.find(m => m.id === formData.manufacturer_id)?.name;
-  useEffect(() => {
-    const cx = import.meta.env.VITE_GOOGLE_PSE_ID?.trim();
-    if (!cx) return;
-    let cancelled = false;
-    mountGoogleProductImageSearch(cx, googleSearchId.current, (query, images) => {
-      if (cancelled || query !== expectedPhotoQuery.current) return;
-      setSuggestedPhotos(images);
-      setSuggestedPhotoIndex(0);
-      setSearchingPhotos(false);
-      setPhotoSearchMessage(images.length ? '' : 'No matching photos found. Search, paste, or upload a photo.');
-    }).then(() => { if (!cancelled) setGooglePhotosReady(true); })
-      .catch(() => { if (!cancelled) setPhotoSearchMessage('Google image search could not load. Search, paste, or upload a photo.'); });
-    return () => { cancelled = true; stopGoogleProductImageSearch(); };
-  }, []);
-
-  useEffect(() => {
-    if (productId || duplicateFromId || formData.item_type !== 'material' || formData.image_url ||
-        !selectedManufacturerName || formData.manufacturer_model_number.trim().length < 3) {
-      setSuggestedPhotos([]);
-      setSuggestedPhotoIndex(0);
-      setSearchingPhotos(false);
-      setPhotoSearchMessage('');
-      return;
-    }
-    let cancelled = false;
-    setSuggestedPhotos([]);
-    setSuggestedPhotoIndex(0);
-    setPhotoSearchMessage('');
-    const timer = window.setTimeout(() => {
-      if (!import.meta.env.VITE_GOOGLE_PSE_ID) {
-        setPhotoSearchMessage('Google photo suggestions are not configured. Search, paste, or upload a photo.');
-        return;
-      }
-      if (!googlePhotosReady) return;
-      const query = `${selectedManufacturerName} "${formData.manufacturer_model_number.trim()}" product`;
-      expectedPhotoQuery.current = query;
-      setSearchingPhotos(true);
-      try { searchGoogleProductImages(query); }
-      catch { if (!cancelled) { setSearchingPhotos(false); setPhotoSearchMessage('Google image search is unavailable. Search, paste, or upload a photo.'); } }
-    }, 700);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [productId, duplicateFromId, formData.item_type, formData.image_url, formData.manufacturer_model_number, selectedManufacturerName, googlePhotosReady]);
 
   // Auto-save hook
   const { restoreSavedData, clearSavedData } = useAutoSave({
@@ -1450,31 +1398,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     Add a product photo so this item is easy to recognize in the catalog and on documents.
                   </p>
                 )}
-                {searchingPhotos && <p className="text-xs text-gray-600 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />Finding photos for this make and model…</p>}
-                {!searchingPhotos && photoSearchMessage && <p className="text-xs text-gray-600">{photoSearchMessage}</p>}
-                {suggestedPhotos.length > 0 && !formData.image_url && (() => {
-                  const photo = suggestedPhotos[suggestedPhotoIndex];
-                  return <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                    <img src={photo.preview} alt={photo.title || 'Suggested product photo'} className="w-20 h-20 rounded bg-white object-contain"
-                      onError={() => { setSuggestedPhotos(current => current.filter(item => item.url !== photo.url)); setSuggestedPhotoIndex(0); }} />
-                    <div className="flex-1 min-w-[140px]">
-                      <p className="text-xs font-medium text-blue-900">Suggested photo {suggestedPhotoIndex + 1} of {suggestedPhotos.length}</p>
-                      <p className="text-xs text-gray-700 truncate" title={photo.title}>{photo.title || photo.source}</p>
-                      <p className="text-xs text-gray-500">Verify the model before using this image.</p>
-                      {photo.page && <a href={photo.page} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-700 underline">View source</a>}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button type="button" aria-label="Previous suggested photo" disabled={suggestedPhotos.length < 2}
-                        onClick={() => setSuggestedPhotoIndex(index => (index - 1 + suggestedPhotos.length) % suggestedPhotos.length)}
-                        className="rounded p-1 hover:bg-blue-100 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
-                      <button type="button" aria-label="Next suggested photo" disabled={suggestedPhotos.length < 2}
-                        onClick={() => setSuggestedPhotoIndex(index => (index + 1) % suggestedPhotos.length)}
-                        className="rounded p-1 hover:bg-blue-100 disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
-                    </div>
-                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, image_url: photo.url }))}
-                      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">Use photo</button>
-                  </div>;
-                })()}
                 <div className="flex gap-2">
                   <button
                     onClick={handleImageSearch}
@@ -1530,12 +1453,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     >
                       <X className="w-4 h-4" />
                     </button>
-                  </div>
-                )}
-                {import.meta.env.VITE_GOOGLE_PSE_ID && (
-                  <div className="border-t border-gray-200 pt-2">
-                    <p className="text-xs text-gray-500 mb-2">Google image results</p>
-                    <div id={googleSearchId.current} />
                   </div>
                 )}
               </div>
