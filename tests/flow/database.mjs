@@ -168,6 +168,19 @@ await asUser(user);
 assert.ok(!(await list({my_work:true})).some(e=>e.project_id===uid(31)),'Customer owner does not inherit another rep project activity');
 assert.ok(!(await list()).some(e=>e.project_id===uid(31)),'All Activity still respects project module access');
 assert.equal((await list({kind:'discussions'})).filter(e=>e.source_table!=='discussion_posts').length,0,'Discussion filter is exact');
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${user}';
+ INSERT INTO discussion_posts(id,organization_id,user_id,content,post_type,project_id)
+ VALUES('${uid(113)}','${org}','${user}','Status for #Jones installation','general','${project}');
+ INSERT INTO flow_updates(organization_id,project_id,body)
+ VALUES('${org}','${project}','@jesse Can you confirm the schedule?');`);
+await asUser(colleague);
+assert.ok((await list({project_id:project,kind:'discussions'})).some(e=>e.source_id===uid(113)),'Chosen project is attached to its Flow');
+assert.ok((await list({project_id:project,mentions_only:true})).some(e=>e.source_table==='flow_updates'),'Flow update @handle is a direct mention');
+const mentionedUpdate=(await list({project_id:project,mentions_only:true})).find(e=>e.source_table==='flow_updates');
+assert.equal((await list({source_id:mentionedUpdate.source_id})).length,1,'Mention link selects the exact update');
+assert.equal((await db.query("SELECT count(*)::int AS count FROM notifications WHERE user_id=$1 AND type='flow_update_mention'",[colleague])).rows[0].count,1,'Flow update mention notifies once');
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${user}';`);
+await rejects(`INSERT INTO discussion_posts(id,organization_id,user_id,content,post_type,project_id) VALUES('${uid(114)}','${org}','${user}','Wrong dealer','general','${uid(999)}')`,'Invalid project tag rejected');
 await asUser(outsider);
 assert.equal((await list({category:'communication'})).length,0,'Another dealer cannot see the thread');
 console.log('PASS: related conversation, mention routing, context link, no body snapshot, and tenant isolation.');
