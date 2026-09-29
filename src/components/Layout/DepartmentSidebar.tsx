@@ -1,4 +1,5 @@
 import { getIcon } from '../../lib/iconMap';
+import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { Menu, ChevronDown, ChevronRight, Star, X, Search, ChevronsDownUp, ChevronsUpDown, Pin } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useDepartments } from '../../contexts/DepartmentContext';
@@ -326,7 +327,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                               }`}
                               title={module.description || ''}
                             >
-                              {renderIcon(module.icon, "w-4 h-4 flex-shrink-0")}
+                              {module.module_key === 'feed' ? <FlowWaveIcon className="w-4 h-4 text-lg" /> : renderIcon(module.icon, "w-4 h-4 flex-shrink-0")}
                               <span className="text-sm truncate flex-1">{module.display_name}</span>
                               {module.module_key === 'tasks' && taskCount > 0 && (
                                 <span className="flex items-center justify-center min-w-[18px] h-4 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex-shrink-0">
