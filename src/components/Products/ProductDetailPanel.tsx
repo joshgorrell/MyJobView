@@ -7,6 +7,7 @@ import {
 export interface ProductDetailPanelData {
   productId: string | null;
   productName: string;
+  modelNumber?: string | null;
   sku: string | null;
   upc: string | null;
   category: string | null;
@@ -173,8 +174,9 @@ export default function ProductDetailPanel({
               <Package className="w-3 h-3" /> Product Info
             </div>
             {data.manufacturerName && <InfoRow label="Mfr" value={data.manufacturerName} />}
+            {data.modelNumber && <InfoRow label="Model" value={data.modelNumber} />}
             {data.vendorName && <InfoRow label="Vendor" value={data.vendorName} />}
-            {data.sku && <InfoRow label="SKU" value={data.sku} />}
+            {data.sku && data.sku !== data.modelNumber && <InfoRow label="SKU" value={data.sku} />}
             {data.upc && <InfoRow label="UPC" value={data.upc} />}
             {data.msrp && data.msrp > 0 && <InfoRow label="MSRP" value={formatCurrency(data.msrp)} />}
             {data.itemColor && (
@@ -319,7 +321,7 @@ export default function ProductDetailPanel({
               )}
             </div>
             <div>
-              <label className="block text-xs text-blue-700 mb-0.5">Unit Price</label>
+              <label className="block text-xs text-blue-700 mb-0.5">Sales Price</label>
               {isEdit ? (
                 <div className="relative">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
