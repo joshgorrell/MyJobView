@@ -357,8 +357,8 @@ export function UserSessionsViewerEnhanced() {
 
     const profileIds = profiles.map(p => p.id);
 
-    // Fetch last session per user and clocked-in status in bulk (2 queries instead of 2*N)
-    const [sessionsResult, clockedInResult] = await Promise.all([
+    // Fetch the most recent MJV session for each user.
+    const [sessionsResult] = await Promise.all([
       supabase
         .from('user_sessions')
         .select('user_id, last_activity, is_active, ip_address, device_type, browser_name, os_name')
@@ -1478,11 +1478,6 @@ export function UserSessionsViewerEnhanced() {
                               <span className="text-xs sm:text-sm text-gray-600">
                                 {user.is_online ? 'Online' : 'Offline'}
                               </span>
-                              {user.is_clocked_in && (
-                                <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
-                                  Clocked In
-                                </span>
-                              )}
                             </div>
                           </td>
                           <td className="px-2 sm:px-4 py-3 hidden md:table-cell">
