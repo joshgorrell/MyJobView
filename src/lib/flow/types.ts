@@ -15,6 +15,7 @@ export interface FlowEvent {
   summary: string;
   details: string;
   source_table: string;
+  is_internal?: boolean;
   source_id: string;
   thread_id?: string | null;
   task_id?: string | null;
@@ -29,7 +30,7 @@ export interface FlowTarget { kind: 'contact' | 'project' | 'work_order'; id: st
 export interface FlowFilters {
   contact_id?: string; project_id?: string; work_order_id?: string;
   office_id?: string; actor_id?: string; location_id?: string;
-  category?: string; search?: string; since?: string; until?: string;
+  category?: string; kind?: string; search?: string; since?: string; until?: string;
   my_work?: boolean; new_only?: boolean; mentions_only?: boolean;
 }
 export const FLOW_CATEGORIES: Record<string, string> = {
