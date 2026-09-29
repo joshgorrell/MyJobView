@@ -6,7 +6,6 @@ import { ArrowLeft, Plus, Settings, ExternalLink, LayoutGrid, List, Trash2, Copy
 import ProposalSettings from './ProposalSettings';
 import ProposalRevisionManager from './ProposalRevisionManager';
 import AddItemToAreasModal from './AddItemToAreasModal';
-import QuickAddProductModal from './QuickAddProductModal';
 import ProposalTaxReport from './ProposalTaxReport';
 import EditCustomerModal from './EditCustomerModal';
 import { ManualApprovalModal } from './ManualApprovalModal';
@@ -40,7 +39,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
   const [showTotalsBar, setShowTotalsBar] = useState(true);
   const [showRevisionManager, setShowRevisionManager] = useState(false);
   const [showAddItemToAreasModal, setShowAddItemToAreasModal] = useState(false);
-  const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
+  const [addItemDefaultAreaIds, setAddItemDefaultAreaIds] = useState<string[]>([]);
   const [showTaxReport, setShowTaxReport] = useState(false);
   const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
   const [showManualApprovalModal, setShowManualApprovalModal] = useState(false);
@@ -57,6 +56,11 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
   // Use external state if provided, otherwise use local state
   const targetRoomIds = externalTargetRoomIds || new Set<string>();
   const setTargetRoomIds = onTargetRoomsChange || (() => {});
+
+  function openAddItem(areaIds?: string[]) {
+    setAddItemDefaultAreaIds(areaIds ?? (targetRoomIds.size ? Array.from(targetRoomIds) : activeRoomId ? [activeRoomId] : []));
+    setShowAddItemToAreasModal(true);
+  }
 
   // Focus the add room input after clearing it
   useEffect(() => {
@@ -488,7 +492,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
               {/* Add Item Button */}
               {targetRoomIds.size === 0 ? (
                 <button
-                  onClick={() => setShowAddItemToAreasModal(true)}
+                  onClick={() => openAddItem()}
                   className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium"
                   title="Add Item"
                 >
@@ -497,7 +501,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
                 </button>
               ) : (
                 <button
-                  onClick={() => setShowQuickAddProduct(true)}
+                  onClick={() => openAddItem(Array.from(targetRoomIds))}
                   className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors font-medium animate-pulse"
                   title="Quick Add to Selected Areas"
                 >
@@ -945,7 +949,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
                   key={room.id}
                   room={room}
                   onDelete={() => handleDeleteRoom(room.id)}
-                  onAddItem={() => setShowAddItemToAreasModal(true)}
+                  onAddItem={() => openAddItem([room.id])}
                 />
               ))}
 
@@ -965,7 +969,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
               <RoomCard
                 room={activeRoom}
                 onDelete={() => handleDeleteRoom(activeRoom.id)}
-                onAddItem={() => setShowAddItemToAreasModal(true)}
+                onAddItem={() => openAddItem([activeRoom.id])}
                 isActive
               />
             ) : (
@@ -1256,21 +1260,10 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
         <AddItemToAreasModal
           proposalId={proposalId}
           rooms={rooms}
+          defaultAreaIds={addItemDefaultAreaIds}
           onClose={() => setShowAddItemToAreasModal(false)}
           onItemsAdded={() => {
             setShowAddItemToAreasModal(false);
-            loadData();
-          }}
-        />,
-        document.body
-      )}
-
-      {showQuickAddProduct && createPortal(
-        <QuickAddProductModal
-          proposalId={proposalId}
-          targetRoomIds={Array.from(targetRoomIds)}
-          onClose={() => setShowQuickAddProduct(false)}
-          onItemAdded={() => {
             loadData();
           }}
         />,
