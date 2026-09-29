@@ -173,6 +173,7 @@ export default function AddItemToAreasModal({
     const q = searchQuery.toLowerCase();
     return (
       p.sku?.toLowerCase().includes(q) ||
+      (p as any).manufacturer_model_number?.toLowerCase().includes(q) ||
       p.name?.toLowerCase().includes(q) ||
       p.description?.toLowerCase().includes(q) ||
       p.categoryName.toLowerCase().includes(q) || p.subcategoryName.toLowerCase().includes(q) ||
@@ -302,6 +303,10 @@ export default function AddItemToAreasModal({
 
   async function handleSave() {
     if (!selectedProduct) { alert('Please select a product'); return; }
+    if (localRooms.length > 0 && selectedRooms.size === 0) {
+      alert('Select the room or area for this item before adding it.');
+      return;
+    }
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
       alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
       return;
@@ -456,7 +461,7 @@ export default function AddItemToAreasModal({
                     type="text"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search by name, SKU, or description..."
+                    placeholder="Search model #, speaker type, name, SKU..."
                     className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     autoFocus
                   />
@@ -494,7 +499,9 @@ export default function AddItemToAreasModal({
                           {(product.categoryName || product.subcategoryName || product.vendorName) && <div className="text-xs text-blue-700 mt-0.5">
                             {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
                           </div>}
-                          {product.sku && <div className="text-xs text-gray-500 mt-0.5 font-mono">SKU: {product.sku}</div>}
+                          <div className="text-xs text-gray-500 mt-0.5 font-mono">
+                            {[(product as any).manufacturer_model_number && `Model: ${(product as any).manufacturer_model_number}`, product.sku && `SKU: ${product.sku}`].filter(Boolean).join(' · ')}
+                          </div>
                           {product.description && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</div>}
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -662,6 +669,7 @@ export default function AddItemToAreasModal({
                       </div>
                     )}
                   </div>
+                  {localRooms.length > 0 && selectedRooms.size === 0 && <p className="text-xs text-amber-700">Select an area before adding this item.</p>}
                 </div>
               </div>
             </div>
@@ -691,7 +699,7 @@ export default function AddItemToAreasModal({
             {selectedProduct && (
               <button
                 onClick={handleSave}
-                disabled={saving || saved}
+                disabled={saving || saved || (localRooms.length > 0 && selectedRooms.size === 0)}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
                   saved ? 'bg-green-600 text-white'
                     : saving ? 'bg-blue-400 text-white cursor-not-allowed'
