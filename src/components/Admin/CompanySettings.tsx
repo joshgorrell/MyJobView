@@ -182,7 +182,7 @@ export function CompanySettings() {
     try {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, timezone, header_logo_url, footer_logo_url')
+        .select('id, timezone, header_logo_url, footer_logo_url, subdomain')
         .limit(1)
         .maybeSingle();
 
