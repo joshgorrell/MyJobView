@@ -24,6 +24,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const { profile } = useAuth();
   const { hasModuleAccess } = useDepartments();
   const scoped = !!(contactId || projectId || workOrderId);
+  const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
   const [myWork, setMyWork] = useState(!scoped);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -54,11 +55,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
     return { ...scopeFilters(target ? { ...scope, ...targetScope(target) } : scope),
-      search: debouncedSearch, my_work: myWork, new_only: newOnly, mentions_only: mentionsOnly, category, kind, office_id: office, actor_id: actor, location_id: location,
+      source_id: focusUpdateId || undefined, search: debouncedSearch, my_work: myWork, new_only: newOnly, mentions_only: mentionsOnly, category, kind, office_id: office, actor_id: actor, location_id: location,
       since: todayOnly ? today.toISOString() : from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
       until: todayOnly ? tomorrow.toISOString() : until?.toISOString(),
     };
-  }, [scope, target, debouncedSearch, myWork, newOnly, mentionsOnly, todayOnly, category, kind, office, actor, location, from, to]);
+  }, [scope, target, focusUpdateId, debouncedSearch, myWork, newOnly, mentionsOnly, todayOnly, category, kind, office, actor, location, from, to]);
   const flow = useFlow(filters);
   const scopeModule = workOrderId ? 'work_orders' : projectId ? 'projects' : contactId ? 'contacts' : null;
   const canPost = scopeModule ? hasModuleAccess(scopeModule) : ['contacts', 'projects', 'work_orders'].some(hasModuleAccess);
