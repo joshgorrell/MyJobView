@@ -141,6 +141,10 @@ await db.exec(`UPDATE profiles SET can_view_all_messages=true WHERE id='${uid(13
 await asUser(uid(13));
 assert.equal((await list({category:'communication'})).length,1,'Explicit executive access covers company conversations');
 assert.equal((await list({category:'communication',my_work:true})).length,0,'Executive oversight does not turn every thread into personal work');
+assert.equal((await list({kind:'messages'})).length,1,'Messages category includes its conversation');
+assert.equal((await list({kind:'tasks'})).length,0,'Tasks filter excludes messages');
+assert.equal((await list({kind:'activity'})).length,0,'Executive message access does not grant unrelated activity modules');
+
 await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${user}';
  INSERT INTO tasks(id,organization_id,contact_id,user_id,assigned_to,title,status)
  VALUES('${uid(110)}','${org}','${customer}','${user}','${colleague}','Check rack','pending');
@@ -154,6 +158,16 @@ assert.ok(relatedComms.some(e=>e.source_table==='tasks' && e.source_id===uid(110
 assert.ok(relatedComms.some(e=>e.source_table==='task_comments' && e.task_id===uid(110) && e.preview?.includes('Parts arrived')),'Task comments preview and open their parent task');
 assert.ok(relatedComms.some(e=>e.source_table==='discussion_posts' && e.mentioned_user_ids.includes(colleague)),'Discussion mentions are highlighted');
 assert.equal((await db.query("SELECT count(*)::int AS count FROM notifications WHERE user_id=$1 AND type='discussion_post_mention'",[colleague])).rows[0].count,1,'Discussion mentions notify with a direct post link');
+
+await db.exec(`RESET ROLE; SET request.jwt.claim.sub=''; UPDATE contacts SET assigned_to='${user}' WHERE id='${customer}';
+ INSERT INTO projects(id,organization_id,contact_id,name,project_number,salesperson_id,status)
+ VALUES('${uid(31)}','${org}','${customer}','Other rep project','P-101','${colleague}','draft');`);
+await asUser(colleague);
+await db.exec(`UPDATE projects SET status='active' WHERE id='${uid(31)}'`);
+await asUser(user);
+assert.ok(!(await list({my_work:true})).some(e=>e.project_id===uid(31)),'Customer owner does not inherit another rep project activity');
+assert.ok(!(await list()).some(e=>e.project_id===uid(31)),'All Activity still respects project module access');
+assert.equal((await list({kind:'discussions'})).filter(e=>e.source_table!=='discussion_posts').length,0,'Discussion filter is exact');
 await asUser(outsider);
 assert.equal((await list({category:'communication'})).length,0,'Another dealer cannot see the thread');
 console.log('PASS: related conversation, mention routing, context link, no body snapshot, and tenant isolation.');
