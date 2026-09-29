@@ -186,6 +186,11 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
       setIsOpen(false);
       return;
     }
+    if (notifType === 'flow_update_mention' && notification.related_id) {
+      await markAsRead(notification);
+      window.location.assign(`?tab=feed&flowUpdateId=${notification.related_id}`);
+      return;
+    }
     if (notifType === 'discussion_post_mention' && notification.related_id) {
       await markAsRead(notification);
       window.location.assign(`?tab=feed&postId=${notification.related_id}`);
