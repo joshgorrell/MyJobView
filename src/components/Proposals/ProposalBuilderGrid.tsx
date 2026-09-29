@@ -1261,6 +1261,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
           proposalId={proposalId}
           rooms={rooms}
           defaultAreaIds={addItemDefaultAreaIds}
+          onRoomsUpdate={() => { void loadData(); }}
           onClose={() => setShowAddItemToAreasModal(false)}
           onItemsAdded={() => {
             setShowAddItemToAreasModal(false);
