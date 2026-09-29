@@ -296,7 +296,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
     <QuickActionModal
       title="New Lead"
       subtitle="Add a new sales opportunity"
-      icon={<Users className="w-5 h-5 text-white" />}
+      icon={<Users className="w-5 h-5 text-primary" />}
       accentColor="from-emerald-600 to-teal-700"
       onClose={handleClose}
       showSuccess={showSuccess}
@@ -305,7 +305,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
         <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Contact Name <span className="text-red-400">*</span>
               </label>
               <input
@@ -313,97 +313,97 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 required
                 value={formData.contact_name}
                 onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="John Doe"
                 autoFocus
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Company Name
               </label>
               <input
                 type="text"
                 value={formData.company_name}
                 onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="Acme Corp"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Username <span className="text-gray-500 font-normal">(@ mention name)</span>
+            <label className="block text-sm font-medium text-secondary mb-1.5">
+              Username <span className="text-muted font-normal">(@ mention name)</span>
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <AtSign className="w-4 h-4 text-gray-500" />
+                <AtSign className="w-4 h-4 text-muted" />
               </div>
               <input
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') })}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder={formData.contact_name ? generateUsername(formData.contact_name) : 'johndoe'}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">Leave blank to auto-generate. Used for @mentions.</p>
+            <p className="text-xs text-muted mt-1">Leave blank to auto-generate. Used for @mentions.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-secondary mb-1.5">Email</label>
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="john@acme.com"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">Phone</label>
+              <label className="block text-sm font-medium text-secondary mb-1.5">Phone</label>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="+1 (555) 123-4567"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Opportunity / Description</label>
+            <label className="block text-sm font-medium text-secondary mb-1.5">Opportunity / Description</label>
             <textarea
               value={formData.opportunity_description}
               onChange={(e) => setFormData({ ...formData, opportunity_description: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
               placeholder="Interested in our enterprise plan..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Tags</label>
+            <label className="block text-sm font-medium text-secondary mb-1.5">Tags</label>
             <input
               type="text"
               value={formData.tags}
               onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               placeholder="#enterprise #referral"
             />
-            <p className="text-xs text-gray-500 mt-1">Separate tags with spaces. Use # prefix.</p>
+            <p className="text-xs text-muted mt-1">Separate tags with spaces. Use # prefix.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">Follow-up Priority</label>
+              <label className="block text-sm font-medium text-secondary mb-1.5">Follow-up Priority</label>
               <select
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value="urgent">Urgent — within hours</option>
                 <option value="high">High — within 1 day</option>
@@ -414,11 +414,11 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
 
             {offices.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Sales Office</label>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Sales Office</label>
                 <select
                   value={formData.office_id}
                   onChange={(e) => setFormData({ ...formData, office_id: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 >
                   <option value="">No specific office</option>
                   {offices.map((office) => (
@@ -430,11 +430,11 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Assignment</label>
+            <label className="block text-sm font-medium text-secondary mb-1.5">Assignment</label>
             <select
               value={formData.assignment}
               onChange={(e) => setFormData({ ...formData, assignment: e.target.value })}
-              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             >
               <option value="fishbowl">Send to Fishbowl (All reps notified)</option>
               {salesReps.map((rep) => (
@@ -443,11 +443,11 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
             </select>
           </div>
 
-          <div className="flex gap-3 pt-2 pb-2 border-t border-gray-700/60">
+          <div className="flex gap-3 pt-2 pb-2 border-t border-subtle/60">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 border border-gray-700 text-gray-300 rounded-xl hover:bg-gray-800 transition-colors font-medium text-sm"
+              className="flex-1 px-4 py-3 border border-subtle text-secondary rounded-xl hover:bg-surface transition-colors font-medium text-sm"
             >
               Cancel
             </button>

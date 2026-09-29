@@ -649,7 +649,9 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const rawPortalUrl = settings.portal_url || (settings.app_url ? settings.app_url.replace(/\/$/, '') + '/portal' : null) || Deno.env.get("SUPABASE_URL")?.replace('.supabase.co', '.app') + '/portal' || 'https://your-portal-url.com/portal';
+    const rawPortalUrl = settings.subdomain
+      ? `https://${settings.subdomain}.myjobview.com`
+      : settings.portal_url || (settings.app_url ? settings.app_url.replace(/\/$/, '') + '/portal' : null) || Deno.env.get("SUPABASE_URL")?.replace('.supabase.co', '.app') + '/portal' || 'https://your-portal-url.com/portal';
     const portalUrl = rawPortalUrl.replace(/\/$/, '');
     const accentColor = '#06b6d4';
     const resolvedProjectName = project_name || 'your project';

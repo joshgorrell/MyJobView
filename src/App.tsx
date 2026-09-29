@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
+import { TenantProvider, useTenant } from './contexts/TenantContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
+import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { MessageTicker } from './components/Layout/MessageTicker';
 import { DepartmentSidebar } from './components/Layout/DepartmentSidebar';
-import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
 import { PlatformFooter } from './components/Layout/PlatformFooter';
 import { OfflineIndicator } from './components/Offline/OfflineIndicator';
 import BugReportModal from './components/Shared/BugReportModal';
@@ -21,6 +23,7 @@ import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { supabase } from './lib/supabase';
+import ProductsManagement from './components/Products/ProductsManagement';
 
 // Lazy load components
 const ContactForm = lazy(() => import('./components/Contacts/ContactForm').then(m => ({ default: m.ContactForm })));
@@ -69,7 +72,6 @@ const JobPhotosGallery = lazy(() => import('./components/Production/JobPhotosGal
 const TechStats = lazy(() => import('./components/Production/TechStats').then(m => ({ default: m.TechStats })));
 const InventoryDashboard = lazy(() => import('./components/Inventory/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
 const PurchaseOrders = lazy(() => import('./components/Inventory/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
-const ProductsManagement = lazy(() => import('./components/Products/ProductsManagement'));
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
 const AppointmentsCalendar = lazy(() => import('./components/Appointments/AppointmentsCalendar').then(m => ({ default: m.AppointmentsCalendar })));
 const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopout').then(m => ({ default: m.CalendarPopout })));
@@ -174,7 +176,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
-  const { footerDepartments, getUserModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
+  const { footerDepartments, getUserModules, starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -218,6 +220,18 @@ function AppContent() {
     const saved = localStorage.getItem('departmentSidebarPinned');
     return saved === 'true';
   });
+  const [bookmarksVisible, setBookmarksVisible] = useState(true);
+  useEffect(() => {
+    if (!profile?.id) return;
+    setBookmarksVisible(localStorage.getItem(`mjv-bookmarks-visible-${profile.id}`) !== 'false');
+  }, [profile?.id]);
+  const toggleBookmarks = () => {
+    if (!profile?.id) return;
+    setBookmarksVisible(current => {
+      localStorage.setItem(`mjv-bookmarks-visible-${profile.id}`, String(!current));
+      return !current;
+    });
+  };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [newPassword, setNewPassword] = useState('');
@@ -468,11 +482,20 @@ function AppContent() {
     '/portal/membership',
     '/portal/signup',
     '/security-onboarding',
+    '/onboarding',
+    '/login',
+    '/punchlist',
+    '/proposals',
+    '/vip-membership',
+    '/contact',
+    '/membership',
+    '/signup',
   ];
 
   const isPortalAllowedPath =
     PORTAL_ALLOWED_PATHS.includes(currentPath) ||
-    currentPath.startsWith('/portal/proposals/');
+    currentPath.startsWith('/portal/proposals/') ||
+    currentPath.startsWith('/proposals/');
 
   if (isPortalUser && user && !isPortalAllowedPath) {
     // If the user is navigating to the root path (/) they are trying to reach
@@ -485,42 +508,30 @@ function AppContent() {
       return <LoadingFallback />;
     }
     // For all other non-portal paths redirect back to the portal.
-    window.location.replace('/portal/punchlist');
+    window.location.replace('/punchlist');
     return <LoadingFallback />;
   }
   // --- END PORTAL USER ISOLATION ---
 
   // Portal & public routes — must come AFTER the portal isolation guard above
-  if (currentPath === '/portal/membership') {
+  if (currentPath === '/security-onboarding' || currentPath === '/onboarding') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <PublicVIPMembership />
+        <SecurityOnboardingPortal token={token || undefined} />
       </Suspense>
     );
   }
 
-  if (currentPath === '/portal/signup') {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PortalSignup />
-      </Suspense>
-    );
-  }
-
-  if (currentPath === '/portal') {
+  // --- CLEAN SUBDOMAIN ROUTES (mirror the /portal/* routes for dealer subdomains) ---
+  if (currentPath === '/login' || currentPath === '/portal') {
     const portalTokenParam = new URLSearchParams(window.location.search).get('portal_token');
-
-    // If a real customer is arriving via an invite link, clear any stale admin
-    // impersonation state so the token verification flow runs correctly.
     if (portalTokenParam) {
       localStorage.removeItem('admin_impersonating_contact');
       localStorage.removeItem('admin_impersonating_name');
     }
-
-    // Check if we have impersonation data (use localStorage for cross-tab compatibility)
     const impersonatingContactId = localStorage.getItem('admin_impersonating_contact');
-
-    // If admin is impersonating a customer, show the portal dashboard
     if (impersonatingContactId) {
       return (
         <Suspense fallback={<LoadingFallback />}>
@@ -528,8 +539,6 @@ function AppContent() {
         </Suspense>
       );
     }
-
-    // Otherwise show the customer login page
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalLogin />
@@ -537,7 +546,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/punchlist') {
+  if (currentPath === '/punchlist' || currentPath === '/portal/punchlist') {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalModuleGuard moduleKey="portal_tasks_enabled">
@@ -547,7 +556,8 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
+  if (currentPath === '/proposals' || currentPath.startsWith('/proposals/') ||
+      currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalModuleGuard moduleKey="portal_proposals_enabled">
@@ -557,7 +567,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/vip-membership') {
+  if (currentPath === '/vip-membership' || currentPath === '/portal/vip-membership') {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalVIPMembership />
@@ -565,12 +575,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/portal/vip-benefits') {
-    window.location.replace('/portal/vip-membership');
-    return null;
-  }
-
-  if (currentPath === '/portal/contact') {
+  if (currentPath === '/contact' || currentPath === '/portal/contact') {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalContactUs />
@@ -578,14 +583,25 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/security-onboarding') {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+  if (currentPath === '/membership' || currentPath === '/portal/membership') {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <SecurityOnboardingPortal token={token || undefined} />
+        <PublicVIPMembership />
       </Suspense>
     );
+  }
+
+  if (currentPath === '/signup' || currentPath === '/portal/signup') {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <PortalSignup />
+      </Suspense>
+    );
+  }
+
+  if (currentPath === '/portal/vip-benefits') {
+    window.location.replace('/vip-membership');
+    return null;
   }
 
   // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
@@ -816,7 +832,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col overflow-hidden">
+    <div className="workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>
@@ -830,10 +846,7 @@ function AppContent() {
               setShowTaskForm(true);
               setActiveTab('tasks');
             }}
-            onCreateJobMedia={() => {
-              setShowJobMediaUpload(true);
-              setActiveTab('job_photos');
-            }}
+            onCreateJobMedia={() => setShowJobMediaUpload(true)}
             onCreateProjectTime={['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role) ? () => setShowAddProjectTime(true) : undefined}
             onLeadClick={(leadId) => setSelectedLeadId(leadId)}
             onTaskClick={(taskId) => {
@@ -870,22 +883,21 @@ function AppContent() {
           onToggle={toggleSidebar}
           isPinned={sidebarPinned}
           onPinToggle={toggleSidebarPin}
+          bookmarksVisible={bookmarksVisible}
+          onBookmarksToggle={toggleBookmarks}
         />
       )}
 
-      <div className={`flex-1 overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+      <div className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+        {!isStandalone && bookmarksVisible && starredModules.length > 0 && (
+          <div className="border-b border-subtle bg-canvas px-3 sm:px-4 lg:px-5 py-1.5">
+            <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
+          </div>
+        )}
         <main
-          className={`h-full overflow-y-auto ${isStandalone ? 'w-full' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8'}`}
+          className={`min-h-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
         >
-          {!isStandalone && (
-            <div className="hidden sm:block mb-6">
-              <div className="border-b border-purple-500/30 pb-3">
-                <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
-              </div>
-            </div>
-          )}
-
         <Suspense fallback={<LoadingFallback />}>
           {activeTab === 'time' && <DailyClock key={activeTab} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
@@ -971,7 +983,6 @@ function AppContent() {
           {activeTab === 'job_photos' && checkModuleAccess('job_photos') && (
             <JobPhotosGallery
               key={activeTab}
-              initialShowUpload={showJobMediaUpload}
               onClose={() => setShowJobMediaUpload(false)}
             />
           )}
@@ -1069,7 +1080,7 @@ function AppContent() {
           {activeTab === 'test_tune' && checkModuleAccess('test_tune') && <TestTunePerformanceDashboard key={activeTab} />}
 
           {activeTab === 'vip-plans' && checkModuleAccess('vip-plans') && <VIPPlanManagement key={activeTab} />}
-          {activeTab === 'contract_management' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} />}
+          {activeTab === 'contract_management' && checkModuleAccess('contract_management') && <ContractManagement key={activeTab} onNavigateToImport={() => setActiveTab('contract_import')} onNavigateToOnboarding={checkModuleAccess('security_onboarding') ? () => setActiveTab('security_onboarding') : undefined} />}
           {activeTab === 'security_onboarding' && checkModuleAccess('security_onboarding') && <SecurityOnboarding key={activeTab} onNavigateToContracts={() => setActiveTab('contract_management')} canAccessContractManagement={checkModuleAccess('contract_management')} />}
           {activeTab === 'tax_reports' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={checkModuleAccess('tax_filing_guide') ? () => setActiveTab('tax_filing_guide') : undefined} />}
           {activeTab === 'tax_filing_guide' && checkModuleAccess('tax_reports') && <SalesTaxReports key={activeTab} onNavigateToGuide={() => setActiveTab('tax_reports')} />}
@@ -1096,7 +1107,7 @@ function AppContent() {
 
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-canvas text-primary rounded-xl shadow-sm border border-subtle p-4 sm:p-6">
                 <UserPreferences />
               </div>
             </div>
@@ -1230,6 +1241,14 @@ function AppContent() {
         <PlatformFooter />
       )}
 
+      {showJobMediaUpload && (
+        <JobPhotosGallery
+          modalOnly
+          initialShowUpload
+          onClose={() => setShowJobMediaUpload(false)}
+        />
+      )}
+
       {showAddProjectTime && (
         <Suspense fallback={null}>
           <AddProjectTimeModal
@@ -1294,7 +1313,7 @@ function AppContent() {
           icon={<MessageSquare className="w-5 h-5 text-white" />}
           accentColor="from-teal-600 to-cyan-700"
           onClose={() => setShowMessageForm(false)}
-          maxWidth="sm:max-w-md"
+
         >
           <div className="p-4 sm:p-6 space-y-5">
             <p className="text-gray-400 text-sm leading-relaxed">
@@ -1413,9 +1432,13 @@ function App() {
     <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
-          <DepartmentProvider>
-            <AppContent />
-          </DepartmentProvider>
+          <ThemeProvider>
+            <TenantProvider>
+              <DepartmentProvider>
+                <AppContent />
+              </DepartmentProvider>
+            </TenantProvider>
+          </ThemeProvider>
         </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>

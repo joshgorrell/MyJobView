@@ -420,7 +420,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading punchlist data...</div>
+        <div className="text-muted">Loading punchlist data...</div>
       </div>
     );
   }
@@ -441,14 +441,14 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     <div className="space-y-4 px-3 sm:px-0">
       {/* Header - Compact */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+        <h2 className="text-xl font-bold text-primary flex items-center gap-2">
           <ClipboardList className="w-5 h-5" />
           Punchlist Management
         </h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowHelp(true)}
-            className="p-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            className="p-2.5 bg-elevated hover:bg-surface text-primary rounded-lg transition-colors"
             title="How Punchlist Access Works"
           >
             <HelpCircle className="w-4 h-4" />
@@ -464,14 +464,14 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
       </div>
 
       {/* Tabs - Compact */}
-      <div className="border-b border-gray-700">
+      <div className="border-b border-subtle">
         <div className="flex gap-1">
           <button
             onClick={() => setActiveTab('punchlist')}
             className={`px-4 py-2 text-sm font-medium transition-all ${
               activeTab === 'punchlist'
-                ? 'text-white border-b-2 border-blue-500 bg-gray-800/50'
-                : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800/30'
+                ? 'text-primary border-b-2 border-blue-500 bg-surface/50'
+                : 'text-muted hover:text-secondary hover:bg-surface/30'
             }`}
           >
             <div className="flex items-center gap-1.5">
@@ -483,8 +483,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
             onClick={() => setActiveTab('customers')}
             className={`px-4 py-2 text-sm font-medium transition-all ${
               activeTab === 'customers'
-                ? 'text-white border-b-2 border-blue-500 bg-gray-800/50'
-                : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800/30'
+                ? 'text-primary border-b-2 border-blue-500 bg-surface/50'
+                : 'text-muted hover:text-secondary hover:bg-surface/30'
             }`}
           >
             <div className="flex items-center gap-1.5">
@@ -501,13 +501,13 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
       {/* Search and Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1 relative">
-          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search tasks..."
-            className="w-full pl-9 pr-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 text-sm bg-surface border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
         {/* Status dropdown */}
@@ -515,7 +515,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           <select
             value={selectedFilter}
             onChange={e => setSelectedFilter(e.target.value as typeof selectedFilter)}
-            className="appearance-none pl-3 pr-7 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-gray-500 cursor-pointer hover:border-gray-600 transition-colors"
+            className="appearance-none pl-3 pr-7 py-2 bg-surface border border-subtle rounded-lg text-sm text-gray-200 focus:outline-none focus:border-gray-500 cursor-pointer hover:border-strong transition-colors"
           >
             <option value="all">All ({stats.total})</option>
             <option value="draft">Draft ({stats.draft})</option>
@@ -523,7 +523,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
             <option value="scheduled">Scheduled ({stats.scheduled})</option>
             <option value="completed">Completed ({stats.completed})</option>
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
         </div>
         {selectableTasks.length > 0 && (
           <button
@@ -537,7 +537,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         {(selectedFilter !== 'all' || searchQuery) && (
           <button
             onClick={() => { setSelectedFilter('all'); setSearchQuery(''); }}
-            className="px-3 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center gap-1.5 whitespace-nowrap"
+            className="px-3 py-2 text-sm bg-elevated hover:bg-surface text-primary rounded-lg flex items-center gap-1.5 whitespace-nowrap"
           >
             <X className="w-3.5 h-3.5" />
             Clear
@@ -586,7 +586,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setSelectedTaskIds(new Set())}
-              className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-xs bg-elevated hover:bg-gray-600 text-secondary rounded-lg transition-colors"
             >
               Clear
             </button>
@@ -609,7 +609,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
       {/* Tasks List - Compact */}
       <div className="space-y-2">
         {filteredTasks.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 bg-gray-800 border border-gray-700 rounded-lg">
+          <div className="text-center py-8 text-muted bg-surface border border-subtle rounded-lg">
             <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-50" />
             <p className="font-medium">No tasks found</p>
             <p className="text-xs mt-1">
@@ -658,10 +658,10 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                   )}
 
                   {/* Task Card */}
-                  <div className={`bg-gray-800 border rounded-lg overflow-hidden transition-colors ${
+                  <div className={`bg-surface border rounded-lg overflow-hidden transition-colors ${
                     selectedTaskIds.has(task.id)
                       ? 'border-blue-500 ring-2 ring-blue-500/50'
-                      : 'border-gray-700 hover:border-gray-600'
+                      : 'border-subtle hover:border-strong'
                   }`}>
               {/* Task Header - Clickable and Compact */}
               <div className="p-3">
@@ -676,7 +676,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                           e.stopPropagation();
                           toggleTaskSelection(task.id);
                         }}
-                        className="w-4 h-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                        className="w-4 h-4 rounded border-strong text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
                       />
                     )}
                   </div>
@@ -689,7 +689,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     <div className="flex items-center gap-2 mb-1.5">
                       <StatusBadge status={task.status} task={task} />
                       {task.photos && task.photos.length > 0 && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-gray-700 rounded text-xs text-gray-300">
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-elevated rounded text-xs text-secondary">
                           <ImageIcon className="w-3 h-3" />
                           {task.photos.length}
                         </span>
@@ -697,17 +697,17 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                      className="text-left text-base font-semibold text-white mb-1 hover:text-amber-300 transition-colors leading-snug"
+                      className="text-left text-base font-semibold text-primary mb-1 hover:text-amber-300 transition-colors leading-snug"
                     >
                       {task.title}
                     </button>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-400 min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted min-w-0">
                       <div className="flex items-center gap-1">
                         <User className="w-3.5 h-3.5" />
                         {task.contact_id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickViewContactId(task.contact_id); }}
-                            className="text-blue-400 hover:text-blue-300 text-left font-medium transition-colors"
+                            className="customer-link text-left font-medium transition-colors"
                           >
                             {task.contact.full_name}
                           </button>
@@ -740,16 +740,16 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
                     {/* Quick Preview - Compact */}
                     {task.details && expandedTask !== task.id && (
-                      <p className="text-xs text-gray-400 mt-1.5 line-clamp-1">{task.details}</p>
+                      <p className="text-xs text-muted mt-1.5 line-clamp-1">{task.details}</p>
                     )}
                   </div>
 
                   {/* Expand/Collapse Icon */}
                   <div className="flex-shrink-0 pt-1">
                     {expandedTask === task.id ? (
-                      <ChevronUp className="w-4 h-4 text-gray-400" />
+                      <ChevronUp className="w-4 h-4 text-muted" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                      <ChevronDown className="w-4 h-4 text-muted" />
                     )}
                   </div>
                 </div>
@@ -757,7 +757,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
               {/* Expanded Details - Compact */}
               {expandedTask === task.id && (
-                <div className="border-t border-gray-700 bg-gray-900/50">
+                <div className="border-t border-subtle bg-canvas/50">
                   <div className="p-3 space-y-3">
                     {/* Customer self-completed notice */}
                     {task.status === 'completed' && task.completed_by_customer && (
@@ -773,19 +773,19 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     {/* Details */}
                     {task.details && (
                       <div>
-                        <div className="text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                        <div className="text-xs font-medium text-secondary mb-1 flex items-center gap-1">
                           <MessageSquare className="w-3.5 h-3.5" />
                           Description
                         </div>
-                        <p className="text-xs text-gray-400 whitespace-pre-wrap">{task.details}</p>
+                        <p className="text-xs text-muted whitespace-pre-wrap">{task.details}</p>
                       </div>
                     )}
 
                     {/* Installer Notes */}
                     {task.installer_notes && (
                       <div>
-                        <div className="text-xs font-medium text-gray-300 mb-1">Installer Notes</div>
-                        <p className="text-xs text-gray-400 whitespace-pre-wrap bg-gray-800 p-2 rounded">
+                        <div className="text-xs font-medium text-secondary mb-1">Installer Notes</div>
+                        <p className="text-xs text-muted whitespace-pre-wrap bg-surface p-2 rounded">
                           {task.installer_notes}
                         </p>
                       </div>
@@ -794,7 +794,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     {/* Photos */}
                     {task.photos && task.photos.length > 0 && (
                       <div>
-                        <div className="text-xs font-medium text-gray-300 mb-1.5 flex items-center gap-1">
+                        <div className="text-xs font-medium text-secondary mb-1.5 flex items-center gap-1">
                           <ImageIcon className="w-3.5 h-3.5" />
                           Photos ({task.photos.length})
                         </div>
@@ -804,7 +804,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                               <img
                                 src={photo.photo_url}
                                 alt={photo.caption || 'Task photo'}
-                                className="w-full h-20 object-cover rounded border border-gray-700"
+                                className="w-full h-20 object-cover rounded border border-subtle"
                               />
                               {photo.caption && (
                                 <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b truncate">
@@ -827,7 +827,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
                     {/* Status Actions - Compact */}
                     <div>
-                      <div className="text-xs font-medium text-gray-300 mb-1.5">Update Status</div>
+                      <div className="text-xs font-medium text-secondary mb-1.5">Update Status</div>
                       <div className="flex flex-wrap gap-1.5">
                         {task.status !== 'requested' && task.status !== 'scheduled' && task.status !== 'completed' && (
                           <button
@@ -841,7 +841,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                         {task.status === 'requested' && (() => {
                           const hasWorkOrder = !!(task.service_request?.work_order_id || task.work_order_id);
                           return hasWorkOrder ? (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-700/60 border border-gray-600 rounded text-xs text-gray-400 italic">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-elevated/60 border border-strong rounded text-xs text-muted italic">
                               <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
                               Work order assigned — contact Service Manager to cancel.
                             </div>
@@ -1157,27 +1157,27 @@ function StatusBadge({ status, task }: { status: string; task?: PunchlistTask })
   const statusConfig: Record<string, { label: string; className: string; icon: any }> = {
     draft: {
       label: 'Draft',
-      className: 'bg-yellow-900/50 text-yellow-300 border border-yellow-700',
+      className: 'bg-warningSoft text-warning border border-warningLine',
       icon: FileText,
     },
     scheduled: {
       label: 'Scheduled',
-      className: 'bg-blue-900/50 text-blue-300 border border-blue-700',
+      className: 'bg-infoSoft text-info border border-subtle',
       icon: Calendar,
     },
     in_work_order: {
       label: 'In Work Order',
-      className: 'bg-purple-900/50 text-purple-300 border border-purple-700',
+      className: 'bg-infoSoft text-info border border-subtle',
       icon: ClipboardList,
     },
     requested: {
       label: 'Requested',
-      className: 'bg-blue-900/50 text-blue-300 border border-blue-700',
+      className: 'bg-infoSoft text-info border border-subtle',
       icon: Send,
     },
     completed: {
       label: 'Completed',
-      className: 'bg-green-900/50 text-green-300 border border-green-700',
+      className: 'bg-successSoft text-success border border-subtle',
       icon: CheckCircle2,
     },
   };
@@ -1266,19 +1266,19 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl w-full max-w-lg border border-gray-700 shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-canvas rounded-2xl w-full max-w-lg border border-subtle shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 bg-gray-800 rounded-t-2xl shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-subtle bg-surface rounded-t-2xl shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
               <Layers className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Create Service Requests</h3>
-              <p className="text-xs text-gray-400">{tasks.length} task{tasks.length !== 1 ? 's' : ''} across {groups.length} customer{groups.length !== 1 ? 's' : ''}</p>
+              <h3 className="text-base font-bold text-primary">Create Service Requests</h3>
+              <p className="text-xs text-muted">{tasks.length} task{tasks.length !== 1 ? 's' : ''} across {groups.length} customer{groups.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white">
+          <button onClick={onClose} className="p-2 hover:bg-elevated rounded-lg transition-colors text-muted hover:text-primary">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1296,12 +1296,12 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
           {/* Customer groups */}
           <div className="space-y-3">
             {groups.map((group) => (
-              <div key={group.contactId} className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-                <div className="flex items-center gap-2.5 px-4 py-3 bg-gray-750 border-b border-gray-700">
+              <div key={group.contactId} className="bg-surface border border-subtle rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2.5 px-4 py-3 bg-gray-750 border-b border-subtle">
                   <User className="w-4 h-4 text-blue-400 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white truncate">{group.contactName}</div>
-                    <div className="text-xs text-gray-400">{group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''} selected</div>
+                    <div className="text-sm font-semibold text-primary truncate">{group.contactName}</div>
+                    <div className="text-xs text-muted">{group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''} selected</div>
                   </div>
                   <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 text-xs rounded-full font-medium border border-blue-600/30 whitespace-nowrap">
                     1 SR
@@ -1314,7 +1314,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
                       <div className="min-w-0">
                         <div className="text-sm text-white font-medium truncate">{task.title}</div>
                         {task.details && (
-                          <div className="text-xs text-gray-400 truncate mt-0.5">{task.details}</div>
+                          <div className="text-xs text-muted truncate mt-0.5">{task.details}</div>
                         )}
                       </div>
                     </div>
@@ -1326,7 +1326,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
 
           {/* Optional notes */}
           <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+            <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
               Notes (optional — applied to all requests)
             </label>
             <textarea
@@ -1334,21 +1334,21 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
               onChange={(e) => setGlobalNotes(e.target.value)}
               rows={3}
               placeholder="Add any notes for the service team..."
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 bg-surface border border-subtle rounded-lg text-primary text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-700 bg-gray-800 rounded-b-2xl shrink-0">
-          <div className="text-xs text-gray-500">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-subtle bg-surface rounded-b-2xl shrink-0">
+          <div className="text-xs text-muted">
             {groups.length} service request{groups.length !== 1 ? 's' : ''} will be created
           </div>
           <div className="flex gap-3">
             <button
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors text-sm font-medium"
+              className="px-4 py-2 bg-elevated text-primary rounded-xl hover:bg-surface transition-colors text-sm font-medium"
             >
               Cancel
             </button>

@@ -10,7 +10,6 @@ interface QuickActionModalProps {
   children: ReactNode;
   showSuccess?: boolean;
   successMessage?: string;
-  maxWidth?: string;
 }
 
 export function QuickActionModal({
@@ -22,7 +21,6 @@ export function QuickActionModal({
   children,
   showSuccess = false,
   successMessage = 'Created!',
-  maxWidth = 'sm:max-w-2xl',
 }: QuickActionModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -116,9 +114,9 @@ export function QuickActionModal({
       >
         <div
           className={`
-            qam-sheet bg-gray-900 w-full ${maxWidth}
+            qam-sheet bg-canvas text-primary w-full sm:max-w-2xl
             rounded-t-2xl sm:rounded-xl
-            shadow-2xl border-t sm:border border-gray-700/80
+            shadow-2xl border-t sm:border border-subtle
             flex flex-col
             max-h-[92svh] sm:max-h-[90svh]
             relative
@@ -128,7 +126,7 @@ export function QuickActionModal({
 
           {/* Drag handle — visible on mobile only */}
           <div className="flex justify-center pt-2.5 pb-0 sm:hidden flex-shrink-0">
-            <div className="w-10 h-1 rounded-full bg-gray-600" />
+            <div className="w-10 h-1 rounded-full bg-strong" />
           </div>
 
           {/* Success overlay */}

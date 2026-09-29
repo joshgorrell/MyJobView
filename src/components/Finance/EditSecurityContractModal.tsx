@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { X, Search, Save, User, Mail, DollarSign, Calendar } from 'lucide-react';
+import { X, Search, Save, User, Mail, DollarSign, Calendar, Wrench } from 'lucide-react';
 
 interface Contact {
   id: string;
@@ -34,11 +34,15 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   const [selectedContact, setSelectedContact] = useState(contract.contact_id || '');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [priceOverride, setPriceOverride] = useState(contract.monthly_price?.toString() || '');
-  const [termMonths, setTermMonths] = useState<number>(contract.term_months || 12);
-  const [renewalTermMonths, setRenewalTermMonths] = useState<number>(contract.renewal_term_months || 12);
+  const [termMonths, setTermMonths] = useState<number>(contract.term_months || 36);
+  const [renewalTermMonths, setRenewalTermMonths] = useState<number>(contract.renewal_term_months || 1);
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>(contract.account_type || '');
   const [accountServices, setAccountServices] = useState<string[]>(contract.account_services || []);
   const [accountNumber, setAccountNumber] = useState(contract.account_number || '');
+  const [isMonitoring, setIsMonitoring] = useState(contract.is_monitoring || false);
+  const [monitoringAccountNumber, setMonitoringAccountNumber] = useState(contract.account_number || '');
+  const [installationDate, setInstallationDate] = useState(contract.installation_date || '');
+  const [serviceAccountNumbers, setServiceAccountNumbers] = useState<Record<string, string>>(contract.service_account_numbers || {});
   const [notes, setNotes] = useState(contract.notes || '');
   const [emailOverride, setEmailOverride] = useState(contract.email_override || '');
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,9 +163,13 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           monthly_price: monthlyPrice,
           term_months: termMonths,
           renewal_term_months: renewalTermMonths,
+          ...(renewalTermMonths === 1 ? { cancellation_notice_days: 30 } : {}),
           account_type: accountType || null,
           account_services: accountServices,
-          account_number: accountNumber.trim() || null,
+          is_monitoring: isMonitoring,
+          account_number: isMonitoring ? (monitoringAccountNumber.trim() || null) : null,
+          installation_date: installationDate || null,
+          service_account_numbers: serviceAccountNumbers,
           notes: notes.trim() || null,
           updated_at: new Date().toISOString()
         })
@@ -426,15 +434,40 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             </div>
 
             <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Monitoring</label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isMonitoring}
+                  onChange={(e) => setIsMonitoring(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-blue-600 rounded"
+                />
+                <span className="text-xs sm:text-sm text-gray-700">Yes, this system calls a monitoring center when the alarm goes off</span>
+              </label>
+              {isMonitoring && (
+                <div className="mt-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Monitoring Account Number <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <input
+                    type="text"
+                    value={monitoringAccountNumber}
+                    onChange={(e) => setMonitoringAccountNumber(e.target.value)}
+                    placeholder="e.g. 12345"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Account Services</label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { value: 'monitored_alarm', label: 'Monitored Alarm' },
-                  { value: 'testing_inspection', label: 'Testing & Inspection' },
-                  { value: 'service_agreement', label: 'Service Agreement' },
+                  { value: 'dial_up', label: 'Dial-Up' },
+                  { value: 'telguard', label: 'Telguard' },
+                  { value: 'alarmnet', label: 'Alarmnet' },
+                  { value: 'alarm_com', label: 'Alarm.com' },
                   { value: 'video_monitoring', label: 'Video / CCTV' },
                   { value: 'access_control', label: 'Access Control' },
-                  { value: 'other', label: 'Other' },
                 ].map(svc => (
                   <label key={svc.value} className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -467,22 +500,94 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             </div>
           </div>
 
+          {/* Installation Details */}
+          <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3 sm:space-y-4">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-amber-600" />
+              <h3 className="text-xs sm:text-sm font-semibold text-gray-800">Installation Details</h3>
+              <span className="text-xs text-amber-600">Enter after system is installed</span>
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Installation Date</label>
+              <input
+                type="date"
+                value={installationDate}
+                onChange={(e) => setInstallationDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            {accountServices.filter(s => ['dial_up', 'telguard', 'alarmnet', 'alarm_com'].includes(s)).length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers</label>
+                {accountServices.includes('dial_up') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.dial_up || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, dial_up: e.target.value }))}
+                      placeholder="e.g. 12345"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+                {accountServices.includes('telguard') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.telguard || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, telguard: e.target.value }))}
+                      placeholder="e.g. TG67890"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+                {accountServices.includes('alarmnet') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.alarmnet || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarmnet: e.target.value }))}
+                      placeholder="e.g. AN111"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+                {accountServices.includes('alarm_com') && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number</label>
+                    <input
+                      type="text"
+                      value={serviceAccountNumbers.alarm_com || ''}
+                      onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarm_com: e.target.value }))}
+                      placeholder="e.g. AC222"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Renewal Term */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-              Renewal Term (Months)
+              Renewal Term
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={renewalTermMonths}
-                onChange={(e) => setRenewalTermMonths(parseInt(e.target.value) || 12)}
-                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <p className="text-sm text-gray-700">
+              {renewalTermMonths === 1
+                ? "Automatically renews month-to-month after the initial term; 30 days' notice to cancel."
+                : `Existing agreement: ${renewalTermMonths} month renewal term.`}
+            </p>
+            {renewalTermMonths !== 1 && contract.status === 'draft' && (
+              <button type="button" onClick={() => setRenewalTermMonths(1)} className="mt-2 text-sm text-blue-700 underline">
+                Change this draft to month-to-month renewal
+              </button>
+            )}
           </div>
 
           {/* Notes */}
@@ -513,7 +618,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Renewal Term:</span>
-                <span className="font-semibold text-gray-900">{renewalTermMonths} months</span>
+                <span className="font-semibold text-gray-900">{renewalTermMonths === 1 ? 'Month-to-month' : `${renewalTermMonths} months`}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-300">
                 <span className="text-gray-600">Total Contract Value:</span>

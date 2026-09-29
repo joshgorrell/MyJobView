@@ -14,21 +14,21 @@ interface ContractRow {
 }
 
 const SERVICE_LABELS: Record<string, string> = {
-  monitored_alarm: 'Monitored Alarm',
-  testing_inspection: 'Testing & Inspection',
-  service_agreement: 'Service Agreement',
+  dial_up: 'Dial-Up',
+  telguard: 'Telguard',
+  alarmnet: 'Alarmnet',
+  alarm_com: 'Alarm.com',
   video_monitoring: 'Video / CCTV',
   access_control: 'Access Control',
-  other: 'Other',
 };
 
 const SERVICE_COLORS: Record<string, string> = {
-  monitored_alarm: 'bg-blue-500',
-  testing_inspection: 'bg-teal-500',
-  service_agreement: 'bg-amber-500',
+  dial_up: 'bg-blue-500',
+  telguard: 'bg-teal-500',
+  alarmnet: 'bg-amber-500',
+  alarm_com: 'bg-cyan-500',
   video_monitoring: 'bg-rose-500',
-  access_control: 'bg-violet-500',
-  other: 'bg-gray-400',
+  access_control: 'bg-emerald-500',
 };
 
 function StatCard({ icon: Icon, label, value, sub, color = 'blue' }: {

@@ -84,3 +84,159 @@ verify_jwt = false
 
 [functions.taxjar-lookup]
 verify_jwt = true
+
+[functions.generate-blank-contract-form]
+verify_jwt = true
+
+[functions.ai-assistant]
+verify_jwt = true
+
+[functions.auto-archive-declined-proposals]
+verify_jwt = false
+
+[functions.auto-clock-out-scheduler]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = true
+
+[functions.delete-user]
+verify_jwt = true
+
+[functions.extract-product-from-url]
+verify_jwt = true
+
+[functions.force-logout-all-users]
+verify_jwt = true
+
+[functions.generate-change-order-report]
+verify_jwt = true
+
+[functions.generate-invoice-pdf]
+verify_jwt = true
+
+[functions.generate-proposal-documents]
+verify_jwt = true
+
+[functions.generate-proposal-pdf]
+verify_jwt = true
+
+[functions.generate-qr-vcard]
+verify_jwt = true
+
+[functions.generate-sales-order-report]
+verify_jwt = true
+
+[functions.generate-scope-of-work]
+verify_jwt = true
+
+[functions.generate-vcard]
+verify_jwt = true
+
+[functions.get-client-ip]
+verify_jwt = false
+
+[functions.google-calendar-auth]
+verify_jwt = true
+
+[functions.google-calendar-callback]
+verify_jwt = false
+
+[functions.google-calendar-event]
+verify_jwt = true
+
+[functions.google-maps-proxy]
+verify_jwt = false
+
+[functions.midnight-session-cleanup]
+verify_jwt = false
+
+[functions.notify-purchasing-new-request]
+verify_jwt = true
+
+[functions.process-design-brief]
+verify_jwt = true
+
+[functions.quickbooks-import-staged-customers]
+verify_jwt = true
+
+[functions.receive-inbound-email]
+verify_jwt = false
+
+[functions.recurring-billing-scheduler]
+verify_jwt = false
+
+[functions.reset-user-password]
+verify_jwt = true
+
+[functions.scheduled-connections-daily-job]
+verify_jwt = false
+
+[functions.send-business-card]
+verify_jwt = false
+
+[functions.send-change-order-email]
+verify_jwt = true
+
+[functions.send-contract-invitation]
+verify_jwt = true
+
+[functions.send-deposit-reminder]
+verify_jwt = true
+
+[functions.send-kiosk-thank-you]
+verify_jwt = true
+
+[functions.send-mileage-reminder]
+verify_jwt = true
+
+[functions.send-on-my-way-sms]
+verify_jwt = false
+
+[functions.send-paparazzi-photos-notification]
+verify_jwt = true
+
+[functions.send-paparazzi-request]
+verify_jwt = true
+
+[functions.send-portal-magic-link]
+verify_jwt = false
+
+[functions.send-proposal-question-email]
+verify_jwt = true
+
+[functions.send-purchase-order-email]
+verify_jwt = true
+
+[functions.send-push-notification]
+verify_jwt = true
+
+[functions.send-review-request-sms]
+verify_jwt = false
+
+[functions.send-sms-reminder]
+verify_jwt = false
+
+[functions.send-time-request-notification]
+verify_jwt = true
+
+[functions.send-welcome-email]
+verify_jwt = true
+
+[functions.submit-kiosk-lead]
+verify_jwt = false
+
+[functions.tech-advisor]
+verify_jwt = true
+
+[functions.test-tune-day-90-evaluation]
+verify_jwt = true
+
+[functions.update-user-email]
+verify_jwt = true
+
+[functions.verify-portal-token]
+verify_jwt = false
+
+[functions.zip-tax-lookup]
+verify_jwt = true

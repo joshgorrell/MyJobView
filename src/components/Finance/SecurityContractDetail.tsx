@@ -1185,12 +1185,24 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Account Info</h2>
             <div className="space-y-3">
-              {contractData.account_number && (
-                <div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Account Number</div>
-                  <div className="font-medium text-gray-900">{contractData.account_number}</div>
+              <div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide">Monitoring</div>
+                <div className="mt-1">
+                  {contractData.is_monitoring ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                      <ShieldCheck className="w-3 h-3" />
+                      Monitoring Active
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400 italic">Not monitored</span>
+                  )}
                 </div>
-              )}
+                {contractData.is_monitoring && contractData.account_number && (
+                  <div className="text-sm text-gray-700 mt-1">
+                    <span className="text-xs text-gray-500">Monitoring Account Number:</span> {contractData.account_number}
+                  </div>
+                )}
+              </div>
               <div>
                 <div className="text-xs text-gray-500 uppercase tracking-wide">Account Type</div>
                 <div className="mt-1">
@@ -1213,12 +1225,12 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                   <div className="flex flex-wrap gap-1.5">
                     {(contractData.account_services as string[]).map(svc => {
                       const labels: Record<string, string> = {
-                        monitored_alarm: 'Monitored Alarm',
-                        testing_inspection: 'T&I',
-                        service_agreement: 'Service Agreement',
+                        dial_up: 'Dial-Up',
+                        telguard: 'Telguard',
+                        alarmnet: 'Alarmnet',
+                        alarm_com: 'Alarm.com',
                         video_monitoring: 'Video / CCTV',
                         access_control: 'Access Control',
-                        other: 'Other',
                       };
                       return (
                         <span key={svc} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
@@ -1231,6 +1243,71 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                   <span className="text-sm text-gray-400 italic">None selected</span>
                 )}
               </div>
+              {contractData.installation_date && (
+                <div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">Installation Date</div>
+                  <div className="font-medium text-gray-900">
+                    {new Date(contractData.installation_date).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
+              {contractData.service_account_numbers && Object.keys(contractData.service_account_numbers).length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Service Account Numbers</div>
+                  <div className="space-y-1">
+                    {Object.entries(contractData.service_account_numbers).map(([svc, num]) => {
+                      const labels: Record<string, string> = {
+                        dial_up: 'Monitoring',
+                        telguard: 'Telguard',
+                        alarmnet: 'Alarmnet',
+                        alarm_com: 'Alarm.com',
+                      };
+                      return (
+                        <div key={svc} className="text-sm text-gray-700">
+                          <span className="font-medium">{labels[svc] ?? svc}:</span> {num}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {(() => {
+                const SERVICES_NEEDING_ACCT = ['dial_up', 'telguard', 'alarmnet', 'alarm_com'];
+                const svcLabels: Record<string, string> = {
+                  dial_up: 'Monitoring Account Number',
+                  telguard: 'Telguard Account Number',
+                  alarmnet: 'Alarmnet Account Number',
+                  alarm_com: 'Alarm.com Account Number',
+                };
+                const missing: string[] = [];
+                if (contractData.status === 'active' && !contractData.installation_date) {
+                  missing.push('Installation Date');
+                }
+                const services = (contractData.account_services as string[]) || [];
+                const acctNums = (contractData.service_account_numbers as Record<string, string>) || {};
+                SERVICES_NEEDING_ACCT.forEach(svc => {
+                  if (services.includes(svc) && !acctNums[svc]) {
+                    missing.push(svcLabels[svc]);
+                  }
+                });
+                if (missing.length === 0) return null;
+                return (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-semibold text-amber-800 text-sm">Missing Post-Install Data</div>
+                        <div className="text-sm text-amber-700 mt-1">
+                          {missing.join(', ')}
+                        </div>
+                        <div className="text-xs text-amber-600 mt-1">
+                          Edit this contract to fill in the missing information.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
                   <div className="text-xs text-gray-500 uppercase tracking-wide">Initial Term</div>

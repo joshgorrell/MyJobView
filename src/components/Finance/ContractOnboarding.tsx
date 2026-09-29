@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload, Shield } from 'lucide-react';
+import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload, Shield, ArrowRight } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
 import SecurityAccountStats from './SecurityAccountStats';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -22,6 +22,8 @@ interface Contract {
   notes: string;
   account_type: string | null;
   account_services: string[] | null;
+  installation_date: string | null;
+  service_account_numbers: Record<string, string> | null;
 }
 
 interface StatusColumn {
@@ -33,7 +35,7 @@ interface StatusColumn {
   borderColor: string;
 }
 
-export default function ContractOnboarding({ onNavigateToImport }: { onNavigateToImport?: () => void }) {
+export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnboarding }: { onNavigateToImport?: () => void; onNavigateToOnboarding?: () => void }) {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,7 +50,7 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
   });
 
   const statusColumns: StatusColumn[] = [
-    { key: 'pending_approval', label: 'Completed', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
+    { key: 'pending_approval', label: 'Awaiting Approval', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
     { key: 'active', label: 'Active', icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
     { key: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' }
   ];
@@ -145,6 +147,28 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
 
   const unclassifiedCount = contracts.filter(c => c.status === 'active' && !c.account_type).length;
 
+  const SERVICES_NEEDING_ACCOUNT_NUMBERS = ['dial_up', 'telguard', 'alarmnet', 'alarm_com'];
+
+  function getMissingDataItems(contract: Contract): string[] {
+    if (contract.status !== 'active') return [];
+    const missing: string[] = [];
+    if (!contract.installation_date) missing.push('Installation Date');
+    const services = contract.account_services || [];
+    const acctNums = contract.service_account_numbers || {};
+    SERVICES_NEEDING_ACCOUNT_NUMBERS.forEach(svc => {
+      if (services.includes(svc) && !acctNums[svc]) {
+        const labels: Record<string, string> = {
+          dial_up: 'Monitoring Account Number',
+          telguard: 'Telguard Account Number',
+          alarmnet: 'Alarmnet Account Number',
+          alarm_com: 'Alarm.com Account Number',
+        };
+        missing.push(labels[svc]);
+      }
+    });
+    return missing;
+  }
+
   async function handleApproveContract(contract: Contract) {
     try {
       const { error } = await supabase
@@ -158,12 +182,12 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
 
       if (error) throw error;
 
-      alert('Contract approved and activated successfully!');
+      alert('Security contract approved and activated successfully!');
       loadContracts();
       loadCancellationStats();
     } catch (error) {
       console.error('Error approving contract:', error);
-      alert('Failed to approve contract');
+      alert('Failed to approve security contract');
     }
   }
 
@@ -193,7 +217,7 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading contracts...</p>
+          <p className="text-gray-600">Loading security contracts...</p>
         </div>
       </div>
     );
@@ -218,19 +242,26 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Shield className="w-6 h-6 text-blue-400" />
-            Monitoring Contract Onboarding
+            Security Contract Management
           </h1>
-          <p className="text-gray-300 mt-1">Alarm monitoring contract onboarding, approval, and activation</p>
+          <p className="text-gray-300 mt-1">Review, approve, activate, and manage security monitoring contracts</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        {onNavigateToOnboarding && (
+          <button onClick={onNavigateToOnboarding} className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium">
+            <ArrowRight className="w-4 h-4" /> Create New Contract
+          </button>
+        )}
         {onNavigateToImport && (
           <button
             onClick={onNavigateToImport}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             <Upload className="w-4 h-4" />
-            Import Contracts
+            Import Security Contracts
           </button>
         )}
+        </div>
       </div>
 
       <div className="flex gap-1 mb-6 bg-white/10 rounded-lg p-1 w-fit">
@@ -243,7 +274,7 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
           }`}
         >
           <List className="w-4 h-4" />
-          Contracts
+          Security Contracts
         </button>
         <button
           onClick={() => setActiveTab('stats')}
@@ -346,7 +377,7 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
                 {columnContracts.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Icon className={`w-12 h-12 ${column.color} opacity-50 mx-auto mb-2`} />
-                    <p className="font-medium">No contracts</p>
+                    <p className="font-medium">No security contracts</p>
                   </div>
                 ) : (
                   columnContracts.map((contract) => {
@@ -417,6 +448,16 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
                             </div>
                           )}
 
+                          {getMissingDataItems(contract).length > 0 && (
+                            <div className="flex items-start gap-2 text-sm text-amber-700">
+                              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-semibold">Missing data:</span>{' '}
+                                {getMissingDataItems(contract).join(', ')}
+                              </div>
+                            </div>
+                          )}
+
                           {contract.status === 'cancelled' && contract.cancellation_requested_at && (
                             <div className="mt-1 p-3 bg-red-50 border border-red-200 rounded-lg space-y-2">
                               <div className="flex items-start gap-2 text-sm text-red-700 font-semibold">
@@ -483,8 +524,8 @@ export default function ContractOnboarding({ onNavigateToImport }: { onNavigateT
       </>}
       <ConfirmModal
         isOpen={confirmApproveContract !== null}
-        title="Approve Contract"
-        message="Approve this contract and activate recurring billing?"
+        title="Approve Security Contract"
+        message="Approve this security contract and activate recurring billing?"
         variant="neutral"
         confirmLabel="Approve & Activate"
         onConfirm={() => {

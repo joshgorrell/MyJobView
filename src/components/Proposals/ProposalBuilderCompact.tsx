@@ -107,10 +107,10 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Pricing Modifiers</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-surface border-b border-subtle px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-primary">Pricing Modifiers</h2>
+          <button onClick={onClose} className="text-muted hover:text-primary">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -125,12 +125,12 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-300">Discount %</label>
+                <label className="text-sm font-medium text-secondary">Discount %</label>
                 {showApplyToggles && (
                   <button
                     type="button"
                     onClick={() => setApplyDiscount(!applyDiscount)}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyDiscount ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyDiscount ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-elevated border-strong text-muted'}`}
                   >
                     {applyDiscount ? 'Active' : 'Off'}
                   </button>
@@ -141,20 +141,20 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                 value={discountPercent}
                 onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
                 step="0.01"
-                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applyDiscount ? 'opacity-40' : ''}`}
+                className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyDiscount ? 'opacity-40' : ''}`}
                 placeholder="0.00"
               />
-              <p className="text-xs text-gray-500 mt-1">Enter positive number to subtract from subtotal</p>
+              <p className="text-xs text-muted mt-1">Enter positive number to subtract from subtotal</p>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-300">Project Management %</label>
+                <label className="text-sm font-medium text-secondary">Project Management %</label>
                 {showApplyToggles && (
                   <button
                     type="button"
                     onClick={() => setApplyPm(!applyPm)}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyPm ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyPm ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-elevated border-strong text-muted'}`}
                   >
                     {applyPm ? 'Active' : 'Off'}
                   </button>
@@ -165,20 +165,20 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                 value={pmPercent}
                 onChange={(e) => setPmPercent(parseFloat(e.target.value) || 0)}
                 step="0.01"
-                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applyPm ? 'opacity-40' : ''}`}
+                className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyPm ? 'opacity-40' : ''}`}
                 placeholder="0.00"
               />
-              <p className="text-xs text-gray-500 mt-1">Project management fee percentage</p>
+              <p className="text-xs text-muted mt-1">Project management fee percentage</p>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-300">Project Design %</label>
+                <label className="text-sm font-medium text-secondary">Project Design %</label>
                 {showApplyToggles && (
                   <button
                     type="button"
                     onClick={() => setApplyDesign(!applyDesign)}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyDesign ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyDesign ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-elevated border-strong text-muted'}`}
                   >
                     {applyDesign ? 'Active' : 'Off'}
                   </button>
@@ -189,20 +189,20 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                 value={designPercent}
                 onChange={(e) => setDesignPercent(parseFloat(e.target.value) || 0)}
                 step="0.01"
-                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applyDesign ? 'opacity-40' : ''}`}
+                className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyDesign ? 'opacity-40' : ''}`}
                 placeholder="0.00"
               />
-              <p className="text-xs text-gray-500 mt-1">Design fee percentage</p>
+              <p className="text-xs text-muted mt-1">Design fee percentage</p>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-300">System Design %</label>
+                <label className="text-sm font-medium text-secondary">System Design %</label>
                 {showApplyToggles && (
                   <button
                     type="button"
                     onClick={() => setApplySystemDesign(!applySystemDesign)}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applySystemDesign ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applySystemDesign ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-elevated border-strong text-muted'}`}
                   >
                     {applySystemDesign ? 'Active' : 'Off'}
                   </button>
@@ -213,20 +213,20 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                 value={systemDesignPercent}
                 onChange={(e) => setSystemDesignPercent(parseFloat(e.target.value) || 0)}
                 step="0.01"
-                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applySystemDesign ? 'opacity-40' : ''}`}
+                className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applySystemDesign ? 'opacity-40' : ''}`}
                 placeholder="0.00"
               />
-              <p className="text-xs text-gray-500 mt-1">System design fee percentage</p>
+              <p className="text-xs text-muted mt-1">System design fee percentage</p>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-300">Misc Parts %</label>
+                <label className="text-sm font-medium text-secondary">Misc Parts %</label>
                 {showApplyToggles && (
                   <button
                     type="button"
                     onClick={() => setApplyMiscParts(!applyMiscParts)}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyMiscParts ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyMiscParts ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-elevated border-strong text-muted'}`}
                   >
                     {applyMiscParts ? 'Active' : 'Off'}
                   </button>
@@ -237,24 +237,24 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                 value={miscPartsPercent}
                 onChange={(e) => setMiscPartsPercent(parseFloat(e.target.value) || 0)}
                 step="0.01"
-                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applyMiscParts ? 'opacity-40' : ''}`}
+                className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyMiscParts ? 'opacity-40' : ''}`}
                 placeholder="0.00"
               />
-              <p className="text-xs text-gray-500 mt-1">Miscellaneous parts markup</p>
+              <p className="text-xs text-muted mt-1">Miscellaneous parts markup</p>
             </div>
 
-            <div className="border-t border-gray-700 pt-4">
-              <h3 className="text-sm font-semibold text-white mb-3">Custom Modifiers</h3>
+            <div className="border-t border-subtle pt-4">
+              <h3 className="text-sm font-semibold text-primary mb-3">Custom Modifiers</h3>
 
               <div className="space-y-3">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-300">Custom Modifier 1 Label</label>
+                    <label className="text-sm font-medium text-secondary">Custom Modifier 1 Label</label>
                     {showApplyToggles && (
                       <button
                         type="button"
                         onClick={() => setApplyCustom1(!applyCustom1)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyCustom1 ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyCustom1 ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-elevated border-strong text-muted'}`}
                       >
                         {applyCustom1 ? 'Active' : 'Off'}
                       </button>
@@ -264,7 +264,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                     type="text"
                     value={custom1Label}
                     onChange={(e) => setCustom1Label(e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white mb-2"
+                    className="w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary mb-2"
                     placeholder="e.g., Rush Fee, Volume Discount, etc."
                   />
                   <input
@@ -272,20 +272,20 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                     value={custom1Percent}
                     onChange={(e) => setCustom1Percent(parseFloat(e.target.value) || 0)}
                     step="0.01"
-                    className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applyCustom1 ? 'opacity-40' : ''}`}
+                    className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyCustom1 ? 'opacity-40' : ''}`}
                     placeholder="0.00"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Use positive for additions, negative for deductions</p>
+                  <p className="text-xs text-muted mt-1">Use positive for additions, negative for deductions</p>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-300">Custom Modifier 2 Label</label>
+                    <label className="text-sm font-medium text-secondary">Custom Modifier 2 Label</label>
                     {showApplyToggles && (
                       <button
                         type="button"
                         onClick={() => setApplyCustom2(!applyCustom2)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyCustom2 ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${applyCustom2 ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300' : 'bg-elevated border-strong text-muted'}`}
                       >
                         {applyCustom2 ? 'Active' : 'Off'}
                       </button>
@@ -295,7 +295,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                     type="text"
                     value={custom2Label}
                     onChange={(e) => setCustom2Label(e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white mb-2"
+                    className="w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary mb-2"
                     placeholder="e.g., Referral Credit, Fuel Surcharge, etc."
                   />
                   <input
@@ -303,20 +303,20 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                     value={custom2Percent}
                     onChange={(e) => setCustom2Percent(parseFloat(e.target.value) || 0)}
                     step="0.01"
-                    className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white transition-opacity ${showApplyToggles && !applyCustom2 ? 'opacity-40' : ''}`}
+                    className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyCustom2 ? 'opacity-40' : ''}`}
                     placeholder="0.00"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Use positive for additions, negative for deductions</p>
+                  <p className="text-xs text-muted mt-1">Use positive for additions, negative for deductions</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-gray-800 border-t border-gray-700 px-6 py-4 flex justify-end gap-3">
+        <div className="sticky bottom-0 bg-surface border-t border-subtle px-6 py-4 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-muted hover:text-primary transition-colors"
           >
             Cancel
           </button>
@@ -374,10 +374,10 @@ function FilterModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Filter Items</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-surface border-b border-subtle px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-primary">Filter Items</h2>
+          <button onClick={onClose} className="text-muted hover:text-primary">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -385,7 +385,7 @@ function FilterModal({
         <div className="p-6 space-y-6">
           {/* Areas */}
           <div>
-            <h3 className="text-sm font-semibold text-white mb-3">Areas</h3>
+            <h3 className="text-sm font-semibold text-primary mb-3">Areas</h3>
             <div className="flex flex-wrap gap-2">
               {rooms.map((room) => (
                 <button
@@ -394,7 +394,7 @@ function FilterModal({
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     localFilters.areas.includes(room.id)
                       ? 'bg-cyan-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-elevated text-secondary hover:bg-strong/25'
                   }`}
                 >
                   {room.name}
@@ -406,7 +406,7 @@ function FilterModal({
           {/* Labor Phases */}
           {uniquePhases.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-white mb-3">Labor Phases</h3>
+              <h3 className="text-sm font-semibold text-primary mb-3">Labor Phases</h3>
               <div className="flex flex-wrap gap-2">
                 {uniquePhases.map((phase) => (
                   <button
@@ -415,7 +415,7 @@ function FilterModal({
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       localFilters.phases.includes(phase)
                         ? 'bg-cyan-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        : 'bg-elevated text-secondary hover:bg-strong/25'
                     }`}
                   >
                     {phase}
@@ -428,7 +428,7 @@ function FilterModal({
           {/* Manufacturers */}
           {uniqueManufacturers.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-white mb-3">Manufacturers</h3>
+              <h3 className="text-sm font-semibold text-primary mb-3">Manufacturers</h3>
               <div className="flex flex-wrap gap-2">
                 {uniqueManufacturers.map((manufacturer) => (
                   <button
@@ -437,7 +437,7 @@ function FilterModal({
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       localFilters.manufacturers.includes(manufacturer)
                         ? 'bg-cyan-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        : 'bg-elevated text-secondary hover:bg-strong/25'
                     }`}
                   >
                     {manufacturer}
@@ -448,17 +448,17 @@ function FilterModal({
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-gray-800 border-t border-gray-700 px-6 py-4 flex items-center justify-between">
+        <div className="sticky bottom-0 bg-surface border-t border-subtle px-6 py-4 flex items-center justify-between">
           <button
             onClick={clearAll}
-            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-muted hover:text-primary transition-colors"
           >
             Clear All
           </button>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              className="px-4 py-2 bg-elevated text-primary rounded-lg hover:bg-strong/25 transition-colors"
             >
               Cancel
             </button>
@@ -1441,8 +1441,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   function getStatusBadge(status: string) {
     const statusConfig: Record<string, { label: string; bgColor: string; textColor: string; icon?: React.ReactNode }> = {
-      'designing': { label: 'Designing', bgColor: 'bg-pink-600', textColor: 'text-white' },
-      'ready_to_submit': { label: 'Ready', bgColor: 'bg-yellow-600', textColor: 'text-white' },
+      'designing': { label: 'Designing', bgColor: 'bg-pink-700', textColor: 'text-white' },
+      'ready_to_submit': { label: 'Ready', bgColor: 'bg-yellow-400', textColor: 'text-gray-900' },
       'sent': { label: 'Sent', bgColor: 'bg-blue-600', textColor: 'text-white' },
       'portal': { label: 'Portal', bgColor: 'bg-blue-600', textColor: 'text-white' },
       'accepted': { label: 'Accepted', bgColor: 'bg-green-600', textColor: 'text-white', icon: <CheckCircle2 className="w-3 h-3" /> },
@@ -1450,7 +1450,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       'expired': { label: 'Expired', bgColor: 'bg-orange-600', textColor: 'text-white' }
     };
 
-    const config = statusConfig[status] || { label: status, bgColor: 'bg-gray-600', textColor: 'text-white' };
+    const config = statusConfig[status] || { label: status, bgColor: 'bg-gray-600', textColor: 'text-primary' };
 
     return (
       <span className={`inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium ${config.bgColor} ${config.textColor}`}>
@@ -3252,7 +3252,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     };
   }
 
-  const containerClass = isCoMode ? "h-full flex flex-col bg-gray-900 overflow-hidden" : "h-screen flex flex-col bg-gray-900 overflow-hidden";
+  const containerClass = isCoMode ? "h-full flex flex-col bg-canvas overflow-hidden" : "h-screen flex flex-col bg-canvas overflow-hidden";
 
   const containerStyle = {};
 
@@ -3261,11 +3261,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   // Show loading state
   if (loading) {
     return (
-      <div className={`${isCoMode ? 'h-full' : 'h-screen'} flex items-center justify-center bg-gray-900`}>
+      <div className={`${isCoMode ? 'h-full' : 'h-screen'} flex items-center justify-center bg-canvas`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-          <div className="text-white text-lg mb-2">{changeOrderId ? 'Change Order Loading...' : 'Loading Proposal...'}</div>
-          <div className="text-gray-400 text-sm">Please wait while we load the data</div>
+          <div className="text-primary text-lg mb-2">{changeOrderId ? 'Change Order Loading...' : 'Loading Proposal...'}</div>
+          <div className="text-muted text-sm">Please wait while we load the data</div>
         </div>
       </div>
     );
@@ -3275,10 +3275,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   // Only show error state if loading is complete and data is still missing
   if (!loading && (!proposal || !rooms)) {
     return (
-      <div className={`${isCoMode ? 'h-full' : 'h-screen'} flex items-center justify-center bg-gray-900`}>
+      <div className={`${isCoMode ? 'h-full' : 'h-screen'} flex items-center justify-center bg-canvas`}>
         <div className="text-center">
           <div className="text-yellow-400 text-lg mb-2">Data Loading Issue</div>
-          <div className="text-gray-500 text-sm mb-4">Proposal: {proposal ? 'OK' : 'Missing'}, Rooms: {rooms ? 'OK' : 'Missing'}</div>
+          <div className="text-muted text-sm mb-4">Proposal: {proposal ? 'OK' : 'Missing'}, Rooms: {rooms ? 'OK' : 'Missing'}</div>
           <button
             type="button"
             onClick={(e) => {
@@ -3286,7 +3286,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               e.stopPropagation();
               onBack();
             }}
-            className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+            className="px-4 py-2 bg-elevated text-primary rounded-lg hover:bg-strong/25"
           >
             Go Back
           </button>
@@ -3331,7 +3331,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   return (
     <div className={containerClass} style={containerStyle}>
       {/* Header */}
-      <div className="sticky top-0 bg-gray-800 border-b border-gray-700 flex-shrink-0 z-30">
+      <div className="sticky top-0 bg-surface border-b border-subtle flex-shrink-0 z-30">
         {/* Compact Header — single row */}
         <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
           {/* Left: Back + Title + Customer */}
@@ -3343,7 +3343,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   e.stopPropagation();
                   onBack();
                 }}
-                className="text-gray-400 hover:text-white transition-colors flex-shrink-0"
+                className="text-muted hover:text-primary transition-colors flex-shrink-0"
                 title="Back to Proposals"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -3351,16 +3351,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-base font-semibold text-white truncate">
+                  <h1 className="text-base font-semibold text-primary truncate">
                     {proposal?.title || proposal?.proposal_number || 'Proposal Builder'}
                   </h1>
                   {proposal?.status && getStatusBadge(proposal.status)}
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
                   <User className="w-3 h-3 flex-shrink-0" />
                   <span className="truncate">{proposal?.contacts?.full_name || 'Loading...'}</span>
                   <span className="text-gray-600">•</span>
-                  <span className="text-gray-500">#{proposal?.proposal_number}</span>
+                  <span className="text-muted">#{proposal?.proposal_number}</span>
                 </div>
               </div>
           </div>
@@ -3409,7 +3409,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             {sidebarCollapsed && (
               <button
                 onClick={() => setSidebarCollapsed(false)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors lg:hidden"
+                className="p-2 text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors lg:hidden"
                 title="Show Areas"
               >
                 <PanelLeft className="w-4 h-4" />
@@ -3419,7 +3419,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             {/* Bulk Actions (when items selected) */}
             {selectedItems.size > 0 && (
               <>
-                <div className="h-6 w-px bg-gray-700 mx-1" />
+                <div className="h-6 w-px bg-elevated mx-1" />
                 {(() => {
                   const selectedItemsData = rooms.flatMap(room =>
                     room.line_items.filter(item => selectedItems.has(item.id))
@@ -3464,7 +3464,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>{selectedItems.size}</span>
                 </button>
-                <div className="h-6 w-px bg-gray-700 mx-1" />
+                <div className="h-6 w-px bg-elevated mx-1" />
               </>
             )}
 
@@ -3478,14 +3478,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       ? 'bg-green-600 hover:bg-green-700 text-white'
                       : proposalReadiness?.isReady
                         ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                        : 'bg-gray-600/50 text-gray-300 hover:bg-gray-600/70 border border-gray-500/50'
+                        : 'bg-elevated text-secondary hover:bg-strong/25 border border-strong'
                   }`}
                   title="Deliver proposal to customer"
                 >
                   <Mail className="w-4 h-4" />
                   <span className="hidden sm:inline">Deliver</span>
                   {selectedTemplateId && pdfTemplates.find(t => t.id === selectedTemplateId) && (
-                    <span className="hidden lg:inline text-xs text-gray-300 ml-1 pl-2 border-l border-gray-500/40 max-w-[120px] truncate">
+                    <span className="hidden lg:inline text-xs text-secondary ml-1 pl-2 border-l border-gray-500/40 max-w-[120px] truncate">
                       {pdfTemplates.find(t => t.id === selectedTemplateId)?.name}
                     </span>
                   )}
@@ -3495,7 +3495,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 {showDeliverDropdown && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowDeliverDropdown(false)} />
-                    <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[200px]">
+                    <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
                       {/* Submit to Portal */}
                       <button
                         onClick={() => {
@@ -3505,8 +3505,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         disabled={sending}
                         className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm disabled:opacity-50 ${
                           proposalReadiness?.isReady
-                            ? 'text-blue-600 hover:bg-blue-50'
-                            : 'text-gray-400 hover:bg-gray-50'
+                            ? 'text-brand hover:bg-infoSoft'
+                            : 'text-muted hover:bg-surface'
                         }`}
                         title={proposalReadiness?.isReady ? "Submit to customer portal" : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
                       >
@@ -3526,7 +3526,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm ${
                           proposalReadiness?.isReady
                             ? 'text-gray-700 hover:bg-gray-100'
-                            : 'text-gray-400 hover:bg-gray-50'
+                            : 'text-muted hover:bg-surface'
                         }`}
                         title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
                       >
@@ -3540,7 +3540,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       {/* Tasks */}
                       <button
                         onClick={() => setShowTasksPanel(true)}
-                        className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
+                        className="px-3 py-1.5 bg-elevated hover:bg-strong/25 text-gray-200 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
                         title="View and edit proposal tasks"
                       >
                         <ListChecks className="w-4 h-4" />
@@ -3560,7 +3560,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         <span>Download PDF</span>
                       </button>
 
-                      <div className="border-t border-gray-200 my-1" />
+                      <div className="border-t border-subtle my-1" />
 
                       {/* Present Live */}
                       <button
@@ -3577,14 +3577,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       {/* Portal management for already-sent proposals */}
                       {(proposal?.status === 'sent' || proposal?.status === 'portal' || proposal?.status === 'expired') && (
                         <>
-                          <div className="border-t border-gray-200 my-1" />
+                          <div className="border-t border-subtle my-1" />
                           {proposal?.status === 'expired' ? (
                             <button
                               onClick={() => {
                                 setShowReactivateModal(true);
                                 setShowDeliverDropdown(false);
                               }}
-                              className="w-full px-3 py-2 text-left text-green-600 hover:bg-green-50 flex items-center gap-2 text-sm"
+                              className="w-full px-3 py-2 text-left text-success hover:bg-successSoft flex items-center gap-2 text-sm"
                             >
                               <RefreshCw className="w-4 h-4" />
                               Reactivate
@@ -3617,8 +3617,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs ${
                       proposalReadiness?.isReady
-                        ? 'bg-gray-700 text-white hover:bg-gray-600'
-                        : 'bg-gray-800/60 text-gray-400 hover:bg-gray-700/60 border border-gray-600/40'
+                        ? 'bg-elevated text-primary hover:bg-strong/25'
+                        : 'bg-surface/60 text-muted hover:bg-elevated/60 border border-strong/40'
                     }`}
                     title={proposalReadiness?.isReady ? "Status Actions" : `Complete proposal settings before approving (${proposalReadiness?.overallProgress ?? 0}% ready)`}
                   >
@@ -3630,7 +3630,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   {showStatusDropdown && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setShowStatusDropdown(false)} />
-                      <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[180px]">
+                      <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[180px]">
                         <button
                           onClick={() => {
                             setShowManualApprovalModal(true);
@@ -3639,8 +3639,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           disabled={updatingStatus}
                           className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm disabled:opacity-50 ${
                             proposalReadiness?.isReady
-                              ? 'text-green-600 hover:bg-green-50'
-                              : 'text-gray-400 hover:bg-gray-50'
+                              ? 'text-success hover:bg-successSoft'
+                              : 'text-muted hover:bg-surface'
                           }`}
                           title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete — review settings before approving`}
                         >
@@ -3654,7 +3654,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           <button
                             onClick={handleDeclineProposal}
                             disabled={updatingStatus}
-                            className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 text-sm disabled:opacity-50"
+                            className="w-full px-3 py-2 text-left text-danger hover:bg-dangerSoft flex items-center gap-2 text-sm disabled:opacity-50"
                           >
                             <XCircle className="w-4 h-4" />
                             Decline
@@ -3663,11 +3663,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                         {proposal?.status === 'designing' && (
                           <>
-                            <div className="border-t border-gray-200 my-1" />
+                            <div className="border-t border-subtle my-1" />
                             <button
                               onClick={() => handleUpdateStatus('ready_to_submit')}
                               disabled={updatingStatus}
-                              className="w-full px-3 py-2 text-left text-yellow-600 hover:bg-yellow-50 flex items-center gap-2 text-sm disabled:opacity-50"
+                              className="w-full px-3 py-2 text-left text-warning hover:bg-warningSoft flex items-center gap-2 text-sm disabled:opacity-50"
                             >
                               <ThumbsUp className="w-4 h-4" />
                               Mark Ready
@@ -3677,7 +3677,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                         {proposal?.status !== 'designing' && (
                           <>
-                            <div className="border-t border-gray-200 my-1" />
+                            <div className="border-t border-subtle my-1" />
                             <button
                               onClick={() => handleUpdateStatus('designing')}
                               disabled={updatingStatus}
@@ -3710,7 +3710,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             <div className="relative">
               <button
                 onClick={() => setShowMoreOptionsMenu(!showMoreOptionsMenu)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
                 title="More Options"
               >
                 <MoreVertical className="w-4 h-4" />
@@ -3719,11 +3719,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               {showMoreOptionsMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMoreOptionsMenu(false)} />
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 min-w-[200px]">
+                  <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
                     {/* Customer Section */}
                     {proposal?.contact_id && (
                       <>
-                        <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</div>
+                        <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Customer</div>
                         <a
                           href={`/contacts?id=${proposal.contact_id}`}
                           target="_blank"
@@ -3743,12 +3743,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           <Edit2 className="w-4 h-4" />
                           <span>Change Customer</span>
                         </button>
-                        <div className="border-t border-gray-200 my-1" />
+                        <div className="border-t border-subtle my-1" />
                       </>
                     )}
 
                     {/* Proposal Actions */}
-                    <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Proposal</div>
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Proposal</div>
                     <button
                       onClick={() => {
                         setShowFilterModal(true);
@@ -3765,10 +3765,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       )}
                     </button>
 
-                    <div className="border-t border-gray-200 my-1" />
+                    <div className="border-t border-subtle my-1" />
 
                     {/* View Options */}
-                    <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">View</div>
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">View</div>
                     <button
                       onClick={() => {
                         const newColumns = new Set(visibleColumns);
@@ -3796,10 +3796,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       )}
                     </button>
 
-                    <div className="border-t border-gray-200 my-1" />
+                    <div className="border-t border-subtle my-1" />
 
                     {/* Reports & History */}
-                    <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reports</div>
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Reports</div>
                     <button
                       onClick={() => {
                         setShowRevisionManager(true);
@@ -3878,7 +3878,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       </button>
                     )}
 
-                    <div className="border-t border-gray-200 my-1" />
+                    <div className="border-t border-subtle my-1" />
 
                     {/* Settings */}
                     <button
@@ -3894,7 +3894,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                     {!isStandalone && (
                       <>
-                        <div className="border-t border-gray-200 my-1" />
+                        <div className="border-t border-subtle my-1" />
                         <button
                           onClick={() => {
                             handlePopOut();
@@ -3910,7 +3910,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                     {isStandalone && (
                       <>
-                        <div className="border-t border-gray-200 my-1" />
+                        <div className="border-t border-subtle my-1" />
                         <button
                           onClick={() => window.close()}
                           className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
@@ -3975,7 +3975,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         {sidebarCollapsed && !isMobile && (
           <button
             onClick={() => setSidebarCollapsed(false)}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-r-lg shadow-lg transition-all hover:pl-3"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-elevated hover:bg-strong/25 text-primary p-2 rounded-r-lg shadow-lg transition-all hover:pl-3"
             title="Show Areas Sidebar"
           >
             <ChevronRight className="w-5 h-5" />
@@ -3984,13 +3984,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
         {/* ── DESKTOP SIDEBAR (md and up) ── */}
         {!sidebarCollapsed && !isMobile && (
-          <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col overflow-y-auto flex-shrink-0">
-            <div className="p-3 sm:p-4 border-b border-gray-700">
+          <div className="w-64 bg-surface border-r border-subtle flex flex-col overflow-y-auto flex-shrink-0">
+            <div className="p-3 sm:p-4 border-b border-subtle">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-white font-semibold text-sm sm:text-base">Areas</h2>
+                <h2 className="text-primary font-semibold text-sm sm:text-base">Areas</h2>
                 <button
                   onClick={() => setSidebarCollapsed(true)}
-                  className="text-gray-400 hover:text-white hover:bg-gray-700 p-1 rounded transition-colors"
+                  className="text-muted hover:text-primary hover:bg-elevated p-1 rounded transition-colors"
                   title="Collapse Sidebar"
                 >
                   <PanelLeftClose className="w-4 h-4" />
@@ -4005,7 +4005,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   onChange={(e) => setNewAreaName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddArea()}
                   placeholder="New area name..."
-                  className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-700 border border-gray-600 text-white text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-elevated border border-strong text-primary text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 />
                 <button
                   onClick={handleAddArea}
@@ -4079,7 +4079,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 return (
                   <div
                     key={room.id}
-                    className={`border-b border-gray-700 ${isActive ? 'bg-cyan-900/30' : ''}`}
+                    className={`border-b border-subtle ${isActive ? 'bg-cyan-900/30' : ''}`}
                   >
                     {editingAreaId === room.id ? (
                       <div className="p-3">
@@ -4094,7 +4094,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               setEditingAreaName('');
                             }
                           }}
-                          className="w-full px-2 py-1 bg-gray-700 border border-gray-600 text-white text-sm rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          className="w-full px-2 py-1 bg-elevated border border-strong text-primary text-sm rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
                           autoFocus
                         />
                         <div className="flex gap-2 mt-2">
@@ -4109,7 +4109,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               setEditingAreaId(null);
                               setEditingAreaName('');
                             }}
-                            className="flex-1 px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded hover:bg-gray-600"
+                            className="flex-1 px-2 py-1 bg-elevated text-secondary text-xs rounded hover:bg-strong/25"
                           >
                             Cancel
                           </button>
@@ -4118,18 +4118,18 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     ) : (
                       <div
                         onClick={() => setActiveAreaId(isActive ? null : room.id)}
-                        className={`p-3 cursor-pointer hover:bg-gray-700/50 transition-colors ${isActive ? 'border-l-4 border-cyan-500' : ''}`}
+                        className={`p-3 cursor-pointer hover:bg-elevated/50 transition-colors ${isActive ? 'border-l-4 border-cyan-500' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               {isActive && <Target className="w-4 h-4 text-blue-400 flex-shrink-0" />}
-                              <h3 className={`font-medium truncate ${isActive ? 'text-blue-400' : 'text-white'}`}>
+                              <h3 className={`font-medium truncate ${isActive ? 'text-blue-400' : 'text-primary'}`}>
                                 {room.name}
                               </h3>
                             </div>
                             <div className="flex items-center justify-between mt-1 gap-2">
-                              <span className="text-xs text-gray-400 truncate">
+                              <span className="text-xs text-muted truncate">
                                 {topLevelItems.length} item{topLevelItems.length !== 1 ? 's' : ''}{room.line_items.length > topLevelItems.length ? ` (${room.line_items.length - topLevelItems.length} nested)` : ''}
                               </span>
                               <span className={`text-xs font-bold flex-shrink-0 ${isActive ? 'text-cyan-300' : 'text-gray-200'}`}>
@@ -4144,28 +4144,28 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 setEditingAreaId(room.id);
                                 setEditingAreaName(room.name);
                               }}
-                              className="p-1 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded"
+                              className="p-1 text-muted hover:text-blue-400 hover:bg-elevated rounded"
                               title="Edit Area"
                             >
                               <Edit2 className="w-3 h-3" />
                             </button>
                             <button
                               onClick={() => setEditingScopeRoom({id: room.id, name: room.name, description: room.description, showScope: room.show_scope})}
-                              className="p-1 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded"
+                              className="p-1 text-muted hover:text-blue-400 hover:bg-elevated rounded"
                               title="Edit Area Notes"
                             >
                               <FileText className="w-3 h-3" />
                             </button>
                             <button
                               onClick={() => toggleRoomScopeVisibility(room.id, room.show_scope ?? true)}
-                              className={`p-1 rounded ${room.show_scope ? 'text-blue-400' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'}`}
+                              className={`p-1 rounded ${room.show_scope ? 'text-blue-400' : 'text-muted hover:text-blue-400 hover:bg-elevated'}`}
                               title={room.show_scope ? 'Hide scope' : 'Show scope'}
                             >
                               {room.show_scope ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                             </button>
                             <button
                               onClick={() => handleDeleteArea(room.id)}
-                              className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded"
+                              className="p-1 text-muted hover:text-red-400 hover:bg-elevated rounded"
                               title="Delete Area"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -4179,7 +4179,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               })}
 
               {rooms.length === 0 && (
-                <div className="p-4 text-center text-gray-500 text-sm">
+                <div className="p-4 text-center text-muted text-sm">
                   No areas yet. Add one above to get started.
                 </div>
               )}
@@ -4198,7 +4198,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
             {/* Bottom Sheet Panel */}
             <div
-              className={`fixed bottom-0 left-0 right-0 z-50 bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col transition-transform duration-300 ease-out ${!sidebarCollapsed ? 'translate-y-0' : 'translate-y-full'}`}
+              className={`fixed bottom-0 left-0 right-0 z-50 bg-surface rounded-t-2xl shadow-2xl flex flex-col transition-transform duration-300 ease-out ${!sidebarCollapsed ? 'translate-y-0' : 'translate-y-full'}`}
               style={{ maxHeight: '78vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
               {/* Drag Handle */}
@@ -4207,11 +4207,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </div>
 
               {/* Sheet Header */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-700 flex-shrink-0">
-                <h2 className="text-white font-semibold text-base">Areas</h2>
+              <div className="flex items-center justify-between px-5 py-3 border-b border-subtle flex-shrink-0">
+                <h2 className="text-primary font-semibold text-base">Areas</h2>
                 <button
                   onClick={() => setSidebarCollapsed(true)}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                  className="p-2 text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
                   title="Close"
                 >
                   <X className="w-5 h-5" />
@@ -4219,14 +4219,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </div>
 
               {/* Add New Area — mobile stacked layout */}
-              <div className="px-4 pt-3 pb-3 border-b border-gray-700 flex-shrink-0">
+              <div className="px-4 pt-3 pb-3 border-b border-subtle flex-shrink-0">
                 <input
                   type="text"
                   value={newAreaName}
                   onChange={(e) => setNewAreaName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddArea()}
                   placeholder="New area name..."
-                  className="w-full px-3 py-3 bg-gray-700 border border-gray-600 text-white text-base rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 mb-2"
+                  className="w-full px-3 py-3 bg-elevated border border-strong text-primary text-base rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 mb-2"
                 />
                 <button
                   onClick={handleAddArea}
@@ -4301,7 +4301,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   return (
                     <div
                       key={room.id}
-                      className={`border-b border-gray-700 ${isActive ? 'bg-cyan-900/30' : ''}`}
+                      className={`border-b border-subtle ${isActive ? 'bg-cyan-900/30' : ''}`}
                     >
                       {editingAreaId === room.id ? (
                         <div className="p-4">
@@ -4316,7 +4316,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 setEditingAreaName('');
                               }
                             }}
-                            className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white text-base rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="w-full px-3 py-2.5 bg-elevated border border-strong text-primary text-base rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
                             autoFocus
                           />
                           <div className="flex gap-2 mt-3">
@@ -4331,7 +4331,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 setEditingAreaId(null);
                                 setEditingAreaName('');
                               }}
-                              className="flex-1 py-2.5 bg-gray-700 text-gray-300 text-sm rounded-xl hover:bg-gray-600"
+                              className="flex-1 py-2.5 bg-elevated text-secondary text-sm rounded-xl hover:bg-strong/25"
                             >
                               Cancel
                             </button>
@@ -4349,12 +4349,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 {isActive && <Target className="w-4 h-4 text-blue-400 flex-shrink-0" />}
-                                <h3 className={`font-medium text-sm truncate ${isActive ? 'text-blue-400' : 'text-white'}`}>
+                                <h3 className={`font-medium text-sm truncate ${isActive ? 'text-blue-400' : 'text-primary'}`}>
                                   {room.name}
                                 </h3>
                               </div>
                               <div className="flex items-center justify-between mt-1 gap-2">
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-muted">
                                   {topLevelItems.length} item{topLevelItems.length !== 1 ? 's' : ''}{room.line_items.length > topLevelItems.length ? ` +${room.line_items.length - topLevelItems.length}` : ''}
                                 </span>
                                 <span className={`text-xs font-bold ${isActive ? 'text-cyan-300' : 'text-gray-200'}`}>
@@ -4371,28 +4371,28 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                     setEditingAreaId(room.id);
                                     setEditingAreaName(room.name);
                                   }}
-                                  className="p-2.5 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded-lg"
+                                  className="p-2.5 text-muted hover:text-blue-400 hover:bg-elevated rounded-lg"
                                   title="Edit Area"
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => setEditingScopeRoom({id: room.id, name: room.name, description: room.description, showScope: room.show_scope})}
-                                  className="p-2.5 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded-lg"
+                                  className="p-2.5 text-muted hover:text-blue-400 hover:bg-elevated rounded-lg"
                                   title="Edit Area Notes"
                                 >
                                   <FileText className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => toggleRoomScopeVisibility(room.id, room.show_scope ?? true)}
-                                  className={`p-2.5 rounded-lg ${room.show_scope ? 'text-blue-400' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'}`}
+                                  className={`p-2.5 rounded-lg ${room.show_scope ? 'text-blue-400' : 'text-muted hover:text-blue-400 hover:bg-elevated'}`}
                                   title={room.show_scope ? 'Hide scope' : 'Show scope'}
                                 >
                                   {room.show_scope ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteArea(room.id)}
-                                  className="p-2.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg"
+                                  className="p-2.5 text-muted hover:text-red-400 hover:bg-elevated rounded-lg"
                                   title="Delete Area"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -4407,7 +4407,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 })}
 
                 {rooms.length === 0 && (
-                  <div className="p-6 text-center text-gray-500 text-sm">
+                  <div className="p-6 text-center text-muted text-sm">
                     No areas yet. Add one above to get started.
                   </div>
                 )}
@@ -4421,19 +4421,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             {rooms.length === 0 && unassignedItems.filter(i => isCoMode || !i.is_hidden).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <Package className="w-16 h-16 text-gray-600 mb-4" />
-                <p className="text-gray-400 text-lg mb-2">No items yet</p>
-                <p className="text-gray-500 text-sm mb-4">Click "Add" in the toolbar to add your first item</p>
+                <p className="text-muted text-lg mb-2">No items yet</p>
+                <p className="text-muted text-sm mb-4">Click "Add" in the toolbar to add your first item</p>
               </div>
             ) : (
               <div style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
                 {/* Collapse/Expand All Button */}
-                <div className="bg-gray-850 border-b border-gray-700 px-3 py-2 flex items-center justify-between">
-                  <div className="text-xs text-gray-400">
+                <div className="bg-canvas border-b border-subtle px-3 py-2 flex items-center justify-between">
+                  <div className="text-xs text-muted">
                     {rooms.length > 0 ? `${rooms.length} ${rooms.length === 1 ? 'Area' : 'Areas'}` : 'Unassigned Items'}
                   </div>
                   <button
                     onClick={() => expandedRooms.size === 0 ? expandAllRooms() : collapseAllRooms()}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+                    className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-elevated transition-colors"
                     title={expandedRooms.size === 0 ? 'Expand All Areas' : 'Collapse All Areas'}
                   >
                     {expandedRooms.size === 0 ? (
@@ -4450,7 +4450,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   </button>
                 </div>
                 <table className="w-full text-xs sm:text-xs">
-                  <thead className="bg-gray-800 text-gray-400">
+                  <thead className="bg-surface text-muted">
                     <tr>
                       <th className="text-center py-2 px-2 w-16">
                         <div className="flex items-center justify-center gap-1">
@@ -4459,7 +4459,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                             type="checkbox"
                             checked={selectedItems.size > 0 && selectedItems.size === rooms.flatMap(r => r.line_items).length}
                             onChange={toggleSelectAll}
-                            className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                            className="rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       </th>
@@ -4522,13 +4522,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <React.Fragment key={room.id}>
                         {/* Area Header Row — hidden for flat unassigned items (no rooms case) */}
                         {room.name !== '' && (
-                        <tr className={`bg-gray-800/50 border-t-2 border-gray-700 cursor-pointer hover:bg-gray-800/70 transition-colors ${room.id === '__unassigned__' ? 'border-amber-700/40' : ''}`}>
+                        <tr className={`bg-surface/50 border-t-2 border-subtle cursor-pointer hover:bg-surface/70 transition-colors ${room.id === '__unassigned__' ? 'border-amber-700/40' : ''}`}>
                           <td colSpan={visibleColumns.size + 2} className="py-3 px-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => toggleRoomExpanded(room.id)}
-                                  className="p-1 hover:bg-gray-700 rounded transition-colors"
+                                  className="p-1 hover:bg-elevated rounded transition-colors"
                                   title={expandedRooms.has(room.id) ? 'Collapse Area' : 'Expand Area'}
                                 >
                                   {expandedRooms.has(room.id) ? (
@@ -4545,7 +4545,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 </h3>
 
                                 {room.id !== '__unassigned__' && room.description && room.show_scope && (
-                                  <span className="text-xs text-gray-400 italic">
+                                  <span className="text-xs text-muted italic">
                                     {room.description}
                                   </span>
                                 )}
@@ -4562,8 +4562,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   }}
                                   className={`p-1 rounded transition-colors ${
                                     room.description
-                                      ? 'text-blue-400 hover:text-blue-300 hover:bg-gray-700'
-                                      : 'text-gray-500 hover:text-blue-400 hover:bg-gray-700'
+                                      ? 'text-blue-400 hover:text-blue-300 hover:bg-elevated'
+                                      : 'text-muted hover:text-blue-400 hover:bg-elevated'
                                   }`}
                                   title="Edit Area Notes"
                                 >
@@ -4574,7 +4574,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   <span className="text-xs text-amber-600 italic">No area assigned</span>
                                 )}
                               </div>
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-muted">
                                 {topLevelItems.length} items
                                 {room.line_items.length > topLevelItems.length && (
                                   <span className="text-gray-600"> ({room.line_items.length - topLevelItems.length} nested)</span>
@@ -4619,7 +4619,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               return (
                             <tr
                               key={item.id}
-                              className={`border-t border-gray-700 hover:bg-gray-800/50 transition-colors h-10 relative ${
+                              className={`border-t border-subtle hover:bg-surface/50 transition-colors h-10 relative ${
                                 isCoRemoved ? 'bg-red-950/30 opacity-60' : ''
                               } ${
                                 isCoAdded ? 'bg-emerald-950/30' : ''
@@ -4667,7 +4667,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   )}
                                   {!hasChildren && (
                                     <div
-                                      className="cursor-move text-gray-500 hover:text-gray-300"
+                                      className="cursor-move text-muted hover:text-secondary"
                                       title={isNested ? "Drag to reorder with siblings or unnest" : "Drag to reorder"}
                                     >
                                       <GripVertical className="w-4 h-4 sm:w-3 sm:h-3" />
@@ -4680,19 +4680,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       console.log('Checkbox onChange fired for item:', item.id, 'Checked:', e.target.checked);
                                       toggleItemSelection(item.id);
                                     }}
-                                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                    className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                   />
                                 </div>
                               </td>
 
                               {visibleColumns.has('manufacturer') && (
-                                <td className="py-2 px-3 text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]" title={item.products?.manufacturers?.name || '-'}>
+                                <td className="py-2 px-3 text-muted whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]" title={item.products?.manufacturers?.name || '-'}>
                                   {item.products?.manufacturers?.name || '-'}
                                 </td>
                               )}
                               {visibleColumns.has('sku') && (
                                 <td
-                                  className="py-2 px-3 text-cyan-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] cursor-pointer hover:bg-gray-700 hover:text-cyan-300 transition-colors underline"
+                                  className="py-2 px-3 text-cyan-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] cursor-pointer hover:bg-elevated hover:text-cyan-300 transition-colors underline"
                                   title={`${item.products?.sku || '-'} (click to edit)`}
                                   onClick={() => setShowProductDetail(item.id)}
                                 >
@@ -4701,7 +4701,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               )}
                               {visibleColumns.has('description') && (
                                 <td
-                                  className="py-2 px-3 text-white whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px] cursor-pointer hover:bg-gray-700"
+                                  className="py-2 px-3 text-primary whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px] cursor-pointer hover:bg-elevated"
                                   title={isNested ? `Nested under: ${parentItem?.description || 'Unknown'}` : "Click to edit description"}
                                   onClick={() => startEditingItem(item.id, 'description', item.description)}
                                   style={{ paddingLeft: isNested ? '1.5rem' : undefined }}
@@ -4716,7 +4716,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         if (e.key === 'Enter') saveEdit(item.id, 'description');
                                         if (e.key === 'Escape') cancelEdit();
                                       }}
-                                      className="w-full bg-gray-600 text-white px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                      className="w-full bg-elevated text-primary px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
                                       autoFocus
                                     />
                                   ) : (
@@ -4743,7 +4743,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               )}
                               {visibleColumns.has('qty') && (
                                 <td
-                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-gray-700 ${materialStrike || 'text-gray-300'}`}
+                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${materialStrike || 'text-secondary'}`}
                                   onClick={() => startEditingItem(item.id, 'quantity', item.quantity)}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_quantity`] !== undefined ? (
@@ -4756,7 +4756,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         if (e.key === 'Enter') saveEdit(item.id, 'quantity');
                                         if (e.key === 'Escape') cancelEdit();
                                       }}
-                                      className="w-full bg-gray-600 text-white text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                      className="w-full bg-elevated text-primary text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
                                       autoFocus
                                       step="0.01"
                                     />
@@ -4767,7 +4767,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               )}
                               {visibleColumns.has('cost') && (
                                 <td
-                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-gray-700 ${materialStrike || 'text-gray-400'}`}
+                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${materialStrike || 'text-muted'}`}
                                   onClick={() => startEditingItem(item.id, 'cost', item.cost || 0)}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_cost`] !== undefined ? (
@@ -4780,7 +4780,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         if (e.key === 'Enter') saveEdit(item.id, 'cost');
                                         if (e.key === 'Escape') cancelEdit();
                                       }}
-                                      className="w-full bg-gray-600 text-white text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                      className="w-full bg-elevated text-primary text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
                                       autoFocus
                                       step="0.01"
                                     />
@@ -4791,7 +4791,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               )}
                               {visibleColumns.has('price') && (
                                 <td
-                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-gray-700 ${materialStrike || 'text-gray-300'}`}
+                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${materialStrike || 'text-secondary'}`}
                                   onClick={() => startEditingItem(item.id, 'unit_price', item.unit_price || 0)}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_unit_price`] !== undefined ? (
@@ -4804,7 +4804,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         if (e.key === 'Enter') saveEdit(item.id, 'unit_price');
                                         if (e.key === 'Escape') cancelEdit();
                                       }}
-                                      className="w-full bg-gray-600 text-white text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                      className="w-full bg-elevated text-primary text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
                                       autoFocus
                                       step="0.01"
                                     />
@@ -4815,7 +4815,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               )}
                               {visibleColumns.has('laborPhase') && (
                                 <td
-                                  className={`py-2 px-3 whitespace-nowrap ${laborStrike || 'text-gray-400'}`}
+                                  className={`py-2 px-3 whitespace-nowrap ${laborStrike || 'text-muted'}`}
                                 >
                                   {isFullRemoval ? (
                                     <span className={laborStrike}>
@@ -4842,7 +4842,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                                         await updateLineItem(item.id, updates);
                                       }}
-                                      className="w-full bg-gray-700 text-white px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer hover:bg-gray-600"
+                                      className="w-full bg-elevated text-primary px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer hover:bg-strong/25"
                                     >
                                       <option value="">None</option>
                                       {laborPhases.map(phase => (
@@ -4854,7 +4854,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               )}
                               {visibleColumns.has('laborHrs') && (
                                 <td
-                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-gray-700 ${laborStrike || 'text-gray-400'}`}
+                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${laborStrike || 'text-muted'}`}
                                   onClick={() => !isFullRemoval && startEditingItem(item.id, 'labor_hours', item.labor_hours || 0)}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_labor_hours`] !== undefined && !isFullRemoval ? (
@@ -4867,7 +4867,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         if (e.key === 'Enter') saveEdit(item.id, 'labor_hours');
                                         if (e.key === 'Escape') cancelEdit();
                                       }}
-                                      className="w-full bg-gray-600 text-white text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                      className="w-full bg-elevated text-primary text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
                                       autoFocus
                                       step="0.01"
                                     />
@@ -4878,7 +4878,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               )}
                               {visibleColumns.has('laborRate') && (
                                 <td
-                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-gray-700 ${laborStrike || 'text-gray-400'}`}
+                                  className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${laborStrike || 'text-muted'}`}
                                   onClick={() => !isFullRemoval && startEditingItem(item.id, 'labor_rate', item.labor_rate || 0)}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_labor_rate`] !== undefined && !isFullRemoval ? (
@@ -4891,7 +4891,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         if (e.key === 'Enter') saveEdit(item.id, 'labor_rate');
                                         if (e.key === 'Escape') cancelEdit();
                                       }}
-                                      className="w-full bg-gray-600 text-white text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                      className="w-full bg-elevated text-primary text-right px-1 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
                                       autoFocus
                                       step="0.01"
                                     />
@@ -4901,7 +4901,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 </td>
                               )}
                               {visibleColumns.has('laborTotal') && (
-                                <td className={`py-2 px-3 text-right whitespace-nowrap ${laborStrike || 'text-gray-300'}`}>
+                                <td className={`py-2 px-3 text-right whitespace-nowrap ${laborStrike || 'text-secondary'}`}>
                                   ${parseFloat(item.labor_total || 0).toFixed(2)}
                                 </td>
                               )}
@@ -4916,7 +4916,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 </td>
                               )}
                               {visibleColumns.has('lineTotal') && (
-                                <td className={`py-2 px-3 text-right font-medium whitespace-nowrap ${isCoRemoved ? 'line-through text-red-400' : 'text-white'}`}>
+                                <td className={`py-2 px-3 text-right font-medium whitespace-nowrap ${isCoRemoved ? 'line-through text-red-400' : 'text-primary'}`}>
                                   {isCoRemoved ? (() => {
                                     const materialTotal = parseFloat(item.unit_price || 0) * item.quantity;
                                     const laborTotal = parseFloat(item.labor_total || 0);
@@ -4955,21 +4955,21 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                           description: item.description || '',
                                           productId: item.product_id || null
                                         })}
-                                        className={`p-1 rounded transition-colors ${item.task_completed ? 'text-orange-400 hover:text-orange-300' : 'text-gray-500 hover:text-orange-400'}`}
+                                        className={`p-1 rounded transition-colors ${item.task_completed ? 'text-orange-400 hover:text-orange-300' : 'text-muted hover:text-orange-400'}`}
                                         title="Task & Tech Notes"
                                       >
                                         <Wrench className="w-3 h-3" />
                                       </button>
                                       <button
                                         onClick={() => setSubstituteItemId(item.id)}
-                                        className="p-1 text-gray-400 hover:text-blue-400 rounded"
+                                        className="p-1 text-muted hover:text-blue-400 rounded"
                                         title="Substitute Item"
                                       >
                                         <RefreshCw className="w-3 h-3" />
                                       </button>
                                       <button
                                         onClick={() => handleDeleteItem(item.id)}
-                                        className="p-1 text-gray-400 hover:text-red-400 rounded"
+                                        className="p-1 text-muted hover:text-red-400 rounded"
                                         title={isCoMode ? 'Remove from Change Order' : 'Delete'}
                                       >
                                         <Trash2 className="w-3 h-3" />
@@ -4993,16 +4993,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       </div>
 
       {/* Footer - Pricing Summary */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 z-50 pb-safe" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0px)' }}>
+      <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-subtle z-50 pb-safe" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0px)' }}>
         {/* Collapsed View */}
         {!pricingExpanded && (
           <button
             onClick={() => setPricingExpanded(true)}
-            className="w-full px-2 sm:px-4 py-2 flex items-center justify-between hover:bg-gray-750 transition-colors group"
+            className="w-full px-2 sm:px-4 py-2 flex items-center justify-between hover:bg-elevated transition-colors group"
           >
             <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-              <span className="text-gray-400">Subtotal: <span className="text-white font-medium">{formatCurrency(pricing.subtotal)}</span></span>
-              <span className="text-gray-400 hidden sm:inline">Tax: <span className="text-white font-medium">{formatCurrency(pricing.taxAmount)}</span></span>
+              <span className="text-muted">Subtotal: <span className="text-primary font-medium">{formatCurrency(pricing.subtotal)}</span></span>
+              <span className="text-muted hidden sm:inline">Tax: <span className="text-primary font-medium">{formatCurrency(pricing.taxAmount)}</span></span>
               {isCoMode && (() => {
                 const nonModifierItems = coLineItems.filter(c => c.action_type !== 'modify_modifiers');
                 const coDelta = nonModifierItems.reduce((sum, c) => sum + (c.change_amount || 0), 0);
@@ -5020,7 +5020,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               <div className="text-right">
                 <div className="text-cyan-400 text-base sm:text-xl font-bold">{formatCurrency(pricing.total)}</div>
               </div>
-              <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+              <ChevronUp className="w-4 h-4 text-muted group-hover:text-primary transition-colors" />
             </div>
           </button>
         )}
@@ -5029,17 +5029,17 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         {pricingExpanded && (
           <div className="px-2 sm:px-4 py-3 max-h-[60vh] overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold text-sm sm:text-base">Pricing Details</h3>
+              <h3 className="text-primary font-semibold text-sm sm:text-base">Pricing Details</h3>
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   onClick={() => setShowModifiersModal(true)}
-                  className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 hover:text-white transition-colors"
+                  className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1 bg-elevated text-secondary rounded hover:bg-strong/25 hover:text-primary transition-colors"
                 >
                   Edit Modifiers
                 </button>
                 <button
                   onClick={() => setPricingExpanded(false)}
-                  className="text-gray-400 hover:text-white transition-colors p-1"
+                  className="text-muted hover:text-primary transition-colors p-1"
                 >
                   <ChevronDown className="w-4 h-4" />
                 </button>
@@ -5048,15 +5048,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
             <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-400">Materials:</span>
-                <span className="text-white font-medium">{formatCurrency(pricing.totalMaterials)}</span>
+                <span className="text-muted">Materials:</span>
+                <span className="text-primary font-medium">{formatCurrency(pricing.totalMaterials)}</span>
               </div>
               <div>
                 <button
                   onClick={() => setLaborHoursExpanded(!laborHoursExpanded)}
-                  className="w-full flex justify-between hover:bg-gray-750 rounded px-1 py-0.5 transition-colors"
+                  className="w-full flex justify-between hover:bg-elevated rounded px-1 py-0.5 transition-colors"
                 >
-                  <span className="text-gray-400 flex items-center gap-1">
+                  <span className="text-muted flex items-center gap-1">
                     Labor:
                     {pricing.totalLaborHours > 0 && (
                       <span className="text-[10px] text-cyan-500">
@@ -5065,78 +5065,78 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     )}
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-medium">{formatCurrency(pricing.totalLabor)}</span>
+                    <span className="text-primary font-medium">{formatCurrency(pricing.totalLabor)}</span>
                     {pricing.totalLaborHours > 0 && (
-                      <ChevronRight className={`w-3 h-3 text-gray-500 transition-transform ${laborHoursExpanded ? 'rotate-90' : ''}`} />
+                      <ChevronRight className={`w-3 h-3 text-muted transition-transform ${laborHoursExpanded ? 'rotate-90' : ''}`} />
                     )}
                   </div>
                 </button>
                 {laborHoursExpanded && pricing.laborHoursByPhase && pricing.laborHoursByPhase.length > 0 && (
-                  <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-700 pl-3">
+                  <div className="ml-4 mt-1 space-y-1 border-l-2 border-subtle pl-3">
                     {pricing.laborHoursByPhase.map((phase, index) => (
                       <div key={index} className="flex justify-between text-[11px]">
-                        <span className="text-gray-500">{phase.name}:</span>
-                        <span className="text-gray-400">{phase.hours.toFixed(1)} hrs</span>
+                        <span className="text-muted">{phase.name}:</span>
+                        <span className="text-muted">{phase.hours.toFixed(1)} hrs</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-              <div className="flex justify-between pt-2 border-t border-gray-700">
-                <span className="text-gray-400">Subtotal:</span>
-                <span className="text-white font-medium">{formatCurrency(pricing.subtotal)}</span>
+              <div className="flex justify-between pt-2 border-t border-subtle">
+                <span className="text-muted">Subtotal:</span>
+                <span className="text-primary font-medium">{formatCurrency(pricing.subtotal)}</span>
               </div>
 
               {/* Modifiers Section */}
               {(pricing.discountAmount !== 0 || pricing.pmAmount !== 0 || pricing.designAmount !== 0 || pricing.systemDesignAmount !== 0 || pricing.ccFeeAmount !== 0 || pricing.miscPartsAmount !== 0 || pricing.custom1Amount !== 0 || pricing.custom2Amount !== 0) && (
-                <div className="pt-2 border-t border-gray-700 space-y-2">
-                  <div className="text-xs text-gray-500 font-semibold uppercase">Adjustments</div>
+                <div className="pt-2 border-t border-subtle space-y-2">
+                  <div className="text-xs text-muted font-semibold uppercase">Adjustments</div>
 
                   {pricing.discountAmount !== 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Discount ({pricing.discountPercent}%):</span>
+                      <span className="text-muted">Discount ({pricing.discountPercent}%):</span>
                       <span className="text-red-400 font-medium">-${Math.abs(pricing.discountAmount).toFixed(2)}</span>
                     </div>
                   )}
 
                   {pricing.pmAmount !== 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Project Management ({pricing.pmPercent}%):</span>
+                      <span className="text-muted">Project Management ({pricing.pmPercent}%):</span>
                       <span className="text-green-400 font-medium">{formatCurrency(pricing.pmAmount)}</span>
                     </div>
                   )}
 
                   {pricing.designAmount !== 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Project Design ({pricing.designPercent}%):</span>
+                      <span className="text-muted">Project Design ({pricing.designPercent}%):</span>
                       <span className="text-green-400 font-medium">{formatCurrency(pricing.designAmount)}</span>
                     </div>
                   )}
 
                   {pricing.systemDesignAmount !== 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">System Design ({pricing.systemDesignPercent}%):</span>
+                      <span className="text-muted">System Design ({pricing.systemDesignPercent}%):</span>
                       <span className="text-green-400 font-medium">{formatCurrency(pricing.systemDesignAmount)}</span>
                     </div>
                   )}
 
                   {pricing.ccFeeAmount !== 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Credit Card Fee ({pricing.ccFeePercent}%):</span>
+                      <span className="text-muted">Credit Card Fee ({pricing.ccFeePercent}%):</span>
                       <span className="text-green-400 font-medium">{formatCurrency(pricing.ccFeeAmount)}</span>
                     </div>
                   )}
 
                   {pricing.miscPartsAmount !== 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Misc Parts ({pricing.miscPartsPercent}%):</span>
+                      <span className="text-muted">Misc Parts ({pricing.miscPartsPercent}%):</span>
                       <span className="text-green-400 font-medium">{formatCurrency(pricing.miscPartsAmount)}</span>
                     </div>
                   )}
 
                   {pricing.custom1Amount !== 0 && pricing.custom1Label && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">{pricing.custom1Label} ({pricing.custom1Percent}%):</span>
+                      <span className="text-muted">{pricing.custom1Label} ({pricing.custom1Percent}%):</span>
                       <span className={`font-medium ${pricing.custom1Amount < 0 ? 'text-red-400' : 'text-green-400'}`}>
                         {pricing.custom1Amount < 0 ? '-' : ''}${Math.abs(pricing.custom1Amount).toFixed(2)}
                       </span>
@@ -5145,16 +5145,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                   {pricing.custom2Amount !== 0 && pricing.custom2Label && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">{pricing.custom2Label} ({pricing.custom2Percent}%):</span>
+                      <span className="text-muted">{pricing.custom2Label} ({pricing.custom2Percent}%):</span>
                       <span className={`font-medium ${pricing.custom2Amount < 0 ? 'text-red-400' : 'text-green-400'}`}>
                         {pricing.custom2Amount < 0 ? '-' : ''}${Math.abs(pricing.custom2Amount).toFixed(2)}
                       </span>
                     </div>
                   )}
 
-                  <div className="flex justify-between pt-1 border-t border-gray-600">
-                    <span className="text-gray-400">Adjusted Subtotal:</span>
-                    <span className="text-white font-medium">{formatCurrency(pricing.adjustedSubtotal)}</span>
+                  <div className="flex justify-between pt-1 border-t border-strong">
+                    <span className="text-muted">Adjusted Subtotal:</span>
+                    <span className="text-primary font-medium">{formatCurrency(pricing.adjustedSubtotal)}</span>
                   </div>
                 </div>
               )}
@@ -5174,14 +5174,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       const isOff = adj.new_value === 0;
                       return (
                         <div key={i} className="flex justify-between items-center text-xs">
-                          <span className="text-gray-400">{adj.label}:</span>
+                          <span className="text-muted">{adj.label}:</span>
                           <span className="font-medium tabular-nums">
                             {wasOff ? (
-                              <span className="text-gray-500 line-through">off</span>
+                              <span className="text-muted line-through">off</span>
                             ) : (
-                              <span className="text-gray-400">{adj.old_value}%</span>
+                              <span className="text-muted">{adj.old_value}%</span>
                             )}
-                            <span className="text-gray-500 mx-1">→</span>
+                            <span className="text-muted mx-1">→</span>
                             {isOff ? (
                               <span className="text-red-400">off</span>
                             ) : (
@@ -5195,12 +5195,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 );
               })()}
 
-              <div className="flex justify-between pt-2 border-t border-gray-700">
-                <span className="text-gray-400">Tax ({pricing.taxRate}%):</span>
-                <span className="text-white font-medium">{formatCurrency(pricing.taxAmount)}</span>
+              <div className="flex justify-between pt-2 border-t border-subtle">
+                <span className="text-muted">Tax ({pricing.taxRate}%):</span>
+                <span className="text-primary font-medium">{formatCurrency(pricing.taxAmount)}</span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-gray-700">
-                <span className="text-white font-semibold">Total:</span>
+              <div className="flex justify-between pt-2 border-t border-subtle">
+                <span className="text-primary font-semibold">Total:</span>
                 <div className="text-right">
                   <div className="text-cyan-400 text-xl font-bold">{formatCurrency(pricing.total)}</div>
                   {(() => {
@@ -5237,15 +5237,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </div>
               {pricing.depositAmount > 0 && (
                 <>
-                  <div className="flex justify-between pt-2 border-t border-gray-700">
-                    <span className="text-gray-400">
+                  <div className="flex justify-between pt-2 border-t border-subtle">
+                    <span className="text-muted">
                       Deposit {pricing.depositPercent > 0 ? `(${pricing.depositPercent}%)` : ''}:
                     </span>
                     <span className="text-yellow-400 font-medium">{formatCurrency(pricing.depositAmount)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Balance Due:</span>
-                    <span className="text-white font-medium">${(pricing.total - pricing.depositAmount).toFixed(2)}</span>
+                    <span className="text-muted">Balance Due:</span>
+                    <span className="text-primary font-medium">${(pricing.total - pricing.depositAmount).toFixed(2)}</span>
                   </div>
                 </>
               )}
@@ -5258,32 +5258,32 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* CO Removal Scope Modal */}
       {pendingCORemoval && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-            <div className="px-5 pt-5 pb-4 border-b border-gray-700">
-              <h3 className="text-base font-semibold text-white">Remove from Change Order</h3>
-              <p className="text-sm text-gray-400 mt-1 line-clamp-2">{pendingCORemoval.item.description}</p>
+          <div className="bg-canvas border border-subtle rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="px-5 pt-5 pb-4 border-b border-subtle">
+              <h3 className="text-base font-semibold text-primary">Remove from Change Order</h3>
+              <p className="text-sm text-muted mt-1 line-clamp-2">{pendingCORemoval.item.description}</p>
             </div>
             <div className="p-5 space-y-3">
               {pendingCORemoval.hasLabor ? (
                 <>
                   <button
                     onClick={() => executeCORemoval('parts_only')}
-                    className="w-full flex items-start gap-3 p-3 rounded-lg border border-gray-700 hover:border-orange-500/60 hover:bg-orange-950/20 transition-colors text-left group"
+                    className="w-full flex items-start gap-3 p-3 rounded-lg border border-subtle hover:border-orange-500/60 hover:bg-orange-950/20 transition-colors text-left group"
                   >
                     <div className="mt-0.5 w-4 h-4 rounded-full border-2 border-orange-500/60 group-hover:border-orange-400 shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-white">Remove Part Only</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Removes the part cost. Labor remains billable.</div>
+                      <div className="text-sm font-medium text-primary">Remove Part Only</div>
+                      <div className="text-xs text-muted mt-0.5">Removes the part cost. Labor remains billable.</div>
                     </div>
                   </button>
                   <button
                     onClick={() => executeCORemoval('parts_and_labor')}
-                    className="w-full flex items-start gap-3 p-3 rounded-lg border border-gray-700 hover:border-red-500/60 hover:bg-red-950/20 transition-colors text-left group"
+                    className="w-full flex items-start gap-3 p-3 rounded-lg border border-subtle hover:border-red-500/60 hover:bg-red-950/20 transition-colors text-left group"
                   >
                     <div className="mt-0.5 w-4 h-4 rounded-full border-2 border-red-500/60 group-hover:border-red-400 shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-white">Remove Part + Labor</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Removes both part and labor cost from scope.</div>
+                      <div className="text-sm font-medium text-primary">Remove Part + Labor</div>
+                      <div className="text-xs text-muted mt-0.5">Removes both part and labor cost from scope.</div>
                     </div>
                   </button>
                 </>
@@ -5294,8 +5294,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 >
                   <div className="mt-0.5 w-4 h-4 rounded-full border-2 border-red-500/60 shrink-0" />
                   <div>
-                    <div className="text-sm font-medium text-white">Remove from Scope</div>
-                    <div className="text-xs text-gray-400 mt-0.5">This item will be tracked as removed in this change order.</div>
+                    <div className="text-sm font-medium text-primary">Remove from Scope</div>
+                    <div className="text-xs text-muted mt-0.5">This item will be tracked as removed in this change order.</div>
                   </div>
                 </button>
               )}
@@ -5303,7 +5303,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             <div className="px-5 pb-5">
               <button
                 onClick={() => setPendingCORemoval(null)}
-                className="w-full py-2 text-sm text-gray-400 hover:text-white rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
+                className="w-full py-2 text-sm text-muted hover:text-primary rounded-lg border border-subtle hover:border-strong transition-colors"
               >
                 Cancel
               </button>
@@ -5315,22 +5315,22 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* Bulk CO Removal Scope Modal */}
       {pendingBulkCORemoval && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
-            <div className="px-5 pt-5 pb-4 border-b border-gray-700 shrink-0">
-              <h3 className="text-base font-semibold text-white">Remove Items from Change Order</h3>
-              <p className="text-sm text-gray-400 mt-1">
+          <div className="bg-canvas border border-subtle rounded-xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
+            <div className="px-5 pt-5 pb-4 border-b border-subtle shrink-0">
+              <h3 className="text-base font-semibold text-primary">Remove Items from Change Order</h3>
+              <p className="text-sm text-muted mt-1">
                 {pendingBulkCORemoval.length} item{pendingBulkCORemoval.length !== 1 ? 's' : ''} will be removed. For items with labor, choose what to remove.
               </p>
             </div>
 
             <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
               {pendingBulkCORemoval.map((entry) => (
-                <div key={entry.itemId} className="rounded-lg border border-gray-700 bg-gray-800/50 p-3">
+                <div key={entry.itemId} className="rounded-lg border border-subtle bg-surface/50 p-3">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-white leading-snug truncate">{entry.item.description}</p>
+                      <p className="text-sm font-medium text-primary leading-snug truncate">{entry.item.description}</p>
                       {entry.roomName && (
-                        <p className="text-xs text-gray-500 mt-0.5">{entry.roomName}</p>
+                        <p className="text-xs text-muted mt-0.5">{entry.roomName}</p>
                       )}
                     </div>
                     {!entry.hasLabor && (
@@ -5345,7 +5345,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className={`flex-1 py-1.5 px-3 rounded-md text-xs font-medium border transition-colors ${
                           bulkCORemovalScopes[entry.itemId] === 'parts_only'
                             ? 'bg-orange-500/20 border-orange-500/60 text-orange-300'
-                            : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-orange-500/40 hover:text-orange-400'
+                            : 'bg-elevated/50 border-strong text-muted hover:border-orange-500/40 hover:text-orange-400'
                         }`}
                       >
                         Part Only
@@ -5355,24 +5355,24 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className={`flex-1 py-1.5 px-3 rounded-md text-xs font-medium border transition-colors ${
                           bulkCORemovalScopes[entry.itemId] === 'parts_and_labor'
                             ? 'bg-red-500/20 border-red-500/60 text-red-300'
-                            : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-red-500/40 hover:text-red-400'
+                            : 'bg-elevated/50 border-strong text-muted hover:border-red-500/40 hover:text-red-400'
                         }`}
                       >
                         Part + Labor
                       </button>
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">No labor attached — item will be fully removed from scope.</p>
+                    <p className="text-xs text-muted mt-1">No labor attached — item will be fully removed from scope.</p>
                   )}
                 </div>
               ))}
             </div>
 
-            <div className="px-5 py-4 border-t border-gray-700 shrink-0 flex gap-3">
+            <div className="px-5 py-4 border-t border-subtle shrink-0 flex gap-3">
               <button
                 onClick={() => { setPendingBulkCORemoval(null); setBulkCORemovalScopes({}); }}
                 disabled={executingBulkRemoval}
-                className="flex-1 py-2 text-sm text-gray-400 hover:text-white rounded-lg border border-gray-700 hover:border-gray-600 transition-colors disabled:opacity-50"
+                className="flex-1 py-2 text-sm text-muted hover:text-primary rounded-lg border border-subtle hover:border-strong transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -5658,12 +5658,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* PDF Generation Modal */}
       {showPdfModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-800 z-10">
-              <h3 className="text-lg font-semibold text-white">Generate Proposal Report</h3>
+          <div className="bg-surface rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-subtle flex items-center justify-between sticky top-0 bg-surface z-10">
+              <h3 className="text-lg font-semibold text-primary">Generate Proposal Report</h3>
               <button
                 onClick={() => setShowPdfModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-muted hover:text-primary transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5671,7 +5671,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
             <div className="p-6 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">
+                <label className="block text-sm font-medium text-secondary mb-3">
                   Select Report Template
                 </label>
                 <div className="space-y-2">
@@ -5681,7 +5681,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                         selectedTemplateId === template.id
                           ? 'bg-blue-900 bg-opacity-30 border-blue-500'
-                          : 'bg-gray-700 border-gray-600'
+                          : 'bg-elevated border-strong'
                       }`}
                     >
                       <label className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer">
@@ -5698,7 +5698,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-white">{template.name}</span>
+                            <span className="font-medium text-primary">{template.name}</span>
                             {template.is_default && (
                               <span className="px-1.5 py-0.5 bg-yellow-900 text-yellow-200 text-xs font-medium rounded">
                                 Default
@@ -5711,7 +5711,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                             )}
                           </div>
                           {template.description && (
-                            <p className="text-sm text-gray-400 mt-1">{template.description}</p>
+                            <p className="text-sm text-muted mt-1">{template.description}</p>
                           )}
                         </div>
                       </label>
@@ -5731,7 +5731,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     </div>
                   ))}
                   {pdfTemplates.length === 0 && (
-                    <div className="text-center py-8 text-gray-400">
+                    <div className="text-center py-8 text-muted">
                       <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
                       <p className="text-sm">No report templates available</p>
                       <p className="text-xs mt-1">Create your first template below</p>
@@ -5740,17 +5740,17 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </div>
               </div>
 
-              <div className="border-t border-gray-700 pt-6">
-                <h4 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+              <div className="border-t border-subtle pt-6">
+                <h4 className="text-sm font-medium text-secondary mb-4 flex items-center gap-2">
                   <Eye className="w-4 h-4" />
                   Display Options
                 </h4>
-                <p className="text-xs text-gray-400 mb-4">
+                <p className="text-xs text-muted mb-4">
                   Control what appears in this printed proposal (independent of screen settings)
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={pdfDisplayOptions.showRoomScope}
@@ -5761,12 +5761,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-0.5"
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white">Area Scope of Work</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Show scope descriptions per area/room</div>
+                      <div className="text-sm font-medium text-primary">Area Scope of Work</div>
+                      <div className="text-xs text-muted mt-0.5">Show scope descriptions per area/room</div>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={pdfDisplayOptions.showProposalNotes}
@@ -5777,12 +5777,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-0.5"
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white">Proposal Notes</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Show general proposal notes</div>
+                      <div className="text-sm font-medium text-primary">Proposal Notes</div>
+                      <div className="text-xs text-muted mt-0.5">Show general proposal notes</div>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={pdfDisplayOptions.showModifiers}
@@ -5793,12 +5793,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-0.5"
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white">Pricing Modifiers</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Show discount, fees, adjustments</div>
+                      <div className="text-sm font-medium text-primary">Pricing Modifiers</div>
+                      <div className="text-xs text-muted mt-0.5">Show discount, fees, adjustments</div>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={pdfDisplayOptions.showDeposit}
@@ -5809,16 +5809,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-0.5"
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white">Deposit & Payment Information</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Show deposit requirements and accepted payment methods</div>
+                      <div className="text-sm font-medium text-primary">Deposit & Payment Information</div>
+                      <div className="text-xs text-muted mt-0.5">Show deposit requirements and accepted payment methods</div>
                     </div>
                   </label>
                 </div>
 
-                <div className="border-t border-gray-700 pt-4 mt-4">
-                  <h5 className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">Pricing & Item Details</h5>
+                <div className="border-t border-subtle pt-4 mt-4">
+                  <h5 className="text-xs font-semibold text-secondary mb-3 uppercase tracking-wide">Pricing & Item Details</h5>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showDescription}
@@ -5829,12 +5829,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Item Description</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show item description column</div>
+                        <div className="text-sm font-medium text-primary">Item Description</div>
+                        <div className="text-xs text-muted mt-0.5">Show item description column</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showUnitPrice}
@@ -5845,12 +5845,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Unit Price</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show price per unit column</div>
+                        <div className="text-sm font-medium text-primary">Unit Price</div>
+                        <div className="text-xs text-muted mt-0.5">Show price per unit column</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showLinePrice}
@@ -5861,12 +5861,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Line Price</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show line total price column</div>
+                        <div className="text-sm font-medium text-primary">Line Price</div>
+                        <div className="text-xs text-muted mt-0.5">Show line total price column</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showSKU}
@@ -5877,12 +5877,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">SKU / Model</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show product SKU/model number</div>
+                        <div className="text-sm font-medium text-primary">SKU / Model</div>
+                        <div className="text-xs text-muted mt-0.5">Show product SKU/model number</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showManufacturer}
@@ -5893,12 +5893,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Manufacturer</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show manufacturer/brand name</div>
+                        <div className="text-sm font-medium text-primary">Manufacturer</div>
+                        <div className="text-xs text-muted mt-0.5">Show manufacturer/brand name</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showColor}
@@ -5909,12 +5909,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Color / Finish</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show item color or finish</div>
+                        <div className="text-sm font-medium text-primary">Color / Finish</div>
+                        <div className="text-xs text-muted mt-0.5">Show item color or finish</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showSalesTax}
@@ -5925,17 +5925,17 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Sales Tax</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show sales tax calculation</div>
+                        <div className="text-sm font-medium text-primary">Sales Tax</div>
+                        <div className="text-xs text-muted mt-0.5">Show sales tax calculation</div>
                       </div>
                     </label>
                   </div>
                 </div>
 
-                <div className="border-t border-gray-700 pt-4 mt-4">
-                  <h5 className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">Labor & Totals</h5>
+                <div className="border-t border-subtle pt-4 mt-4">
+                  <h5 className="text-xs font-semibold text-secondary mb-3 uppercase tracking-wide">Labor & Totals</h5>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showInstalledPrice}
@@ -5946,12 +5946,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Installed Price</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show item + labor combined price</div>
+                        <div className="text-sm font-medium text-primary">Installed Price</div>
+                        <div className="text-xs text-muted mt-0.5">Show item + labor combined price</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showLaborPerLine}
@@ -5962,12 +5962,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Labor Per Line</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show labor breakdown per item</div>
+                        <div className="text-sm font-medium text-primary">Labor Per Line</div>
+                        <div className="text-xs text-muted mt-0.5">Show labor breakdown per item</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showAreaTotals}
@@ -5978,12 +5978,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Area Totals</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show grand total per area/room</div>
+                        <div className="text-sm font-medium text-primary">Area Totals</div>
+                        <div className="text-xs text-muted mt-0.5">Show grand total per area/room</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.separatePartsLabor}
@@ -5994,17 +5994,17 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Separate Parts & Labor</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Split parts and labor into sections</div>
+                        <div className="text-sm font-medium text-primary">Separate Parts & Labor</div>
+                        <div className="text-xs text-muted mt-0.5">Split parts and labor into sections</div>
                       </div>
                     </label>
                   </div>
                 </div>
 
-                <div className="border-t border-gray-700 pt-4 mt-4">
-                  <h5 className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">Additional Options</h5>
+                <div className="border-t border-subtle pt-4 mt-4">
+                  <h5 className="text-xs font-semibold text-secondary mb-3 uppercase tracking-wide">Additional Options</h5>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showAccessories}
@@ -6015,12 +6015,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Show Accessories</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Include accessory items in report</div>
+                        <div className="text-sm font-medium text-primary">Show Accessories</div>
+                        <div className="text-xs text-muted mt-0.5">Include accessory items in report</div>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showPackageItems}
@@ -6031,8 +6031,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">Show Package Items</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Show individual items in packages</div>
+                        <div className="text-sm font-medium text-primary">Show Package Items</div>
+                        <div className="text-xs text-muted mt-0.5">Show individual items in packages</div>
                       </div>
                     </label>
 
@@ -6047,23 +6047,23 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white flex items-center gap-2">
+                        <div className="text-sm font-medium text-primary flex items-center gap-2">
                           Hide All Prices
                           <span className="text-xs px-2 py-0.5 bg-red-600 rounded text-white font-semibold">IMPORTANT</span>
                         </div>
-                        <div className="text-xs text-gray-300 mt-0.5">Remove all pricing information from report (unit price, line price, labor, totals, tax, etc.)</div>
+                        <div className="text-xs text-secondary mt-0.5">Remove all pricing information from report (unit price, line price, labor, totals, tax, etc.)</div>
                       </div>
                     </label>
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-700 pt-6">
-                <h4 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+              <div className="border-t border-subtle pt-6">
+                <h4 className="text-sm font-medium text-secondary mb-4 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Cover Page
                 </h4>
-                <p className="text-xs text-gray-400 mb-3">
+                <p className="text-xs text-muted mb-3">
                   Optionally add a professional cover page before your proposal
                 </p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -6072,12 +6072,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     className={`relative rounded-lg border-2 transition-all overflow-hidden aspect-[8.5/11] flex items-center justify-center ${
                       !coverPageImage
                         ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-gray-600 bg-gray-700 hover:border-gray-500'
+                        : 'border-strong bg-elevated hover:border-gray-500'
                     }`}
                   >
                     <div className="text-center px-1">
-                      <X className="w-5 h-5 text-gray-400 mx-auto mb-1" />
-                      <span className="text-[10px] text-gray-400 leading-tight block">No Cover</span>
+                      <X className="w-5 h-5 text-muted mx-auto mb-1" />
+                      <span className="text-[10px] text-muted leading-tight block">No Cover</span>
                     </div>
                   </button>
                   {[
@@ -6099,7 +6099,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className={`relative rounded-lg border-2 transition-all overflow-hidden aspect-[8.5/11] group ${
                         coverPageImage === img.url
                           ? 'border-blue-500 ring-1 ring-blue-500/50'
-                          : 'border-gray-600 hover:border-gray-500'
+                          : 'border-strong hover:border-gray-500'
                       }`}
                     >
                       <img
@@ -6109,11 +6109,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         loading="lazy"
                       />
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent pt-4 pb-1 px-1">
-                        <span className="text-[9px] text-white/90 font-medium leading-none">{img.label}</span>
+                        <span className="text-[9px] text-primary/90 font-medium leading-none">{img.label}</span>
                       </div>
                       {coverPageImage === img.url && (
                         <div className="absolute top-1 right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                          <Check className="w-2.5 h-2.5 text-white" />
+                          <Check className="w-2.5 h-2.5 text-primary" />
                         </div>
                       )}
                     </button>
@@ -6121,17 +6121,17 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </div>
               </div>
 
-              <div className="border-t border-gray-700 pt-6">
-                <h4 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+              <div className="border-t border-subtle pt-6">
+                <h4 className="text-sm font-medium text-secondary mb-4 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Additional Pages
                 </h4>
-                <p className="text-xs text-gray-400 mb-4">
+                <p className="text-xs text-muted mb-4">
                   Include these as separate pages after the proposal
                 </p>
 
                 <div className="grid grid-cols-1 gap-3">
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={pdfDisplayOptions.showScopeOfWorkPage}
@@ -6142,12 +6142,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-0.5"
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white">Scope of Work Page</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Include detailed narrative overview as a separate page (from Scope tab)</div>
+                      <div className="text-sm font-medium text-primary">Scope of Work Page</div>
+                      <div className="text-xs text-muted mt-0.5">Include detailed narrative overview as a separate page (from Scope tab)</div>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={pdfDisplayOptions.showContractPage}
@@ -6158,12 +6158,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-0.5"
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white">Contract Terms Page</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Include contract terms and conditions as a separate page (from Contract tab)</div>
+                      <div className="text-sm font-medium text-primary">Contract Terms Page</div>
+                      <div className="text-xs text-muted mt-0.5">Include contract terms and conditions as a separate page (from Contract tab)</div>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-650 cursor-pointer transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={pdfDisplayOptions.showDepositPage}
@@ -6174,8 +6174,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-0.5"
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white">Payment Schedule Page</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Include detailed payment schedule as a separate page (from Deposit tab)</div>
+                      <div className="text-sm font-medium text-primary">Payment Schedule Page</div>
+                      <div className="text-xs text-muted mt-0.5">Include detailed payment schedule as a separate page (from Deposit tab)</div>
                     </div>
                   </label>
                 </div>
@@ -6188,7 +6188,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </div>
             </div>
 
-            <div className="px-4 sm:px-6 py-4 border-t border-gray-700 sticky bottom-0 bg-gray-800">
+            <div className="px-4 sm:px-6 py-4 border-t border-subtle sticky bottom-0 bg-surface">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 {/* Template Actions */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -6217,7 +6217,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setShowPdfModal(false)}
-                    className="flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                    className="flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 bg-elevated text-primary rounded-lg hover:bg-strong/25 transition-colors text-sm font-medium"
                   >
                     Cancel
                   </button>
@@ -6275,9 +6275,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
         return (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-gray-800 rounded-lg shadow-xl max-w-full sm:max-w-3xl w-full my-8">
-              <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">
+            <div className="bg-surface rounded-lg shadow-xl max-w-full sm:max-w-3xl w-full my-8">
+              <div className="px-6 py-4 border-b border-subtle flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-primary">
                   {isEditing ? 'Edit Report Template' : 'Save Report Template'}
                 </h3>
                 <button
@@ -6286,7 +6286,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     setNewTemplateName('');
                     setNewTemplateDescription('');
                   }}
-                  className="text-gray-400 hover:text-white"
+                  className="text-muted hover:text-primary"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -6294,7 +6294,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
               <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-secondary mb-2">
                     Template Name
                   </label>
                   <input
@@ -6302,13 +6302,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     value={newTemplateName}
                     onChange={(e) => setNewTemplateName(e.target.value)}
                     placeholder="e.g., Residential Standard, Commercial Detailed"
-                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 bg-elevated border border-strong rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
                     autoFocus
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-secondary mb-2">
                     Description (Optional)
                   </label>
                   <textarea
@@ -6316,11 +6316,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     onChange={(e) => setNewTemplateDescription(e.target.value)}
                     placeholder="When to use this template..."
                     rows={3}
-                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 bg-elevated border border-strong rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
-                <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
+                <div className="bg-elevated border border-strong rounded-lg p-4">
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -6329,8 +6329,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       className="mt-1"
                     />
                     <div>
-                      <div className="text-sm font-medium text-white">Make this a company-wide template</div>
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-sm font-medium text-primary">Make this a company-wide template</div>
+                      <div className="text-xs text-muted mt-1">
                         All team members will be able to use this template. Otherwise, only you can use it.
                       </div>
                     </div>
@@ -6338,12 +6338,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </div>
 
                 {/* PDF Display Options */}
-                <div className="border-t border-gray-700 pt-6">
-                  <h4 className="text-sm font-semibold text-white mb-4">PDF Display Options</h4>
-                  <p className="text-xs text-gray-400 mb-4">Configure what appears in the generated PDF. Your current selections are shown below.</p>
+                <div className="border-t border-subtle pt-6">
+                  <h4 className="text-sm font-semibold text-primary mb-4">PDF Display Options</h4>
+                  <p className="text-xs text-muted mb-4">Configure what appears in the generated PDF. Your current selections are shown below.</p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showDescription}
@@ -6353,7 +6353,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Description</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showManufacturer}
@@ -6363,7 +6363,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Manufacturer</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showSKU}
@@ -6373,7 +6373,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show SKU/Model</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showColor}
@@ -6383,7 +6383,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Color</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showUnitPrice}
@@ -6393,7 +6393,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Unit Price</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showLinePrice}
@@ -6403,7 +6403,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Line Total</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showInstalledPrice}
@@ -6413,7 +6413,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Installed Price</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showLaborPerLine}
@@ -6423,7 +6423,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Labor Hours</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showRoomScope}
@@ -6433,7 +6433,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Area Descriptions</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showAreaTotals}
@@ -6443,7 +6443,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Area Subtotals</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.separatePartsLabor}
@@ -6453,7 +6453,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Separate Parts/Labor</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showSalesTax}
@@ -6463,7 +6463,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Sales Tax</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showModifiers}
@@ -6473,7 +6473,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Modifiers (Discounts/Fees)</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showDeposit}
@@ -6483,7 +6483,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Deposit Info</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showProposalNotes}
@@ -6493,7 +6493,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Proposal Notes</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showAccessories}
@@ -6503,7 +6503,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Product Images</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showPackageItems}
@@ -6513,7 +6513,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Package Breakdowns</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showScopeOfWorkPage}
@@ -6523,7 +6523,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Scope of Work Page</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showContractPage}
@@ -6533,7 +6533,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Contract Terms Page</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.showDepositPage}
@@ -6543,7 +6543,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       <div className="text-sm text-gray-200">Show Payment Schedule Page</div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-700 rounded-lg hover:bg-gray-650">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
                         checked={pdfDisplayOptions.hideAllPrices}
@@ -6564,14 +6564,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
+              <div className="px-6 py-4 border-t border-subtle flex justify-end gap-3">
                 <button
                   onClick={() => {
                     setShowSaveTemplateModal(false);
                     setNewTemplateName('');
                     setNewTemplateDescription('');
                   }}
-                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                  className="px-4 py-2 bg-elevated text-primary rounded-lg hover:bg-strong/25 transition-colors text-sm font-medium"
                 >
                   Cancel
                 </button>
@@ -6592,15 +6592,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* Copy to Areas Modal */}
       {showCopyToModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold text-white mb-4">Copy Items To...</h2>
-            <p className="text-sm text-gray-400 mb-4">
+          <div className="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold text-primary mb-4">Copy Items To...</h2>
+            <p className="text-sm text-muted mb-4">
               Select the area(s) where you want to copy the {selectedItems.size} selected item{selectedItems.size !== 1 ? 's' : ''}
             </p>
 
             {/* Quick Add Area */}
-            <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+            <div className="mb-4 p-3 bg-elevated rounded-lg border border-strong">
+              <label className="block text-sm font-medium text-secondary mb-2">
                 Create New Area
               </label>
               <div className="flex gap-2">
@@ -6615,7 +6615,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     }
                   }}
                   placeholder="Enter area name..."
-                  className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 bg-surface border border-strong rounded px-3 py-2 text-primary placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
                   onClick={quickAddArea}
@@ -6634,7 +6634,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 .map(room => (
                   <label
                     key={room.id}
-                    className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600"
+                    className="flex items-center gap-3 p-3 bg-elevated rounded-lg cursor-pointer hover:bg-strong/25"
                   >
                     <input
                       type="checkbox"
@@ -6648,13 +6648,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         }
                         setSelectedRoomsToCopy(newRooms);
                       }}
-                      className="rounded border-gray-600 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-strong text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-white">{room.name}</span>
+                    <span className="text-primary">{room.name}</span>
                   </label>
                 ))}
               {rooms.filter(room => !room.line_items.some(item => selectedItems.has(item.id))).length === 0 && (
-                <p className="text-gray-400 text-center py-4">
+                <p className="text-muted text-center py-4">
                   No available areas (all areas contain selected items)
                 </p>
               )}
@@ -6667,7 +6667,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   setSelectedRoomsToCopy(new Set());
                   setQuickAddAreaName('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                className="flex-1 px-4 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg"
               >
                 Cancel
               </button>
@@ -6677,7 +6677,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   setQuickAddAreaName('');
                 }}
                 disabled={selectedRoomsToCopy.size === 0}
-                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg"
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-elevated disabled:cursor-not-allowed text-white rounded-lg"
               >
                 Copy to {selectedRoomsToCopy.size} area{selectedRoomsToCopy.size !== 1 ? 's' : ''}
               </button>
@@ -6701,21 +6701,21 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* Substitute Item Modal */}
       {substituteItemId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg p-6 max-w-full sm:max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="bg-surface rounded-lg p-6 max-w-full sm:max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-white">Substitute Item</h2>
+              <h2 className="text-xl font-bold text-primary">Substitute Item</h2>
               <button
                 onClick={() => {
                   setSubstituteItemId(null);
                   setSubstituteSearchQuery('');
                 }}
-                className="p-1 text-gray-400 hover:text-white rounded"
+                className="p-1 text-muted hover:text-primary rounded"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-sm text-gray-400 mb-4">
+            <p className="text-sm text-muted mb-4">
               Search for a product to replace the current item with. All product details (price, cost, labor, etc.) will be updated.
             </p>
 
@@ -6726,7 +6726,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 value={substituteSearchQuery}
                 onChange={(e) => setSubstituteSearchQuery(e.target.value)}
                 placeholder="Search by SKU, name, description..."
-                className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-elevated border border-strong rounded px-4 py-2 text-primary placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />
             </div>
@@ -6752,31 +6752,31 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         substituteItem(product.id);
                       }
                     }}
-                    className="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors"
+                    className="p-4 bg-elevated rounded-lg cursor-pointer hover:bg-strong/25 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-mono text-cyan-400">{product.sku}</span>
                           {product.manufacturers?.name && (
-                            <span className="text-xs text-gray-400">| {product.manufacturers.name}</span>
+                            <span className="text-xs text-muted">| {product.manufacturers.name}</span>
                           )}
                         </div>
-                        <h3 className="text-white font-medium mb-1">{product.name || product.description}</h3>
+                        <h3 className="text-primary font-medium mb-1">{product.name || product.description}</h3>
                         {product.description && product.name && (
-                          <p className="text-sm text-gray-400 line-clamp-2">{product.description}</p>
+                          <p className="text-sm text-muted line-clamp-2">{product.description}</p>
                         )}
                         {product.category && (
-                          <span className="inline-block mt-2 text-xs px-2 py-1 bg-gray-800 text-gray-300 rounded">
+                          <span className="inline-block mt-2 text-xs px-2 py-1 bg-surface text-secondary rounded">
                             {product.category}
                           </span>
                         )}
                       </div>
                       <div className="text-right">
                         <div className="text-green-400 font-medium">${product.price?.toFixed(2) || '0.00'}</div>
-                        <div className="text-xs text-gray-400">Cost: ${product.cost?.toFixed(2) || '0.00'}</div>
+                        <div className="text-xs text-muted">Cost: ${product.cost?.toFixed(2) || '0.00'}</div>
                         {product.labor_hours && (
-                          <div className="text-xs text-gray-400 mt-1">{product.labor_hours}h labor</div>
+                          <div className="text-xs text-muted mt-1">{product.labor_hours}h labor</div>
                         )}
                       </div>
                     </div>
@@ -6792,19 +6792,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   product.category?.toLowerCase().includes(query)
                 );
               }).length === 0 && (
-                <p className="text-gray-400 text-center py-8">
+                <p className="text-muted text-center py-8">
                   {substituteSearchQuery ? 'No products found matching your search' : 'No products available'}
                 </p>
               )}
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-700">
+            <div className="mt-4 pt-4 border-t border-subtle">
               <button
                 onClick={() => {
                   setSubstituteItemId(null);
                   setSubstituteSearchQuery('');
                 }}
-                className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                className="w-full px-4 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg"
               >
                 Cancel
               </button>
@@ -6974,16 +6974,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       {showActivityModal && proposal && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg shadow-2xl w-full max-w-full sm:max-w-2xl border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
+          <div className="bg-surface rounded-lg shadow-2xl w-full max-w-full sm:max-w-2xl border border-subtle">
+            <div className="p-6 border-b border-subtle">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Activity className="text-blue-400" size={24} />
                   <div>
-                    <h2 className="text-xl font-bold text-white">
+                    <h2 className="text-xl font-bold text-primary">
                       Customer Activity
                     </h2>
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-muted">
                       Proposal {proposal.proposal_number}
                     </p>
                   </div>
@@ -6993,7 +6993,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     setShowActivityModal(false);
                     setActivityData(null);
                   }}
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-muted hover:text-primary transition-colors"
                 >
                   <XCircle size={24} />
                 </button>
@@ -7004,30 +7004,30 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               {activityData ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Total Views</div>
-                      <div className="text-2xl font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Total Views</div>
+                      <div className="text-2xl font-bold text-primary">
                         {activityData.total_views || 0}
                       </div>
                     </div>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Unique Sessions</div>
-                      <div className="text-2xl font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Unique Sessions</div>
+                      <div className="text-2xl font-bold text-primary">
                         {activityData.unique_sessions || 0}
                       </div>
                     </div>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Total Time</div>
-                      <div className="text-2xl font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Total Time</div>
+                      <div className="text-2xl font-bold text-primary">
                         {activityData.total_time_seconds
                           ? `${Math.floor(activityData.total_time_seconds / 60)}m ${activityData.total_time_seconds % 60}s`
                           : '0m 0s'
                         }
                       </div>
                     </div>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      <div className="text-gray-400 text-sm mb-1">Last Viewed</div>
-                      <div className="text-sm font-bold text-white">
+                    <div className="bg-elevated p-4 rounded-lg">
+                      <div className="text-muted text-sm mb-1">Last Viewed</div>
+                      <div className="text-sm font-bold text-primary">
                         {activityData.last_viewed_at
                           ? new Date(activityData.last_viewed_at).toLocaleDateString('en-US', {
                               month: 'short',
@@ -7043,14 +7043,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                   {activityData.activity_timeline && activityData.activity_timeline.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                      <h3 className="text-sm font-semibold text-secondary mb-3 uppercase tracking-wide">
                         Activity Timeline
                       </h3>
                       <div className="space-y-2">
                         {activityData.activity_timeline.map((activity: any, index: number) => (
                           <div
                             key={index}
-                            className="flex items-center justify-between bg-gray-700 p-3 rounded-lg"
+                            className="flex items-center justify-between bg-elevated p-3 rounded-lg"
                           >
                             <div className="flex items-center gap-3">
                               {activity.type === 'viewed' && <Eye className="text-blue-400" size={16} />}
@@ -7058,15 +7058,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               {activity.type === 'accepted' && <CheckCircle2 className="text-green-400" size={16} />}
                               {activity.type === 'declined' && <XCircle className="text-red-400" size={16} />}
                               <div>
-                                <div className="text-sm text-white capitalize">{activity.type}</div>
+                                <div className="text-sm text-primary capitalize">{activity.type}</div>
                                 {activity.duration > 0 && (
-                                  <div className="text-xs text-gray-400">
+                                  <div className="text-xs text-muted">
                                     {Math.floor(activity.duration / 60)}m {activity.duration % 60}s
                                   </div>
                                 )}
                               </div>
                             </div>
-                            <div className="text-xs text-gray-400">
+                            <div className="text-xs text-muted">
                               {new Date(activity.created_at).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
@@ -7081,7 +7081,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   )}
                 </>
               ) : (
-                <div className="text-center py-12 text-gray-400">
+                <div className="text-center py-12 text-muted">
                   <Activity className="mx-auto mb-3 text-gray-600" size={48} />
                   <p>No activity recorded yet</p>
                   <p className="text-sm mt-2">Customer hasn't viewed this proposal</p>
@@ -7089,13 +7089,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-700">
+            <div className="p-6 border-t border-subtle">
               <button
                 onClick={() => {
                   setShowActivityModal(false);
                   setActivityData(null);
                 }}
-                className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="w-full py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg transition-colors"
               >
                 Close
               </button>
@@ -7107,10 +7107,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* Portal Preview — full-screen overlay rendered to document.body */}
       {showPortalPreview && createPortal(
         <div className="fixed inset-0 z-[9999] flex flex-col bg-gray-950">
-          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 bg-gray-900 border-b border-gray-700 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 bg-canvas border-b border-subtle shrink-0 flex-wrap">
             <div className="flex items-center gap-2">
               <Eye className={`w-4 h-4 ${proposal?.is_portal_visible ? 'text-green-400' : 'text-blue-400'}`} />
-              <span className="text-sm font-semibold text-white">Customer Portal Preview</span>
+              <span className="text-sm font-semibold text-primary">Customer Portal Preview</span>
             </div>
             {proposal?.is_portal_visible ? (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/30">
@@ -7129,7 +7129,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-all ${
                 previewHideCosts
                   ? 'bg-blue-600 text-white border-blue-500 hover:bg-blue-700'
-                  : 'text-gray-300 hover:text-white hover:bg-gray-700 border-gray-600 hover:border-gray-500'
+                  : 'text-secondary hover:text-primary hover:bg-elevated border-strong hover:border-gray-500'
               }`}
               title={previewHideCosts ? 'Show prices in preview' : 'Hide prices in preview'}
             >
@@ -7147,7 +7147,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             </button>
             <button
               onClick={() => setShowPortalPreview(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600 hover:border-gray-500 rounded-lg transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-primary hover:bg-elevated border border-strong hover:border-gray-500 rounded-lg transition-all"
             >
               <X className="w-3.5 h-3.5" />
               Close Preview

@@ -1139,7 +1139,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                           {brief.contact_id ? (
                             <button
                               onClick={(e) => { e.stopPropagation(); setQuickViewContactId(brief.contact_id!); }}
-                              className="text-sm font-semibold text-blue-600 hover:text-blue-800 truncate block text-left max-w-full"
+                              className="customer-link text-sm font-semibold truncate block text-left max-w-full"
                             >
                               {contactName}
                             </button>

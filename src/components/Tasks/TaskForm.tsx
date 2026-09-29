@@ -317,12 +317,12 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <QuickActionModal
       title={task ? 'Edit Task' : 'New Task'}
       subtitle={task ? 'Update task details' : 'Assign and track a new task'}
-      icon={<ListTodo className="w-5 h-5 text-white" />}
+      icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
       showSuccess={showSuccess}
       successMessage={task ? 'Task Updated!' : 'Task Created!'}
-      maxWidth="sm:max-w-lg"
+
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 space-y-4">
@@ -334,7 +334,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
             {/* Task Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Task Title <span className="text-red-400">*</span>
               </label>
               <input
@@ -342,7 +342,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                 required
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 placeholder="Follow up with customer"
                 autoFocus
               />
@@ -350,28 +350,28 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-secondary mb-1.5">
                 Description
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={2}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
                 placeholder="Add any additional details..."
               />
             </div>
 
             {/* Assign To */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-gray-400" />
+              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-muted" />
                 Assign To
               </label>
               <select
                 value={formData.assigned_to}
                 onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               >
                 <option value="">Anyone (claimable by team)</option>
                 {profile && (
@@ -388,14 +388,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             {/* Priority + Due Date side by side */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <Flag className="w-4 h-4 text-gray-400" />
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Flag className="w-4 h-4 text-muted" />
                   Priority
                 </label>
                 <select
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 >
                   {priorities.length === 0 ? (
                     <option value="medium">Medium</option>
@@ -410,40 +410,40 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-gray-400" />
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-muted" />
                   Due Date
                 </label>
                 <input
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 />
               </div>
             </div>
 
             {/* Reminder */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-gray-400" />
+              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-muted" />
                 Reminder
               </label>
               <input
                 type="datetime-local"
                 value={formData.reminder_date}
                 onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
-                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Creates a Google Calendar reminder if connected
               </p>
             </div>
 
             {/* Contact */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                Contact <span className="text-gray-500 font-normal">(optional)</span>
+              <label className="block text-sm font-medium text-secondary mb-1.5">
+                Contact <span className="text-muted font-normal">(optional)</span>
               </label>
               <div className="flex gap-2">
                 <ContactSearchSelect
@@ -461,7 +461,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                 <button
                   type="button"
                   onClick={() => setShowNewContactForm(!showNewContactForm)}
-                  className="px-3 py-2.5 bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1.5 flex-shrink-0 text-sm"
+                  className="px-3 py-2.5 bg-elevated text-secondary hover:text-primary hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1.5 flex-shrink-0 text-sm"
                   title="Create new contact"
                 >
                   <Plus className="w-4 h-4" />
@@ -470,53 +470,53 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             </div>
 
             {showNewContactForm && (
-              <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg space-y-3">
+              <div className="p-4 bg-surface border border-subtle rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                     <UserPlus className="w-4 h-4" />
                     Create New Contact
                   </h3>
-                  <button type="button" onClick={() => setShowNewContactForm(false)} className="text-gray-400 hover:text-white">
+                  <button type="button" onClick={() => setShowNewContactForm(false)} className="text-muted hover:text-primary">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Name *</label>
+                  <label className="block text-xs font-medium text-muted mb-1">Name *</label>
                   <input
                     type="text"
                     value={newContactData.contact_name}
                     onChange={(e) => setNewContactData({ ...newContactData, contact_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-600 text-white rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-canvas border border-strong text-primary rounded-lg text-sm"
                     placeholder="John Doe"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Email</label>
+                    <label className="block text-xs font-medium text-muted mb-1">Email</label>
                     <input
                       type="email"
                       value={newContactData.email}
                       onChange={(e) => setNewContactData({ ...newContactData, email: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-600 text-white rounded-lg text-sm"
+                      className="w-full px-3 py-2 bg-canvas border border-strong text-primary rounded-lg text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Phone</label>
+                    <label className="block text-xs font-medium text-muted mb-1">Phone</label>
                     <input
                       type="tel"
                       value={newContactData.phone}
                       onChange={(e) => setNewContactData({ ...newContactData, phone: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-600 text-white rounded-lg text-sm"
+                      className="w-full px-3 py-2 bg-canvas border border-strong text-primary rounded-lg text-sm"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Company</label>
+                  <label className="block text-xs font-medium text-muted mb-1">Company</label>
                   <input
                     type="text"
                     value={newContactData.company_name}
                     onChange={(e) => setNewContactData({ ...newContactData, company_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-600 text-white rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-canvas border border-strong text-primary rounded-lg text-sm"
                   />
                 </div>
                 <button
@@ -532,13 +532,13 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             {/* Status (edit only) */}
             {task && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-secondary mb-1.5">
                   Status
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as Task['status'] })}
-                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 >
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
@@ -550,11 +550,11 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
           </div>
 
           {/* Footer buttons */}
-          <div className="flex gap-3 px-4 sm:px-6 py-4 border-t border-gray-700/60 flex-shrink-0">
+          <div className="flex gap-3 px-4 sm:px-6 py-4 border-t border-subtle/60 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 border border-gray-700 text-gray-300 rounded-xl hover:bg-gray-800 transition-colors font-medium text-sm"
+              className="flex-1 px-4 py-3 border border-subtle text-secondary rounded-xl hover:bg-surface transition-colors font-medium text-sm"
             >
               Cancel
             </button>

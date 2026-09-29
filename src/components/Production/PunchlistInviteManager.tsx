@@ -1759,7 +1759,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
               >
                 {/* Row 1: name + badge + status */}
                 <div className="flex items-center gap-2 min-w-0 mb-1.5">
-                  <span className="text-sm font-semibold text-white truncate flex-1 min-w-0">
+                  <span className="customer-link text-sm font-semibold truncate flex-1 min-w-0">
                     {customer.contact_name}
                   </span>
                   <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0 ${accessColor}`}>

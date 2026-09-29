@@ -67,7 +67,7 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
             {/* Customer */}
             <div className="flex items-center gap-2 text-sm text-gray-300 mb-2">
               <Briefcase size={14} className="text-gray-500 shrink-0" />
-              <span className="truncate">{customerName}</span>
+              <span className="customer-link truncate">{customerName}</span>
             </div>
 
             {/* Sales Order Link */}

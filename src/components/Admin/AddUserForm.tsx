@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, AtSign, Shield, Briefcase, Eye, EyeOff, UserCircle, Clock, DollarSign } from 'lucide-react';
+import { X, Mail, AtSign, Shield, Briefcase, Eye, EyeOff, UserCircle, Clock, DollarSign, Check, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { generateUsername } from '../../lib/username';
 import { CompanyOffice } from '../../lib/types';
@@ -11,9 +11,27 @@ interface PaySchedule {
   is_active: boolean;
 }
 
+interface Department {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string;
+  color: string;
+  is_active: boolean;
+}
+
+export interface CreatedUserData {
+  userId: string;
+  email: string;
+  full_name: string;
+  role: string;
+  classification: 'employee' | 'non_employee';
+  departmentNames: string[];
+}
+
 interface AddUserFormProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (userData: CreatedUserData) => void;
 }
 
 interface Role {
@@ -59,7 +77,10 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
-  const [isEmployee, setIsEmployee] = useState(false);
+  const [classification, setClassification] = useState<'employee' | 'non_employee' | ''>('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [roleDeptAccess, setRoleDeptAccess] = useState<Map<string, boolean>>(new Map());
+  const [deptOverrides, setDeptOverrides] = useState<Map<string, boolean>>(new Map());
   const [employeeForm, setEmployeeForm] = useState({
     hire_date: new Date().toISOString().split('T')[0],
     employment_status: 'active' as 'active' | 'inactive' | 'terminated',
@@ -82,7 +103,14 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     loadRoles();
     loadOffices();
     loadPaySchedules();
+    loadDepartments();
   }, []);
+
+  useEffect(() => {
+    if (formData.role_id) {
+      loadRoleDeptAccess(formData.role_id);
+    }
+  }, [formData.role_id]);
 
   async function loadRoles() {
     try {
@@ -133,10 +161,78 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     }
   }
 
+  async function loadDepartments() {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error loading departments:', error);
+    }
+  }
+
+  async function loadRoleDeptAccess(roleId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('role_department_access')
+        .select('department_id, has_access')
+        .eq('role_id', roleId);
+      if (error) throw error;
+      const accessMap = new Map<string, boolean>();
+      (data || []).forEach((item: { department_id: string; has_access: boolean }) => {
+        accessMap.set(item.department_id, item.has_access);
+      });
+      setRoleDeptAccess(accessMap);
+      setDeptOverrides(new Map());
+    } catch (error) {
+      console.error('Error loading role department access:', error);
+    }
+  }
+
+  function getEffectiveDeptAccess(deptId: string): boolean {
+    const override = deptOverrides.get(deptId);
+    if (override !== undefined) return override;
+    return roleDeptAccess.get(deptId) ?? false;
+  }
+
+  function toggleDeptAccess(deptId: string) {
+    const roleHas = roleDeptAccess.get(deptId) ?? false;
+    const currentOverride = deptOverrides.get(deptId);
+    const newOverrides = new Map(deptOverrides);
+    if (currentOverride !== undefined) {
+      const newAccess = !currentOverride;
+      if (newAccess === roleHas) {
+        newOverrides.delete(deptId);
+      } else {
+        newOverrides.set(deptId, newAccess);
+      }
+    } else {
+      newOverrides.set(deptId, !roleHas);
+    }
+    setDeptOverrides(newOverrides);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    if (!classification) {
+      setError('Please select an employment classification (Employee or Non-Employee).');
+      setLoading(false);
+      return;
+    }
+
+    const hasDeptAccess = departments.some(d => getEffectiveDeptAccess(d.id));
+    if (!hasDeptAccess) {
+      setError('At least one department must be enabled.');
+      setLoading(false);
+      return;
+    }
 
     try {
       // Check if username is already taken
@@ -213,11 +309,16 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
 
       console.log('User created successfully:', result);
 
-      // If employee, create employee record + initial config + classification atomically via RPC
-      if (isEmployee && result.userId) {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const newUserId = result.user?.id || result.userId;
+      if (!newUserId) {
+        throw new Error('User created but no user ID returned');
+      }
+
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      if (classification === 'employee') {
         const { error: rpcError } = await supabase.rpc('classify_as_employee', {
-          p_user_id: result.userId,
+          p_user_id: newUserId,
           p_hire_date: employeeForm.hire_date,
           p_employee_number: employeeForm.employee_number || null,
           p_employment_status: employeeForm.employment_status,
@@ -238,9 +339,42 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           console.error('Employee creation error:', rpcError);
           throw new Error(`Employee setup failed: ${rpcError.message}`);
         }
+      } else if (classification === 'non_employee') {
+        const { error: rpcError } = await supabase.rpc('classify_as_non_employee', {
+          p_user_id: newUserId,
+          p_reviewed_by: currentUser?.id,
+        });
+        if (rpcError) {
+          console.error('Non-employee classification error:', rpcError);
+          throw new Error(`Classification failed: ${rpcError.message}`);
+        }
       }
 
-      onSuccess();
+      const overridesToInsert: { user_id: string; department_id: string; has_access: boolean }[] = [];
+      deptOverrides.forEach((hasAccess, deptId) => {
+        overridesToInsert.push({ user_id: newUserId, department_id: deptId, has_access: hasAccess });
+      });
+      if (overridesToInsert.length > 0) {
+        const { error: deptError } = await supabase
+          .from('department_user_overrides')
+          .insert(overridesToInsert);
+        if (deptError) {
+          console.error('Department override error:', deptError);
+        }
+      }
+
+      const grantedDeptNames = departments
+        .filter(d => getEffectiveDeptAccess(d.id))
+        .map(d => d.display_name);
+
+      onSuccess({
+        userId: newUserId,
+        email: formData.email,
+        full_name: formData.full_name,
+        role: formData.role,
+        classification: classification as 'employee' | 'non_employee',
+        departmentNames: grantedDeptNames,
+      });
     } catch (err: any) {
       console.error('Error creating user:', err);
       console.error('Full error object:', JSON.stringify(err, null, 2));
@@ -680,30 +814,56 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           </div>
 
           <div className="bg-gray-800 border border-blue-500/30 rounded-lg p-4 space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isEmployee}
-                onChange={(e) => setIsEmployee(e.target.checked)}
-                className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <UserCircle className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm font-medium text-white">Is this person an Employee?</span>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">Check to enable payroll, timekeeping, and pay schedule assignment.</p>
-              </div>
-            </label>
+            <div className="flex items-center gap-2">
+              <UserCircle className="w-4 h-4 text-blue-400" />
+              <span className="text-sm font-medium text-white">Employment Classification *</span>
+            </div>
+            <p className="text-xs text-gray-400">Every user must be classified as either an Employee or Non-Employee.</p>
 
-            {isEmployee && (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setClassification('employee')}
+                className={`px-4 py-3 rounded-lg border-2 transition-all text-left ${
+                  classification === 'employee'
+                    ? 'border-blue-500 bg-blue-500/20'
+                    : 'border-gray-700 bg-gray-700/50 hover:border-gray-600'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <UserCircle className={`w-4 h-4 ${classification === 'employee' ? 'text-blue-400' : 'text-gray-400'}`} />
+                  <span className="text-sm font-medium text-white">Employee</span>
+                  {classification === 'employee' && <Check className="w-4 h-4 text-blue-400 ml-auto" />}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Enable payroll, timekeeping, and pay schedule</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setClassification('non_employee')}
+                className={`px-4 py-3 rounded-lg border-2 transition-all text-left ${
+                  classification === 'non_employee'
+                    ? 'border-blue-500 bg-blue-500/20'
+                    : 'border-gray-700 bg-gray-700/50 hover:border-gray-600'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Briefcase className={`w-4 h-4 ${classification === 'non_employee' ? 'text-blue-400' : 'text-gray-400'}`} />
+                  <span className="text-sm font-medium text-white">Non-Employee</span>
+                  {classification === 'non_employee' && <Check className="w-4 h-4 text-blue-400 ml-auto" />}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">No payroll or timekeeping access</p>
+              </button>
+            </div>
+
+            {classification === 'employee' && (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">Hire Date *</label>
                     <input
                       type="date"
-                      required={isEmployee}
+                      required
                       value={employeeForm.hire_date}
                       onChange={(e) => setEmployeeForm({ ...employeeForm, hire_date: e.target.value })}
                       className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
@@ -824,6 +984,68 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
             )}
           </div>
 
+          {/* Department Access */}
+          <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-cyan-400" />
+              <span className="text-sm font-medium text-white">Department Access *</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              Departments default to the selected role. Toggle to override. At least one department must be enabled.
+            </p>
+            <div className="space-y-2">
+              {departments.map((dept) => {
+                const hasAccess = getEffectiveDeptAccess(dept.id);
+                const isOverridden = deptOverrides.has(dept.id);
+                const roleHas = roleDeptAccess.get(dept.id) ?? false;
+                return (
+                  <div
+                    key={dept.id}
+                    className={`p-3 rounded-lg border transition-all ${
+                      hasAccess
+                        ? 'border-cyan-500/40 bg-cyan-500/10'
+                        : 'border-gray-700 bg-gray-700/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+                          style={{ backgroundColor: dept.color }}
+                        >
+                          {dept.display_name.charAt(0)}
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-white">{dept.display_name}</span>
+                          {isOverridden ? (
+                            <span className="ml-2 px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+                              Override
+                            </span>
+                          ) : (
+                            <span className="ml-2 text-xs text-gray-500">
+                              Role default: {roleHas ? 'Has access' : 'No access'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleDeptAccess(dept.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          hasAccess
+                            ? 'bg-cyan-500 text-white hover:bg-cyan-600'
+                            : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                        }`}
+                      >
+                        {hasAccess ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-cyan-400" />
@@ -886,7 +1108,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !classification}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all font-medium disabled:opacity-50"
             >
               {loading ? 'Creating...' : 'Create User'}

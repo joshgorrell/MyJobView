@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Shield, Plus, Clock, FileText, Send, Calendar, User, RotateCcw, Search, Trash2, AlertCircle, Eye, CreditCard as Edit2, ArrowRight, UserCheck, CheckCircle, XCircle, Loader2, Mail, X } from 'lucide-react';
+import { Shield, Plus, Clock, FileText, Send, Calendar, User, RotateCcw, Search, Trash2, AlertCircle, Eye, CreditCard as Edit2, ArrowRight, UserCheck, CheckCircle, XCircle, Loader2, Mail, X, Printer } from 'lucide-react';
 import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
-import CreateSecurityContractModal from './CreateSecurityContractModal';
-import SecurityContractDetail from './SecurityContractDetail';
-import EditSecurityContractModal from './EditSecurityContractModal';
-import ManualContractEntry from './ManualContractEntry';
+const CreateSecurityContractModal = lazy(() => import('./CreateSecurityContractModal'));
+const SecurityContractDetail = lazy(() => import('./SecurityContractDetail'));
+const EditSecurityContractModal = lazy(() => import('./EditSecurityContractModal'));
+const ManualContractEntry = lazy(() => import('./ManualContractEntry'));
 
 interface Contract {
   id: string;
@@ -313,6 +313,7 @@ function SendAgreementDialog({
 
 export default function SecurityOnboarding({ onNavigateToContracts, canAccessContractManagement }: SecurityOnboardingProps = {}) {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createPaperOnboarding, setCreatePaperOnboarding] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -475,6 +476,31 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
     setDialog({ type: 'confirm_delete', contract });
   }
 
+  async function printBlankForm(contract: Contract) {
+    // Open the tab during the click so browser popup blocking does not prevent printing.
+    const printTab = window.open('', '_blank');
+    if (!printTab) {
+      setDialog({ type: 'error', message: 'Please allow popups to print this form.' });
+      return;
+    }
+    printTab.document.write('<p>Preparing printable onboarding form...</p>');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Please sign in to print this form.');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-blank-contract-form?contractId=${encodeURIComponent(contract.id)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok) throw new Error('The printable form could not be loaded.');
+      const html = await response.text();
+      printTab.document.open();
+      printTab.document.write(html);
+      printTab.document.close();
+    } catch (error) {
+      printTab.close();
+      setDialog({ type: 'error', message: error instanceof Error ? error.message : 'Could not print the form.' });
+    }
+  }
+
   async function executeDelete(contract: Contract) {
     setDialog({ type: 'sending', action: 'delete' });
     try {
@@ -549,19 +575,9 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
     return new Date(expiresAt) < new Date();
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading agreements...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (selectedContract) {
     return (
+      <Suspense fallback={<div className="p-6 text-gray-600">Loading agreement...</div>}>
       <SecurityContractDetail
         contract={selectedContract}
         onClose={() => setSelectedContract(null)}
@@ -570,6 +586,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           loadContracts(false);
         }}
       />
+      </Suspense>
     );
   }
 
@@ -583,24 +600,41 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
             <h1 className="text-xl sm:text-2xl font-bold text-white">Security Onboarding</h1>
           </div>
           <p className="text-sm sm:text-base text-gray-300">Track pending and in-progress customer agreement onboarding</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {onNavigateToContracts && canAccessContractManagement !== false && (
             <button
+              type="button"
               onClick={onNavigateToContracts}
-              className="flex items-center gap-2 mt-3 text-blue-400 hover:text-blue-300 transition-colors group"
+              aria-label="View all agreements"
+              title="View all agreements"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/25 px-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
             >
-              <span className="text-sm font-medium">View All Agreements</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Agreements</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }}
+            aria-label="Paper onboarding"
+            title="Paper onboarding"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+          >
+            <Printer className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Paper Form</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCreatePaperOnboarding(false); setShowCreateModal(true); }}
+            aria-label="New online agreement"
+            title="New online agreement"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">New Online</span>
+          </button>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg text-sm sm:text-base font-medium whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span className="hidden xs:inline">Start New Agreement</span>
-          <span className="xs:hidden">New Agreement</span>
-        </button>
       </div>
 
       {/* Search */}
@@ -632,13 +666,15 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
                     <h3 className={`font-bold text-sm sm:text-base ${column.color}`}>{column.label}</h3>
                   </div>
                   <span className={`${column.color} font-bold text-lg sm:text-xl`}>
-                    {columnContracts.length}
+                    {loading ? '…' : columnContracts.length}
                   </span>
                 </div>
               </div>
 
               <div className={`flex-1 ${column.bgColor} ${column.borderColor} border-2 border-t-0 rounded-b-lg p-2 sm:p-3 space-y-2 min-h-[200px] max-h-[60vh] lg:max-h-[calc(100vh-280px)] overflow-y-auto`}>
-                {columnContracts.length === 0 ? (
+                {loading ? (
+                  <div className="py-8 text-center text-sm text-gray-600" role="status">Loading agreements...</div>
+                ) : columnContracts.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <Icon className={`w-8 h-8 ${column.color} opacity-50 mx-auto mb-2`} />
                     <p className="font-medium text-sm">No agreements</p>
@@ -769,6 +805,12 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
                             </div>
                           )}
 
+                          <button
+                            onClick={() => printBlankForm(contract)}
+                            className="w-full px-2 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded hover:bg-blue-100 flex items-center justify-center gap-1"
+                          >
+                            <Printer className="w-3 h-3" /> Print blank onboarding form
+                          </button>
                           <div className="grid grid-cols-3 gap-1.5">
                             <button
                               onClick={() => {
@@ -815,9 +857,16 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
       />
 
       {/* Modals */}
+      <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-white" role="status">Loading form...</div>}>
       {showCreateModal && (
         <CreateSecurityContractModal
           onClose={() => setShowCreateModal(false)}
+          onPaperCreated={createPaperOnboarding ? (contract) => {
+            setShowCreateModal(false);
+            setContractForManualEntry(contract as Contract);
+            setShowManualEntry(true);
+            loadContracts(false);
+          } : undefined}
           onSuccess={() => {
             setShowCreateModal(false);
             loadContracts(false);
@@ -865,6 +914,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           }}
         />
       )}
+      </Suspense>
     </div>
   );
 }

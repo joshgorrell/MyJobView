@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Mail, CheckCircle, AlertCircle, Star, ArrowRight, Zap, Loader, LogIn } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useTenant } from '../../contexts/TenantContext';
 
 export function PortalLogin() {
+  const { tenant } = useTenant();
+  const dealerName = tenant?.organizationName || 'Electronic Life';
+  const dealerLogo = tenant?.logoUrl;
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [tokenLoading, setTokenLoading] = useState(false);
@@ -181,14 +185,20 @@ export function PortalLogin() {
       <div className="relative w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
           <div className="bg-gradient-to-r from-[#0f2347] to-[#1a3a6e] px-6 sm:px-8 pt-10 pb-6 sm:pb-8 text-center">
-            <img
-              src="/el_logo_color_(2).png"
-              alt="Electronic Life"
-              className="mx-auto h-16 sm:h-20 mb-6 object-contain"
-            />
+            {dealerLogo ? (
+              <img
+                src={dealerLogo}
+                alt={dealerName}
+                className="mx-auto h-16 sm:h-20 mb-6 object-contain"
+              />
+            ) : (
+              <div className="mx-auto h-16 sm:h-20 mb-6 flex items-center justify-center">
+                <span className="text-2xl sm:text-3xl font-bold text-white">{dealerName}</span>
+              </div>
+            )}
             <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Customer Portal</h1>
             <p className="text-blue-200 text-sm sm:text-base">
-              Electronic Life
+              {dealerName}
             </p>
           </div>
 
@@ -296,7 +306,7 @@ export function PortalLogin() {
 
             <div className="mt-5 pt-4 border-t border-gray-100">
               <p className="text-xs text-gray-400 text-center mb-3">
-                This portal is for Electronic Life customers only.
+                This portal is for {dealerName} customers only.
               </p>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-400 mb-4">
                 <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline underline-offset-2 transition-colors">
@@ -322,7 +332,7 @@ export function PortalLogin() {
         </div>
 
         <p className="text-center text-blue-300/60 text-xs mt-6">
-          © {new Date().getFullYear()} Electronic Life. All rights reserved.
+          © {new Date().getFullYear()} {dealerName}. All rights reserved.
         </p>
       </div>
     </div>

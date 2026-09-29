@@ -165,7 +165,9 @@ Deno.serve(async (req: Request) => {
               appointment_notes: wo.description || 'Service appointment',
               company_phone: settings.company_phone || '',
               company_email: settings.company_email || '',
-              portal_link: settings.portal_url || `${supabaseUrl}/portal`,
+              portal_link: settings.subdomain
+                ? `https://${settings.subdomain}.myjobview.com`
+                : (settings.portal_url || `${supabaseUrl}/portal`),
               appointment_duration: '2-4 hours',
             };
 

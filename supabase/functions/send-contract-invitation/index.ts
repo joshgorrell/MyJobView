@@ -52,6 +52,12 @@ Deno.serve(async (req: Request) => {
       .select("company_name, from_email, from_name, portal_url, company_logo_url, company_email")
       .single();
 
+    const { data: orgData } = await supabase
+      .from("organizations")
+      .select("subdomain")
+      .limit(1)
+      .maybeSingle();
+
     const companyName = settings?.company_name || "Your Company";
     const fromEmail = settings?.from_email || "noreply@yourdomain.com";
     const fromName = settings?.from_name || companyName;
@@ -59,9 +65,11 @@ Deno.serve(async (req: Request) => {
     const companyLogoUrl = settings?.company_logo_url || "";
     const companyEmail = settings?.company_email || "";
 
-    // Use appOrigin (sent by the frontend) if available, otherwise fall back to portal_url
-    const baseUrl = appOrigin || portalUrl;
-    const onboardingUrl = `${baseUrl}/security-onboarding?token=${token}`;
+    // Use appOrigin (sent by the frontend) if available, otherwise fall back to subdomain or portal_url
+    const subdomain = orgData?.subdomain || null;
+    const baseUrl = appOrigin
+      || (subdomain ? `https://${subdomain}.myjobview.com` : portalUrl);
+    const onboardingUrl = `${baseUrl}/onboarding?token=${token}`;
 
     // Build logo block for the template
     const logoBlock = companyLogoUrl
