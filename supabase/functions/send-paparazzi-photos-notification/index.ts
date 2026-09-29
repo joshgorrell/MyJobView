@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,7 +43,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const fromEmail = Deno.env.get("FROM_EMAIL") || "noreply@yourdomain.com";
-    const appUrl = Deno.env.get("APP_URL") || "https://yourdomain.com";
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const [settingsRes, orgRes] = await Promise.all([
+      supabaseClient.from("company_settings").select("portal_url, app_url").maybeSingle(),
+      supabaseClient.from("organizations").select("subdomain").limit(1).maybeSingle(),
+    ]);
+    const subdomain = orgRes.data?.subdomain || null;
+    const appUrl = subdomain
+      ? `https://${subdomain}.myjobview.com`
+      : (settingsRes.data?.portal_url || settingsRes.data?.app_url || Deno.env.get("APP_URL") || "https://yourdomain.com");
 
     const projectInfo = projectName ? ` for the ${projectName} project` : '';
     const photoCountText = photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? '' : 's'}` : 'Photos';

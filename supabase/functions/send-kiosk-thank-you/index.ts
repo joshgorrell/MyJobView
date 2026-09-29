@@ -48,16 +48,21 @@ Deno.serve(async (req: Request) => {
       throw new Error("No active kiosk thank you email template found");
     }
 
-    // Get company settings
-    const { data: companySettings } = await supabaseClient
-      .from("company_settings")
-      .select("*")
-      .maybeSingle();
+    // Get company settings + organization subdomain
+    const [settingsRes, orgRes] = await Promise.all([
+      supabaseClient.from("company_settings").select("*").maybeSingle(),
+      supabaseClient.from("organizations").select("subdomain").limit(1).maybeSingle(),
+    ]);
+
+    const companySettings = settingsRes.data;
+    const subdomain = orgRes.data?.subdomain || null;
 
     const companyName = companySettings?.company_name || "Electronic Life";
     const companyPhone = companySettings?.company_phone || "";
     const companyEmail = companySettings?.email_from_address || "info@electroniclife.com";
-    const companyWebsite = companySettings?.portal_url || "https://electroniclife.com";
+    const companyWebsite = subdomain
+      ? `https://${subdomain}.myjobview.com`
+      : (companySettings?.portal_url || "https://electroniclife.com");
 
     // Build interests HTML
     let interestsHtml = '';

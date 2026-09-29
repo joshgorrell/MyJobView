@@ -20,7 +20,6 @@ export function CompanySettings() {
 
   const [companyName, setCompanyName] = useState('');
   const [website, setWebsite] = useState('');
-  const [appUrl, setAppUrl] = useState('');
   const [portalUrl, setPortalUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [headerLogoUrl, setHeaderLogoUrl] = useState('');
@@ -109,7 +108,6 @@ export function CompanySettings() {
         setSettings(data);
         setCompanyName(data.company_name);
         setWebsite(data.website || '');
-        setAppUrl(data.app_url || '');
         setPortalUrl(data.portal_url || '');
         setLogoUrl(data.company_logo_url || '');
         setFromEmail(data.from_email || '');
@@ -379,8 +377,7 @@ export function CompanySettings() {
           .update({
             company_name: companyName,
             website: website,
-            app_url: appUrl?.trim() || null,
-            portal_url: portalUrl || null,
+            portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
             company_logo_url: logoUrl || null,
             from_email: fromEmail?.trim() || null,
             from_name: fromName?.trim() || null,
@@ -433,8 +430,7 @@ export function CompanySettings() {
           .insert({
             company_name: companyName,
             website: website,
-            app_url: appUrl?.trim() || null,
-            portal_url: portalUrl || null,
+            portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
             company_logo_url: logoUrl || null,
             from_email: fromEmail?.trim() || null,
             from_name: fromName?.trim() || null,
@@ -743,35 +739,34 @@ export function CompanySettings() {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             <Globe className="w-4 h-4 inline mr-1" />
-            App URL
-          </label>
-          <input
-            type="url"
-            value={appUrl}
-            onChange={(e) => setAppUrl(e.target.value)}
-            placeholder="https://app.example.com"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            The URL of your main application. Used in satisfaction survey email links and other internal notifications.
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            <Globe className="w-4 h-4 inline mr-1" />
             Portal URL
           </label>
-          <input
-            type="url"
-            value={portalUrl}
-            onChange={(e) => setPortalUrl(e.target.value)}
-            placeholder="https://portal.example.com"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            The URL where your customers access the portal. Used in email links and notifications.
-          </p>
+          {subdomain ? (
+            <>
+              <input
+                type="url"
+                value={`https://${subdomain}.myjobview.com`}
+                readOnly
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Automatically derived from your subdomain. All customer-facing email links will use this URL.
+              </p>
+            </>
+          ) : (
+            <>
+              <input
+                type="url"
+                value={portalUrl}
+                onChange={(e) => setPortalUrl(e.target.value)}
+                placeholder="https://portal.example.com"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Set a subdomain below to automatically generate your portal URL, or enter a custom URL here.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="border-t border-gray-200 pt-4 space-y-3">
@@ -909,6 +904,12 @@ export function CompanySettings() {
                   new_subdomain: trimmed,
                   changed_by: (await supabase.auth.getUser()).data.user?.id,
                 });
+                const derivedPortalUrl = `https://${trimmed}.myjobview.com`;
+                await supabase
+                  .from('company_settings')
+                  .update({ portal_url: derivedPortalUrl, updated_at: new Date().toISOString() })
+                  .eq('id', settings?.id);
+                setPortalUrl(derivedPortalUrl);
                 setOriginalSubdomain(trimmed);
                 setSubdomainSaved(true);
                 setSubdomainAvailable(null);
