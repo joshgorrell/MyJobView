@@ -20,6 +20,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'details' | 'history'>('details');
   const [auditInfo, setAuditInfo] = useState<{ createdAt: string; createdBy: string; updatedAt: string; updatedBy: string } | null>(null);
+  const [manufacturerId, setManufacturerId] = useState<string | null>(null);
   const [model, setModel] = useState('');
   const [photoOpen, setPhotoOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -46,18 +47,26 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
     setPhotoFile(null);
     setSuggestions([]);
     setSuggestionIndex(0);
-    if (!panelData?.manufacturerName || model.trim().length < 3) return;
+    if (!profile?.organization_id || !manufacturerId || model.trim().length < 3) return;
     let cancelled = false;
     setChecking(true);
-    supabase.functions.invoke('product-image-suggestions', { body: { manufacturer: panelData.manufacturerName, model } })
+    supabase.from('products')
+      .select('id, manufacturer_model_number, image_url')
+      .eq('organization_id', profile.organization_id)
+      .eq('manufacturer_id', manufacturerId)
+      .ilike('manufacturer_model_number', model.trim())
+      .not('image_url', 'is', null)
+      .limit(20)
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) setPhotoError('Online photo lookup is unavailable. You can still paste or upload a photo.');
-        else setSuggestions(Array.isArray(data?.images) ? data.images : []);
+        if (error) setPhotoError('Could not check your catalog for matching photos.');
+        else setSuggestions([...new Set((data || [])
+          .filter(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.trim().toLowerCase() && p.image_url?.trim())
+          .map(p => p.image_url!.trim()))]);
         setChecking(false);
       });
     return () => { cancelled = true; };
-  }, [photoOpen, panelData?.manufacturerName, model]);
+  }, [photoOpen, profile?.organization_id, manufacturerId, model, productId]);
 
   function selectFile(file: File) {
     if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) {
@@ -140,6 +149,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
       });
 
       const taxonomy = catalogTaxonomy(p);
+      setManufacturerId(p.manufacturer_id || null);
       setModel(p.manufacturer_model_number || '');
       setPanelData({
         productId: p.id,
@@ -247,11 +257,11 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
                       <p className="text-xs text-gray-600">Choose a match, search for one, paste an image or URL, or upload a file.</p></div>
                     <button type="button" onClick={() => setPhotoOpen(false)} aria-label="Close photo editor" className="p-1 rounded hover:bg-blue-100"><X size={16} /></button>
                   </div>
-                  {checking && <p className="text-xs text-gray-600">Looking online for this exact model…</p>}
+                  {checking && <p className="text-xs text-gray-600">Checking your catalog for this exact model…</p>}
                   {!checking && suggestions.length > 0 && <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white p-2">
                     <img src={suggestions[suggestionIndex]} alt="Suggested product" className="h-16 w-16 object-contain rounded bg-gray-50"
                       onError={() => { setSuggestions(current => current.filter(url => url !== suggestions[suggestionIndex])); setSuggestionIndex(0); }} />
-                    <div className="flex-1 text-xs text-gray-700">Suggested online photo for this exact make and model.
+                    <div className="flex-1 text-xs text-gray-700">Photo from the same make and model in your catalog.
                       {suggestions.length > 1 && <div className="flex items-center gap-1 mt-1">
                         <button type="button" aria-label="Previous photo" onClick={() => setSuggestionIndex(i => (i - 1 + suggestions.length) % suggestions.length)}><ChevronLeft size={17} /></button>
                         <span>{suggestionIndex + 1} of {suggestions.length}</span>
@@ -260,8 +270,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
                     </div>
                     <button type="button" onClick={() => { setPhotoFile(null); setPhotoUrl(suggestions[suggestionIndex]); }} className="text-xs font-medium text-blue-700 hover:underline">Use this</button>
                   </div>}
-                  {!checking && !suggestions.length && model && <p className="text-xs text-gray-600">No verified photo found. Search the web or add your own.</p>}
-                  {suggestions.length > 0 && <p className="text-xs text-gray-500">Photo: <a href="https://icecat.biz" target="_blank" rel="noopener noreferrer" className="underline">Specs Icecat</a>. Information is provided as is; confirm the product and rights before use.</p>}
+                  {!checking && !suggestions.length && manufacturerId && model && <p className="text-xs text-gray-600">No matching photo in your catalog yet. Search the web or add your own.</p>}
                   <div className="flex flex-wrap gap-2">
                     <button type="button" disabled={!panelData.manufacturerName || !model} onClick={() => window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${panelData.manufacturerName} ${model}`)}`, '_blank', 'noopener,noreferrer')}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Search size={14} /> Search images</button>
