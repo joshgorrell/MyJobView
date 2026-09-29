@@ -94,15 +94,39 @@ CREATE OR REPLACE VIEW public.session_page_analytics
 WITH (security_invoker = true)
 AS
 SELECT
-  organization_id,
-  page,
+  ual.organization_id,
+  ual.page,
+  COALESCE(dm.display_name, initcap(replace(ual.page, '_', ' '))) AS page_name,
+  COALESCE(d.name, 'other') AS department_key,
+  COALESCE(d.display_name, 'Other') AS department_name,
   COUNT(*) AS page_views,
-  COUNT(DISTINCT user_id) AS unique_users,
-  SUM(duration_seconds) AS active_seconds,
-  MAX(timestamp) AS last_viewed
-FROM public.user_activity_log
-WHERE action = 'page_view' AND page IS NOT NULL
-GROUP BY organization_id, page;
+  COUNT(DISTINCT ual.user_id) AS unique_users,
+  SUM(ual.duration_seconds) AS session_time_seconds,
+  MAX(ual.timestamp) AS last_viewed
+FROM public.user_activity_log ual
+LEFT JOIN public.department_modules dm ON dm.module_key = ual.page
+LEFT JOIN public.departments d ON d.id = dm.department_id
+WHERE ual.action = 'page_view' AND ual.page IS NOT NULL
+GROUP BY ual.organization_id, ual.page, dm.display_name, d.name, d.display_name;
+
+CREATE OR REPLACE VIEW public.session_department_analytics
+WITH (security_invoker = true)
+AS
+SELECT
+  organization_id,
+  department_key,
+  department_name,
+  SUM(page_views) AS page_views,
+  MAX(unique_users) AS unique_users_floor,
+  SUM(session_time_seconds) AS session_time_seconds,
+  MAX(last_viewed) AS last_viewed
+FROM public.session_page_analytics
+GROUP BY organization_id, department_key, department_name;
+
+COMMENT ON VIEW public.session_page_analytics IS
+  'Manager/admin product usage analytics. session_time_seconds is MJV Session Time, not payroll or clock time.';
+COMMENT ON VIEW public.session_department_analytics IS
+  'Department rollup for MJV Session Time and page usage; not payroll or clock time.';
 
 COMMENT ON COLUMN public.user_sessions.city IS 'Approximate city resolved from public IP; not GPS.';
 COMMENT ON COLUMN public.user_sessions.region IS 'Approximate state/region resolved from public IP; not GPS.';
