@@ -154,6 +154,68 @@ $$;
 REVOKE ALL ON FUNCTION flow_private.notify_message_mentions() FROM PUBLIC,anon,authenticated;
 CREATE TRIGGER flow_message_mention AFTER INSERT ON public.flow_events FOR EACH ROW EXECUTE FUNCTION flow_private.notify_message_mentions();
 
+-- Discussion routing is an explicit record selection, never inferred from free-form hashtags.
+ALTER TABLE public.discussion_posts ADD COLUMN IF NOT EXISTS contact_id uuid;
+ALTER TABLE public.discussion_posts ADD COLUMN IF NOT EXISTS project_id uuid;
+ALTER TABLE public.discussion_posts ADD COLUMN IF NOT EXISTS work_order_id uuid;
+CREATE OR REPLACE FUNCTION flow_private.validate_discussion_route() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_org uuid; v_contact uuid; v_project uuid;
+BEGIN
+ SELECT organization_id INTO v_org FROM public.profiles WHERE id=auth.uid();
+ IF v_org IS NULL OR NEW.organization_id IS DISTINCT FROM v_org THEN RAISE EXCEPTION 'Invalid discussion organization'; END IF;
+ IF num_nonnulls(NEW.contact_id,NEW.project_id,NEW.work_order_id)>1 THEN RAISE EXCEPTION 'Choose one discussion destination'; END IF;
+ IF NEW.work_order_id IS NOT NULL THEN
+  SELECT contact_id,project_id INTO v_contact,v_project FROM public.work_orders WHERE id=NEW.work_order_id AND organization_id=v_org;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Invalid work order destination'; END IF;
+ ELSIF NEW.project_id IS NOT NULL THEN
+  SELECT contact_id INTO v_contact FROM public.projects WHERE id=NEW.project_id AND organization_id=v_org;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Invalid project destination'; END IF;
+ ELSIF NEW.contact_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.contacts WHERE id=NEW.contact_id AND organization_id=v_org) THEN
+  RAISE EXCEPTION 'Invalid customer destination';
+ END IF;
+ RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION flow_private.validate_discussion_route() FROM PUBLIC,anon,authenticated;
+CREATE TRIGGER validate_discussion_route BEFORE INSERT ON public.discussion_posts FOR EACH ROW EXECUTE FUNCTION flow_private.validate_discussion_route();
+CREATE OR REPLACE FUNCTION flow_private.lock_discussion_route() RETURNS trigger
+LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+ IF (NEW.contact_id,NEW.project_id,NEW.work_order_id) IS DISTINCT FROM
+    (OLD.contact_id,OLD.project_id,OLD.work_order_id) THEN
+  RAISE EXCEPTION 'Discussion destination cannot be changed after posting';
+ END IF;
+ RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION flow_private.lock_discussion_route() FROM PUBLIC,anon,authenticated;
+CREATE TRIGGER lock_discussion_route BEFORE UPDATE OF contact_id,project_id,work_order_id ON public.discussion_posts
+ FOR EACH ROW EXECUTE FUNCTION flow_private.lock_discussion_route();
+
+
+-- Flow updates use the same exact @handle resolution as messages.
+CREATE OR REPLACE FUNCTION flow_private.capture_update_mentions() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_mentions uuid[]; v_user uuid;
+BEGIN
+ SELECT coalesce(array_agg(DISTINCT p.id),'{}'::uuid[]) INTO v_mentions
+ FROM regexp_matches(NEW.body,'(^|[^[:alnum:]_])@([[:alnum:]_]+)','g') match
+ JOIN public.profiles p ON lower(p.username)=lower(match[2]) AND p.organization_id=NEW.organization_id
+ WHERE p.id IS DISTINCT FROM NEW.author_id;
+ UPDATE public.flow_events SET mentioned_user_ids=v_mentions
+ WHERE source_table='flow_updates' AND source_id=NEW.id AND organization_id=NEW.organization_id;
+ FOREACH v_user IN ARRAY v_mentions LOOP
+  INSERT INTO public.notifications(organization_id,user_id,type,title,body,related_id,is_read)
+  VALUES(NEW.organization_id,v_user,'flow_update_mention','You were mentioned','Open Flow to read the update in context.',NEW.id,false);
+ END LOOP;
+ RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION flow_private.capture_update_mentions() FROM PUBLIC,anon,authenticated;
+-- capture_flow_event runs first alphabetically so the update row already exists.
+CREATE TRIGGER flow_update_mentions AFTER INSERT ON public.flow_updates FOR EACH ROW EXECUTE FUNCTION flow_private.capture_update_mentions();
+
 -- Tasks and their comments are part of the customer's history when linked to a
 -- customer. Standalone discussions are shown to participants and in All Activity.
 CREATE OR REPLACE FUNCTION flow_private.capture_team_communication() RETURNS trigger
@@ -180,6 +242,9 @@ BEGIN
   v_task=(n->>'task_id')::uuid; v_module='tasks'; v_summary='Comment on task: '||left(v_title,85);
  ELSIF TG_TABLE_NAME='discussion_posts' THEN
   v_module='feed'; v_private=coalesce((n->>'is_private')::boolean,false);
+  v_contact=nullif(n->>'contact_id','')::uuid;
+  IF n->>'project_id' IS NOT NULL THEN SELECT contact_id INTO v_contact FROM public.projects WHERE id=(n->>'project_id')::uuid AND organization_id=v_org; END IF;
+  IF n->>'work_order_id' IS NOT NULL THEN SELECT contact_id INTO v_contact FROM public.work_orders WHERE id=(n->>'work_order_id')::uuid AND organization_id=v_org; END IF;
   IF n->>'parent_id' IS NOT NULL THEN v_summary='Reply in a discussion';
   ELSE v_summary=initcap(coalesce(n->>'post_type','discussion'))||' posted'; END IF;
  ELSE RETURN NEW; END IF;
@@ -198,9 +263,9 @@ BEGIN
    WHERE p.id IS DISTINCT FROM (n->>'user_id')::uuid
   UNION SELECT unnest(v_mentions)
  ) mentioned;
- INSERT INTO public.flow_events(organization_id,contact_id,actor_id,actor_name,customer_name,
+ INSERT INTO public.flow_events(organization_id,contact_id,project_id,work_order_id,actor_id,actor_name,customer_name,
   category,event_type,summary,details,source_table,source_id,required_module,is_internal,mentioned_user_ids,created_at,task_id)
- VALUES(v_org,v_contact,(n->>'user_id')::uuid,coalesce(v_actor,'Team member'),coalesce(v_customer,'Team'),
+ VALUES(v_org,v_contact,nullif(n->>'project_id','')::uuid,nullif(n->>'work_order_id','')::uuid,(n->>'user_id')::uuid,coalesce(v_actor,'Team member'),coalesce(v_customer,'Team'),
   'communication',TG_TABLE_NAME||'.'||lower(TG_OP),v_summary,
   'Open the task or discussion to read the full conversation.',TG_TABLE_NAME,v_source,v_module,v_private,
   coalesce(v_mentions,'{}'::uuid[]),coalesce((n->>'created_at')::timestamptz,now()),v_task);
@@ -231,6 +296,7 @@ RETURNS SETOF jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS
  AND (nullif(p_filters->>'office_id','') IS NULL OR e.office_id=(p_filters->>'office_id')::uuid)
  AND (nullif(p_filters->>'actor_id','') IS NULL OR e.actor_id=(p_filters->>'actor_id')::uuid)
  AND (nullif(p_filters->>'category','') IS NULL OR e.category=p_filters->>'category')
+ AND (nullif(p_filters->>'source_id','') IS NULL OR e.source_table='flow_updates' AND e.source_id=(p_filters->>'source_id')::uuid)
  AND (nullif(p_filters->>'kind','') IS NULL OR CASE p_filters->>'kind'
   WHEN 'messages' THEN e.source_table='messages'
   WHEN 'discussions' THEN e.source_table='discussion_posts'
