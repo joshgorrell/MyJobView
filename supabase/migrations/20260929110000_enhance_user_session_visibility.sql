@@ -113,15 +113,18 @@ CREATE OR REPLACE VIEW public.session_department_analytics
 WITH (security_invoker = true)
 AS
 SELECT
-  organization_id,
-  department_key,
-  department_name,
-  SUM(page_views) AS page_views,
-  MAX(unique_users) AS unique_users_floor,
-  SUM(session_time_seconds) AS session_time_seconds,
-  MAX(last_viewed) AS last_viewed
-FROM public.session_page_analytics
-GROUP BY organization_id, department_key, department_name;
+  ual.organization_id,
+  COALESCE(d.name, 'other') AS department_key,
+  COALESCE(d.display_name, 'Other') AS department_name,
+  COUNT(*) AS page_views,
+  COUNT(DISTINCT ual.user_id) AS unique_users,
+  SUM(ual.duration_seconds) AS session_time_seconds,
+  MAX(ual.timestamp) AS last_viewed
+FROM public.user_activity_log ual
+LEFT JOIN public.department_modules dm ON dm.module_key = ual.page
+LEFT JOIN public.departments d ON d.id = dm.department_id
+WHERE ual.action = 'page_view' AND ual.page IS NOT NULL
+GROUP BY ual.organization_id, d.name, d.display_name;
 
 COMMENT ON VIEW public.session_page_analytics IS
   'Manager/admin product usage analytics. session_time_seconds is MJV Session Time, not payroll or clock time.';
