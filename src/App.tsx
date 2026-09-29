@@ -245,6 +245,28 @@ function AppContent() {
     document.title = notificationCount > 0 ? `(${notificationCount}) MyJobView` : 'MyJobView';
   }, [notificationCount]);
 
+  // Record the module/page the authenticated employee is actively using.
+  // This is application activity, not payroll/worked-time tracking.
+  useEffect(() => {
+    if (!user?.id || !profile?.id || isPortalUser) return;
+
+    const recordPage = () => {
+      const sessionId = (window as any).__currentSessionId || null;
+      supabase.rpc('update_session_activity', {
+        p_user_id: user.id,
+        p_page: activeTab,
+        p_session_id: sessionId,
+      }).then(() => {}).catch(() => {});
+    };
+
+    recordPage();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') recordPage();
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, [activeTab, user?.id, profile?.id, isPortalUser]);
+
   useEffect(() => {
     async function loadFooterLogo() {
       if (!profile?.organization_id) return;

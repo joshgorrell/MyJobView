@@ -22,6 +22,10 @@ interface UserSession {
   os_version: string | null;
   device_model: string | null;
   device_vendor: string | null;
+  current_page: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
   profiles: {
     full_name: string;
     email: string;
@@ -48,7 +52,6 @@ interface UserStats {
   total_time_seconds: number;
   last_seen: string | null;
   is_online: boolean;
-  is_clocked_in: boolean;
   primary_device: string | null;
   primary_location: string | null;
   device_nickname?: {
@@ -182,7 +185,9 @@ export function UserSessionsViewerEnhanced() {
   const [deviceStats, setDeviceStats] = useState<DeviceStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'all'>('today');
-  const [activeTab, setActiveTab] = useState<'active' | 'users' | 'locations' | 'devices' | 'schedule'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'users' | 'usage' | 'locations' | 'devices' | 'schedule'>('active');
+  const [pageUsage, setPageUsage] = useState<any[]>([]);
+  const [departmentUsage, setDepartmentUsage] = useState<any[]>([]);
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
   const [expandedDevices, setExpandedDevices] = useState<Set<number>>(new Set());
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
@@ -326,7 +331,8 @@ export function UserSessionsViewerEnhanced() {
         loadUserStats(),
         loadLocationStats(),
         loadDeviceStats(),
-        loadAllUsers()
+        loadAllUsers(),
+        loadUsageAnalytics()
       ]);
     } finally {
       setLoading(false);
@@ -351,18 +357,13 @@ export function UserSessionsViewerEnhanced() {
 
     const profileIds = profiles.map(p => p.id);
 
-    // Fetch last session per user and clocked-in status in bulk (2 queries instead of 2*N)
-    const [sessionsResult, clockedInResult] = await Promise.all([
+    // Fetch the most recent MJV session for each user.
+    const [sessionsResult] = await Promise.all([
       supabase
         .from('user_sessions')
         .select('user_id, last_activity, is_active, ip_address, device_type, browser_name, os_name')
         .in('user_id', profileIds)
-        .order('last_activity', { ascending: false }),
-      supabase
-        .from('time_clock_history')
-        .select('user_id')
-        .in('user_id', profileIds)
-        .is('clock_out', null)
+        .order('last_activity', { ascending: false })
     ]);
 
     // Build lookup maps - keep only the most recent session per user
@@ -372,8 +373,6 @@ export function UserSessionsViewerEnhanced() {
         lastSessionMap[s.user_id] = s;
       }
     });
-
-    const clockedInSet = new Set((clockedInResult.data || []).map(r => r.user_id));
 
     const usersWithStats = profiles.map(profile => {
       const lastSession = lastSessionMap[profile.id] || null;
@@ -386,7 +385,6 @@ export function UserSessionsViewerEnhanced() {
         total_time_seconds: 0,
         last_seen: lastSession?.last_activity || null,
         is_online: lastSession?.is_active || false,
-        is_clocked_in: clockedInSet.has(profile.id),
         primary_device: lastSession ? `${lastSession.device_type || 'unknown'}|${lastSession.browser_name || 'unknown'}|${lastSession.os_name || 'unknown'}` : null,
         primary_location: lastSession?.ip_address || null,
       };
@@ -627,7 +625,6 @@ export function UserSessionsViewerEnhanced() {
           total_time_seconds: 0,
           last_seen: null,
           is_online: false,
-          is_clocked_in: false,
           primary_device: null,
           primary_location: null,
         });
@@ -656,19 +653,6 @@ export function UserSessionsViewerEnhanced() {
           stats.last_seen = session.last_activity;
           stats.is_online = session.is_active;
         }
-      }
-    });
-
-    const { data: clockedInUsers } = await supabase
-      .from('time_clock_history')
-      .select('user_id')
-      .is('clock_out', null);
-
-    const clockedInSet = new Set(clockedInUsers?.map(u => u.user_id) || []);
-    statsMap.forEach((stats) => {
-      if (clockedInSet.has(stats.user_id)) {
-        stats.is_clocked_in = true;
-        stats.is_online = true;
       }
     });
 
@@ -728,6 +712,54 @@ export function UserSessionsViewerEnhanced() {
       .sort((a, b) => b.total_time_seconds - a.total_time_seconds);
 
     setUserStats(statsArray);
+  }
+
+  async function loadUsageAnalytics() {
+    let pageQuery = supabase
+      .from('user_activity_log')
+      .select('user_id, page, duration_seconds, timestamp')
+      .eq('action', 'page_view')
+      .not('page', 'is', null);
+
+    const now = new Date();
+    if (timeRange === 'today') {
+      pageQuery = pageQuery.gte('timestamp', new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
+    } else if (timeRange === 'week') {
+      pageQuery = pageQuery.gte('timestamp', new Date(now.getTime() - 7 * 86400000).toISOString());
+    } else if (timeRange === 'month') {
+      pageQuery = pageQuery.gte('timestamp', new Date(now.getTime() - 30 * 86400000).toISOString());
+    }
+
+    const [{ data: activity, error }, { data: modules }] = await Promise.all([
+      pageQuery,
+      supabase.from('department_modules').select('module_key, display_name, departments:department_id(name, display_name)')
+    ]);
+    if (error) {
+      console.error('Error loading usage analytics:', error);
+      return;
+    }
+
+    const moduleMap = new Map((modules || []).map((m: any) => [m.module_key, m]));
+    const pages = new Map<string, any>();
+    const departments = new Map<string, any>();
+
+    (activity || []).forEach((row: any) => {
+      const module: any = moduleMap.get(row.page);
+      const pageName = module?.display_name || row.page.replace(/_/g, ' ');
+      const departmentName = module?.departments?.display_name || 'Other';
+      const departmentKey = module?.departments?.name || 'other';
+
+      if (!pages.has(row.page)) pages.set(row.page, { page: row.page, page_name: pageName, department_name: departmentName, views: 0, session_time_seconds: 0, users: new Set<string>() });
+      const p = pages.get(row.page);
+      p.views += 1; p.session_time_seconds += row.duration_seconds || 0; p.users.add(row.user_id);
+
+      if (!departments.has(departmentKey)) departments.set(departmentKey, { department_key: departmentKey, department_name: departmentName, views: 0, session_time_seconds: 0, users: new Set<string>() });
+      const d = departments.get(departmentKey);
+      d.views += 1; d.session_time_seconds += row.duration_seconds || 0; d.users.add(row.user_id);
+    });
+
+    setPageUsage(Array.from(pages.values()).map(p => ({ ...p, unique_users: p.users.size })).sort((a, b) => b.session_time_seconds - a.session_time_seconds));
+    setDepartmentUsage(Array.from(departments.values()).map(d => ({ ...d, unique_users: d.users.size })).sort((a, b) => b.session_time_seconds - a.session_time_seconds));
   }
 
   async function loadLocationStats() {
@@ -966,7 +998,7 @@ export function UserSessionsViewerEnhanced() {
     );
   }
 
-  const totalActiveUsers = activeSessions.length;
+  const totalActiveUsers = new Set(activeSessions.map(s => s.user_id)).size;
   const totalTimeToday = userStats.reduce((sum, user) => sum + user.total_time_seconds, 0);
   const uniqueLocations = new Set(activeSessions.map(s => s.ip_address).filter(Boolean)).size;
 
@@ -1019,7 +1051,7 @@ export function UserSessionsViewerEnhanced() {
         <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Time ({timeRange})</p>
+              <p className="text-sm text-gray-600">Session Time ({timeRange})</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{formatTotalTime(totalTimeToday)}</p>
             </div>
             <div className="p-2 bg-gray-100 rounded-lg">
@@ -1054,6 +1086,12 @@ export function UserSessionsViewerEnhanced() {
               >
                 <span className="hidden sm:inline">All Users</span>
                 <span className="sm:hidden">Users</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('usage')}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${activeTab === 'usage' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                Usage Analytics
               </button>
               <button
                 onClick={() => setActiveTab('locations')}
@@ -1092,7 +1130,7 @@ export function UserSessionsViewerEnhanced() {
               </button>
             </div>
 
-            {activeTab === 'users' && (
+            {(activeTab === 'users' || activeTab === 'usage') && (
               <div className="flex flex-wrap gap-1.5 mt-2 sm:mt-3">
                 {(['today', 'week', 'month', 'all'] as const).map((range) => (
                   <button
@@ -1246,6 +1284,12 @@ export function UserSessionsViewerEnhanced() {
                               </span>
                             ) : session.ip_address && (
                               <div className="relative inline-block">
+                                {(session.city || session.region || session.country) && (
+                                  <span className="mr-1.5 inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded" title="Approximate network location; not GPS">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    {[session.city, session.region, session.country].filter(Boolean).join(', ')}
+                                  </span>
+                                )}
                                 <button
                                   onClick={() => {
                                     setIpNicknamePopover({ ip: session.ip_address!, sessionId: session.id });
@@ -1326,6 +1370,11 @@ export function UserSessionsViewerEnhanced() {
                           <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           <span className="font-medium">{formatDuration(session.duration_seconds)}</span>
                         </div>
+                        {session.current_page && (
+                          <div className="text-xs font-medium text-blue-600 truncate max-w-[180px]" title={session.current_page}>
+                            {session.current_page.replace(/_/g, ' ')}
+                          </div>
+                        )}
                         <div className="text-xs text-gray-500">
                           {formatDistanceToNow(session.last_activity)}
                         </div>
@@ -1334,6 +1383,40 @@ export function UserSessionsViewerEnhanced() {
                   );
                 })
               )}
+            </div>
+          )}
+
+          {activeTab === 'usage' && (
+            <div className="space-y-6">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                <p className="text-sm font-medium text-blue-900">Session Time measures MJV usage only.</p>
+                <p className="text-xs text-blue-700 mt-0.5">It is not Clock Time, Job Time, or payroll time. Use these analytics to understand adoption, workflow, and which departments/pages should be improved, consolidated, or retired.</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Departments</h3>
+                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {departmentUsage.map((d) => (
+                    <div key={d.department_key} className="border border-gray-200 rounded-lg p-4 bg-white">
+                      <div className="flex justify-between gap-3">
+                        <div><p className="font-medium text-gray-900">{d.department_name}</p><p className="text-xs text-gray-500">{d.unique_users} users · {d.views} page visits</p></div>
+                        <p className="font-semibold text-gray-900">{formatTotalTime(d.session_time_seconds)}</p>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Session Time</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Pages</h3>
+                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                  <table className="w-full min-w-[650px]">
+                    <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Page</th><th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Department</th><th className="px-4 py-3 text-right text-xs text-gray-500 uppercase">Users</th><th className="px-4 py-3 text-right text-xs text-gray-500 uppercase">Visits</th><th className="px-4 py-3 text-right text-xs text-gray-500 uppercase">Session Time</th></tr></thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {pageUsage.map((p) => <tr key={p.page} className="hover:bg-gray-50"><td className="px-4 py-3 text-sm font-medium text-gray-900">{p.page_name}</td><td className="px-4 py-3 text-sm text-gray-600">{p.department_name}</td><td className="px-4 py-3 text-sm text-gray-700 text-right">{p.unique_users}</td><td className="px-4 py-3 text-sm text-gray-700 text-right">{p.views}</td><td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">{formatTotalTime(p.session_time_seconds)}</td></tr>)}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1395,11 +1478,6 @@ export function UserSessionsViewerEnhanced() {
                               <span className="text-xs sm:text-sm text-gray-600">
                                 {user.is_online ? 'Online' : 'Offline'}
                               </span>
-                              {user.is_clocked_in && (
-                                <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
-                                  Clocked In
-                                </span>
-                              )}
                             </div>
                           </td>
                           <td className="px-2 sm:px-4 py-3 hidden md:table-cell">

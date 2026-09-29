@@ -322,22 +322,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data) {
         setCurrentSessionId(data);
 
+        // Resolve public IP + approximate city/state/country server-side.
+        // This intentionally does not request browser GPS/location permission.
         setTimeout(() => {
-          fetch('https://api.ipify.org?format=json', {
-            method: 'GET',
-            signal: AbortSignal.timeout(3000)
-          })
-            .then(response => response.json())
-            .then(ipData => {
-              if (ipData.ip && data) {
-                supabase
-                  .from('user_sessions')
-                  .update({ ip_address: ipData.ip })
-                  .eq('id', data)
-                  .catch(() => {});
-              }
-            })
-            .catch(() => {});
+          supabase.functions.invoke('session-location', {
+            body: { session_id: data },
+          }).catch(() => {});
         }, 0);
 
         // Update activity every 5 minutes
