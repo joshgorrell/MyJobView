@@ -8,7 +8,7 @@ import ProjectDetail from './ProjectDetail';
 export default function ProjectsView() {
   const { profile, loading: authLoading } = useAuth();
   const [projects, setProjects] = useState<any[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('projectId'));
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -75,6 +75,7 @@ export default function ProjectsView() {
         projectId={selectedProjectId}
         onBack={() => {
           setSelectedProjectId(null);
+          const url = new URL(window.location.href); url.searchParams.delete('projectId'); window.history.replaceState(null, '', url);
           loadProjects();
         }}
       />

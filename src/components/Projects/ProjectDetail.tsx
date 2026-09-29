@@ -1,3 +1,4 @@
+import Flow from '../Flow/Flow';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,7 +17,7 @@ interface ProjectDetailProps {
   onBack: () => void;
 }
 
-type TabType = 'overview' | 'scope' | 'tasks' | 'appointments' | 'invoices' | 'communication' | 'history' | 'activity_log';
+type TabType = 'overview' | 'scope' | 'tasks' | 'appointments' | 'invoices' | 'communication' | 'history' | 'activity_log' | 'flow';
 
 export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
   const { profile } = useAuth();
@@ -89,6 +90,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
     profile?.role === 'project_manager';
 
   const tabs = [
+    { id: 'flow' as TabType, label: 'Flow', icon: Clock },
     { id: 'overview' as TabType, label: 'Overview', icon: FileText },
     { id: 'scope' as TabType, label: 'Scope', icon: FileText },
     { id: 'tasks' as TabType, label: 'Tasks', icon: CheckSquare },
@@ -166,6 +168,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
 
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
+        {activeTab === 'flow' && <div className="p-4"><Flow projectId={projectId} dark /></div>}
         {activeTab === 'overview' && (
           <ProjectOverview project={project} onUpdate={updateProject} onRefresh={loadProject} />
         )}
