@@ -80,10 +80,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageSectionRef = useRef<HTMLDivElement>(null);
-  const [imageSuggestions, setImageSuggestions] = useState<string[]>([]);
-  const [imageSuggestionIndex, setImageSuggestionIndex] = useState(0);
-  const [checkingImage, setCheckingImage] = useState(false);
-  const autoSelectedImage = useRef<{ modelKey: string; url: string } | null>(null);
   const [showMissingImagePrompt, setShowMissingImagePrompt] = useState(false);
 
   // Auto-save key (needed early for scroll position tracking)
@@ -173,55 +169,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     data: formData,
     enabled: true // Auto-save for all forms (new, edit, and duplicate)
   });
-
-  // Reuse an exact model photo already approved for this organization.
-  useEffect(() => {
-    const model = formData.manufacturer_model_number.trim();
-    const modelKey = `${formData.manufacturer_id}:${model.toLowerCase()}`;
-    if (autoSelectedImage.current && autoSelectedImage.current.modelKey !== modelKey) {
-      const previousUrl = autoSelectedImage.current.url;
-      setFormData(current => current.image_url === previousUrl ? { ...current, image_url: '' } : current);
-      autoSelectedImage.current = null;
-    }
-    const organizationId = profile?.organization_id;
-    if (!organizationId || !formData.manufacturer_id || model.length < 3 || formData.item_type !== 'material') {
-      setImageSuggestions([]);
-      setImageSuggestionIndex(0);
-      setCheckingImage(false);
-      return;
-    }
-
-    setImageSuggestions([]);
-    setImageSuggestionIndex(0);
-    setCheckingImage(false);
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      setCheckingImage(true);
-      const { data, error } = await supabase.from('products')
-        .select('id, manufacturer_model_number, image_url')
-        .eq('organization_id', organizationId)
-        .eq('manufacturer_id', formData.manufacturer_id)
-        .ilike('manufacturer_model_number', model)
-        .not('image_url', 'is', null)
-        .limit(20);
-      if (cancelled) return;
-      if (error) console.error('Could not check for an existing product photo:', error);
-      const matches = (data || [])
-        .filter(p => p.id !== productId && p.manufacturer_model_number?.trim().toLowerCase() === model.toLowerCase() && p.image_url?.trim())
-        .map(p => p.image_url.trim());
-      const urls = [...new Set(matches)];
-      setImageSuggestions(urls);
-      // Fill the thumbnail only if the person has not chosen a photo already.
-      if (urls.length) setFormData(current => {
-        if (current.image_url) return current;
-        autoSelectedImage.current = { modelKey, url: urls[0] };
-        return { ...current, image_url: urls[0] };
-      });
-      setCheckingImage(false);
-    }, 600);
-
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [profile?.organization_id, productId, formData.manufacturer_id, formData.manufacturer_model_number, formData.item_type]);
 
   useEffect(() => {
     // Clean up old localStorage keys that might have invalid data
@@ -1249,7 +1196,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     onClose();
   }
 
-  const suggestedImage = imageSuggestions[imageSuggestionIndex] || imageSuggestions[0];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
@@ -1642,28 +1588,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     Add a product photo so this item is easy to recognize in the catalog and on documents.
                   </p>
-                )}
-                {checkingImage && !formData.image_url && <p className="text-xs text-gray-500">Checking the catalog for this model’s photo…</p>}
-                {suggestedImage && (
-                  <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-2">
-                    <img src={suggestedImage} alt="Suggested catalog photo for this model" className="w-14 h-14 rounded object-contain bg-white"
-                      onError={() => {
-                        setImageSuggestions(current => current.filter(url => url !== suggestedImage));
-                        setImageSuggestionIndex(0);
-                        setFormData(current => current.image_url === suggestedImage ? { ...current, image_url: '' } : current);
-                      }} />
-                    <div className="min-w-0 flex-1 text-xs text-blue-900">
-                      Photo found for this exact manufacturer and model in your catalog.
-                      {imageSuggestions.length > 1 && <div className="mt-1 flex items-center gap-1">
-                        <button type="button" aria-label="Previous suggested photo" onClick={() => setImageSuggestionIndex(index => { const next = (index - 1 + imageSuggestions.length) % imageSuggestions.length; autoSelectedImage.current = { modelKey: `${formData.manufacturer_id}:${formData.manufacturer_model_number.trim().toLowerCase()}`, url: imageSuggestions[next] }; setFormData(prev => ({ ...prev, image_url: imageSuggestions[next] })); return next; })}
-                          className="rounded p-1 hover:bg-blue-100"><ChevronLeft className="w-4 h-4" /></button>
-                        <span>{imageSuggestionIndex + 1} of {imageSuggestions.length}</span>
-                        <button type="button" aria-label="Next suggested photo" onClick={() => setImageSuggestionIndex(index => { const next = (index + 1) % imageSuggestions.length; autoSelectedImage.current = { modelKey: `${formData.manufacturer_id}:${formData.manufacturer_model_number.trim().toLowerCase()}`, url: imageSuggestions[next] }; setFormData(prev => ({ ...prev, image_url: imageSuggestions[next] })); return next; })}
-                          className="rounded p-1 hover:bg-blue-100"><ChevronRight className="w-4 h-4" /></button>
-                      </div>}
-                    </div>
-                    <span className="shrink-0 text-xs font-medium text-blue-700">{formData.image_url === suggestedImage ? 'Selected' : 'Preview'}</span>
-                  </div>
                 )}
                 <div className="flex gap-2">
                   <button
