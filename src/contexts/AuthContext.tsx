@@ -330,10 +330,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .then(response => response.json())
             .then(ipData => {
               if (ipData.ip && data) {
+                // Always refresh the IP on the reused device session. The session
+                // dedupe RPC may return an existing row when a laptop changes networks.
                 supabase
                   .from('user_sessions')
-                  .update({ ip_address: ipData.ip })
+                  .update({ ip_address: ipData.ip, location_updated_at: new Date().toISOString() })
                   .eq('id', data)
+                  .eq('user_id', userId)
                   .catch(() => {});
               }
             })
