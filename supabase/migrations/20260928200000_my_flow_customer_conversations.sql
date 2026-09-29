@@ -160,10 +160,20 @@ ALTER TABLE public.discussion_posts ADD COLUMN IF NOT EXISTS project_id uuid;
 ALTER TABLE public.discussion_posts ADD COLUMN IF NOT EXISTS work_order_id uuid;
 CREATE OR REPLACE FUNCTION flow_private.validate_discussion_route() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_org uuid; v_contact uuid; v_project uuid;
+DECLARE v_org uuid; v_contact uuid; v_project uuid; v_parent_wo uuid;
 BEGIN
  SELECT organization_id INTO v_org FROM public.profiles WHERE id=auth.uid();
  IF v_org IS NULL OR NEW.organization_id IS DISTINCT FROM v_org THEN RAISE EXCEPTION 'Invalid discussion organization'; END IF;
+ IF NEW.parent_id IS NOT NULL THEN
+  SELECT contact_id,project_id,work_order_id INTO v_contact,v_project,v_parent_wo
+  FROM public.discussion_posts WHERE id=NEW.parent_id AND organization_id=v_org;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Invalid parent discussion'; END IF;
+  IF num_nonnulls(NEW.contact_id,NEW.project_id,NEW.work_order_id)>0 AND
+    (NEW.contact_id,NEW.project_id,NEW.work_order_id) IS DISTINCT FROM (v_contact,v_project,v_parent_wo) THEN
+   RAISE EXCEPTION 'Reply destination must match its discussion';
+  END IF;
+  NEW.contact_id=v_contact; NEW.project_id=v_project; NEW.work_order_id=v_parent_wo;
+ END IF;
  IF num_nonnulls(NEW.contact_id,NEW.project_id,NEW.work_order_id)>1 THEN RAISE EXCEPTION 'Choose one discussion destination'; END IF;
  IF NEW.work_order_id IS NOT NULL THEN
   SELECT contact_id,project_id INTO v_contact,v_project FROM public.work_orders WHERE id=NEW.work_order_id AND organization_id=v_org;
@@ -222,7 +232,7 @@ CREATE OR REPLACE FUNCTION flow_private.capture_team_communication() RETURNS tri
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE n jsonb=to_jsonb(NEW); v_org uuid; v_contact uuid; v_task uuid; v_title text;
  v_customer text='Team'; v_actor text='Team member'; v_mentions uuid[]='{}'::uuid[];
- v_summary text; v_source uuid; v_module text; v_private boolean=false;
+ v_summary text; v_source uuid; v_module text; v_private boolean=false; v_project_name text=''; v_wo_number text='';
 BEGIN
  v_org=(n->>'organization_id')::uuid;
  IF v_org IS NULL THEN RETURN NEW; END IF;
@@ -244,7 +254,8 @@ BEGIN
   v_module='feed'; v_private=coalesce((n->>'is_private')::boolean,false);
   v_contact=nullif(n->>'contact_id','')::uuid;
   IF n->>'project_id' IS NOT NULL THEN SELECT contact_id INTO v_contact FROM public.projects WHERE id=(n->>'project_id')::uuid AND organization_id=v_org; END IF;
-  IF n->>'work_order_id' IS NOT NULL THEN SELECT contact_id INTO v_contact FROM public.work_orders WHERE id=(n->>'work_order_id')::uuid AND organization_id=v_org; END IF;
+  IF n->>'work_order_id' IS NOT NULL THEN SELECT contact_id,work_order_number INTO v_contact,v_wo_number FROM public.work_orders WHERE id=(n->>'work_order_id')::uuid AND organization_id=v_org; END IF;
+  IF n->>'project_id' IS NOT NULL THEN SELECT name INTO v_project_name FROM public.projects WHERE id=(n->>'project_id')::uuid AND organization_id=v_org; END IF;
   IF n->>'parent_id' IS NOT NULL THEN v_summary='Reply in a discussion';
   ELSE v_summary=initcap(coalesce(n->>'post_type','discussion'))||' posted'; END IF;
  ELSE RETURN NEW; END IF;
@@ -263,9 +274,9 @@ BEGIN
    WHERE p.id IS DISTINCT FROM (n->>'user_id')::uuid
   UNION SELECT unnest(v_mentions)
  ) mentioned;
- INSERT INTO public.flow_events(organization_id,contact_id,project_id,work_order_id,actor_id,actor_name,customer_name,
+ INSERT INTO public.flow_events(organization_id,contact_id,project_id,work_order_id,project_name,work_order_number,actor_id,actor_name,customer_name,
   category,event_type,summary,details,source_table,source_id,required_module,is_internal,mentioned_user_ids,created_at,task_id)
- VALUES(v_org,v_contact,nullif(n->>'project_id','')::uuid,nullif(n->>'work_order_id','')::uuid,(n->>'user_id')::uuid,coalesce(v_actor,'Team member'),coalesce(v_customer,'Team'),
+ VALUES(v_org,v_contact,nullif(n->>'project_id','')::uuid,nullif(n->>'work_order_id','')::uuid,coalesce(v_project_name,''),coalesce(v_wo_number,''),(n->>'user_id')::uuid,coalesce(v_actor,'Team member'),coalesce(v_customer,'Team'),
   'communication',TG_TABLE_NAME||'.'||lower(TG_OP),v_summary,
   'Open the task or discussion to read the full conversation.',TG_TABLE_NAME,v_source,v_module,v_private,
   coalesce(v_mentions,'{}'::uuid[]),coalesce((n->>'created_at')::timestamptz,now()),v_task);
