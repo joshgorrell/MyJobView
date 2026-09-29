@@ -38,7 +38,7 @@ CREATE POLICY "Dealer admins can view organization activity"
     organization_id = public.get_user_org_id()
     AND EXISTS (
       SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role = 'admin'
+      WHERE p.id = auth.uid() AND p.role IN ('admin', 'manager')
     )
   );
 
