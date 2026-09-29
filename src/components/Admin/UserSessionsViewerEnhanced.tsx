@@ -22,6 +22,10 @@ interface UserSession {
   os_version: string | null;
   device_model: string | null;
   device_vendor: string | null;
+  current_page: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
   profiles: {
     full_name: string;
     email: string;
@@ -966,7 +970,7 @@ export function UserSessionsViewerEnhanced() {
     );
   }
 
-  const totalActiveUsers = activeSessions.length;
+  const totalActiveUsers = new Set(activeSessions.map(s => s.user_id)).size;
   const totalTimeToday = userStats.reduce((sum, user) => sum + user.total_time_seconds, 0);
   const uniqueLocations = new Set(activeSessions.map(s => s.ip_address).filter(Boolean)).size;
 
@@ -1019,7 +1023,7 @@ export function UserSessionsViewerEnhanced() {
         <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Time ({timeRange})</p>
+              <p className="text-sm text-gray-600">MJV Active Time ({timeRange})</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{formatTotalTime(totalTimeToday)}</p>
             </div>
             <div className="p-2 bg-gray-100 rounded-lg">
@@ -1246,6 +1250,12 @@ export function UserSessionsViewerEnhanced() {
                               </span>
                             ) : session.ip_address && (
                               <div className="relative inline-block">
+                                {(session.city || session.region || session.country) && (
+                                  <span className="mr-1.5 inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded" title="Approximate network location; not GPS">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    {[session.city, session.region, session.country].filter(Boolean).join(', ')}
+                                  </span>
+                                )}
                                 <button
                                   onClick={() => {
                                     setIpNicknamePopover({ ip: session.ip_address!, sessionId: session.id });
@@ -1326,6 +1336,11 @@ export function UserSessionsViewerEnhanced() {
                           <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           <span className="font-medium">{formatDuration(session.duration_seconds)}</span>
                         </div>
+                        {session.current_page && (
+                          <div className="text-xs font-medium text-blue-600 truncate max-w-[180px]" title={session.current_page}>
+                            {session.current_page.replace(/_/g, ' ')}
+                          </div>
+                        )}
                         <div className="text-xs text-gray-500">
                           {formatDistanceToNow(session.last_activity)}
                         </div>
