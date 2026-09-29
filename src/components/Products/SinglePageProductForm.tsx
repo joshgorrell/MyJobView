@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
+import { mountGoogleProductImageSearch, searchGoogleProductImages, stopGoogleProductImageSearch, type GoogleProductImage } from './googleProductImageSearch';
 
 interface Category {
   id: string;
@@ -48,14 +49,6 @@ interface ProductFormProps {
 
 }
 
-interface SuggestedPhoto {
-  url: string;
-  preview: string;
-  title: string;
-  source: string;
-  page: string | null;
-}
-
 export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave }: ProductFormProps) {
   const { profile } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -89,10 +82,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageSectionRef = useRef<HTMLDivElement>(null);
   const [showMissingImagePrompt, setShowMissingImagePrompt] = useState(false);
-  const [suggestedPhotos, setSuggestedPhotos] = useState<SuggestedPhoto[]>([]);
+  const [suggestedPhotos, setSuggestedPhotos] = useState<GoogleProductImage[]>([]);
   const [suggestedPhotoIndex, setSuggestedPhotoIndex] = useState(0);
   const [searchingPhotos, setSearchingPhotos] = useState(false);
   const [photoSearchMessage, setPhotoSearchMessage] = useState('');
+  const [googlePhotosReady, setGooglePhotosReady] = useState(false);
+  const expectedPhotoQuery = useRef('');
+  const googleSearchId = useRef(`product-photo-search-${crypto.randomUUID()}`);
 
   // Auto-save key (needed early for scroll position tracking)
   const autoSaveKey = productId ? `product_edit_${productId}` : duplicateFromId ? `product_duplicate_${duplicateFromId}` : 'product_new';
@@ -177,6 +173,21 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
   const selectedManufacturerName = manufacturers.find(m => m.id === formData.manufacturer_id)?.name;
   useEffect(() => {
+    const cx = import.meta.env.VITE_GOOGLE_PSE_ID?.trim();
+    if (!cx) return;
+    let cancelled = false;
+    mountGoogleProductImageSearch(cx, googleSearchId.current, (query, images) => {
+      if (cancelled || query !== expectedPhotoQuery.current) return;
+      setSuggestedPhotos(images);
+      setSuggestedPhotoIndex(0);
+      setSearchingPhotos(false);
+      setPhotoSearchMessage(images.length ? '' : 'No matching photos found. Search, paste, or upload a photo.');
+    }).then(() => { if (!cancelled) setGooglePhotosReady(true); })
+      .catch(() => { if (!cancelled) setPhotoSearchMessage('Google image search could not load. Search, paste, or upload a photo.'); });
+    return () => { cancelled = true; stopGoogleProductImageSearch(); };
+  }, []);
+
+  useEffect(() => {
     if (productId || duplicateFromId || formData.item_type !== 'material' || formData.image_url ||
         !selectedManufacturerName || formData.manufacturer_model_number.trim().length < 3) {
       setSuggestedPhotos([]);
@@ -189,23 +200,20 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     setSuggestedPhotos([]);
     setSuggestedPhotoIndex(0);
     setPhotoSearchMessage('');
-    const timer = window.setTimeout(async () => {
-      setSearchingPhotos(true);
-      const { data, error } = await supabase.functions.invoke('suggest-product-images', {
-        body: { manufacturer: selectedManufacturerName, model: formData.manufacturer_model_number.trim() },
-      });
-      if (cancelled) return;
-      setSearchingPhotos(false);
-      if (error || data?.error) setPhotoSearchMessage('Photo suggestions are unavailable. Search, paste, or upload a photo.');
-      else if (data?.unavailable) setPhotoSearchMessage('Online photo suggestions are not configured. Search, paste, or upload a photo.');
-      else {
-        const photos = Array.isArray(data?.images) ? data.images as SuggestedPhoto[] : [];
-        setSuggestedPhotos(photos);
-        if (!photos.length) setPhotoSearchMessage('No matching photos found. Search, paste, or upload a photo.');
+    const timer = window.setTimeout(() => {
+      if (!import.meta.env.VITE_GOOGLE_PSE_ID) {
+        setPhotoSearchMessage('Google photo suggestions are not configured. Search, paste, or upload a photo.');
+        return;
       }
+      if (!googlePhotosReady) return;
+      const query = `${selectedManufacturerName} "${formData.manufacturer_model_number.trim()}" product`;
+      expectedPhotoQuery.current = query;
+      setSearchingPhotos(true);
+      try { searchGoogleProductImages(query); }
+      catch { if (!cancelled) { setSearchingPhotos(false); setPhotoSearchMessage('Google image search is unavailable. Search, paste, or upload a photo.'); } }
     }, 700);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [productId, duplicateFromId, formData.item_type, formData.image_url, formData.manufacturer_model_number, selectedManufacturerName]);
+  }, [productId, duplicateFromId, formData.item_type, formData.image_url, formData.manufacturer_model_number, selectedManufacturerName, googlePhotosReady]);
 
   // Auto-save hook
   const { restoreSavedData, clearSavedData } = useAutoSave({
@@ -1522,6 +1530,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     >
                       <X className="w-4 h-4" />
                     </button>
+                  </div>
+                )}
+                {import.meta.env.VITE_GOOGLE_PSE_ID && (
+                  <div className="border-t border-gray-200 pt-2">
+                    <p className="text-xs text-gray-500 mb-2">Google image results</p>
+                    <div id={googleSearchId.current} />
                   </div>
                 )}
               </div>
