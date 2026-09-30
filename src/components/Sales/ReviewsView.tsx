@@ -1131,7 +1131,7 @@ export default function ReviewsView() {
               <div className="mb-6 rounded-xl border border-blue-700/50 bg-blue-950/20 p-5">
                 <div className="mb-4">
                   <h3 className="text-base font-bold text-white">Customer Lifecycle</h3>
-                  <p className="mt-1 text-xs text-gray-400">These emails normally send automatically. Select a stage only when you need to preview or manually resend it.</p>
+                  <p className="mt-1 text-xs text-gray-400">These emails normally send automatically. Choose one communication to preview or manually resend. Selecting another replaces your current selection.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
                   {[
@@ -1143,6 +1143,9 @@ export default function ReviewsView() {
                     <button key={value} type="button" onClick={() => { setLifecycleType(value as typeof lifecycleType); setSendMethod('satisfaction'); }}
                       className={`relative rounded-xl border p-4 text-left transition-colors ${sendMethod === 'satisfaction' && lifecycleType === value ? 'border-blue-400 bg-blue-900/40' : 'border-gray-700 bg-gray-900/70 hover:border-blue-600'}`}>
                       <div className="flex items-center gap-2">
+                        <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${sendMethod === 'satisfaction' && lifecycleType === value ? 'border-blue-300 bg-blue-400' : 'border-gray-500 bg-transparent'}`}>
+                          {sendMethod === 'satisfaction' && lifecycleType === value && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </span>
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">{step}</span>
                         <span className="text-xs font-semibold uppercase tracking-wide text-blue-300">{timing}</span>
                       </div>
@@ -1159,7 +1162,12 @@ export default function ReviewsView() {
               <div className="mb-6">
                 <button type="button" onClick={() => { setLifecycleType('manual'); setSendMethod('satisfaction'); }}
                   className={`w-full rounded-xl border p-4 text-left transition-colors ${sendMethod === 'satisfaction' && lifecycleType === 'manual' ? 'border-indigo-500 bg-indigo-950/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'}`}>
-                  <div className="font-semibold text-white">General Customer Feedback</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${sendMethod === 'satisfaction' && lifecycleType === 'manual' ? 'border-indigo-300 bg-indigo-400' : 'border-gray-500 bg-transparent'}`}>
+                      {sendMethod === 'satisfaction' && lifecycleType === 'manual' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                    </span>
+                    <div className="font-semibold text-white">General Customer Feedback</div>
+                  </div>
                   <div className="mt-1 text-xs text-gray-400">Manual feedback request outside the automated customer lifecycle.</div>
                 </button>
               </div>
@@ -1318,7 +1326,7 @@ export default function ReviewsView() {
                   {satSending ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Sending...</>
                   ) : (
-                    <><ThumbsUp className="w-5 h-5" />Send {lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'test_tune_welcome' ? 'Test & Tune Welcome' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'Email'}</>
+                    <><Mail className="w-5 h-5" />Send Email</>
                   )}
                 </button>
               </div>
