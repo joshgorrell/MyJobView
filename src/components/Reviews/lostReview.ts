@@ -1,5 +1,5 @@
 import { supabase } from "../../lib/supabase";
-export const lossReasons = [
+export const responseReasons = [
   ["price", "Price was too high"],
   ["value", "Another company offered a better value"],
   ["company", "I preferred another company"],
@@ -9,6 +9,14 @@ export const lossReasons = [
   ["process", "The process took too long"],
   ["timing", "Timing changed / project is on hold"],
   ["cancelled", "We decided not to do the project"],
+  ["other", "Something else"],
+] as const;
+export const lossReasons = [
+  ["price", "Price was too high"],
+  ["company", "Another company felt like a better fit"],
+  ["design", "The proposed solution wasn’t right"],
+  ["communication", "Communication or timing"],
+  ["timing", "Project postponed or canceled"],
   ["other", "Something else"],
 ] as const;
 export async function lostReviewAction(body: Record<string, unknown>) {
