@@ -562,53 +562,10 @@ export default function ReviewsView() {
     };
   }
 
-  async function fetchEmailPreviewForMethod(method: 'survey') {
-    setLoadingPreview(true);
-    try {
-      const templateType = 'job_completion_survey';
-      const { email: recipientEmail, name: recipientName } = getRecipientInfo();
-
-      const [templateRes, settingsRes] = await Promise.all([
-        supabase
-          .from('email_templates')
-          .select('subject, body')
-          .eq('template_type', templateType)
-          .eq('is_active', true)
-          .maybeSingle(),
-        supabase
-          .from('company_settings')
-          .select('company_name, company_email, company_logo_url, company_website')
-          .maybeSingle(),
-      ]);
-
-      const settings = settingsRes.data || { company_name: 'Electronic Life', company_email: '', company_logo_url: '', company_website: '' };
-      const placeholders: Record<string, string> = {
-        customer_name: recipientName,
-        customer_first_name: recipientName,
-        company_name: settings.company_name,
-        review_url: REVIEW_URL,
-        company_website: (settings as any).company_website || '',
-      };
-
-      const subject = templateRes.data ? replacePlaceholders(templateRes.data.subject, placeholders) : `How did we do, ${recipientName}?`;
-      const html = buildJobSurveyEmailPreview({ customerName: recipientName, companyName: settings.company_name, companyEmail: settings.company_email || '', companyLogoUrl: settings.company_logo_url || '', reviewUrl: REVIEW_URL, companyWebsite: (settings as any).company_website || '' });
-
-      setPreviewData({ subject, html, recipientEmail, recipientName });
-      setEditedSubject(subject);
-      setPersonalNote('');
-      setEditMode(false);
-      setShowPreview(true);
-    } catch (err) {
-      console.error('Error building preview:', err);
-    } finally {
-      setLoadingPreview(false);
-    }
-  }
-
   async function fetchEmailPreview() {
     setLoadingPreview(true);
     try {
-      const templateType = sendMethod === 'survey' ? 'job_completion_survey' : 'review_request';
+      const templateType = 'review_request';
       const { email: recipientEmail, name: recipientName } = getRecipientInfo();
 
       const [templateRes, settingsRes] = await Promise.all([
@@ -641,17 +598,7 @@ export default function ReviewsView() {
 
       let subject: string;
       let html: string;
-      if (sendMethod === 'survey') {
-        subject = templateRes.data ? replacePlaceholders(templateRes.data.subject, placeholders) : `How did we do, ${recipientName}?`;
-        html = buildJobSurveyEmailPreview({
-          customerName: recipientName,
-          companyName: settings.company_name,
-          companyEmail: settings.company_email || '',
-          companyLogoUrl: settings.company_logo_url || '',
-          reviewUrl: REVIEW_URL,
-          companyWebsite: (settings as any).company_website || '',
-        });
-      } else {
+      {
         subject = `How did we do, ${recipientName}?`;
         html = buildJobSurveyEmailPreview({
           customerName: recipientName,
@@ -694,10 +641,9 @@ export default function ReviewsView() {
   }
 
   async function sendReviewRequest() {
-    const isSurvey = sendMethod === 'survey';
     const isEmail = sendMethod === 'email';
 
-    if (isSurvey || isEmail) {
+    if (isEmail) {
       if (useManualEntry) {
         if (!manualEmail) { toast.warning('Please enter an email address'); return; }
         if (!manualEmail.includes('@')) { toast.warning('Please enter a valid email address'); return; }
@@ -721,7 +667,7 @@ export default function ReviewsView() {
       };
 
       if (useManualEntry) {
-        if (isSurvey || isEmail) {
+        if (isEmail) {
           requestBody.email = manualEmail;
           requestBody.name = manualName;
         } else {
@@ -736,9 +682,7 @@ export default function ReviewsView() {
       if (!session) throw new Error('Not authenticated');
 
       let functionName: string;
-      if (isSurvey) {
-        functionName = 'send-job-completion-survey';
-      } else if (isEmail) {
+      if (isEmail) {
         functionName = 'send-review-request';
       } else {
         functionName = 'send-review-request-sms';
@@ -762,10 +706,10 @@ export default function ReviewsView() {
         .from('review_requests')
         .insert({
           contact_id: useManualEntry ? null : selectedContact?.id,
-          recipient_email: (isSurvey || isEmail) && useManualEntry ? manualEmail : null,
+          recipient_email: (isEmail) && useManualEntry ? manualEmail : null,
           recipient_name: useManualEntry ? manualName : null,
           sent_by: profile?.id,
-          method: isSurvey ? 'survey' : sendMethod
+          method: sendMethod
         });
 
       if (insertError) throw insertError;
@@ -773,7 +717,7 @@ export default function ReviewsView() {
       const sentName = useManualEntry
         ? (manualName || manualEmail || manualPhone)
         : (selectedContact?.contact_name || '');
-      const sentMethod = isSurvey ? 'Job Completion Survey' : isEmail ? 'Google Review Request' : 'SMS Review Request';
+      const sentMethod = isEmail ? 'Google Review Request' : 'SMS Review Request';
 
       setShowPreview(false);
       setPreviewData(null);
@@ -891,13 +835,8 @@ export default function ReviewsView() {
           throw new Error('Not authenticated');
         }
 
-        const isSurvey = request.method === 'survey';
         const isSms = request.method === 'sms';
-        const functionName = isSurvey
-          ? 'send-job-completion-survey'
-          : isSms
-            ? 'send-review-request-sms'
-            : 'send-review-request';
+        const functionName = isSms ? 'send-review-request-sms' : 'send-review-request';
 
         if (isSms) {
           if (request.contact_id && request.contacts) {
@@ -946,12 +885,12 @@ export default function ReviewsView() {
 
   const isSendDisabled =
     sending ||
-    ((sendMethod === 'survey' || sendMethod === 'email') && !selectedContact && !manualEmail) ||
+    (sendMethod === 'email' && !selectedContact && !manualEmail) ||
     (sendMethod === 'sms' && !selectedContact && !manualPhone);
 
   const isPreviewDisabled =
     loadingPreview ||
-    ((sendMethod === 'survey' || sendMethod === 'email') && !selectedContact && !manualEmail);
+    (sendMethod === 'email' && !selectedContact && !manualEmail);
 
   const filteredContacts = contacts;
 
@@ -1267,39 +1206,6 @@ export default function ReviewsView() {
                   </div>
                 </div>}
 
-                {/* Job Completion Survey */}
-                {canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'survey' ? 'bg-amber-900/30 border-amber-500 shadow-lg shadow-amber-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
-                  <button
-                    onClick={() => setSendMethod('survey')}
-                    className="text-left p-4 w-full"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`p-1.5 rounded-lg ${sendMethod === 'survey' ? 'bg-amber-600' : 'bg-gray-700'}`}>
-                        <ClipboardList className="w-4 h-4 text-white" />
-                      </div>
-                      <span className={`font-semibold text-sm ${sendMethod === 'survey' ? 'text-amber-300' : 'text-gray-200'}`}>
-                        Job Completion Survey
-                      </span>
-                      {sendMethod === 'survey' && (
-                        <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                      A longer "How did we do?" email — best sent after a job is completed. Same Google review link, more professional tone.
-                    </p>
-                  </button>
-                  <div className="px-4 pb-3">
-                    <button
-                      onClick={e => { e.stopPropagation(); fetchEmailPreviewForMethod('survey'); }}
-                      disabled={loadingPreview}
-                      className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-cyan-400 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Eye className="w-3.5 h-3.5 group-hover:text-cyan-400" />
-                      Preview email
-                    </button>
-                  </div>
-                </div>}
-
                 {/* SMS / Text */}
                 <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
@@ -1561,7 +1467,7 @@ export default function ReviewsView() {
                         className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                       />
                     </div>
-                    {(sendMethod === 'survey' || sendMethod === 'email') ? (
+                    {sendMethod === 'email' ? (
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                           Email Address <span className="text-red-400">*</span>
@@ -1599,15 +1505,13 @@ export default function ReviewsView() {
                     onClick={sendReviewRequest}
                     disabled={isSendDisabled}
                     className={`w-full px-6 py-3 text-white rounded-lg font-medium transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
-                      sendMethod === 'survey' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'
+                      sendMethod === 'email' ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-green-600 hover:bg-green-700'
                     }`}
                   >
-                    {sendMethod === 'sms' ? <MessageSquare className="w-5 h-5" /> : <ClipboardList className="w-5 h-5" />}
+                    {sendMethod === 'sms' ? <MessageSquare className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
                     {sending
                       ? 'Sending...'
-                      : sendMethod === 'survey'
-                        ? 'Send Job Completion Survey'
-                        : 'Send via SMS'
+                      : sendMethod === 'email' ? 'Send Google Review Email' : 'Send via SMS'
                     }
                   </button>
                 </div>
@@ -2030,11 +1934,7 @@ export default function ReviewsView() {
                 <button
                   onClick={sendReviewRequest}
                   disabled={sending}
-                  className={`px-6 py-2 rounded-lg text-white font-medium text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg ${
-                    sendMethod === 'survey'
-                      ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/30'
-                      : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/30'
-                  }`}
+                  className="px-6 py-2 rounded-lg text-white font-medium text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/30"
                 >
                   {sending ? (
                     <>
