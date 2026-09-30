@@ -15,7 +15,7 @@ function buildSatisfactionEmail(params: {
   offices?: { office_name: string; phone: string }[];
   feedbackBaseUrl: string;
   responseToken: string;
-  surveyType?: 'job_completion' | 'post_test_tune' | 'one_year';
+  surveyType?: 'job_completion' | 'post_test_tune' | 'one_year' | 'manual';
 }): string {
   const logoBlock = params.companyLogoUrl
     ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
@@ -144,7 +144,7 @@ Deno.serve(async (req: Request) => {
       user = data.user;
     }
 
-    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType = 'job_completion', projectId, salesOrderId } = await req.json();
+    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType = 'manual', projectId, salesOrderId, previewOnly = false } = await req.json();
 
     if (!customerEmail && !resendRecordId) {
       return new Response(JSON.stringify({ error: 'Customer email is required' }), {
@@ -170,6 +170,37 @@ Deno.serve(async (req: Request) => {
     }
 
     let record: { id: string; response_token: string; customer_name: string; customer_email: string };
+
+    if (previewOnly) {
+      const settings = await getCompanySettings(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      const appUrl = appUrlFromClient || settings.app_url || Deno.env.get('APP_URL') || 'https://app.electroniclife.com';
+      const previewToken = crypto.randomUUID();
+      const previewName = customerName || 'Valued Customer';
+      const emailHtml = buildSatisfactionEmail({
+        customerName: previewName,
+        companyName: settings.company_name,
+        companyEmail: settings.company_email,
+        companyLogoUrl: settings.company_logo_url || '',
+        offices: settings.offices || [],
+        feedbackBaseUrl: appUrl,
+        responseToken: previewToken,
+        surveyType,
+      });
+      const firstName = previewName.split(' ')[0];
+      const subject = surveyType === 'one_year'
+        ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
+        : surveyType === 'post_test_tune'
+          ? (firstName ? `How did Test & Tune go, ${firstName}?` : 'How did Test & Tune go?')
+          : surveyType === 'job_completion'
+            ? (firstName ? `How did we do, ${firstName}?` : 'How did we do?')
+            : (firstName ? `We’d love your feedback, ${firstName}` : 'We’d love your feedback');
+      return new Response(JSON.stringify({ success: true, preview: true, subject, html: emailHtml }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     if (resendRecordId) {
       const { data: existing, error: fetchError } = await supabaseAdmin
