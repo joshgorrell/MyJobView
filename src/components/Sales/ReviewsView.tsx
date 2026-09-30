@@ -1124,89 +1124,66 @@ export default function ReviewsView() {
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
-              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Show the QR in person or email the customer a direct Google review request.' : 'Send a Google review request or an authorized customer lifecycle email.'}</p></div>
+              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Show the QR in person or email the customer a direct Google review request.' : 'Preview or manually send an authorized customer lifecycle communication.'}</p></div>
               {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Hand the customer your screen. No email required.</div></div></div>}
             </div>
-            {!googleOnlyMode && canViewLostOpportunities && <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Feedback</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>}
-
-
-            {/* Send Method Selection */}
-            <div className="mb-2">
-              <p className="text-xs text-gray-400 mb-3">
-                Choose a method below. Every request is attributed to the employee who asks.
-              </p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-                {/* Direct Google review email */}
-                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'email' ? 'bg-cyan-900/30 border-cyan-500 shadow-lg shadow-cyan-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
-                  <button onClick={() => setSendMethod('email')} className="text-left p-4 w-full">
-                    <div className="flex items-center gap-2 mb-2"><div className={`p-1.5 rounded-lg ${sendMethod === 'email' ? 'bg-cyan-600' : 'bg-gray-700'}`}><Mail className="w-4 h-4 text-white" /></div><span className={`font-semibold text-sm ${sendMethod === 'email' ? 'text-cyan-300' : 'text-gray-200'}`}>Google Review Email</span></div>
-                    <p className="text-xs text-gray-400 leading-relaxed">Select a customer or enter an email and send the direct Google review request. Works for projects, service, or any customer.</p>
-                  </button>
-                  <div className="px-4 pb-3"><button onClick={e => { e.stopPropagation(); fetchEmailPreview(); }} disabled={loadingPreview} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-cyan-400"><Eye className="w-3.5 h-3.5" />Preview email</button></div>
+            {!googleOnlyMode && canManageCustomerFeedback && (
+              <div className="mb-6 rounded-xl border border-blue-700/50 bg-blue-950/20 p-5">
+                <div className="mb-4">
+                  <h3 className="text-base font-bold text-white">Customer Lifecycle</h3>
+                  <p className="mt-1 text-xs text-gray-400">These emails normally send automatically. Select a stage only when you need to preview or manually resend it.</p>
                 </div>
-                {/* Customer Satisfaction Survey */}
-                {!googleOnlyMode && canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
-                  <button
-                    onClick={() => setSendMethod('satisfaction')}
-                    className="text-left p-4 w-full"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`p-1.5 rounded-lg ${sendMethod === 'satisfaction' ? 'bg-blue-600' : 'bg-gray-700'}`}>
-                        <ThumbsUp className="w-4 h-4 text-white" />
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+                  {[
+                    ['job_completion', '1', 'Job Completion', 'Day 0', 'Feedback at substantial completion'],
+                    ['test_tune_welcome', '2', 'Test & Tune Welcome', 'Day 7', 'Opens the Test & Tune period'],
+                    ['post_test_tune', '3', 'Post-Test & Tune', 'When T&T ends', 'Feedback after the configured period'],
+                    ['one_year', '4', '1-Year Check-In', '1 year', 'Long-term satisfaction and service check-in'],
+                  ].map(([value, step, label, timing, description], index) => (
+                    <button key={value} type="button" onClick={() => { setLifecycleType(value as typeof lifecycleType); setSendMethod('satisfaction'); }}
+                      className={`relative rounded-xl border p-4 text-left transition-colors ${sendMethod === 'satisfaction' && lifecycleType === value ? 'border-blue-400 bg-blue-900/40' : 'border-gray-700 bg-gray-900/70 hover:border-blue-600'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">{step}</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-blue-300">{timing}</span>
                       </div>
-                      <span className={`font-semibold text-sm ${sendMethod === 'satisfaction' ? 'text-blue-300' : 'text-gray-200'}`}>
-                        Satisfaction Survey
-                      </span>
-                      {!googleOnlyMode && canManageCustomerFeedback && sendMethod === 'satisfaction' && (
-                        <span className="ml-auto w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                      A 4-button rating email (Excellent / Good / Okay / Needs Attention). Happy customers are directed to Google. Unhappy responses alert your team.
-                    </p>
-                  </button>
-                  <div className="px-4 pb-3">
-                    <button
-                      onClick={e => { e.stopPropagation(); fetchSatisfactionPreview(); }}
-                      disabled={loadingPreview}
-                      className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-cyan-400 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Eye className="w-3.5 h-3.5 group-hover:text-cyan-400" />
-                      Preview email
+                      <div className="mt-3 text-sm font-semibold text-white">{label}</div>
+                      <div className="mt-1 text-xs leading-relaxed text-gray-400">{description}</div>
+                      {index < 3 && <span className="absolute -right-2 top-1/2 hidden text-gray-600 md:block">→</span>}
                     </button>
-                  </div>
-                </div>}
-
-                {/* SMS / Text */}
-                {!googleOnlyMode && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
-                  <button
-                    onClick={() => setSendMethod('sms')}
-                    className="text-left p-4 w-full"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`p-1.5 rounded-lg ${sendMethod === 'sms' ? 'bg-green-600' : 'bg-gray-700'}`}>
-                        <MessageSquare className="w-4 h-4 text-white" />
-                      </div>
-                      <span className={`font-semibold text-sm ${sendMethod === 'sms' ? 'text-green-300' : 'text-gray-200'}`}>
-                        SMS / Text
-                      </span>
-                      {sendMethod === 'sms' && (
-                        <span className="ml-auto w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                      A direct text message with your Google review link. Great for customers who prefer texting over email. Requires Twilio setup.
-                    </p>
-                  </button>
-                  <div className="px-4 pb-3">
-                    <span className="flex items-center gap-1.5 text-xs text-gray-600 cursor-default select-none">
-                      <Eye className="w-3.5 h-3.5" />
-                      No preview for SMS
-                    </span>
-                  </div>
-                </div>}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {!googleOnlyMode && canManageCustomerFeedback && (
+              <div className="mb-6">
+                <button type="button" onClick={() => { setLifecycleType('manual'); setSendMethod('satisfaction'); }}
+                  className={`w-full rounded-xl border p-4 text-left transition-colors ${sendMethod === 'satisfaction' && lifecycleType === 'manual' ? 'border-indigo-500 bg-indigo-950/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'}`}>
+                  <div className="font-semibold text-white">General Customer Feedback</div>
+                  <div className="mt-1 text-xs text-gray-400">Manual feedback request outside the automated customer lifecycle.</div>
+                </button>
+              </div>
+            )}
+
+            {googleOnlyMode && (
+              <div className="mb-2">
+                <div className="mb-3">
+                  <h3 className="text-base font-bold text-white">Google Review <span className="ml-2 text-xs font-medium text-amber-300">Anytime</span></h3>
+                  <p className="mt-1 text-xs text-gray-400">Separate from lifecycle feedback. Ask any happy customer by email, text, or QR code.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button onClick={() => setSendMethod('email')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'email' ? 'border-cyan-500 bg-cyan-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
+                    <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-cyan-300" /><span className="text-sm font-semibold text-white">Google Review Email</span></div>
+                    <p className="mt-2 text-xs text-gray-400">Email a direct Google review request.</p>
+                  </button>
+                  {!googleOnlyMode && <button onClick={() => setSendMethod('sms')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'sms' ? 'border-green-500 bg-green-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
+                    <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-green-300" /><span className="text-sm font-semibold text-white">Google Review SMS</span></div>
+                    <p className="mt-2 text-xs text-gray-400">Text the direct Google review link.</p>
+                  </button>}
+                </div>
+              </div>
+  
+            )}
 
             {/* Satisfaction Survey Form */}
             {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
@@ -1218,27 +1195,17 @@ export default function ReviewsView() {
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Lifecycle Email</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {[
-                      ['job_completion', 'Job Completion Feedback', 'Normally sent at substantial completion'],
-                      ['test_tune_welcome', 'Test & Tune Welcome', 'Normally sent 7 days after substantial completion'],
-                      ['post_test_tune', 'Post-Test & Tune Feedback', 'Normally sent when Test & Tune ends'],
-                      ['one_year', '1-Year Check-In', 'Normally sent one year after completion'],
-                      ['manual', 'General Customer Feedback', 'Use anytime outside the automated lifecycle'],
-                    ].map(([value, label, description]) => (
-                      <button key={value} type="button" onClick={() => setLifecycleType(value as typeof lifecycleType)}
-                        className={`rounded-lg border p-3 text-left transition-colors ${lifecycleType === value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'}`}>
-                        <div className="text-sm font-semibold text-white">{label}</div>
-                        <div className="text-xs text-gray-400 mt-1">{description}</div>
-                      </button>
-                    ))}
+                <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-white">{lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'test_tune_welcome' ? 'Test & Tune Welcome' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'General Customer Feedback'}</div>
+                      <div className="mt-1 text-xs text-gray-400">Choose the recipient below, then preview or send this communication.</div>
+                    </div>
+                    <button type="button" onClick={fetchSatisfactionPreview} disabled={loadingPreview}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:border-cyan-500 hover:text-cyan-300 disabled:opacity-50">
+                      <Eye className="w-4 h-4" /> Preview Email
+                    </button>
                   </div>
-                  <button type="button" onClick={fetchSatisfactionPreview} disabled={loadingPreview}
-                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-gray-200 hover:border-cyan-500 hover:text-cyan-300 disabled:opacity-50">
-                    <Eye className="w-4 h-4" /> Preview selected lifecycle email
-                  </button>
                 </div>
 
                 {/* Contact toggle */}
