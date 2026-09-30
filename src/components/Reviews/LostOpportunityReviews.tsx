@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Clock, Send, MessageSquare, CheckCircle, Share2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { lossReasons, lostReviewAction } from "./lostReview";
@@ -246,62 +246,31 @@ export default function LostOpportunityReviews(
       minute: "2-digit",
     });
   }
-  function HistoryTimeline({ v }: { v: Review }) {
-    const events: { icon: React.ReactNode; label: string; time: string | null }[] = [];
+  function HistoryLine({ v }: { v: Review }) {
+    const segments: string[] = [];
     if (v.sent_at) {
-      events.push({
-        icon: <Send size={14} />,
-        label: v.sent_by_name ? `Sent by ${v.sent_by_name}` : "Sent",
-        time: formatDateTime(v.sent_at),
-      });
+      const sender = v.sent_by_name ? `Sent by ${v.sent_by_name}` : "Sent";
+      segments.push(`${sender} \u00b7 ${formatDateTime(v.sent_at)}`);
     }
     if (v.delivery_status === "sent" && v.sent_at) {
-      events.push({
-        icon: <CheckCircle size={14} />,
-        label: "Email delivered",
-        time: null,
-      });
+      segments.push("Delivered");
     }
     if (v.response_created_at || v.responded_at) {
-      events.push({
-        icon: <MessageSquare size={14} />,
-        label: "Customer submitted feedback",
-        time: formatDateTime(v.response_created_at || v.responded_at),
-      });
+      segments.push(
+        `Customer responded \u00b7 ${formatDateTime(v.response_created_at || v.responded_at)}`,
+      );
     }
     if (v.reviewed_at) {
-      events.push({
-        icon: <CheckCircle size={14} />,
-        label: "Marked reviewed",
-        time: formatDateTime(v.reviewed_at),
-      });
+      segments.push(`Reviewed \u00b7 ${formatDateTime(v.reviewed_at)}`);
     }
     if (v.shared_at) {
-      events.push({
-        icon: <Share2 size={14} />,
-        label: "Shared with team",
-        time: formatDateTime(v.shared_at),
-      });
+      segments.push(`Shared \u00b7 ${formatDateTime(v.shared_at)}`);
     }
-    if (events.length === 0) return null;
+    if (segments.length === 0) return null;
     return (
-      <div className="border-t border-gray-700 pt-3 mt-1">
-        <div className="flex items-center gap-1.5 text-gray-400 text-xs font-medium mb-2">
-          <Clock size={12} />
-          History
-        </div>
-        <ol className="space-y-1.5">
-          {events.map((e, i) => (
-            <li key={i} className="flex items-center gap-2 text-xs text-gray-400">
-              <span className="text-gray-500 shrink-0">{e.icon}</span>
-              <span className="text-gray-300">{e.label}</span>
-              {e.time && (
-                <span className="text-gray-500">&middot; {e.time}</span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </div>
+      <p className="text-xs text-gray-500 leading-relaxed">
+        {segments.join("  \u2022  ")}
+      </p>
     );
   }
   return (
@@ -542,6 +511,7 @@ export default function LostOpportunityReviews(
                   : "Awaiting Response"}
               </p>
             </div>
+            <HistoryLine v={v} />
             {v.response
               ? (
                 <div className="space-y-3 text-gray-200">
@@ -600,10 +570,9 @@ export default function LostOpportunityReviews(
                 </p>
               )
               : null}
-            <HistoryTimeline v={v} />
-            {canView && v.response && (
-              <div className="flex flex-wrap gap-3">
-                {!v.reviewed_at && (
+            {canView && (
+              <div className="flex flex-wrap gap-3 items-center">
+                {v.response && !v.reviewed_at && (
                   <button
                     disabled={busy}
                     onClick={() =>
@@ -613,24 +582,43 @@ export default function LostOpportunityReviews(
                     Mark Reviewed
                   </button>
                 )}
-                <label className="text-gray-300">
-                  Recovery outcome<select
-                    disabled={busy}
-                    value={v.recovery_outcome}
-                    onChange={(e) =>
-                      action({
-                        action: "outcome",
-                        request_id: v.request_id,
-                        outcome: e.target.value,
-                      })}
-                    className="ml-2 rounded-lg bg-gray-900 border border-gray-600 p-2"
-                  >
-                    <option value="unreviewed" disabled>Unreviewed</option>
-                    <option value="following_up">Following Up</option>
-                    <option value="recovered">Recovered</option>
-                    <option value="closed">Closed</option>
-                  </select>
-                </label>
+                {v.response && (
+                  <label className="text-gray-300">
+                    Recovery outcome<select
+                      disabled={busy}
+                      value={v.recovery_outcome}
+                      onChange={(e) =>
+                        action({
+                          action: "outcome",
+                          request_id: v.request_id,
+                          outcome: e.target.value,
+                        })}
+                      className="ml-2 rounded-lg bg-gray-900 border border-gray-600 p-2"
+                    >
+                      <option value="unreviewed" disabled>Unreviewed</option>
+                      <option value="following_up">Following Up</option>
+                      <option value="recovered">Recovered</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </label>
+                )}
+                <button
+                  disabled={busy}
+                  onClick={async () => {
+                    if (
+                      !window.confirm(
+                        "Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.",
+                      )
+                    ) return;
+                    if (await action({ action: "delete", request_id: v.request_id })) {
+                      setNotice("Lost opportunity review deleted.");
+                    }
+                  }}
+                  className="ml-auto flex items-center gap-1.5 text-red-400 hover:text-red-300 text-sm disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
               </div>
             )}
           </article>

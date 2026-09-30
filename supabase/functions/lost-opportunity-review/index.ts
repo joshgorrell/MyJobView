@@ -494,6 +494,29 @@ Deno.serve(async (req) => {
       );
       return json({ success: true });
     }
+    if (b.action === "delete") {
+      if (!profile.can_view_lost_opportunity_submissions) {
+        return json({
+          error: "Viewing Lost Opportunity submissions is not permitted.",
+        }, 403);
+      }
+      const response = await admin.from("lost_review_responses").select(
+        "attachments",
+      ).eq("request_id", detail.request_id).maybeSingle();
+      if (response.data?.attachments?.length) {
+        const paths = response.data.attachments
+          .map((a: any) => a.path)
+          .filter(Boolean);
+        if (paths.length) {
+          await admin.storage.from("lost-review-bids").remove(paths);
+        }
+      }
+      await checked(
+        await admin.from("review_requests").delete().eq("id", detail.request_id)
+          .eq("organization_id", org),
+      );
+      return json({ success: true });
+    }
     if (b.action === "download") {
       if (!profile.can_view_lost_opportunity_submissions) {
         return json({
