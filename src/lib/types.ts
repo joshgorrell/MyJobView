@@ -15,6 +15,9 @@ export interface Profile {
   can_view_team_pulse?: boolean;
   can_access_recur?: boolean;
   can_send_portal_invites?: boolean;
+  can_send_lost_opportunity_reviews?: boolean;
+  can_view_lost_opportunity_submissions?: boolean;
+  notify_lost_opportunity_submissions?: boolean;
   can_view_prospects?: boolean;
   can_edit_contacts?: boolean;
   can_edit_contact_assignments?: boolean;

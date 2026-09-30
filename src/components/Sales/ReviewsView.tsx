@@ -1185,7 +1185,7 @@ export default function ReviewsView() {
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h2 className="text-xl font-bold text-white mb-4">Send Review Request</h2>
-            <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Review</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to the owner. Proposal optional.</span></button>
+            <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Review</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>
 
 
             {/* Send Method Selection */}

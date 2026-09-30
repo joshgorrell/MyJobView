@@ -130,6 +130,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     can_create_work_orders: (user as any).can_create_work_orders ?? false,
     can_edit_products: (user as any).can_edit_products ?? true,
     can_see_all_review_requests: (user as any).can_see_all_review_requests ?? false,
+    can_send_lost_opportunity_reviews: user.can_send_lost_opportunity_reviews ?? false,
+    can_view_lost_opportunity_submissions: user.can_view_lost_opportunity_submissions ?? false,
+    notify_lost_opportunity_submissions: user.notify_lost_opportunity_submissions ?? false,
     can_edit_contacts: (user as any).can_edit_contacts ?? true,
     has_calendar_access: (user as any).has_calendar_access ?? true,
     proposal_visibility_scope: (user as any).proposal_visibility_scope || 'company' as 'own' | 'office' | 'company',
@@ -614,6 +617,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         can_create_work_orders: formData.can_create_work_orders,
         can_edit_products: formData.can_edit_products,
         can_see_all_review_requests: formData.can_see_all_review_requests,
+        can_send_lost_opportunity_reviews: formData.can_send_lost_opportunity_reviews,
+        can_view_lost_opportunity_submissions: formData.can_view_lost_opportunity_submissions,
+        notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
         can_edit_contacts: formData.can_edit_contacts,
         has_calendar_access: formData.has_calendar_access,
         proposal_visibility_scope: formData.proposal_visibility_scope,
@@ -951,6 +957,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                   </div>
                 )}
 
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Lost Opportunity Notifications</h3>
+                  <label className="flex items-start gap-3 text-gray-200 mb-4"><input type="checkbox" checked={formData.notify_lost_opportunity_submissions} onChange={e=>setFormData({...formData,notify_lost_opportunity_submissions:e.target.checked})}/><span>Email and in-app notifications for Lost Opportunity responses (requires Can View Responses)</span></label>
+
                 {/* Permissions */}
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Permissions</h3>
@@ -967,6 +976,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       { key: 'can_create_work_orders', icon: Briefcase, label: 'Can Create Work Orders', desc: 'Create work orders from My Work Center' },
                       { key: 'can_edit_products', icon: Shield, label: 'Can Edit Products', desc: 'Add, edit, and delete products in the catalog' },
                       { key: 'can_edit_contacts', icon: Shield, label: 'Can Edit Contacts', desc: 'Add, edit, and delete contacts' },
+                      { key: 'can_send_lost_opportunity_reviews', icon: Shield, label: 'Can Send Lost Opportunity Reviews', desc: 'Send private feedback requests to customers' },
+                      { key: 'can_view_lost_opportunity_submissions', icon: Shield, label: 'Can View Lost Opportunity Responses', desc: 'Read private customer responses and competing bids' },
                       { key: 'can_see_all_review_requests', icon: Shield, label: 'Can See All Review Requests', desc: 'See all company review requests (off = own only)' },
                       { key: 'has_calendar_access', icon: CalendarIcon, label: 'Has Calendar Access', desc: 'Access personal calendar for scheduling' },
                     ].map(({ key, icon: Icon, label, desc }) => (
