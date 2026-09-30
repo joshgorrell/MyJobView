@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CheckCircle, Star, ThumbsUp, Meh, AlertCircle, Loader2 } from 'lucide-react';
 
-const REVIEW_URL = 'https://g.page/r/CZzvVUth7kuyEBM/review';
+const DEFAULT_REVIEW_URL = '';
 
 type Rating = 'excellent' | 'good' | 'okay' | 'needs_attention';
 type Phase = 'rating' | 'comment' | 'positive' | 'negative' | 'submitting' | 'error';
@@ -48,6 +48,7 @@ interface CompanyInfo {
   name: string;
   logoUrl: string;
   email: string;
+  reviewUrl: string;
 }
 
 export function FeedbackPage() {
@@ -67,6 +68,7 @@ export function FeedbackPage() {
     name: 'Electronic Life',
     logoUrl: 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png',
     email: '',
+    reviewUrl: DEFAULT_REVIEW_URL,
   });
 
   const autoSubmittedRef = useRef(false);
@@ -83,13 +85,14 @@ export function FeedbackPage() {
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('company_name, company_logo_url, company_email')
+.select('company_name, company_logo_url, company_email, google_review_url')
         .maybeSingle();
       if (data) {
         setCompanyInfo({
           name: data.company_name || 'Electronic Life',
           logoUrl: data.company_logo_url || companyInfo.logoUrl,
           email: data.company_email || '',
+          reviewUrl: data.google_review_url || '',
         });
       }
     } catch {
@@ -235,7 +238,7 @@ export function FeedbackPage() {
                   <p className="text-white font-semibold mb-1">Sounds like we earned a 5-star review!</p>
                   <p className="text-gray-400 text-sm mb-4">Would you mind sharing on Google? It takes less than 2 minutes and helps other customers find us.</p>
                   <a
-                    href={REVIEW_URL}
+                    href={companyInfo.reviewUrl || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-3 w-full py-4 bg-white hover:bg-gray-100 text-gray-900 rounded-xl font-bold text-base transition-colors shadow-lg"
@@ -295,8 +298,8 @@ export function FeedbackPage() {
                 </p>
               </div>
 
-              <a
-                href={REVIEW_URL}
+              {companyInfo.reviewUrl && <a
+                href={companyInfo.reviewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-3 w-full py-5 bg-white hover:bg-gray-100 text-gray-900 rounded-2xl font-bold text-lg transition-colors shadow-xl mb-4"
@@ -309,7 +312,7 @@ export function FeedbackPage() {
                   <path fill="none" d="M0 0h48v48H0z"/>
                 </svg>
                 Leave a Google Review
-              </a>
+              </a>}
 
               <div className="flex items-center gap-2 justify-center mb-6">
                 {[1, 2, 3, 4, 5].map(i => (
