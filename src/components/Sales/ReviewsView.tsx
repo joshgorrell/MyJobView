@@ -1124,7 +1124,7 @@ export default function ReviewsView() {
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
-              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Show the QR in person or email the customer a direct Google review request.' : 'Send a Google review request or an authorized customer lifecycle email.'}</p></div>
+              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Show the QR in person or email the customer a direct Google review request.' : 'Preview or manually send an authorized customer lifecycle communication.'}</p></div>
               {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Hand the customer your screen. No email required.</div></div></div>}
             </div>
             {!googleOnlyMode && canManageCustomerFeedback && (
@@ -1165,22 +1165,25 @@ export default function ReviewsView() {
               </div>
             )}
 
-            <div className="mb-2">
-              <div className="mb-3">
-                <h3 className="text-base font-bold text-white">Google Review <span className="ml-2 text-xs font-medium text-amber-300">Anytime</span></h3>
-                <p className="mt-1 text-xs text-gray-400">Separate from lifecycle feedback. Ask any happy customer by email, text, or QR code.</p>
+            {googleOnlyMode && (
+              <div className="mb-2">
+                <div className="mb-3">
+                  <h3 className="text-base font-bold text-white">Google Review <span className="ml-2 text-xs font-medium text-amber-300">Anytime</span></h3>
+                  <p className="mt-1 text-xs text-gray-400">Separate from lifecycle feedback. Ask any happy customer by email, text, or QR code.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button onClick={() => setSendMethod('email')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'email' ? 'border-cyan-500 bg-cyan-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
+                    <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-cyan-300" /><span className="text-sm font-semibold text-white">Google Review Email</span></div>
+                    <p className="mt-2 text-xs text-gray-400">Email a direct Google review request.</p>
+                  </button>
+                  {!googleOnlyMode && <button onClick={() => setSendMethod('sms')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'sms' ? 'border-green-500 bg-green-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
+                    <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-green-300" /><span className="text-sm font-semibold text-white">Google Review SMS</span></div>
+                    <p className="mt-2 text-xs text-gray-400">Text the direct Google review link.</p>
+                  </button>}
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <button onClick={() => setSendMethod('email')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'email' ? 'border-cyan-500 bg-cyan-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
-                  <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-cyan-300" /><span className="text-sm font-semibold text-white">Google Review Email</span></div>
-                  <p className="mt-2 text-xs text-gray-400">Email a direct Google review request.</p>
-                </button>
-                {!googleOnlyMode && <button onClick={() => setSendMethod('sms')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'sms' ? 'border-green-500 bg-green-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
-                  <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-green-300" /><span className="text-sm font-semibold text-white">Google Review SMS</span></div>
-                  <p className="mt-2 text-xs text-gray-400">Text the direct Google review link.</p>
-                </button>}
-              </div>
-            </div>
+  
+            )}
 
             {/* Satisfaction Survey Form */}
             {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
