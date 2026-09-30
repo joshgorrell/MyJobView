@@ -315,6 +315,10 @@ export default function ReviewsView() {
   const [editedSubject, setEditedSubject] = useState('');
 
   useEffect(() => {
+    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') setActiveTab('send');
+  }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab]);
+
+  useEffect(() => {
     loadReviewRequests();
     generateQRCode();
     loadStaffProfiles();
@@ -1209,8 +1213,11 @@ export default function ReviewsView() {
       {activeTab === 'send' && (
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-4">Send Review Request</h2>
-            <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Review</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
+              <div><h2 className="text-xl font-bold text-white">Ask for a Google Review</h2><p className="text-sm text-gray-400 mt-1">Show the QR in person or send the customer a direct request.</p></div>
+              {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Hand the customer your screen. No email required.</div></div></div>}
+            </div>
+            {canViewLostOpportunities && <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Feedback</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>}
 
 
             {/* Send Method Selection */}
