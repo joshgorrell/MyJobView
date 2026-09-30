@@ -749,7 +749,7 @@ export default function ReviewsView() {
         .from('review_requests')
         .insert({
           contact_id: useManualEntry ? null : selectedContact?.id,
-          recipient_email: isEmailBased && useManualEntry ? manualEmail : null,
+          recipient_email: isSurvey && useManualEntry ? manualEmail : null,
           recipient_name: useManualEntry ? manualName : null,
           sent_by: profile?.id,
           method: isSurvey ? 'survey' : sendMethod
