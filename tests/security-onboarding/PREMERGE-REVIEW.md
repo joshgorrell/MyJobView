@@ -44,7 +44,8 @@ Primary references for the reviewer:
 The connected MJV project reports a connected QuickBooks account with `environment=sandbox` and a realm mapping. On the latest read-only check:
 - `security-payment-methods` and `security-recurring-billing` were absent from the deployed function list.
 - `quickbooks_settings.payments_enabled` and `security_contracts.security_billing_anchor` were absent.
-- The execution workspace was unavailable.
+- No Supabase development branches were available on September 30.
+- The execution workspace was unavailable; connector access supports repository and database review but does not provide a secure merchant-test runner.
 
 An accounting sandbox connection alone does not demonstrate Payments enrollment or merchant charge capability. No real merchant charge, payment enrollment, test email, migration or function deployment was performed. Confirm the actual test portal and Supabase project before applying schema changes; a sandbox QuickBooks flag does not prove the entire database is a test database.
 
@@ -77,9 +78,37 @@ Retain masked transaction IDs, notice timestamps, invoice totals, outcomes and b
 - [x] Initial technical audit and implementation.
 - [x] Previously recorded local production build, mobile browser, isolated migration/vault/charge tests and current-main review regression checks.
 - [x] Selected 100% early-termination policy drafted in an inactive revision.
-- [ ] Restore execution workspace and rerun applicable checks after the latest wording change.
+- [x] GitHub Actions run 36757918853 passed the onboarding tests, production build and browser/printing checks after the selected cancellation wording (commit 557e303467c492132f5a20369ffcc530e2754de1).
 - [ ] Confirm test environment and complete actual merchant acceptance.
 - [ ] Approve remaining legal provisions and completed transaction-specific notices.
 - [ ] Independent PR review and final release configuration.
 
 Keep PR #33 in draft until these remaining gates are satisfied. No merge or live billing activation is implied by this record.
+
+## Follow-up legal findings and test disposition — September 30
+
+### Required electronic-record workflow
+
+Section 20 draft text alone does not complete the consumer electronic-delivery workflow. Before relying on electronic records to satisfy required written disclosures, add a distinct affirmative consent with the applicable record categories, paper-copy request procedure and any fee, withdrawal/contact-change procedure and consequences, and actual access/retention requirements. Capture the disclosure version, affirmative action and time, and demonstrate access to the format used. Retain the delivered authorization/agreement and delivery evidence; merely displaying a print button does not establish all these facts. Do not conflate this consent with recurring-payment consent or the $7 mailed-invoice exception. This remains an implementation/release gate, not a completed feature.
+
+Primary authority: https://uscode.house.gov/view.xhtml?req=(title:15%20section:7001%20edition:prelim)
+
+### AutoPay and credit classification
+
+For covered consumer-account recurring transfers, obtain a signed or similarly authenticated authorization and provide the customer a copy. Preserve financial-institution stop-payment rights and operational revocation. The worker's ten-day advance notice for every charge is a conservative product policy; the cited regulation specifically addresses varying-amount transfers. Determine whether any financed equipment or bundled installment arrangement constitutes consumer credit: Regulation E prohibits conditioning an extension of consumer credit on repayment by preauthorized electronic fund transfers, subject to its stated exceptions. Do not assume the ordinary monitoring AutoPay rule can be applied unchanged to financed equipment. Counsel must classify the actual offering before approving mandatory AutoPay language.
+
+Primary authority: https://www.consumerfinance.gov/rules-policy/regulations/1005/10/ (paragraphs b–e).
+
+### Cancellation documents and remaining-fee example
+
+Determine applicability from the actual sale and solicitation facts, not merely the fact that the customer signs through a portal. Where a cooling-off rule applies, supply the prescribed notices and completed cancellation forms; keep transaction dates and delivery evidence. Do not use the ordinary remaining-term formula for a qualifying statutory rescission.
+
+For review only: at a $40 base monthly rate with exactly 12 complete unpaid initial-term months remaining and no prepaid credit, the selected formula gives $480 once. Future tax, mailed-invoice fees and separate optional agreements are excluded under the proposed draft. Partial-month math and legally required reductions/exceptions still require approval. The recurring mandate does not independently authorize debiting this amount.
+
+Federal reference: https://www.ftc.gov/legal-library/browse/rules/cooling-period-sales-made-home-or-other-locations
+
+### Actual merchant tests: not run
+
+The connected accounting account reports sandbox, but Payments authorization and new endpoints are not deployed. No existing isolated database branch was found. No safe authenticated merchant-test runner is available through the current execution tools. No test instrument, customer email or production account was used. Do not label mocked tests as merchant acceptance.
+
+Next executable path: provide an authenticated test runtime with Intuit sandbox Payments authorization, synthetic customer mapping and a designated test recipient; deploy this PR to an isolated test project or an explicitly reviewed controlled rollout. Do not apply all onboarding migrations to the live portal merely to obtain a merchant test: the old live frontend and changed signing/RLS interfaces must be released together. Keep the scheduler disabled until merchant outcomes and notice delivery are verified. No merge, live migration, live debit or counsel outreach was performed as part of this follow-up.
