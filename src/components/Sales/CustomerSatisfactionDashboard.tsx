@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { BarChart, Bar, PieChart, Pie, Cell, Tooltip, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { ThumbsUp, AlertCircle, Users, TrendingUp, CheckCircle, Clock, Lock, Eye, EyeOff, MessageSquare, CheckCheck, RotateCcw } from 'lucide-react';
 
 interface SatisfactionRecord {
@@ -234,7 +233,7 @@ export function CustomerSatisfactionDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400 text-sm">Surveys Sent</span>
+            <span className="text-gray-400 text-sm">Feedback Requests</span>
             <Users className="w-5 h-5 text-gray-500" />
           </div>
           <div className="text-3xl font-bold text-white">{totalSent}</div>
@@ -256,7 +255,7 @@ export function CustomerSatisfactionDashboard() {
             <CheckCircle className="w-5 h-5 text-green-400" />
           </div>
           <div className={`text-3xl font-bold ${scoreColor(overallScore)}`}>{overallScore}%</div>
-          <div className="text-xs text-gray-500 mt-1">weighted 4-point scale</div>
+          <div className="text-xs text-gray-500 mt-1">from customer responses</div>
         </div>
 
         <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
@@ -265,243 +264,11 @@ export function CustomerSatisfactionDashboard() {
             <AlertCircle className="w-5 h-5 text-red-400" />
           </div>
           <div className="text-3xl font-bold text-red-400">{counts.okay + counts.needs_attention}</div>
-          <div className="text-xs text-gray-500 mt-1">Okay + Needs Attention</div>
+          <div className="text-xs text-gray-500 mt-1">open customer follow-up</div>
         </div>
       </div>
 
-      {/* Rating Breakdown Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {(Object.entries(RATING_CONFIG) as [keyof typeof RATING_CONFIG, typeof RATING_CONFIG[keyof typeof RATING_CONFIG]][]).map(([key, cfg]) => (
-          <div key={key} className={`${cfg.bg} rounded-xl p-4 border ${cfg.border}`}>
-            <div className={`text-2xl font-bold ${cfg.text}`}>{counts[key]}</div>
-            <div className="text-sm text-gray-300 mt-0.5">{cfg.label}</div>
-            {totalResponded > 0 && (
-              <div className="text-xs text-gray-500 mt-1">
-                {Math.round((counts[key] / totalResponded) * 100)}%
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Charts */}
-      {totalResponded > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Pie Chart */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-            <h3 className="text-white font-semibold mb-4">Rating Distribution</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  labelLine={{ stroke: '#6b7280', strokeWidth: 1 }}
-                  label={renderCustomPieLabel}
-                >
-                  {pieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#f9fafb' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Bar Chart */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-            <h3 className="text-white font-semibold mb-4">Response Count by Rating</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={barData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#f9fafb' }}
-                />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {barData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Performance Tables */}
-      {totalResponded > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Sales Rep Table */}
-          <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-700">
-              <h3 className="text-white font-semibold">By Sales Rep</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-900">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Rep</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-green-400 uppercase">Exc</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-blue-400 uppercase">Good</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-amber-400 uppercase">Okay</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-red-400 uppercase">Attn</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Score</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {salesRepTable.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500 text-sm">No data</td>
-                    </tr>
-                  ) : salesRepTable.map(row => (
-                    <tr key={row.name} className="hover:bg-gray-750">
-                      <td className="px-4 py-3 text-white font-medium">{row.name}</td>
-                      <td className="px-3 py-3 text-center text-green-400">{row.excellent}</td>
-                      <td className="px-3 py-3 text-center text-blue-400">{row.good}</td>
-                      <td className="px-3 py-3 text-center text-amber-400">{row.okay}</td>
-                      <td className="px-3 py-3 text-center text-red-400">{row.needs_attention}</td>
-                      <td className={`px-4 py-3 text-right font-bold ${scoreColor(row.score)}`}>{row.score}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Lead Tech Table */}
-          <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-700">
-              <h3 className="text-white font-semibold">By Lead Tech</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-900">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Tech</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-green-400 uppercase">Exc</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-blue-400 uppercase">Good</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-amber-400 uppercase">Okay</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-red-400 uppercase">Attn</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Score</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {leadTechTable.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500 text-sm">No data</td>
-                    </tr>
-                  ) : leadTechTable.map(row => (
-                    <tr key={row.name} className="hover:bg-gray-750">
-                      <td className="px-4 py-3 text-white font-medium">{row.name}</td>
-                      <td className="px-3 py-3 text-center text-green-400">{row.excellent}</td>
-                      <td className="px-3 py-3 text-center text-blue-400">{row.good}</td>
-                      <td className="px-3 py-3 text-center text-amber-400">{row.okay}</td>
-                      <td className="px-3 py-3 text-center text-red-400">{row.needs_attention}</td>
-                      <td className={`px-4 py-3 text-right font-bold ${scoreColor(row.score)}`}>{row.score}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Comments Card */}
-      {commentsRecords.length > 0 && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-blue-400" />
-              <h3 className="text-white font-semibold">Customer Comments</h3>
-              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-0.5 rounded-full">{commentsRecords.length}</span>
-            </div>
-            {isAdmin && (
-              <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5" /> Toggle visibility to share with your team
-              </p>
-            )}
-          </div>
-          <div className="divide-y divide-gray-700/60">
-            {commentsRecords.map(r => {
-              const ratingCfg = r.rating ? RATING_CONFIG[r.rating as keyof typeof RATING_CONFIG] : null;
-              const isToggling = togglingId === r.id;
-              return (
-                <div key={r.id} className="px-5 py-4 group">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                        <span className="text-white font-medium text-sm">{r.customer_name || 'Unknown Customer'}</span>
-                        {ratingCfg && (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${ratingCfg.bg} ${ratingCfg.text} border ${ratingCfg.border}`}>
-                            {ratingCfg.label}
-                          </span>
-                        )}
-                        {isAdmin && (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${
-                            r.comment_public
-                              ? 'bg-green-900/30 text-green-400 border border-green-700/50'
-                              : 'bg-gray-700 text-gray-400 border border-gray-600'
-                          }`}>
-                            {r.comment_public ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                            {r.comment_public ? 'Public' : 'Private'}
-                          </span>
-                        )}
-                        {!isAdmin && r.comment_public && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400 border border-green-700/50 flex items-center gap-1">
-                            <Eye className="w-3 h-3" /> Public
-                          </span>
-                        )}
-                      </div>
-                      <blockquote className="text-gray-300 text-sm italic border-l-2 border-gray-600 pl-3 leading-relaxed">
-                        "{r.comment}"
-                      </blockquote>
-                      <div className="flex gap-4 text-xs text-gray-500 mt-2">
-                        {r.sales_rep_name && <span>Sales: <span className="text-gray-400">{r.sales_rep_name}</span></span>}
-                        {r.lead_tech_name && <span>Tech: <span className="text-gray-400">{r.lead_tech_name}</span></span>}
-                        {r.responded_at && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(r.responded_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {isAdmin && (
-                      <button
-                        onClick={() => toggleCommentVisibility(r)}
-                        disabled={isToggling}
-                        title={r.comment_public ? 'Make private (hide from team)' : 'Make public (show to team)'}
-                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                          r.comment_public
-                            ? 'bg-green-900/20 text-green-400 border-green-700/50 hover:bg-red-900/20 hover:text-red-400 hover:border-red-700/50'
-                            : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-green-900/20 hover:text-green-400 hover:border-green-700/50'
-                        } ${isToggling ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {isToggling ? (
-                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : r.comment_public ? (
-                          <EyeOff className="w-3.5 h-3.5" />
-                        ) : (
-                          <Eye className="w-3.5 h-3.5" />
-                        )}
-                        {r.comment_public ? 'Hide' : 'Show'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Customer responses and operational follow-up */}
 
       {/* Needs Attention List */}
       {allNeedsAttention.length > 0 && (
@@ -649,11 +416,104 @@ export function CustomerSatisfactionDashboard() {
         </div>
       )}
 
+
+      {/* Recent Customer Feedback */}
+      {/* Comments Card */}
+      {commentsRecords.length > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-blue-400" />
+              <h3 className="text-white font-semibold">Recent Customer Feedback</h3>
+              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-0.5 rounded-full">{commentsRecords.length}</span>
+            </div>
+            {isAdmin && (
+              <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5" /> Toggle visibility to share with your team
+              </p>
+            )}
+          </div>
+          <div className="divide-y divide-gray-700/60">
+            {commentsRecords.map(r => {
+              const ratingCfg = r.rating ? RATING_CONFIG[r.rating as keyof typeof RATING_CONFIG] : null;
+              const isToggling = togglingId === r.id;
+              return (
+                <div key={r.id} className="px-5 py-4 group">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <span className="text-white font-medium text-sm">{r.customer_name || 'Unknown Customer'}</span>
+                        {ratingCfg && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${ratingCfg.bg} ${ratingCfg.text} border ${ratingCfg.border}`}>
+                            {ratingCfg.label}
+                          </span>
+                        )}
+                        {isAdmin && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${
+                            r.comment_public
+                              ? 'bg-green-900/30 text-green-400 border border-green-700/50'
+                              : 'bg-gray-700 text-gray-400 border border-gray-600'
+                          }`}>
+                            {r.comment_public ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                            {r.comment_public ? 'Public' : 'Private'}
+                          </span>
+                        )}
+                        {!isAdmin && r.comment_public && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400 border border-green-700/50 flex items-center gap-1">
+                            <Eye className="w-3 h-3" /> Public
+                          </span>
+                        )}
+                      </div>
+                      <blockquote className="text-gray-300 text-sm italic border-l-2 border-gray-600 pl-3 leading-relaxed">
+                        "{r.comment}"
+                      </blockquote>
+                      <div className="flex gap-4 text-xs text-gray-500 mt-2">
+                        {r.sales_rep_name && <span>Sales: <span className="text-gray-400">{r.sales_rep_name}</span></span>}
+                        {r.lead_tech_name && <span>Tech: <span className="text-gray-400">{r.lead_tech_name}</span></span>}
+                        {r.responded_at && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(r.responded_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {isAdmin && (
+                      <button
+                        onClick={() => toggleCommentVisibility(r)}
+                        disabled={isToggling}
+                        title={r.comment_public ? 'Make private (hide from team)' : 'Make public (show to team)'}
+                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                          r.comment_public
+                            ? 'bg-green-900/20 text-green-400 border-green-700/50 hover:bg-red-900/20 hover:text-red-400 hover:border-red-700/50'
+                            : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-green-900/20 hover:text-green-400 hover:border-green-700/50'
+                        } ${isToggling ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {isToggling ? (
+                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : r.comment_public ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                        {r.comment_public ? 'Hide' : 'Show'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+
       {totalSent === 0 && (
         <div className="text-center py-16 text-gray-500">
           <ThumbsUp className="w-12 h-12 mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-medium">No surveys sent yet</p>
-          <p className="text-sm mt-1">Send a Customer Satisfaction survey from the Send Request tab.</p>
+          <p className="text-lg font-medium">No customer feedback yet</p>
+          <p className="text-sm mt-1">Customer lifecycle feedback will appear here as responses arrive.</p>
         </div>
       )}
     </div>

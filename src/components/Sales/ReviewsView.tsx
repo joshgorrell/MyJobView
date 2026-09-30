@@ -1098,99 +1098,23 @@ export default function ReviewsView() {
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <div className="space-y-6">
-          {reviewChampions.length > 0 && (
-            <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div><h2 className="text-lg font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Google review requests attributed to the employee who asked.</p></div>
-                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-              </div>
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-                {reviewChampions.map((champion, index) => (
-                  <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
-                    <div className="text-xs text-gray-500">#{index + 1}</div>
-                    <div className="font-semibold text-white truncate">{champion.name}</div>
-                    <div className="mt-2 text-2xl font-bold text-cyan-300">{champion.sent}</div>
-                    <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        </div>
+      )}
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Total Requests</span>
-                <Users className="w-5 h-5 text-blue-400" />
-              </div>
-              <div className="text-3xl font-bold text-white">{stats.totalSent}</div>
-            </div>
-
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Open Rate</span>
-                <Eye className="w-5 h-5 text-blue-400" />
-              </div>
-              <div className="text-3xl font-bold text-white">{stats.openRate.toFixed(1)}%</div>
-              <div className="text-xs text-gray-500 mt-1">{stats.emailsOpened} opened</div>
-            </div>
-
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Click Rate</span>
-                <ExternalLink className="w-5 h-5 text-green-400" />
-              </div>
-              <div className="text-3xl font-bold text-white">{stats.clickRate.toFixed(1)}%</div>
-              <div className="text-xs text-gray-500 mt-1">{stats.linksClicked} clicked</div>
-            </div>
-
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">Conversion Rate</span>
-                <Star className="w-5 h-5 text-yellow-400" />
-              </div>
-              <div className="text-3xl font-bold text-white">{stats.conversionRate.toFixed(1)}%</div>
-              <div className="text-xs text-gray-500 mt-1">{stats.reviewsCompleted} reviews</div>
-            </div>
+      {activeTab === 'dashboard' && canViewCustomerFeedback && reviewChampions.length > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div><h2 className="text-base font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Secondary view: Google review requests attributed to the employee who asked.</p></div>
+            <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
           </div>
-
-          {/* QR Code Section */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <div className="flex items-center gap-3 mb-4">
-              <QrCode className="w-6 h-6 text-yellow-400" />
-              <h2 className="text-xl font-bold text-white">QR Code for In-Person Requests</h2>
-            </div>
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="bg-white p-4 rounded-lg">
-                {qrCodeUrl && <img src={qrCodeUrl} alt="Review QR Code" className="w-64 h-64" />}
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {reviewChampions.map((champion, index) => (
+              <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
+                <div className="font-semibold text-white truncate">{champion.name}</div>
+                <div className="mt-1 text-xl font-bold text-cyan-300">{champion.sent}</div>
+                <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
               </div>
-              <div className="flex-1 space-y-4">
-                <p className="text-gray-300">
-                  Show this QR code to customers to request a review in person. They can scan it with their phone camera to go directly to your Google review page.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => window.open(qrCodeUrl, '_blank')}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Download QR Code
-                  </button>
-                  <button
-                    onClick={recordQRCodeUse}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Record Usage
-                  </button>
-                </div>
-                <div className="text-sm text-gray-400 bg-gray-900 p-3 rounded">
-                  <strong className="text-gray-300">Review Link:</strong><br />
-                  <a href={REVIEW_URL} target="_blank" rel="noopener noreferrer" className="text-yellow-400 hover:underline break-all">
-                    {REVIEW_URL}
-                  </a>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
