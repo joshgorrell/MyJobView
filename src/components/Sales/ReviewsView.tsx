@@ -281,6 +281,7 @@ export default function ReviewsView() {
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms'>('email');
+  const [googleOnlyMode, setGoogleOnlyMode] = useState(false);
   const [lifecycleType, setLifecycleType] = useState<'job_completion' | 'test_tune_welcome' | 'post_test_tune' | 'one_year' | 'manual'>('job_completion');
 
   // Customer Satisfaction form state
@@ -321,7 +322,7 @@ export default function ReviewsView() {
   const [editedSubject, setEditedSubject] = useState('');
 
   useEffect(() => {
-    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') setActiveTab('send');
+    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }
   }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab]);
 
   useEffect(() => {
@@ -1052,7 +1053,7 @@ export default function ReviewsView() {
             <p className="mt-0.5 max-w-2xl text-xs text-blue-100/90">Turn customer feedback into better experiences, stronger reviews, and lasting relationships.</p>
           </div>
           {canRequestGoogleReviews && (
-            <button onClick={() => setActiveTab('send')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow transition hover:bg-blue-50">
+            <button onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow transition hover:bg-blue-50">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               Ask for a Google Review
             </button>
@@ -1074,7 +1075,7 @@ export default function ReviewsView() {
           Customer Feedback
         </button>}
         {canRequestGoogleReviews && <button
-          onClick={() => setActiveTab('send')}
+          onClick={() => { setGoogleOnlyMode(!canManageCustomerFeedback); setSendMethod('email'); setActiveTab('send'); }}
           className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
             activeTab === 'send'
               ? 'text-yellow-400 border-b-2 border-yellow-400'
@@ -1199,10 +1200,10 @@ export default function ReviewsView() {
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
-              <div><h2 className="text-xl font-bold text-white">Ask for a Google Review</h2><p className="text-sm text-gray-400 mt-1">Show the QR in person or send the customer a direct request.</p></div>
+              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Show the QR in person or email the customer a direct Google review request.' : 'Send a Google review request or an authorized customer lifecycle email.'}</p></div>
               {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Hand the customer your screen. No email required.</div></div></div>}
             </div>
-            {canViewLostOpportunities && <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Feedback</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>}
+            {!googleOnlyMode && canViewLostOpportunities && <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Feedback</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>}
 
 
             {/* Send Method Selection */}
@@ -1220,7 +1221,7 @@ export default function ReviewsView() {
                   <div className="px-4 pb-3"><button onClick={e => { e.stopPropagation(); fetchEmailPreview(); }} disabled={loadingPreview} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-cyan-400"><Eye className="w-3.5 h-3.5" />Preview email</button></div>
                 </div>
                 {/* Customer Satisfaction Survey */}
-                {canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {!googleOnlyMode && canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('satisfaction')}
                     className="text-left p-4 w-full"
@@ -1232,7 +1233,7 @@ export default function ReviewsView() {
                       <span className={`font-semibold text-sm ${sendMethod === 'satisfaction' ? 'text-blue-300' : 'text-gray-200'}`}>
                         Satisfaction Survey
                       </span>
-                      {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
+                      {!googleOnlyMode && canManageCustomerFeedback && sendMethod === 'satisfaction' && (
                         <span className="ml-auto w-2 h-2 rounded-full bg-blue-400 shrink-0" />
                       )}
                     </div>
@@ -1253,7 +1254,7 @@ export default function ReviewsView() {
                 </div>}
 
                 {/* SMS / Text */}
-                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {!googleOnlyMode && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('sms')}
                     className="text-left p-4 w-full"
@@ -1279,7 +1280,7 @@ export default function ReviewsView() {
                       No preview for SMS
                     </span>
                   </div>
-                </div>
+                </div>}
               </div>
             </div>
 
