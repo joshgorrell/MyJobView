@@ -100,11 +100,7 @@ export function FeedbackPage() {
   async function submitRating(rating: Rating) {
     if (!token) return;
     try {
-      const { error } = await supabase
-        .from('customer_satisfaction')
-        .update({ rating, responded_at: new Date().toISOString() })
-        .eq('response_token', token);
-
+      const { error } = await supabase.functions.invoke('submit-customer-feedback', { body: { token, rating } });
       if (error) throw error;
       setSelectedRating(rating);
       setPhase('comment');
@@ -118,11 +114,7 @@ export function FeedbackPage() {
     setSelectedRating(rating);
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('customer_satisfaction')
-        .update({ rating, responded_at: new Date().toISOString() })
-        .eq('response_token', token);
-
+      const { error } = await supabase.functions.invoke('submit-customer-feedback', { body: { token, rating } });
       if (error) throw error;
       setPhase('comment');
     } catch {
@@ -138,10 +130,8 @@ export function FeedbackPage() {
     try {
       const commentText = skipComment ? '' : comment.trim();
       if (commentText) {
-        await supabase
-          .from('customer_satisfaction')
-          .update({ comment: commentText })
-          .eq('response_token', token);
+        const { error } = await supabase.functions.invoke('submit-customer-feedback', { body: { token, rating: selectedRating, comment: commentText } });
+        if (error) throw error;
       }
 
       const isNegative = selectedRating === 'okay' || selectedRating === 'needs_attention';
