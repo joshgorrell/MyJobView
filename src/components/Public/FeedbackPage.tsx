@@ -85,14 +85,14 @@ export function FeedbackPage() {
     try {
       const { data } = await supabase
         .from('company_settings')
-.select('company_name, company_logo_url, company_email, google_review_url')
+.select('company_name, company_logo_url, company_email')
         .maybeSingle();
       if (data) {
         setCompanyInfo({
           name: data.company_name || 'Electronic Life',
           logoUrl: data.company_logo_url || companyInfo.logoUrl,
           email: data.company_email || '',
-          reviewUrl: data.google_review_url || '',
+          reviewUrl: companyInfo.reviewUrl,
         });
       }
     } catch {
