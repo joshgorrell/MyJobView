@@ -65,8 +65,11 @@ function buildInvitationEmail(
   const introduction = personal
     ? `I’m ${escape(settings.invitation_owner_name)}, owner of ${company}.`
     : `We’re the leadership team at ${company}.`;
+  const signature = personal && settings?.invitation_owner_photo_url
+    ? `<p>Thank you,</p><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px;vertical-align:middle"><img src="${escape(settings.invitation_owner_photo_url)}" alt="${escape(settings.invitation_owner_name)}" width="72" style="display:block;width:72px;height:auto;border-radius:10px;border:0" /></td><td style="vertical-align:middle;line-height:1.5"><strong>${escape(settings.invitation_owner_name)}</strong><br><span style="font-size:14px">Owner, ${company}</span></td></tr></table>`
+    : `<p>Thank you,<br>${personal ? escape(settings.invitation_owner_name) : `${company} leadership team`}</p>`;
   const html = wrapInEmailLayout(
-    `<p>Hi ${escape(contact.first_name || contact.contact_name || "there")},</p><p>${introduction} Thank you for considering us for your <strong>${escape(opportunityName)}</strong>. Since we didn’t earn your business, could you spare 30 seconds to tell ${personal ? "me" : "us"} why? Your honest feedback will help us improve.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p style="font-size:13px">Your feedback is shared privately with authorized company reviewers.</p><p>Thank you,<br>${personal ? escape(settings.invitation_owner_name) : `${company} leadership team`}</p>`,
+    `<p>Hi ${escape(contact.first_name || contact.contact_name || "there")},</p><p>${introduction} Thank you for considering us for your <strong>${escape(opportunityName)}</strong>. Since we didn’t earn your business, could you spare 30 seconds to tell ${personal ? "me" : "us"} why? Your honest feedback will help us improve.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p style="font-size:13px">Your feedback is shared privately with authorized company reviewers.</p>${signature}`,
     company,
     escape(settings?.company_email || ""),
     "#0e7490",
@@ -380,6 +383,7 @@ Deno.serve(async (req) => {
       // Electronic Life's owner introduction is specific to its tenant.
       if (settings && organization.subdomain === "elife") {
         settings.invitation_owner_name = "Josh Gorrell";
+        settings.invitation_owner_photo_url = `${base}/images/josh-gorrell-email.jpg`;
       }
       if (b.action === "preview") {
         const previewUrl = new URL("/lost-opportunity-review", base);
