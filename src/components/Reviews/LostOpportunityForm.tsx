@@ -83,7 +83,7 @@ export default function LostOpportunityForm() {
             {invitation?.company_name}
           </p>
           <h1 className="text-2xl font-bold">
-            {invitation?.title || "A note to our owner"}
+            {invitation?.title || "A private note to our leadership"}
           </h1>
         </header>
         <div className="p-6 sm:p-8">
@@ -102,9 +102,9 @@ export default function LostOpportunityForm() {
                   Thank you for your honest feedback.
                 </h2>
                 <p className="mt-3">
-                  Your response has been sent privately to our owner for
-                  personal review. We appreciate the opportunity to learn and do
-                  better.
+                  Your response has been sent privately to company leadership
+                  for personal review. We appreciate the opportunity to learn
+                  and do better.
                 </p>
               </div>
             )
@@ -113,14 +113,15 @@ export default function LostOpportunityForm() {
               <form onSubmit={submit} className="space-y-6">
                 <section className="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
                   <h2 className="font-bold">
-                    This feedback goes directly to our owner first.
+                    This feedback is privately reviewed by company leadership.
                   </h2>
                   <p className="mt-2 text-sm leading-6">
-                    Our owner personally reviews every response before it is
-                    shared with your salesperson or anyone else on our team.
-                    Please be candid—constructive criticism is absolutely
-                    welcome. We want to know where we fell short, how we can
-                    improve, and whether we can win you over.
+                    Only authorized reviewers can see your response and
+                    attachments. Sending this request does not give your
+                    salesperson access to your feedback. Please be
+                    candid—constructive criticism is absolutely welcome. We want
+                    to know where we fell short, how we can improve, and whether
+                    we can win you over.
                   </p>
                 </section>
                 <fieldset>
@@ -152,7 +153,7 @@ export default function LostOpportunityForm() {
                   </div>
                 </fieldset>
                 <label className="block font-semibold">
-                  Tell the owner more<textarea
+                  Tell us more<textarea
                     value={message}
                     maxLength={10000}
                     onChange={(e) => setMessage(e.target.value)}
@@ -245,7 +246,7 @@ export default function LostOpportunityForm() {
                     !chance}
                   className="w-full rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white py-3 font-bold disabled:opacity-50"
                 >
-                  {busy ? "Sending…" : "Send to Owner"}
+                  {busy ? "Sending…" : "Send Private Feedback"}
                 </button>
               </form>
             )

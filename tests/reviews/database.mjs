@@ -172,6 +172,111 @@ await assert.rejects(
   ),
   "Repeat submission cannot overwrite feedback",
 );
+await db.exec(
+  `ALTER TABLE profiles ADD COLUMN role text DEFAULT 'sales', ADD COLUMN is_active boolean DEFAULT true, ADD COLUMN email text DEFAULT 'test@example.com', ADD COLUMN full_name text DEFAULT 'Test user', ADD COLUMN role_id uuid;
+CREATE TABLE department_modules(id uuid,module_key text,is_active boolean);
+CREATE TABLE user_permission_overrides(user_id uuid,module_id uuid,override_type text);
+CREATE TABLE role_module_access(role_id uuid,module_id uuid,has_access boolean);
+INSERT INTO department_modules VALUES('${id(99)}','reviews',true);
+GRANT SELECT ON department_modules,user_permission_overrides,role_module_access TO service_role;
+UPDATE profiles SET role='admin' WHERE id='${id(10)}';
+UPDATE profiles SET role='manager' WHERE id='${id(12)}';
+UPDATE profiles SET role='admin' WHERE id='${id(20)}';
+GRANT SELECT,UPDATE ON profiles TO authenticated;`,
+);
+await db.exec(
+  await readFile(
+    new URL(
+      "../../supabase/migrations/20260930155602_lost_review_user_permissions.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+await as(11);
+assert.equal(
+  (await db.query(
+    "SELECT can_send_lost_opportunity_reviews FROM profiles WHERE id=$1",
+    [id(11)],
+  )).rows[0].can_send_lost_opportunity_reviews,
+  true,
+  "Sales defaults to send",
+);
+assert.equal(
+  await count("lost_review_responses"),
+  0,
+  "Old sharing does not grant viewing permission",
+);
+await assert.rejects(
+  db.exec(
+    `UPDATE profiles SET can_view_lost_opportunity_submissions=true WHERE id='${
+      id(11)
+    }'`,
+  ),
+  "Sales cannot self-grant view",
+);
+await as(12);
+assert.equal(
+  await count("lost_review_responses"),
+  0,
+  "Managers require explicit viewing permission",
+);
+await as(10);
+await db.exec(
+  `UPDATE profiles SET can_send_lost_opportunity_reviews=false,can_view_lost_opportunity_submissions=true WHERE id='${
+    id(12)
+  }'`,
+);
+await as(12);
+assert.equal(
+  await count("lost_review_responses"),
+  1,
+  "View-only permission works independently of send",
+);
+await as(10);
+await db.exec(
+  `UPDATE profiles SET can_view_lost_opportunity_submissions=false WHERE id='${
+    id(12)
+  }'`,
+);
+await as(12);
+assert.equal(
+  await count("lost_review_responses"),
+  0,
+  "Revocation hides previously shared responses",
+);
+await as(20);
+assert.equal((await db.query("SELECT can_view_lost_opportunity_submissions FROM profiles WHERE id=$1",[id(20)])).rows[0].can_view_lost_opportunity_submissions,true,"Admins default to viewing permission");
+assert.equal(
+  await count("lost_review_responses"),
+  0,
+  "Permission change never crosses tenant",
+);
+await db.exec(`RESET ROLE; SET ROLE service_role;
+UPDATE profiles SET notify_lost_opportunity_submissions=true WHERE id='${
+  id(10)
+}';
+INSERT INTO review_requests(id,organization_id,request_type) VALUES('${
+  id(31)
+}','${id(1)}','lost_opportunity');
+INSERT INTO lost_review_details(request_id,organization_id,opportunity_name,title) VALUES('${
+  id(31)
+}','${id(1)}','External quote','Tell us why');
+INSERT INTO lost_review_responses(request_id,message,recoverable) VALUES('${
+  id(31)
+}','Thanks','no'); RESET ROLE;`);
+const alerts =
+  (await db.query("SELECT user_id FROM notifications WHERE related_id=$1", [
+    id(31),
+  ])).rows;
+assert.deepEqual(
+  alerts.map((v) => v.user_id),
+  [id(10)],
+  "Only permitted viewers receive alerts",
+);
+console.log(
+  "Independent permissions, defaults, self-grant protection, revocation and legacy sharing tests passed.",
+);
 await db.close();
 console.log(
   "Lost opportunity review privacy, sharing, completion, owner notification, external proposal and tenant tests passed.",

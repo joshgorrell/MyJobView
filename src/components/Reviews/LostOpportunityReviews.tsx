@@ -36,9 +36,6 @@ export default function LostOpportunityReviews(
   { showCreate = false }: { showCreate?: boolean },
 ) {
   const { profile } = useAuth();
-  const [owner, setOwner] = useState<string | null>(null);
-  const [staff, setStaff] = useState<{ id: string; full_name: string }[]>([]);
-  const [ownerChoice, setOwnerChoice] = useState("");
   const [reviews, setReviews] = useState<Review[]>([]);
   const [filter, setFilter] = useState("all");
   const [creating, setCreating] = useState(showCreate);
@@ -50,34 +47,36 @@ export default function LostOpportunityReviews(
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
+  const [preview, setPreview] = useState<
+    { subject: string; recipient: string; html: string } | null
+  >(null);
+  const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const isOwner = owner === profile?.id;
+  const canSend = profile?.can_send_lost_opportunity_reviews ?? false;
+  const canView = profile?.can_view_lost_opportunity_submissions ?? false;
   const org = profile?.organization_id;
   async function load() {
     if (!org) return;
     setLoading(true);
     try {
-      const [o, d, r, q] = await Promise.all([
-        supabase.from("lost_review_owners").select("owner_id").eq(
-          "organization_id",
-          org,
-        ).maybeSingle(),
+      const [d, r, q] = await Promise.all([
         supabase.from("lost_review_details").select("*").eq(
           "organization_id",
           org,
         ).order("request_id"),
-        supabase.from("lost_review_responses").select("*"),
+        canView
+          ? supabase.from("lost_review_responses").select("*")
+          : Promise.resolve({ data: [], error: null }),
         supabase.from("review_requests").select(
           "id,recipient_name,recipient_email",
         ).eq("request_type", "lost_opportunity").order("sent_at", {
           ascending: false,
         }),
       ]);
-      for (const result of [o, d, r, q]) if (result.error) throw result.error;
-      setOwner(o.data?.owner_id || null);
+      for (const result of [d, r, q]) if (result.error) throw result.error;
       setReviews((q.data || []).flatMap((request) => {
         const detail = d.data?.find((v) => v.request_id === request.id);
         return detail
@@ -100,21 +99,7 @@ export default function LostOpportunityReviews(
   }
   useEffect(() => {
     load();
-  }, [org]);
-  useEffect(() => {
-    if (!org) return;
-    let active = true;
-    supabase.from("profiles").select("id,full_name").eq("organization_id", org)
-      .eq("is_active", true).order("full_name").then(({ data, error }) => {
-        if (active) {
-          if (error) setError(error.message);
-          else setStaff(data || []);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [org]);
+  }, [org, canView]);
   useEffect(() => {
     if (!search.trim() || contact) {
       setContacts([]);
@@ -177,6 +162,25 @@ export default function LostOpportunityReviews(
     setName(value);
     if (!titleEdited) setTitle(value ? `Why didn’t we win your ${value}?` : "");
   }
+  async function previewEmail() {
+    setPreviewing(true);
+    setError("");
+    try {
+      setPreview(
+        await lostReviewAction({
+          action: "preview",
+          contact_id: contact?.id,
+          proposal_id: proposal || null,
+          opportunity_name: name,
+          title,
+        }),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to preview email.");
+    } finally {
+      setPreviewing(false);
+    }
+  }
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (
@@ -215,10 +219,11 @@ export default function LostOpportunityReviews(
           </h2>
           <p className="text-gray-400 text-sm mt-1">
             Learn why we lost and earn another chance. Customer feedback is
-            owner only until shared.
+            visible only to users with submission viewing permission.
           </p>
         </div>
         <button
+          disabled={!canSend}
           onClick={() => setCreating(!creating)}
           className="bg-cyan-700 text-white rounded-lg px-4 py-2"
         >
@@ -235,55 +240,7 @@ export default function LostOpportunityReviews(
           {notice}
         </p>
       )}
-      {!owner && !loading && (
-        <section className="border border-amber-700 bg-gray-800 p-5 rounded-xl">
-          <h3 className="font-semibold text-white">
-            Designate the owner first
-          </h3>
-          <p className="text-gray-300 text-sm mt-2">
-            Only this person sees new customer responses and competing bids.
-            Other admins do not receive access automatically.
-          </p>
-          {profile?.role === "admin"
-            ? (
-              <>
-                <label className="block text-gray-200 mt-3">
-                  Owner<select
-                    value={ownerChoice}
-                    onChange={(e) => setOwnerChoice(e.target.value)}
-                    className={input}
-                  >
-                    <option value="">Select the business owner</option>
-                    {staff.map((s) => (
-                      <option key={s.id} value={s.id}>{s.full_name}</option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  disabled={!ownerChoice || busy}
-                  onClick={() =>
-                    action({ action: "set_owner", owner_id: ownerChoice })}
-                  className="mt-3 rounded-lg bg-cyan-700 text-white p-3 disabled:opacity-50"
-                >
-                  Save Owner
-                </button>
-              </>
-            )
-            : (
-              <p className="text-amber-300 mt-3">
-                An admin needs to designate the owner before you can send
-                requests.
-              </p>
-            )}
-        </section>
-      )}
-      {owner && (
-        <p className="text-sm text-gray-400">
-          Owner:{" "}
-          {staff.find((s) => s.id === owner)?.full_name || "Designated owner"}
-        </p>
-      )}
-      {creating && (
+      {creating && canSend && (
         <form
           onSubmit={send}
           className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4 max-w-3xl"
@@ -373,25 +330,79 @@ export default function LostOpportunityReviews(
               <strong>{name || "your project"}</strong>.
             </p>
             <p>
-              Your feedback goes directly to our owner first. Constructive
-              criticism is absolutely welcome. We want to improve and win you
-              over.
+              Your feedback is privately reviewed by company leadership.
+              Constructive criticism is absolutely welcome. We want to improve
+              and win you over.
             </p>
             <p>
               For a competing proposal with comparable equipment and scope, we
               will work to meet or beat their price. If we can’t, we’ll buy you
               dinner.
             </p>
-            <p className="text-cyan-300">Tell Our Owner Why →</p>
+            <p className="text-cyan-300">Tell Us Why →</p>
           </div>
           <button
-            disabled={busy || !owner || !contact?.email || !name.trim() ||
+            type="button"
+            disabled={busy || previewing || !canSend || !contact?.email ||
+              !name.trim() || !title.trim()}
+            onClick={previewEmail}
+            className="rounded-lg border border-cyan-600 px-5 py-3 text-cyan-200 disabled:opacity-50"
+          >
+            {previewing ? "Loading Preview…" : "Preview Email"}
+          </button>
+          <button
+            disabled={busy || !canSend || !contact?.email || !name.trim() ||
               !title.trim()}
             className="rounded-lg bg-cyan-700 px-5 py-3 text-white disabled:opacity-50"
           >
             {busy ? "Sending…" : "Send Lost Opportunity Review"}
           </button>
         </form>
+      )}
+      {preview && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lost-email-preview-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-xl bg-gray-800 border border-gray-600 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 flex justify-between gap-4">
+              <div>
+                <h3
+                  id="lost-email-preview-title"
+                  className="text-lg font-bold text-white"
+                >
+                  Email Preview
+                </h3>
+                <p className="text-gray-300 text-sm">To: {preview.recipient}</p>
+                <p className="text-gray-300 text-sm">
+                  Subject: {preview.subject}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="text-gray-200 self-start"
+              >
+                Close
+              </button>
+            </div>
+            <iframe
+              title="Lost Opportunity email preview"
+              sandbox=""
+              srcDoc={preview.html}
+              className="w-full h-[70vh] bg-white"
+            />
+            <p className="p-3 text-sm text-gray-400">
+              Preview only. No email has been sent.
+            </p>
+          </div>
+        </div>
       )}
       <label className="flex items-center gap-3 text-gray-300">
         Filter<select
@@ -400,7 +411,7 @@ export default function LostOpportunityReviews(
           className="rounded-lg bg-gray-800 border border-gray-600 p-2"
         >
           <option value="all">All Lost Opportunities</option>
-          <option value="needs_review">Needs Owner Review</option>
+          <option value="needs_review">Needs Review</option>
           <option value="winnable">Still Winnable (visible responses)</option>
           <option value="bids">
             Competing Bid Uploaded (visible responses)
@@ -429,11 +440,7 @@ export default function LostOpportunityReviews(
               </div>
               <p className="text-cyan-300 text-sm">
                 {v.responded_at
-                  ? (v.shared_at
-                    ? "Reviewed & Shared"
-                    : v.reviewed_at
-                    ? "Owner Reviewed"
-                    : "Needs Owner Review")
+                  ? (v.reviewed_at ? "Reviewed" : "Needs Review")
                   : v.delivery_status === "failed"
                   ? "Delivery Failed"
                   : v.delivery_status === "pending"
@@ -494,12 +501,12 @@ export default function LostOpportunityReviews(
               : v.responded_at
               ? (
                 <p className="text-gray-400 text-sm">
-                  Owner Only — the owner must review and share this feedback
-                  before your team can view it.
+                  Private — viewing this response requires the View Lost
+                  Opportunity Submissions permission.
                 </p>
               )
               : null}
-            {isOwner && v.response && (
+            {canView && v.response && (
               <div className="flex flex-wrap gap-3">
                 {!v.reviewed_at && (
                   <button
@@ -509,21 +516,6 @@ export default function LostOpportunityReviews(
                     className="bg-gray-700 text-white rounded-lg px-3 py-2"
                   >
                     Mark Reviewed
-                  </button>
-                )}
-                {!v.shared_at && (
-                  <button
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Share this response and its competing bids with your team?",
-                        )
-                      ) action({ action: "share", request_id: v.request_id });
-                    }}
-                    className="bg-cyan-700 text-white rounded-lg px-3 py-2"
-                  >
-                    Review & Share with Team
                   </button>
                 )}
                 <label className="text-gray-300">
