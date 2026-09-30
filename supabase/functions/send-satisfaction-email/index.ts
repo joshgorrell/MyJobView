@@ -15,6 +15,7 @@ function buildSatisfactionEmail(params: {
   offices?: { office_name: string; phone: string }[];
   feedbackBaseUrl: string;
   responseToken: string;
+  surveyType?: 'job_completion' | 'post_test_tune' | 'one_year';
 }): string {
   const logoBlock = params.companyLogoUrl
     ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
@@ -60,6 +61,13 @@ function buildSatisfactionEmail(params: {
       </tr>
     </table>`;
 
+  const heading = params.surveyType === 'one_year' ? 'How’s everything after your first year?' : params.surveyType === 'post_test_tune' ? 'How did Test & Tune go?' : 'How Did We Do?';
+  const intro = params.surveyType === 'one_year'
+    ? `It’s been about a year since your system was completed. We’d love a quick check-in on how everything is working for you. This is also a great time to schedule a system checkup and ask about available service or protection plans.`
+    : params.surveyType === 'post_test_tune'
+      ? `Your Test & Tune period has wrapped up. After living with the system and giving us a chance to make adjustments, we’d love to know how the overall experience went.`
+      : `Your project is substantially complete. Before Test & Tune begins, we’d love a quick read on how our team did and whether there’s anything that needs our attention.`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,12 +81,12 @@ function buildSatisfactionEmail(params: {
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
       <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #0e7490;">
         <div style="margin-bottom:20px;">${logoBlock}</div>
-        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">How Did We Do?</h1>
+        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">${heading}</h1>
         <p style="color:#94a3b8;margin:0;font-size:15px;">Your feedback helps us improve</p>
       </td></tr>
       <tr><td style="background:#ffffff;padding:44px 44px 36px;">
         <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 16px 0;">Hi ${params.customerName || 'there'},</p>
-        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">Thank you for choosing <strong style="color:#0e7490;">${params.companyName}</strong>. We hope your experience was exceptional. We'd love to hear how we did — just tap the button that best describes your experience:</p>
+        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">${intro} Just tap the button that best describes your experience:</p>
 
         ${ratingGrid}
 
@@ -116,21 +124,27 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const isServiceCall = authHeader === `Bearer ${serviceKey}`;
+    let user: { id: string } | null = null;
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!isServiceCall) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data, error: authError } = await supabaseClient.auth.getUser();
+      if (authError || !data.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      user = data.user;
     }
 
-    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId } = await req.json();
+    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType = 'job_completion', projectId, salesOrderId } = await req.json();
 
     if (!customerEmail && !resendRecordId) {
       return new Response(JSON.stringify({ error: 'Customer email is required' }), {
@@ -139,13 +153,16 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .maybeSingle();
+    const { data: contactOrg } = contactId
+      ? await supabaseAdmin.from('contacts').select('organization_id').eq('id', contactId).maybeSingle()
+      : { data: null };
 
-    if (!profile?.organization_id) {
+    const { data: profile } = user
+      ? await supabaseAdmin.from('profiles').select('organization_id').eq('id', user.id).maybeSingle()
+      : { data: null };
+
+    const organizationId = profile?.organization_id || contactOrg?.organization_id;
+    if (!organizationId) {
       return new Response(JSON.stringify({ error: 'Could not determine organization' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -159,7 +176,7 @@ Deno.serve(async (req: Request) => {
         .from('customer_satisfaction')
         .select('id, response_token, customer_name, customer_email')
         .eq('id', resendRecordId)
-        .eq('organization_id', profile.organization_id)
+        .eq('organization_id', organizationId)
         .maybeSingle();
 
       if (fetchError || !existing) {
@@ -175,7 +192,7 @@ Deno.serve(async (req: Request) => {
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from('customer_satisfaction')
         .insert({
-          organization_id: profile.organization_id,
+          organization_id: organizationId,
           contact_id: contactId || null,
           customer_name: customerName || '',
           customer_email: customerEmail,
@@ -184,7 +201,10 @@ Deno.serve(async (req: Request) => {
           lead_tech_id: leadTechId || null,
           lead_tech_name: leadTechName || '',
           response_token: responseToken,
-          created_by: user.id,
+          created_by: user?.id || null,
+          survey_type: surveyType,
+          project_id: projectId || null,
+          sales_order_id: salesOrderId || null,
         })
         .select('id, response_token, customer_name, customer_email')
         .single();
@@ -217,11 +237,15 @@ Deno.serve(async (req: Request) => {
       offices: settings.offices || [],
       feedbackBaseUrl: appUrl,
       responseToken: record.response_token,
+      surveyType,
     });
 
-    const subject = finalCustomerName
-      ? `How did we do, ${finalCustomerName.split(' ')[0]}?`
-      : 'How did we do?';
+    const firstName = finalCustomerName.split(' ')[0];
+    const subject = surveyType === 'one_year'
+      ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
+      : surveyType === 'post_test_tune'
+        ? (firstName ? `How did Test & Tune go, ${firstName}?` : 'How did Test & Tune go?')
+        : (firstName ? `How did we do, ${firstName}?` : 'How did we do?');
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
