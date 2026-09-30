@@ -13,6 +13,7 @@ import { OfflineIndicator } from './components/Offline/OfflineIndicator';
 import BugReportModal from './components/Shared/BugReportModal';
 import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
+import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
@@ -463,17 +464,7 @@ function AppContent() {
   }, [activeTab]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0a1628] flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <div className="text-gray-300 text-lg mb-2">Loading...</div>
-          <div className="text-gray-400 text-sm">
-            If this takes more than a few seconds, try refreshing the page.
-          </div>
-        </div>
-      </div>
-    );
+    return <BrandedLoading message="Loading your workspace..." />;
   }
 
   // --- PORTAL USER ISOLATION ---
@@ -541,7 +532,7 @@ function AppContent() {
   // the dealer subdomain with a short-lived token transfer via URL fragment.
   if (currentPath === '/auth-bridge') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<BrandedLoading message="Connecting to your portal..." />}>
         <AuthBridge />
       </Suspense>
     );
@@ -551,7 +542,7 @@ function AppContent() {
   // establishes it in this origin's localStorage.
   if (currentPath === '/auth-callback') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<BrandedLoading message="Signing you in..." />}>
         <AuthCallback />
       </Suspense>
     );
