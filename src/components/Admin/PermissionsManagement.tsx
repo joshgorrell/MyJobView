@@ -10,6 +10,10 @@ interface UserWithRole {
   role: string;
   role_id: string | null;
   is_active: boolean;
+  can_request_google_reviews: boolean;
+  can_view_customer_feedback: boolean;
+  can_manage_customer_feedback: boolean;
+  can_view_lost_opportunity_submissions: boolean;
 }
 
 interface Role {
@@ -40,7 +44,7 @@ export function PermissionsManagement() {
       const [usersRes, rolesRes] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, email, role, role_id, is_active')
+          .select('id, full_name, email, role, role_id, is_active, can_request_google_reviews, can_view_customer_feedback, can_manage_customer_feedback, can_view_lost_opportunity_submissions')
           .order('full_name'),
         supabase
           .from('roles')
@@ -85,6 +89,21 @@ export function PermissionsManagement() {
     } catch (error) {
       console.error('Error updating role:', error);
       showMessage('error', 'Failed to update user role');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleFeedbackPermission(user: UserWithRole, field: 'can_request_google_reviews' | 'can_view_customer_feedback' | 'can_manage_customer_feedback' | 'can_view_lost_opportunity_submissions') {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ [field]: !user[field] }).eq('id', user.id);
+      if (error) throw error;
+      setUsers(current => current.map(item => item.id === user.id ? { ...item, [field]: !item[field] } : item));
+      showMessage('success', 'Feedback permission updated');
+    } catch (error) {
+      console.error('Error updating feedback permission:', error);
+      showMessage('error', 'Failed to update Feedback permission');
     } finally {
       setSaving(false);
     }
@@ -151,6 +170,35 @@ export function PermissionsManagement() {
               <p><strong>3. Priority:</strong> User-specific overrides always take precedence over role-based permissions.</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Feedback permissions */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-200">
+          <h4 className="font-semibold text-gray-900">Feedback Permissions</h4>
+          <p className="text-sm text-gray-600 mt-1">Google review asking is intentionally separate from access to private customer feedback and lost-opportunity responses.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-600">
+              <tr><th className="px-5 py-3 text-left">User</th><th className="px-4 py-3 text-center">Ask for Google Review</th><th className="px-4 py-3 text-center">View Customer Feedback</th><th className="px-4 py-3 text-center">Manage Feedback</th><th className="px-4 py-3 text-center">View Lost Opportunities</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {users.filter(user => user.is_active).map(user => (
+                <tr key={`feedback-${user.id}`} className="hover:bg-gray-50">
+                  <td className="px-5 py-3"><div className="font-medium text-gray-900">{user.full_name}</div><div className="text-xs text-gray-500">{user.role}</div></td>
+                  {(['can_request_google_reviews','can_view_customer_feedback','can_manage_customer_feedback','can_view_lost_opportunity_submissions'] as const).map(field => (
+                    <td key={field} className="px-4 py-3 text-center">
+                      <button disabled={saving} onClick={() => toggleFeedbackPermission(user, field)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${user[field] ? 'bg-blue-600' : 'bg-gray-300'} disabled:opacity-50`} aria-label={`Toggle ${field} for ${user.full_name}`}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${user[field] ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

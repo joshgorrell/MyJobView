@@ -257,7 +257,7 @@ export default function ReviewsView() {
   const canViewCustomerFeedback = isAdmin || ((profile as any)?.can_view_customer_feedback ?? canSeeAllRequests);
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'satisfaction' | 'send' | 'history' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'send' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [satisfactionHistory, setSatisfactionHistory] = useState<SatisfactionRecord[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -275,7 +275,7 @@ export default function ReviewsView() {
   const [manualEmail, setManualEmail] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
-  const [sendMethod, setSendMethod] = useState<'satisfaction' | 'sms' | 'survey'>('satisfaction');
+  const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms' | 'survey'>('email');
 
   // Customer Satisfaction form state
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
@@ -313,6 +313,10 @@ export default function ReviewsView() {
   }
   const [personalNote, setPersonalNote] = useState('');
   const [editedSubject, setEditedSubject] = useState('');
+
+  useEffect(() => {
+    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') setActiveTab('send');
+  }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab]);
 
   useEffect(() => {
     loadReviewRequests();
@@ -691,8 +695,9 @@ export default function ReviewsView() {
 
   async function sendReviewRequest() {
     const isSurvey = sendMethod === 'survey';
+    const isEmail = sendMethod === 'email';
 
-    if (isSurvey) {
+    if (isSurvey || isEmail) {
       if (useManualEntry) {
         if (!manualEmail) { toast.warning('Please enter an email address'); return; }
         if (!manualEmail.includes('@')) { toast.warning('Please enter a valid email address'); return; }
@@ -716,7 +721,7 @@ export default function ReviewsView() {
       };
 
       if (useManualEntry) {
-        if (isSurvey) {
+        if (isSurvey || isEmail) {
           requestBody.email = manualEmail;
           requestBody.name = manualName;
         } else {
@@ -733,6 +738,8 @@ export default function ReviewsView() {
       let functionName: string;
       if (isSurvey) {
         functionName = 'send-job-completion-survey';
+      } else if (isEmail) {
+        functionName = 'send-review-request';
       } else {
         functionName = 'send-review-request-sms';
       }
@@ -755,7 +762,7 @@ export default function ReviewsView() {
         .from('review_requests')
         .insert({
           contact_id: useManualEntry ? null : selectedContact?.id,
-          recipient_email: isSurvey && useManualEntry ? manualEmail : null,
+          recipient_email: (isSurvey || isEmail) && useManualEntry ? manualEmail : null,
           recipient_name: useManualEntry ? manualName : null,
           sent_by: profile?.id,
           method: isSurvey ? 'survey' : sendMethod
@@ -766,7 +773,7 @@ export default function ReviewsView() {
       const sentName = useManualEntry
         ? (manualName || manualEmail || manualPhone)
         : (selectedContact?.contact_name || '');
-      const sentMethod = isSurvey ? 'Job Completion Survey' : 'SMS Review Request';
+      const sentMethod = isSurvey ? 'Job Completion Survey' : isEmail ? 'Google Review Request' : 'SMS Review Request';
 
       setShowPreview(false);
       setPreviewData(null);
@@ -939,14 +946,23 @@ export default function ReviewsView() {
 
   const isSendDisabled =
     sending ||
-    (sendMethod === 'survey' && !selectedContact && !manualEmail) ||
+    ((sendMethod === 'survey' || sendMethod === 'email') && !selectedContact && !manualEmail) ||
     (sendMethod === 'sms' && !selectedContact && !manualPhone);
 
   const isPreviewDisabled =
     loadingPreview ||
-    (sendMethod === 'survey' && !selectedContact && !manualEmail);
+    ((sendMethod === 'survey' || sendMethod === 'email') && !selectedContact && !manualEmail);
 
   const filteredContacts = contacts;
+
+  const reviewChampions = Object.values(requests.reduce<Record<string, { name: string; sent: number; clicked: number; completed: number }>>((acc, request) => {
+    const key = request.sent_by || 'unknown';
+    if (!acc[key]) acc[key] = { name: request.profiles?.full_name || 'Unknown', sent: 0, clicked: 0, completed: 0 };
+    acc[key].sent += 1;
+    if (request.link_clicked) acc[key].clicked += 1;
+    if (request.review_completed) acc[key].completed += 1;
+    return acc;
+  }, {})).sort((a, b) => b.sent - a.sent).slice(0, 5);
 
   const PARTICLES = Array.from({ length: 18 }, (_, i) => {
     const angle = (i / 18) * 360;
@@ -1061,7 +1077,7 @@ export default function ReviewsView() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-700 overflow-x-auto">
-        <button
+        {canViewCustomerFeedback && <button
           onClick={() => setActiveTab('dashboard')}
           className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
             activeTab === 'dashboard'
@@ -1071,19 +1087,8 @@ export default function ReviewsView() {
         >
           <TrendingUp className="w-4 h-4 inline mr-2" />
           Customer Feedback
-        </button>
-        <button
-          onClick={() => setActiveTab('satisfaction')}
-          className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'satisfaction'
-              ? 'text-blue-400 border-b-2 border-blue-400'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          <ThumbsUp className="w-4 h-4 inline mr-2" />
-          Satisfaction
-        </button>
-        <button
+        </button>}
+        {canRequestGoogleReviews && <button
           onClick={() => setActiveTab('send')}
           className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
             activeTab === 'send'
@@ -1093,31 +1098,39 @@ export default function ReviewsView() {
         >
           <Send className="w-4 h-4 inline mr-2" />
           Ask / Send
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'history'
-              ? 'text-yellow-400 border-b-2 border-yellow-400'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          <Calendar className="w-4 h-4 inline mr-2" />
-          History
-        </button>
+        </button>}
         {canViewLostOpportunities && <button onClick={() => setActiveTab('lost')} className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>}
       </div>
 
       {activeTab === 'lost' && canViewLostOpportunities && <LostOpportunityReviews />}
 
-      {/* Satisfaction Tab */}
-      {activeTab === 'satisfaction' && (
+      {/* Customer satisfaction is part of the unified Customer Feedback view. */}
+      {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <CustomerSatisfactionDashboard />
       )}
 
       {/* Dashboard Tab */}
-      {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <div className="space-y-6">
+          {reviewChampions.length > 0 && (
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div><h2 className="text-lg font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Google review requests attributed to the employee who asked.</p></div>
+                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+              </div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                {reviewChampions.map((champion, index) => (
+                  <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
+                    <div className="text-xs text-gray-500">#{index + 1}</div>
+                    <div className="font-semibold text-white truncate">{champion.name}</div>
+                    <div className="mt-2 text-2xl font-bold text-cyan-300">{champion.sent}</div>
+                    <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
@@ -1200,18 +1213,29 @@ export default function ReviewsView() {
       {activeTab === 'send' && (
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-4">Send Review Request</h2>
-            <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Review</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
+              <div><h2 className="text-xl font-bold text-white">Ask for a Google Review</h2><p className="text-sm text-gray-400 mt-1">Show the QR in person or send the customer a direct request.</p></div>
+              {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Hand the customer your screen. No email required.</div></div></div>}
+            </div>
+            {canViewLostOpportunities && <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Feedback</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>}
 
 
             {/* Send Method Selection */}
             <div className="mb-2">
               <p className="text-xs text-gray-400 mb-3">
-                Choose a method below. Survey and SMS requests are tracked on the History tab.
+                Choose a method below. Every request is attributed to the employee who asks.
               </p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+                {/* Direct Google review email */}
+                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'email' ? 'bg-cyan-900/30 border-cyan-500 shadow-lg shadow-cyan-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                  <button onClick={() => setSendMethod('email')} className="text-left p-4 w-full">
+                    <div className="flex items-center gap-2 mb-2"><div className={`p-1.5 rounded-lg ${sendMethod === 'email' ? 'bg-cyan-600' : 'bg-gray-700'}`}><Mail className="w-4 h-4 text-white" /></div><span className={`font-semibold text-sm ${sendMethod === 'email' ? 'text-cyan-300' : 'text-gray-200'}`}>Google Review Email</span></div>
+                    <p className="text-xs text-gray-400 leading-relaxed">Select a customer or enter an email and send the direct Google review request. Works for projects, service, or any customer.</p>
+                  </button>
+                  <div className="px-4 pb-3"><button onClick={e => { e.stopPropagation(); fetchEmailPreview(); }} disabled={loadingPreview} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-cyan-400"><Eye className="w-3.5 h-3.5" />Preview email</button></div>
+                </div>
                 {/* Customer Satisfaction Survey */}
-                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('satisfaction')}
                     className="text-left p-4 w-full"
@@ -1223,7 +1247,7 @@ export default function ReviewsView() {
                       <span className={`font-semibold text-sm ${sendMethod === 'satisfaction' ? 'text-blue-300' : 'text-gray-200'}`}>
                         Satisfaction Survey
                       </span>
-                      {sendMethod === 'satisfaction' && (
+                      {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
                         <span className="ml-auto w-2 h-2 rounded-full bg-blue-400 shrink-0" />
                       )}
                     </div>
@@ -1241,10 +1265,10 @@ export default function ReviewsView() {
                       Preview email
                     </button>
                   </div>
-                </div>
+                </div>}
 
                 {/* Job Completion Survey */}
-                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'survey' ? 'bg-amber-900/30 border-amber-500 shadow-lg shadow-amber-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'survey' ? 'bg-amber-900/30 border-amber-500 shadow-lg shadow-amber-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('survey')}
                     className="text-left p-4 w-full"
@@ -1274,7 +1298,7 @@ export default function ReviewsView() {
                       Preview email
                     </button>
                   </div>
-                </div>
+                </div>}
 
                 {/* SMS / Text */}
                 <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
@@ -1308,7 +1332,7 @@ export default function ReviewsView() {
             </div>
 
             {/* Satisfaction Survey Form */}
-            {sendMethod === 'satisfaction' && (
+            {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
               <div className="space-y-4">
                 {satSuccess && (
                   <div className="flex items-center gap-3 p-4 bg-green-900/30 border border-green-600/50 rounded-xl text-green-300">
@@ -1537,7 +1561,7 @@ export default function ReviewsView() {
                         className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                       />
                     </div>
-                    {sendMethod === 'survey' ? (
+                    {(sendMethod === 'survey' || sendMethod === 'email') ? (
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                           Email Address <span className="text-red-400">*</span>
@@ -1593,8 +1617,8 @@ export default function ReviewsView() {
         </div>
       )}
 
-      {/* History Tab */}
-      {activeTab === 'history' && (
+      {/* Unified feedback activity */}
+      {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
           {!canSeeAllRequests && (
             <div className="px-6 py-3 bg-blue-900/30 border-b border-blue-700/50 flex items-center gap-2 text-sm text-blue-300">
