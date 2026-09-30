@@ -35,6 +35,7 @@ export function CompanySettings() {
   const [ccFeeLabel, setCcFeeLabel] = useState('Credit Card Convenience Fee');
   const [defaultInvoiceTermsAndConditions, setDefaultInvoiceTermsAndConditions] = useState('');
 
+  const [portalSecurityContractsEnabled, setPortalSecurityContractsEnabled] = useState(true);
   const [portalProposalsEnabled, setPortalProposalsEnabled] = useState(true);
   const [portalProjectsEnabled, setPortalProjectsEnabled] = useState(false);
   const [portalAppointmentsEnabled, setPortalAppointmentsEnabled] = useState(false);
@@ -118,6 +119,7 @@ export function CompanySettings() {
         setCcFeeLabel(data.cc_convenience_fee_label || 'Credit Card Convenience Fee');
         setDefaultInvoiceTermsAndConditions(data.default_invoice_terms_and_conditions || '');
 
+        setPortalSecurityContractsEnabled(data.portal_security_contracts_enabled ?? true);
         setPortalProposalsEnabled(data.portal_proposals_enabled ?? true);
         setPortalProjectsEnabled(data.portal_projects_enabled ?? false);
         setPortalAppointmentsEnabled(data.portal_appointments_enabled ?? false);
@@ -395,6 +397,7 @@ export function CompanySettings() {
             billing_change_effective_date: billingChangeEffective,
             default_auto_renew: defaultAutoRenew,
             grace_period_days: gracePeriodDays,
+            portal_security_contracts_enabled: portalSecurityContractsEnabled,
             portal_proposals_enabled: portalProposalsEnabled,
             portal_projects_enabled: portalProjectsEnabled,
             portal_appointments_enabled: portalAppointmentsEnabled,
@@ -448,6 +451,7 @@ export function CompanySettings() {
             billing_change_effective_date: billingChangeEffective,
             default_auto_renew: defaultAutoRenew,
             grace_period_days: gracePeriodDays,
+            portal_security_contracts_enabled: portalSecurityContractsEnabled,
             portal_proposals_enabled: portalProposalsEnabled,
             portal_projects_enabled: portalProjectsEnabled,
             portal_appointments_enabled: portalAppointmentsEnabled,
@@ -1472,6 +1476,12 @@ export function CompanySettings() {
         </p>
 
         <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <input type="checkbox" id="portal-security-contracts" checked={portalSecurityContractsEnabled}
+              onChange={e => setPortalSecurityContractsEnabled(e.target.checked)} className="w-5 h-5 text-blue-600 rounded" />
+            <div className="flex-1"><label htmlFor="portal-security-contracts" className="font-medium text-gray-900 cursor-pointer">Security Contracts</label>
+              <p className="text-sm text-gray-600">Show onboarding, signed agreements, monthly charges, balances, and months remaining when the security contracts module is enabled.</p></div>
+          </div>
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <input
               type="checkbox"

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { X, Search, Plus, Wrench } from 'lucide-react';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
@@ -56,6 +57,8 @@ interface CreateSecurityContractModalProps {
 }
 
 export default function CreateSecurityContractModal({ onClose, onSuccess, onPaperCreated, prefill }: CreateSecurityContractModalProps) {
+  const { profile } = useAuth();
+  const standardMonitoringTerm = profile?.organization_id === 'b324e4e3-cd2e-4c68-8df8-3e27c7e08f15';
   const [templates, setTemplates] = useState<Template[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [monitoringServices, setMonitoringServices] = useState<MonitoringService[]>([]);
@@ -325,7 +328,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
           status: 'draft',
           monthly_price: finalMonthlyPrice,
           price_override: priceOverride ? parseFloat(priceOverride) : null,
-          term_months: termMonths,
+          term_months: standardMonitoringTerm ? 36 : termMonths,
           renewal_term_months: 1,
           cancellation_notice_days: 30,
           account_type: accountType || null,
@@ -821,13 +824,13 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                 Agreement Term <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {[12, 24, 36, 48, 60].map((months) => (
+                {(standardMonitoringTerm ? [36] : [12, 24, 36, 48, 60]).map((months) => (
                   <button
                     key={months}
                     type="button"
                     onClick={() => setTermMonths(months)}
                     className={`px-2 sm:px-4 py-3 text-center rounded-lg border-2 transition-all ${
-                      termMonths === months
+                      (standardMonitoringTerm ? 36 : termMonths) === months
                         ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
                         : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                     }`}

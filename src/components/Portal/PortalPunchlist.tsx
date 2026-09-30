@@ -1,3 +1,4 @@
+import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -97,6 +98,7 @@ async function markTaskComplete(taskId: string) {
 }
 
 export function PortalPunchlist({ previewContactId, isEmbedded = false }: PortalPunchlistProps = {}) {
+  const securityPortalEnabled = useSecurityPortalEnabled();
   const { profile, user } = useAuth();
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
   const [tasks, setTasks] = useState<PunchlistTask[]>([]);
@@ -1831,6 +1833,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               <p className="text-blue-300 text-xs">Track service items and communicate with our team</p>
             </div>
             <div className="flex-1" />
+            {securityPortalEnabled && <a href="/portal/security" className="text-sm font-semibold text-blue-100 hover:text-white px-3 py-2 min-h-[44px] flex items-center">Security</a>}
             {accessInfo?.access_type === 'vip_membership' && (
               <div className="hidden sm:flex items-center gap-1.5 bg-yellow-500/20 border border-yellow-500/40 rounded-full px-3 py-1">
                 <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />

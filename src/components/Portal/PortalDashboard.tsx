@@ -1,3 +1,4 @@
+import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect } from 'react';
 import { FileText, Briefcase, Calendar, DollarSign, MessageSquare, LogOut, Shield, XCircle, ClipboardList, Star, ArrowLeft, ChevronRight, CheckSquare, Receipt, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -49,6 +50,7 @@ interface PortalDashboardProps {
 }
 
 export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboardProps = {}) {
+  const securityPortalEnabled = useSecurityPortalEnabled();
   const { tenant } = useTenant();
   const dealerName = tenant?.organizationName || 'Electronic Life';
   const dealerLogo = tenant?.logoUrl;
@@ -434,6 +436,9 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {securityPortalEnabled && <DashboardTile icon={<Shield className="w-5 h-5" />} title="Security agreements"
+            description="Finish onboarding, review terms, and print your agreements."
+            count={null} color="blue" onClick={() => { window.location.href = '/portal/security'; }} />}
           {moduleSettings.portal_proposals_enabled && (
             <DashboardTile
               icon={<FileText className="w-5 h-5" />}
@@ -774,7 +779,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
 interface DashboardTileProps {
   icon: React.ReactNode;
   title: string;
-  count: number;
+  count: number | null;
   description: string;
   color: 'blue' | 'green' | 'teal' | 'orange' | 'cyan' | 'navy' | 'amber';
   onClick: () => void;
@@ -814,7 +819,7 @@ function DashboardTile({ icon, title, count, description, color, onClick, badge 
           <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors mt-1" />
         </div>
         <div className="flex items-baseline gap-2 mb-1.5">
-          <span className={`text-3xl font-bold ${cfg.count}`}>{count}</span>
+          {count !== null && <span className={`text-3xl font-bold ${cfg.count}`}>{count}</span>}
           <span className="text-sm font-semibold text-gray-700">{title}</span>
         </div>
         <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">{description}</p>

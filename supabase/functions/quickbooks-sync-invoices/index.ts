@@ -180,6 +180,7 @@ async function pushInvoice(
     .maybeSingle();
 
   if (!invoice) return { success: false, error: 'Invoice not found' };
+  if (invoice.security_billing_cycle_id) return { success: false, error: 'Monitoring invoices are synchronized by the security billing workflow' };
   if (!invoice.contacts?.qbo_customer_id) return { success: false, error: 'Contact is not linked to QuickBooks' };
 
   const lineItems = (invoice.invoice_line_items || []).map((item: any, index: number) => ({

@@ -244,5 +244,13 @@ verify_jwt = true
 [functions.verify-portal-token]
 verify_jwt = false
 
+# The handler validates the contract invitation or authenticated portal ownership.
+[functions.security-payment-methods]
+verify_jwt = false
+
 [functions.zip-tax-lookup]
 verify_jwt = true
+
+# Dedicated server cron secret is checked by the handler. Never called by portal sessions.
+[functions.security-recurring-billing]
+verify_jwt = false

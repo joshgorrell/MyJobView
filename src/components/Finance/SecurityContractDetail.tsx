@@ -1,5 +1,8 @@
+import { SecurityBillingPanel } from './SecurityBillingPanel';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { readableAgreementTerms, securityAgreementHtml, printSecurityAgreement } from '../../lib/securityAgreementDocument';
 import { formatCurrency } from '../../lib/utils';
 import { ArrowLeft, Send, CheckCircle, XCircle, Eye, Mail, Clock, AlertCircle, User, Shield, Phone, CreditCard, Ligature as FileSignature, MapPin, CreditCard as Edit, Printer, Trash2, Ban, Wrench, ShieldCheck } from 'lucide-react';
 import ManualContractEntry from './ManualContractEntry';
@@ -15,6 +18,7 @@ interface SecurityContractDetailProps {
 }
 
 export default function SecurityContractDetail({ contract, contractId, onClose, onUpdate }: SecurityContractDetailProps) {
+  const { profile } = useAuth();
   const resolvedContractId = contract?.id || contractId;
   const [contractData, setContractData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,6 +35,18 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   const [cancellationDate, setCancellationDate] = useState('');
   const [cancellationReason, setCancellationReason] = useState('');
   const [immediateCancel, setImmediateCancel] = useState(true);
+  const [billingUpdating, setBillingUpdating] = useState(false);
+  const [billingError, setBillingError] = useState('');
+
+  async function setSecurityBilling(mode: 'autopay' | 'mail') {
+    setBillingUpdating(true);setBillingError('');
+    try {
+      const {error}=await supabase.from('security_contracts').update({security_billing_mode:mode}).eq('id',resolvedContractId);
+      if(error) throw error;
+      await loadContractDetails();onUpdate?.();
+    } catch(e) {setBillingError(e instanceof Error ? e.message : 'Billing authorization could not be updated');}
+    finally {setBillingUpdating(false);}
+  }
 
   useEffect(() => {
     loadContractDetails();
@@ -68,7 +84,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   async function handleSendInvitation() {
     setSending(true);
     try {
-      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      const token = crypto.randomUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
 
@@ -258,6 +274,13 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
   function handlePrint() {
     const d = contractData;
+    if (d?.onboarding_agreement_snapshot) {
+      const doc = d.onboarding_agreement_snapshot;
+      const terms = readableAgreementTerms(doc.template?.contract_terms || '').replace(/\[term\]/g, `${doc.term_months} months`);
+      try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date)); }
+      catch (error) { alert(error instanceof Error ? error.message : 'Could not print the agreement.'); }
+      return;
+    }
     const contact = d?.contact || {};
     const template = d?.template || {};
     const emergencyContacts = d?.emergency_contacts || [];
@@ -763,6 +786,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
     <>
 
       <div className="p-8 contract-print-root">
+        <SecurityBillingPanel contractId={contractData.id} organizationId={contractData.organization_id} />
         <div className="mb-6 no-print">
           <button
             onClick={onClose}
@@ -834,6 +858,16 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
           </div>
         </div>
 
+        <div className="border border-blue-200 bg-blue-50 rounded-xl p-4 space-y-3 print-hide">
+          <p className="font-semibold text-blue-900">Security billing: {contractData.security_billing_mode === 'mail' ? 'Admin-approved mailed invoices' : 'Required AutoPay'}</p>
+          <p className="text-sm text-blue-900">{contractData.security_billing_mode === 'mail' ? 'The monthly price includes the $7 mailed-invoice fee.' : 'The customer must add or select a verified payment method and authorize recurring automatic payments.'}</p>
+          {profile?.role === 'admin' && !contractData.customer_completed_at && ['draft','pending_customer'].includes(contractData.status) &&
+            <button disabled={billingUpdating} onClick={()=>void setSecurityBilling(contractData.security_billing_mode === 'mail' ? 'autopay' : 'mail')}
+              className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-50">
+              {contractData.security_billing_mode === 'mail' ? 'Require AutoPay (remove $7/month fee)' : 'Authorize mailed invoices (+$7/month)'}
+            </button>}
+          {billingError && <p role="alert" className="text-red-700">{billingError}</p>}
+        </div>
         {/* Print Header - Only shows when printing */}
         <div className="print-show mb-8">
           <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
@@ -1661,7 +1695,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
       <ConfirmModal
         isOpen={confirmActivate}
         title="Activate Contract"
-        message="Activate this contract and create recurring subscription?"
+        message="Activate this contract and start its configured billing workflow?"
         variant="neutral"
         confirmLabel="Activate"
         onConfirm={() => {

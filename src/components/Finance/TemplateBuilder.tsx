@@ -14,7 +14,7 @@ export default function TemplateBuilder({ template, onClose, onSave }: TemplateB
     description: template?.description || '',
     requires_approval: template?.requires_approval || false,
     approval_role: template?.approval_role || 'admin',
-    auto_create_subscription: template?.auto_create_subscription || true,
+    auto_create_subscription: template?.auto_create_subscription ?? true,
     contract_terms: template?.contract_terms || ''
   });
   const [saving, setSaving] = useState(false);
