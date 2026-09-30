@@ -257,7 +257,7 @@ export default function ReviewsView() {
   const canViewCustomerFeedback = isAdmin || ((profile as any)?.can_view_customer_feedback ?? canSeeAllRequests);
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'satisfaction' | 'send' | 'history' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'send' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [satisfactionHistory, setSatisfactionHistory] = useState<SatisfactionRecord[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -1110,13 +1110,13 @@ export default function ReviewsView() {
 
       {activeTab === 'lost' && canViewLostOpportunities && <LostOpportunityReviews />}
 
-      {/* Satisfaction Tab */}
-      {activeTab === 'satisfaction' && (
+      {/* Customer satisfaction is part of the unified Customer Feedback view. */}
+      {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <CustomerSatisfactionDashboard />
       )}
 
       {/* Dashboard Tab */}
-      {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <div className="space-y-6">
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1593,8 +1593,8 @@ export default function ReviewsView() {
         </div>
       )}
 
-      {/* History Tab */}
-      {activeTab === 'history' && (
+      {/* Unified feedback activity */}
+      {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
           {!canSeeAllRequests && (
             <div className="px-6 py-3 bg-blue-900/30 border-b border-blue-700/50 flex items-center gap-2 text-sm text-blue-300">
