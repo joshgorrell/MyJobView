@@ -151,6 +151,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
   const [emailOverride, setEmailOverride] = useState('');
+  const [sendPunchlistInvite, setSendPunchlistInvite] = useState(false);
   const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
   const [editingDescription, setEditingDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
@@ -389,6 +390,45 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
     }
   }
 
+  async function sendPunchlistInviteFromInvoice(recipientEmail: string) {
+    if (!invoice?.contact_id) return;
+    const customerName = getCustomerName(invoice) || 'Customer';
+
+    let { data: grant } = await supabase.from('punchlist_access_grants')
+      .select('id, expiration_date')
+      .eq('contact_id', invoice.contact_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!grant) {
+      const { data: inviteId, error: createError } = await supabase.rpc('create_manual_punchlist_invite', {
+        p_contact_id: invoice.contact_id,
+        p_notes: `Intentional invite while emailing invoice #${invoice.invoice_number}`
+      });
+      if (createError) throw createError;
+
+      const { data: grantId, error: grantError } = await supabase.rpc('send_punchlist_invite', { p_invite_id: inviteId });
+      if (grantError) throw grantError;
+
+      const result = await supabase.from('punchlist_access_grants').select('id, expiration_date').eq('id', grantId).single();
+      if (result.error) throw result.error;
+      grant = result.data;
+    }
+
+    const { error: emailError } = await supabase.functions.invoke('send-punchlist-invite', {
+      body: {
+        contact_email: recipientEmail,
+        contact_name: customerName,
+        project_name: invoice.invoice_title || `Invoice #${invoice.invoice_number}`,
+        expiration_date: grant?.expiration_date,
+        access_type: 'test_and_tune'
+      }
+    });
+    if (emailError) throw emailError;
+  }
+
   async function handleSendEmail() {
     if (!invoice) return;
     const taxBlock = checkTaxFinalizationGuard(invoice.tax_calculation_status);
@@ -408,6 +448,9 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
       }
       const { error } = await supabase.functions.invoke('send-invoice-email', { body });
       if (error) throw error;
+      if (sendPunchlistInvite && invoice.contact_id) {
+        await sendPunchlistInviteFromInvoice(trimmed || invoice.contacts?.email || '');
+      }
       setEmailSent(true);
       setTimeout(() => setEmailSent(false), 4000);
       loadInvoice();
@@ -1230,6 +1273,12 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                 <p className="text-xs text-blue-600 mt-1.5">Sending to a different address than on file</p>
               )}
             </div>
+            {invoice.contact_id && (
+              <label className="mb-4 flex items-start gap-3 rounded-lg border border-cyan-200 bg-cyan-50 p-3 cursor-pointer">
+                <input type="checkbox" checked={sendPunchlistInvite} onChange={e => setSendPunchlistInvite(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" />
+                <span><span className="block text-sm font-semibold text-cyan-900">Also send Punchlist / Test & Tune invite</span><span className="block text-xs text-cyan-700 mt-0.5">Intentional send: existing active access is reused; otherwise MJV creates access once and sends the invite.</span></span>
+              </label>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmEmail(false)}
