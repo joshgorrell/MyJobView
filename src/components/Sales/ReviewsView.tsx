@@ -281,7 +281,7 @@ export default function ReviewsView() {
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms'>('email');
-  const [lifecycleType, setLifecycleType] = useState<'job_completion' | 'post_test_tune' | 'one_year' | 'manual'>('job_completion');
+  const [lifecycleType, setLifecycleType] = useState<'job_completion' | 'test_tune_welcome' | 'post_test_tune' | 'one_year' | 'manual'>('job_completion');
 
   // Customer Satisfaction form state
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
@@ -352,6 +352,27 @@ export default function ReviewsView() {
   }, [staffProfiles, profile?.id]);
 
   async function sendSatisfactionSurvey() {
+    if (lifecycleType === 'test_tune_welcome') {
+      const email = satUseManual ? satManualEmail : satContact?.email;
+      const name = satUseManual ? satManualName : satContact?.contact_name;
+      if (!email || !email.includes('@')) { toast.warning('Please provide a valid customer email address.'); return; }
+      setSatSending(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-punchlist-invite`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contact_email: email, contact_name: name || 'Valued Customer', project_name: 'your project', access_type: 'test_and_tune' })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false) throw new Error(result.error || 'Failed to send Test & Tune Welcome');
+        showSuccessAnimation(name || email, 'Test & Tune Welcome');
+      } catch (error: any) {
+        toast.error(`Failed to send: ${error.message || 'Please try again.'}`);
+      } finally { setSatSending(false); }
+      return;
+    }
     const email = satUseManual ? satManualEmail : satContact?.email;
     const name = satUseManual ? satManualName : satContact?.contact_name;
     if (!email) { toast.warning('Please provide a customer email address.'); return; }
@@ -417,17 +438,20 @@ export default function ReviewsView() {
       const recipientEmail = satUseManual ? satManualEmail : (satContact?.email || '');
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-satisfaction-email`, {
+      const isTestTuneWelcome = lifecycleType === 'test_tune_welcome';
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${isTestTuneWelcome ? 'send-punchlist-invite' : 'send-satisfaction-email'}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contactId: !satUseManual && satContact ? satContact.id : undefined,
-          customerName,
-          customerEmail: recipientEmail || 'preview@example.com',
-          surveyType: lifecycleType,
-          appUrl: window.location.origin,
-          previewOnly: true,
-        }),
+        body: JSON.stringify(isTestTuneWelcome
+          ? { contact_name: customerName, project_name: 'your project', access_type: 'test_and_tune', preview: true }
+          : {
+              contactId: !satUseManual && satContact ? satContact.id : undefined,
+              customerName,
+              customerEmail: recipientEmail || 'preview@example.com',
+              surveyType: lifecycleType,
+              appUrl: window.location.origin,
+              previewOnly: true,
+            }),
       });
       if (!response.ok) throw new Error('Unable to load lifecycle email preview');
       const data = await response.json();
@@ -1274,6 +1298,7 @@ export default function ReviewsView() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {[
                       ['job_completion', 'Job Completion Feedback', 'Normally sent at substantial completion'],
+                      ['test_tune_welcome', 'Test & Tune Welcome', 'Normally sent 7 days after substantial completion'],
                       ['post_test_tune', 'Post-Test & Tune Feedback', 'Normally sent when Test & Tune ends'],
                       ['one_year', '1-Year Check-In', 'Normally sent one year after completion'],
                       ['manual', 'General Customer Feedback', 'Use anytime outside the automated lifecycle'],
@@ -1407,7 +1432,7 @@ export default function ReviewsView() {
                   {satSending ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Sending...</>
                   ) : (
-                    <><ThumbsUp className="w-5 h-5" />Send {lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'Customer Feedback'}</>
+                    <><ThumbsUp className="w-5 h-5" />Send {lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'test_tune_welcome' ? 'Test & Tune Welcome' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'Customer Feedback'}</>
                   )}
                 </button>
               </div>
