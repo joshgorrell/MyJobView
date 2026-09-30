@@ -495,24 +495,47 @@ export default function LostOpportunityReviews(
             key={v.request_id}
             className="rounded-xl border border-gray-700 bg-gray-800 p-5 space-y-3"
           >
-            <div className="flex flex-wrap justify-between gap-2">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
               <div>
                 <h3 className="text-white font-semibold">
                   {v.opportunity_name}
                 </h3>
                 <p className="text-gray-400 text-sm">{v.recipient}</p>
               </div>
-              <p className="text-cyan-300 text-sm">
-                {v.responded_at
-                  ? (v.reviewed_at ? "Reviewed" : "Needs Review")
-                  : v.delivery_status === "failed"
-                  ? "Delivery Failed"
-                  : v.delivery_status === "pending"
-                  ? "Delivery Pending"
-                  : "Awaiting Response"}
-              </p>
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
+                <p className="text-cyan-300">
+                  {v.responded_at
+                    ? (v.reviewed_at ? "Reviewed" : "Needs Review")
+                    : v.delivery_status === "failed"
+                    ? "Delivery Failed"
+                    : v.delivery_status === "pending"
+                    ? "Delivery Pending"
+                    : "Awaiting Response"}
+                </p>
+                <HistoryLine v={v} />
+                {canView && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-label="Delete lost opportunity review"
+                    title="Delete review"
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          "Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.",
+                        )
+                      ) return;
+                      if (await action({ action: "delete", request_id: v.request_id })) {
+                        setNotice("Lost opportunity review deleted.");
+                      }
+                    }}
+                    className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
             </div>
-            <HistoryLine v={v} />
             {v.response
               ? (
                 <div className="space-y-3 text-gray-200">
@@ -603,23 +626,6 @@ export default function LostOpportunityReviews(
                     </select>
                   </label>
                 )}
-                <button
-                  disabled={busy}
-                  onClick={async () => {
-                    if (
-                      !window.confirm(
-                        "Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.",
-                      )
-                    ) return;
-                    if (await action({ action: "delete", request_id: v.request_id })) {
-                      setNotice("Lost opportunity review deleted.");
-                    }
-                  }}
-                  className="ml-auto flex items-center gap-1.5 text-red-400 hover:text-red-300 text-sm disabled:opacity-50"
-                >
-                  <Trash2 size={14} />
-                  Delete
-                </button>
               </div>
             )}
           </article>
