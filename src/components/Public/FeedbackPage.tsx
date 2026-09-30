@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CheckCircle, Star, ThumbsUp, Meh, AlertCircle, Loader2 } from 'lucide-react';
 
-const DEFAULT_REVIEW_URL = '';
+
 
 type Rating = 'excellent' | 'good' | 'okay' | 'needs_attention';
 type Phase = 'rating' | 'comment' | 'positive' | 'negative' | 'submitting' | 'error';
@@ -48,7 +48,6 @@ interface CompanyInfo {
   name: string;
   logoUrl: string;
   email: string;
-  reviewUrl: string;
 }
 
 export function FeedbackPage() {
@@ -68,7 +67,6 @@ export function FeedbackPage() {
     name: 'Electronic Life',
     logoUrl: 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png',
     email: '',
-    reviewUrl: DEFAULT_REVIEW_URL,
   });
 
   const autoSubmittedRef = useRef(false);
@@ -92,7 +90,6 @@ export function FeedbackPage() {
           name: data.company_name || 'Electronic Life',
           logoUrl: data.company_logo_url || companyInfo.logoUrl,
           email: data.company_email || '',
-          reviewUrl: companyInfo.reviewUrl,
         });
       }
     } catch {
@@ -298,21 +295,7 @@ export function FeedbackPage() {
                 </p>
               </div>
 
-              {companyInfo.reviewUrl && <a
-                href={companyInfo.reviewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-3 w-full py-5 bg-white hover:bg-gray-100 text-gray-900 rounded-2xl font-bold text-lg transition-colors shadow-xl mb-4"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-3.58-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  <path fill="none" d="M0 0h48v48H0z"/>
-                </svg>
-                Leave a Google Review
-              </a>}
+              <p className="text-gray-300 text-base mb-5">Thank you. Your feedback has been shared with our team.</p>
 
               <div className="flex items-center gap-2 justify-center mb-6">
                 {[1, 2, 3, 4, 5].map(i => (
