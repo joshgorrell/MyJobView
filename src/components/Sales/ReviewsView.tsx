@@ -253,6 +253,10 @@ export default function ReviewsView() {
   const { profile } = useAuth();
   const canSeeAllRequests = profile?.can_see_all_review_requests ?? false;
   const isAdmin = profile?.role === 'admin';
+  const canRequestGoogleReviews = (profile as any)?.can_request_google_reviews ?? true;
+  const canViewCustomerFeedback = isAdmin || ((profile as any)?.can_view_customer_feedback ?? canSeeAllRequests);
+  const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
+  const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'satisfaction' | 'send' | 'history' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [satisfactionHistory, setSatisfactionHistory] = useState<SatisfactionRecord[]>([]);
@@ -1035,10 +1039,24 @@ export default function ReviewsView() {
       )}
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg px-4 py-2.5 text-white flex items-center gap-2.5">
-        <Star className="w-5 h-5 shrink-0" />
-        <h1 className="text-base font-bold">Reviews</h1>
-        <span className="text-yellow-50 text-sm hidden sm:inline">— request and track customer reviews</span>
+      <div className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 px-6 py-6 text-white shadow-xl">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <MessageSquare className="w-6 h-6 text-cyan-200" />
+              <h1 className="text-2xl font-bold">Feedback</h1>
+            </div>
+            <p className="mt-1 text-lg font-semibold text-blue-50">Listen. Learn. Improve.</p>
+            <p className="mt-1 max-w-2xl text-sm text-blue-100/90">Turn customer feedback into better experiences, stronger reviews, and lasting relationships.</p>
+          </div>
+          {canRequestGoogleReviews && (
+            <button onClick={() => setActiveTab('send')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 font-semibold text-indigo-700 shadow-lg transition hover:bg-blue-50">
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              Ask for a Google Review
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -1052,7 +1070,7 @@ export default function ReviewsView() {
           }`}
         >
           <TrendingUp className="w-4 h-4 inline mr-2" />
-          Reviews
+          Customer Feedback
         </button>
         <button
           onClick={() => setActiveTab('satisfaction')}
@@ -1074,7 +1092,7 @@ export default function ReviewsView() {
           }`}
         >
           <Send className="w-4 h-4 inline mr-2" />
-          Send Request
+          Ask / Send
         </button>
         <button
           onClick={() => setActiveTab('history')}
@@ -1087,10 +1105,10 @@ export default function ReviewsView() {
           <Calendar className="w-4 h-4 inline mr-2" />
           History
         </button>
-        <button onClick={() => setActiveTab('lost')} className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>
+        {canViewLostOpportunities && <button onClick={() => setActiveTab('lost')} className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>}
       </div>
 
-      {activeTab === 'lost' && <LostOpportunityReviews />}
+      {activeTab === 'lost' && canViewLostOpportunities && <LostOpportunityReviews />}
 
       {/* Satisfaction Tab */}
       {activeTab === 'satisfaction' && (
