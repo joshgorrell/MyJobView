@@ -1934,11 +1934,7 @@ export default function ReviewsView() {
                 <button
                   onClick={sendReviewRequest}
                   disabled={sending}
-                  className={`px-6 py-2 rounded-lg text-white font-medium text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg ${
-                    sendMethod === 'survey'
-                      ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/30'
-                      : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/30'
-                  }`}
+                  className="px-6 py-2 rounded-lg text-white font-medium text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/30"
                 >
                   {sending ? (
                     <>
