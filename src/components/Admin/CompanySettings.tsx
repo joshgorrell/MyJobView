@@ -58,8 +58,6 @@ export function CompanySettings() {
   const [forgotClockOutPenaltyPoints, setForgotClockOutPenaltyPoints] = useState(15);
 
   // Auto Review Follow-up Settings
-  const [autoReviewFollowupEnabled, setAutoReviewFollowupEnabled] = useState(false);
-  const [autoReviewFollowupDays, setAutoReviewFollowupDays] = useState(14);
 
   // Billing Preference Settings
   const [annualBillingEnabled, setAnnualBillingEnabled] = useState(false);
@@ -142,8 +140,6 @@ export function CompanySettings() {
         setForgotClockOutPenaltyPoints(data.forgot_clock_out_penalty_points ?? 15);
 
         // Auto review follow-up settings
-        setAutoReviewFollowupEnabled(data.auto_review_followup_enabled ?? false);
-        setAutoReviewFollowupDays(data.auto_review_followup_days ?? 14);
         setAnnualBillingEnabled(data.annual_billing_enabled ?? false);
         setDefaultBillingPreference(data.default_billing_preference ?? 'monthly');
         setAnnualDiscountType(data.annual_discount_type ?? 'none');
@@ -415,8 +411,6 @@ export function CompanySettings() {
             auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
             auto_clock_out_time: autoClockOutTime + ':00',
             forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
-            auto_review_followup_enabled: autoReviewFollowupEnabled,
-            auto_review_followup_days: autoReviewFollowupDays,
             default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
             updated_at: new Date().toISOString()
           })
@@ -469,8 +463,6 @@ export function CompanySettings() {
             auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
             auto_clock_out_time: autoClockOutTime + ':00',
             forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
-            auto_review_followup_enabled: autoReviewFollowupEnabled,
-            auto_review_followup_days: autoReviewFollowupDays,
             default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
           });
 
