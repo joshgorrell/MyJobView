@@ -244,7 +244,6 @@ function AppContent() {
   const [resetSuccess, setResetSuccess] = useState(false);
 
   const notificationCount = useNotificationCount();
-  const [footerLogoUrl, setFooterLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = notificationCount > 0 ? `(${notificationCount}) MyJobView` : 'MyJobView';
@@ -271,25 +270,6 @@ function AppContent() {
 
     return () => window.clearInterval(interval);
   }, [activeTab, user?.id, profile?.id, isPortalUser]);
-
-  useEffect(() => {
-    async function loadFooterLogo() {
-      if (!profile?.organization_id) return;
-      try {
-        const { data } = await supabase
-          .from('organizations')
-          .select('footer_logo_url')
-          .eq('id', profile.organization_id)
-          .maybeSingle();
-        if (data?.footer_logo_url) {
-          setFooterLogoUrl(data.footer_logo_url);
-        }
-      } catch {
-        // silently use text fallback
-      }
-    }
-    if (user) loadFooterLogo();
-  }, [user, profile?.organization_id]);
 
   const toggleSidebar = () => {
     if (sidebarPinned) return;
@@ -1229,41 +1209,7 @@ function AppContent() {
       {!isStandalone && (
         <footer className="bg-gray-900/50 border-t border-purple-500/30 mt-8 sm:mt-12 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-            <div className="flex-shrink-0">
-              {footerLogoUrl ? (
-                <img
-                  src={footerLogoUrl}
-                  alt="Company Logo"
-                  className="h-7 sm:h-8 object-contain"
-                />
-              ) : (
-                <p className="text-gray-400 text-xs sm:text-sm text-center sm:text-left">
-                  MyJobView
-                </p>
-              )}
-            </div>
-            {/* Legal links */}
-            <div className="flex items-center gap-3 text-xs text-gray-600">
-              <a
-                href="/privacy-policy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gray-400 transition-colors"
-              >
-                Privacy Policy
-              </a>
-              <span className="text-gray-700">·</span>
-              <a
-                href="/eula"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gray-400 transition-colors"
-              >
-                Terms of Service
-              </a>
-            </div>
-
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4">
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
               {footerDepartments.map((dept) => {
                 const modules = getUserModules(dept.id);
