@@ -1,4 +1,4 @@
-import { LockKeyhole, MessageSquare, ArrowRight, CheckCircle2 } from "lucide-react";
+import { LockKeyhole, ArrowRight, CheckCircle2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { lossReasons, lostReviewAction } from "./lostReview";
 interface Invitation {
@@ -91,7 +91,6 @@ export default function LostOpportunityForm() {
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
             {invitation?.title || (error ? "Review unavailable" : "Loading your invitation…")}
           </h1>
-          <p className="mt-4 text-slate-200 text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4" aria-hidden="true" /> A moment of feedback. A chance to do better.</p>
         </header>
         <div className="p-5 sm:p-9">
           {error && (
