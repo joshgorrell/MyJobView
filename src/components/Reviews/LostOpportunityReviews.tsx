@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Clock, Send, MessageSquare, CheckCircle, Share2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { lossReasons, lostReviewAction } from "./lostReview";
@@ -31,6 +32,9 @@ interface Review {
   recovery_outcome: string;
   response?: Response;
   recipient?: string;
+  sent_at: string | null;
+  sent_by_name: string | null;
+  response_created_at: string | null;
 }
 export default function LostOpportunityReviews(
   { showCreate = false }: { showCreate?: boolean },
@@ -71,19 +75,39 @@ export default function LostOpportunityReviews(
           ? supabase.from("lost_review_responses").select("*")
           : Promise.resolve({ data: [], error: null }),
         supabase.from("review_requests").select(
-          "id,recipient_name,recipient_email",
+          "id,recipient_name,recipient_email,sent_at,sent_by",
         ).eq("request_type", "lost_opportunity").order("sent_at", {
           ascending: false,
         }),
       ]);
       for (const result of [d, r, q]) if (result.error) throw result.error;
+      const senderIds = [...new Set(
+        (q.data || []).map((req) => req.sent_by).filter(Boolean),
+      )] as string[];
+      const senders = senderIds.length
+        ? await supabase.from("profiles").select("id,first_name,last_name")
+            .in("id", senderIds)
+        : { data: [], error: null };
+      if (senders.error) throw senders.error;
+      const senderMap = new Map(
+        (senders.data || []).map((p) => [
+          p.id,
+          [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unknown user",
+        ]),
+      );
       setReviews((q.data || []).flatMap((request) => {
         const detail = d.data?.find((v) => v.request_id === request.id);
+        const response = r.data?.find((v) => v.request_id === request.id);
         return detail
           ? [{
             ...detail,
-            response: r.data?.find((v) => v.request_id === request.id),
+            response,
             recipient: request.recipient_name || request.recipient_email,
+            sent_at: request.sent_at,
+            sent_by_name: request.sent_by
+              ? senderMap.get(request.sent_by) || "Unknown user"
+              : null,
+            response_created_at: response?.created_at || null,
           }]
           : [];
       }));
@@ -210,6 +234,76 @@ export default function LostOpportunityReviews(
   );
   const input =
     "block w-full rounded-lg border border-gray-600 bg-gray-900 text-gray-100 p-3 mt-2";
+  function formatDateTime(iso: string | null): string | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  function HistoryTimeline({ v }: { v: Review }) {
+    const events: { icon: React.ReactNode; label: string; time: string | null }[] = [];
+    if (v.sent_at) {
+      events.push({
+        icon: <Send size={14} />,
+        label: v.sent_by_name ? `Sent by ${v.sent_by_name}` : "Sent",
+        time: formatDateTime(v.sent_at),
+      });
+    }
+    if (v.delivery_status === "sent" && v.sent_at) {
+      events.push({
+        icon: <CheckCircle size={14} />,
+        label: "Email delivered",
+        time: null,
+      });
+    }
+    if (v.response_created_at || v.responded_at) {
+      events.push({
+        icon: <MessageSquare size={14} />,
+        label: "Customer submitted feedback",
+        time: formatDateTime(v.response_created_at || v.responded_at),
+      });
+    }
+    if (v.reviewed_at) {
+      events.push({
+        icon: <CheckCircle size={14} />,
+        label: "Marked reviewed",
+        time: formatDateTime(v.reviewed_at),
+      });
+    }
+    if (v.shared_at) {
+      events.push({
+        icon: <Share2 size={14} />,
+        label: "Shared with team",
+        time: formatDateTime(v.shared_at),
+      });
+    }
+    if (events.length === 0) return null;
+    return (
+      <div className="border-t border-gray-700 pt-3 mt-1">
+        <div className="flex items-center gap-1.5 text-gray-400 text-xs font-medium mb-2">
+          <Clock size={12} />
+          History
+        </div>
+        <ol className="space-y-1.5">
+          {events.map((e, i) => (
+            <li key={i} className="flex items-center gap-2 text-xs text-gray-400">
+              <span className="text-gray-500 shrink-0">{e.icon}</span>
+              <span className="text-gray-300">{e.label}</span>
+              {e.time && (
+                <span className="text-gray-500">&middot; {e.time}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap justify-between gap-3">
@@ -506,6 +600,7 @@ export default function LostOpportunityReviews(
                 </p>
               )
               : null}
+            <HistoryTimeline v={v} />
             {canView && v.response && (
               <div className="flex flex-wrap gap-3">
                 {!v.reviewed_at && (
