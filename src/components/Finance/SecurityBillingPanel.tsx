@@ -1,0 +1,61 @@
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../lib/utils';
+
+interface Cycle { id:string; state:string; amount:number|null; period_start:string; last_message:string|null; processor_id:string|null }
+export function SecurityBillingPanel({ contractId, organizationId }: { contractId:string; organizationId:string }) {
+  const { profile } = useAuth();
+  const [classes,setClasses] = useState<{id:string;label:string}[]>([]);
+  const [classification,setClassification] = useState('');
+  const [cycles,setCycles] = useState<Cycle[]>([]);
+  const [reason,setReason] = useState('');
+  const [transaction,setTransaction] = useState('');
+  const [message,setMessage] = useState('');
+  const [paused,setPaused] = useState(false);
+  const [revoked,setRevoked] = useState(false);
+  const reload = useCallback(async () => {
+    const [tax,billing,contract] = await Promise.all([
+      supabase.from('tax_classifications').select('id,label').eq('organization_id',organizationId).eq('is_active',true),
+      supabase.from('security_billing_cycles').select('id,state,amount,period_start,last_message,processor_id').eq('contract_id',contractId).eq('organization_id',organizationId).order('period_index',{ascending:false}),
+      supabase.from('security_contracts').select('monitoring_tax_classification_id,autopay_paused,autopay_revoked_at').eq('id',contractId).eq('organization_id',organizationId).single(),
+    ]);
+    const error=tax.error||billing.error||contract.error;
+    if(error) {setMessage(error.message);return;}
+    setClasses(tax.data||[]);setCycles(billing.data||[]);setClassification(contract.data?.monitoring_tax_classification_id||'');
+    setPaused(Boolean(contract.data?.autopay_paused));setRevoked(Boolean(contract.data?.autopay_revoked_at));
+  },[contractId,organizationId]);
+  useEffect(()=>{void reload();},[reload]);
+  async function review(cycle:Cycle,action:string) {
+    const {error}=await supabase.rpc('security_billing_review',{p_id:cycle.id,p_action:action,p_reason:reason,p_processor_id:transaction.trim()||null});
+    setMessage(error ? error.message : 'Review recorded. Billing will resume through the checked workflow.');
+    if(!error) {setReason('');setTransaction('');await reload();}
+  }
+  return <section className="no-print bg-white text-gray-900 rounded-xl p-5 mb-6 space-y-4">
+    <h2 className="font-semibold text-lg">Monitoring billing</h2>
+    <label className="block">Tax classification (required before activation)
+      <select value={classification} onChange={e=>setClassification(e.target.value)} className="block w-full border rounded p-2 mt-1"><option value="">Select classification</option>{classes.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+    <button className="bg-blue-700 text-white px-3 py-2 rounded" onClick={async()=>{
+      const {error}=await supabase.from('security_contracts').update({monitoring_tax_classification_id:classification||null}).eq('id',contractId).eq('organization_id',organizationId);
+      setMessage(error ? error.message : 'Tax classification saved.');
+    }}>Save classification</button>
+    {profile?.role==='admin' && <button className="border rounded px-3 py-2 ml-2" disabled={revoked} onClick={async()=>{
+      const {error}=await supabase.from('security_contracts').update({autopay_paused:!paused}).eq('id',contractId).eq('organization_id',organizationId);
+      setMessage(error ? error.message : 'AutoPay status saved.');if(!error) await reload();
+    }}>{revoked ? 'New authorization required after revocation' : paused ? 'Resume authorized AutoPay' : 'Pause AutoPay'}</button>}
+    {cycles.length===0 && <p className="text-sm text-gray-600">Billing starts after activation of a portal-signed monitoring agreement. Historical accounts are not automatically charged.</p>}
+    {cycles.map(cycle=><div key={cycle.id} className="border rounded-lg p-3 space-y-2">
+      <p>{cycle.period_start} · {cycle.amount===null ? 'Awaiting tax calculation' : formatCurrency(Number(cycle.amount))} · {cycle.state}</p>
+      {cycle.last_message && <p className="text-sm text-amber-900">{cycle.last_message}</p>}
+      {cycle.processor_id && <p className="text-xs break-all">Processor transaction: {cycle.processor_id}</p>}
+      {profile?.role==='admin' && ['declined','unknown','review'].includes(cycle.state) && <div className="space-y-2">
+        <input aria-label="Billing review reason" placeholder="Document reconciliation evidence (at least 10 characters)" value={reason} onChange={e=>setReason(e.target.value)} className="border rounded p-2 w-full" />
+        <input aria-label="Provider transaction ID" placeholder="Verified QuickBooks transaction ID for lookup" value={transaction} onChange={e=>setTransaction(e.target.value)} className="border rounded p-2 w-full" />
+        <button className="border rounded p-2" onClick={()=>void review(cycle,'reconcile')}>Look up provider transaction</button>
+        <button className="border rounded p-2 ml-2" onClick={()=>void review(cycle,'retry_confirmed_no_charge')}>Confirm no charge and schedule new notice</button>
+        <p className="text-xs text-gray-600">Reconcile the merchant account first. An uncertain payment is never automatically charged again. A retry sends a new advance notice.</p>
+      </div>}
+    </div>)}
+    {message && <p role="status">{message}</p>}
+  </section>;
+}

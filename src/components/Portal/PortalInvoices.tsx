@@ -6,6 +6,7 @@ import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
 
 interface Invoice {
+  security_billing_cycle_id: string | null;
   id: string;
   invoice_number: string;
   invoice_date: string;
@@ -120,6 +121,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             amount_due,
             project_id,
             qbo_invoice_id,
+            security_billing_cycle_id,
             portal_visible,
             projects:project_id (
               project_number
@@ -186,7 +188,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   }
 
   function selectAllUnpaidInvoices() {
-    const unpaidInvoices = outstandingInvoices;
+    const unpaidInvoices = outstandingInvoices.filter(inv => !inv.security_billing_cycle_id);
     setSelectedInvoiceIds(unpaidInvoices.map(inv => inv.id));
   }
 
@@ -196,6 +198,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   }
 
   async function handlePayment(invoice: Invoice) {
+    if (invoice.security_billing_cycle_id) return;
     try {
       if (!invoice.qbo_invoice_id) {
         setPaymentUnavailableInvoice(invoice);
@@ -224,7 +227,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     setPayingAll(true);
     setConfirmPayAll(false);
     try {
-      const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+      const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
       const { data: companySettings } = await supabase
         .from('company_settings')
         .select('qbo_realm_id')
@@ -251,7 +254,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   async function handlePayAll() {
     if (selectedInvoiceIds.length === 0) return;
 
-    const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+    const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
     const unsyncedInvoices = selectedInvoices.filter(inv => !inv.qbo_invoice_id);
 
     if (unsyncedInvoices.length > 0) {
@@ -393,7 +396,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
   const outstandingInvoices = invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'void' && inv.status !== 'draft' && (inv.amount_due ?? 0) > 0);
   const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-  const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+  const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
   const selectedTotal = selectedInvoices.reduce((sum, inv) => sum + inv.amount_due, 0);
 
   if (loading) {
@@ -549,6 +552,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                       <div className="flex-1 flex items-start gap-3 min-w-0">
                         <input
                           type="checkbox"
+                          disabled={Boolean(invoice.security_billing_cycle_id)}
                           checked={selectedInvoiceIds.includes(invoice.id)}
                           onChange={() => toggleInvoiceSelection(invoice.id)}
                           className="mt-1.5 w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
@@ -599,7 +603,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                       </div>
                     </div>
 
-                    {selectedInvoiceIds.includes(invoice.id) ? (
+                    {invoice.security_billing_cycle_id ? <p className="rounded-lg bg-slate-50 p-3 text-sm text-gray-700">Monitoring billing is managed through your <a className="underline text-blue-800" href="/portal/security">security agreement</a>. Contact your provider for payment assistance.</p> : selectedInvoiceIds.includes(invoice.id) ? (
                       <div className="w-full px-4 py-2 bg-blue-100 border-2 border-blue-300 rounded-lg flex items-center justify-center gap-2 font-medium text-blue-700">
                         <CheckCircle className="w-4 h-4" />
                         Selected for Batch Payment

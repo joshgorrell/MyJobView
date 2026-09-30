@@ -25,17 +25,17 @@ Deno.serve(async (req: Request) => {
 
     if (sessionError || !session) {
       console.error('Invalid OAuth state:', state);
-      return redirectToError('Invalid state parameter');
+      return redirectToError(null, 'Invalid state parameter');
     }
 
     if (session.consumed_at) {
       console.error('OAuth state already consumed:', state);
-      return redirectToError('State already used');
+      return redirectToError(session.app_url, 'State already used');
     }
 
     if (new Date(session.expires_at) < new Date()) {
       console.error('OAuth state expired:', state);
-      return redirectToError('State expired');
+      return redirectToError(session.app_url, 'State expired');
     }
 
     const clientId = Deno.env.get('QUICKBOOKS_CLIENT_ID');
@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
     const redirectUri = Deno.env.get('QUICKBOOKS_REDIRECT_URI');
 
     if (!clientId || !clientSecret || !redirectUri) {
-      return redirectToError('OAuth not configured');
+      return redirectToError(session.app_url, 'OAuth not configured');
     }
 
     const tokenResponse = await fetch(getTokenUrl(), {
@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange failed:', errorText);
-      return redirectToError('Token exchange failed');
+      return redirectToError(session.app_url, 'Token exchange failed');
     }
 
     const tokens = await tokenResponse.json();
@@ -87,6 +87,7 @@ Deno.serve(async (req: Request) => {
           realm_id: realmId,
           token_expires_at: expiresAt.toISOString(),
           is_connected: true,
+          payments_enabled: session.payments_requested === true,
           environment,
           sync_health: 'healthy',
           last_error: null,
@@ -103,6 +104,7 @@ Deno.serve(async (req: Request) => {
           realm_id: realmId,
           token_expires_at: expiresAt.toISOString(),
           is_connected: true,
+          payments_enabled: session.payments_requested === true,
           environment,
           auto_import_complete_data: false,
           auto_sync_enabled: false,

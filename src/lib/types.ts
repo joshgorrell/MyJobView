@@ -283,6 +283,9 @@ export interface DiscussionPost {
 }
 
 export interface QuickBooksSettings {
+  last_synced_at?: string | null;
+  security_monitoring_item_id?: string | null;
+  payments_enabled?: boolean;
   id: string;
   access_token: string | null;
   refresh_token: string | null;

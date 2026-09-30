@@ -16,9 +16,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { contractId, token, customerEmail, customerName, appOrigin } = await req.json();
+    const { contractId, token, appOrigin } = await req.json();
 
-    if (!contractId || !token || !customerEmail || !customerName) {
+    if (!contractId || !token) {
       throw new Error("Missing required fields");
     }
 
@@ -27,13 +27,35 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const expirationDays = 30;
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) throw new Error('Authentication required');
+    const caller = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authHeader } }, auth: { persistSession: false },
+    });
+    const { data: { user }, error: userError } = await caller.auth.getUser();
+    if (userError || !user) throw new Error('Authentication required');
+    const { data: profile } = await supabase.from('profiles').select('organization_id, role').eq('id', user.id).maybeSingle();
+    const { data: contract } = await supabase.from('security_contracts')
+      .select('organization_id, contact_id, magic_link_token, magic_link_expires_at, email_override')
+      .eq('id', contractId).maybeSingle();
+    if (!profile || !contract || profile.organization_id !== contract.organization_id || profile.role === 'portal'
+      || user.app_metadata?.is_portal_user || contract.magic_link_token !== token
+      || !contract.magic_link_expires_at || new Date(contract.magic_link_expires_at) <= new Date()) {
+      throw new Error('You do not have access to send this invitation');
+    }
+    const { data: contact } = await supabase.from('contacts').select('email, full_name')
+      .eq('id', contract.contact_id).eq('organization_id', contract.organization_id).maybeSingle();
+    const customerEmail = contract.email_override || contact?.email;
+    const customerName = contact?.full_name || 'Customer';
+    if (!customerEmail) throw new Error('Customer email is required');
+    const expirationDays = Math.max(1, Math.ceil((new Date(contract.magic_link_expires_at).getTime() - Date.now()) / 86400000));
 
     // Fetch email template from database
     const { data: template, error: templateError } = await supabase
       .from("email_templates")
       .select("subject, body")
       .eq("template_type", "contract_invitation")
+      .eq("organization_id", contract.organization_id)
       .eq("is_active", true)
       .maybeSingle();
 
@@ -50,12 +72,13 @@ Deno.serve(async (req: Request) => {
     const { data: settings } = await supabase
       .from("company_settings")
       .select("company_name, from_email, from_name, portal_url, company_logo_url, company_email")
+      .eq("organization_id", contract.organization_id)
       .single();
 
     const { data: orgData } = await supabase
       .from("organizations")
       .select("subdomain")
-      .limit(1)
+      .eq("id", contract.organization_id)
       .maybeSingle();
 
     const companyName = settings?.company_name || "Your Company";
@@ -67,9 +90,10 @@ Deno.serve(async (req: Request) => {
 
     // Use appOrigin (sent by the frontend) if available, otherwise fall back to subdomain or portal_url
     const subdomain = orgData?.subdomain || null;
-    const baseUrl = appOrigin
-      || (subdomain ? `https://${subdomain}.myjobview.com` : portalUrl);
-    const onboardingUrl = `${baseUrl}/onboarding?token=${token}`;
+    const defaultOrigin = subdomain ? `https://${subdomain}.myjobview.com` : new URL(portalUrl).origin;
+    const allowedOrigins = new Set([defaultOrigin, 'https://myjobview.com', 'https://www.myjobview.com']);
+    const baseUrl = typeof appOrigin === 'string' && allowedOrigins.has(appOrigin) ? appOrigin : defaultOrigin;
+    const onboardingUrl = `${baseUrl}/portal/security?token=${encodeURIComponent(token)}`;
 
     // Build logo block for the template
     const logoBlock = companyLogoUrl
@@ -106,11 +130,13 @@ Please complete your agreement by visiting:
 ${onboardingUrl}
 
 What's Next:
+- Resume saved progress from the Security section of your customer portal
+- Print or download your agreement before signing
 - Review your agreement details
 - Complete any required fields
 - Review terms and conditions
 - Provide your digital signature
-- Set up recurring billing (if applicable)
+- Add or select a payment method and authorize automatic recurring payments
 
 IMPORTANT: This link will expire in ${expirationDays} days.
 

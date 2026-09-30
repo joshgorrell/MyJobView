@@ -20,8 +20,10 @@ interface QBCustomer {
 
 export function QuickBooksSettings() {
   const { profile } = useAuth();
-  const [settings, setSettings] = useState<QBSettings | null>(null);
+  const [settings, setSettings] = useState<Omit<QBSettings, 'access_token' | 'refresh_token' | 'token_expires_at'> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [monitoringItem, setMonitoringItem] = useState('');
+  const [monitoringMessage, setMonitoringMessage] = useState('');
   const [settingsError, setSettingsError] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -59,12 +61,13 @@ export function QuickBooksSettings() {
     try {
       const { data, error } = await supabase
         .from('quickbooks_settings')
-        .select('id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
+        .select('security_monitoring_item_id, payments_enabled, id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
         .eq('organization_id', organizationId)
         .maybeSingle();
 
       if (error) throw error;
       setSettings(data);
+      setMonitoringItem(data?.security_monitoring_item_id || "");
     } catch (error) {
       console.error('Error loading QuickBooks settings:', error);
       setSettingsError(true);
@@ -95,10 +98,10 @@ export function QuickBooksSettings() {
     }
   }
 
-  async function handleConnect() {
+  async function handleConnect(includePayments = false) {
     setConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('quickbooks-oauth-initiate');
+      const { data, error } = await supabase.functions.invoke('quickbooks-oauth-initiate', {body:{includePayments}});
       if (error || !data?.authorizationUrl) {
         throw new Error('Unable to start QuickBooks connection');
       }
@@ -203,6 +206,17 @@ export function QuickBooksSettings() {
 
   return (
     <div className="space-y-6">
+      {settings?.is_connected && <div className="rounded-lg border p-4 space-y-3">
+        <label className="block font-medium" htmlFor="security-qbo-item">Security monitoring QuickBooks sales item ID</label>
+        <input id="security-qbo-item" value={monitoringItem} onChange={e => setMonitoringItem(e.target.value)} className="border rounded p-2 w-full" />
+        <p className="text-sm text-gray-600">Choose the sales item configured for monitoring invoices in this QuickBooks company. Payments access and tax classification must also be configured before billing.</p>
+        <button type="button" className="rounded bg-blue-700 text-white px-4 py-2" onClick={async () => {
+          if (profile?.role !== 'admin') { setMonitoringMessage('Only Admin can configure monitoring billing.'); return; }
+          const { error } = await supabase.from('quickbooks_settings').update({ security_monitoring_item_id: monitoringItem.trim() || null }).eq('id', settings.id).eq('organization_id', profile.organization_id);
+          setMonitoringMessage(error ? error.message : 'Monitoring sales item saved.');
+        }}>Save monitoring item</button>
+        {monitoringMessage && <p role="status">{monitoringMessage}</p>}
+      </div>}
       {settingsError && (
         <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -269,7 +283,7 @@ export function QuickBooksSettings() {
               </button>
             ) : (
               <button
-                onClick={handleConnect}
+                onClick={() => void handleConnect()}
                 disabled={connecting}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
@@ -283,6 +297,10 @@ export function QuickBooksSettings() {
 
       {isConnected && (
         <>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+            <p className="text-sm text-blue-900">Security onboarding requires QuickBooks Payments access to save cards or bank accounts and select existing payment methods. Your Intuit app and merchant account must support Payments.</p>
+            <button onClick={()=>void handleConnect(true)} disabled={connecting} className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-50">Connect QuickBooks Payments</button>
+          </div>
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium text-blue-900 flex items-center gap-2">

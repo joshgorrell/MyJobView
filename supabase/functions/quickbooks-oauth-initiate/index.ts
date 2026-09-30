@@ -7,6 +7,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const input = await req.json().catch(() => ({}));
+    const paymentsRequested = input.includePayments === true;
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -84,6 +86,7 @@ Deno.serve(async (req: Request) => {
         initiated_by: user.id,
         expires_at: expiresAt.toISOString(),
         app_url: appUrl,
+        payments_requested: paymentsRequested,
       });
 
     if (sessionError) {
@@ -97,7 +100,7 @@ Deno.serve(async (req: Request) => {
     const params = new URLSearchParams({
       client_id: clientId,
       response_type: 'code',
-      scope: 'com.intuit.quickbooks.accounting',
+      scope: 'com.intuit.quickbooks.accounting' + (paymentsRequested ? ' com.intuit.quickbooks.payment' : ''),
       redirect_uri: redirectUri,
       state: state,
     });

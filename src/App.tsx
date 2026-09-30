@@ -473,6 +473,8 @@ function AppContent() {
   // timing window or unguarded route that could expose internal admin pages.
   const PORTAL_ALLOWED_PATHS = [
     '/portal',
+    '/portal/dashboard',
+    '/portal/security',
     '/portal/punchlist',
     '/portal/proposals',
     '/portal/vip-membership',
@@ -517,7 +519,7 @@ function AppContent() {
   }
 
   // Portal & public routes — must come AFTER the portal isolation guard above
-  if (currentPath === '/security-onboarding' || currentPath === '/onboarding') {
+  if (currentPath === '/portal/security' || currentPath === '/security-onboarding' || currentPath === '/onboarding') {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     return (
@@ -525,6 +527,10 @@ function AppContent() {
         <SecurityOnboardingPortal token={token || undefined} />
       </Suspense>
     );
+  }
+
+  if (currentPath === '/portal/dashboard') {
+    return <Suspense fallback={<LoadingFallback />}><PortalDashboard /></Suspense>;
   }
 
   // --- CROSS-DOMAIN AUTH BRIDGE ---

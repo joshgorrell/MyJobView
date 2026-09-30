@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test:flow": "node tests/flow/database.mjs",
+    "test:security-onboarding": "node tests/security-onboarding/database.mjs && node tests/security-onboarding/payments.mjs && node tests/security-onboarding/payment-edge.mjs && node tests/security-onboarding/charges.mjs",
     "test:reviews": "node tests/reviews/database.mjs"
   },
   "dependencies": {

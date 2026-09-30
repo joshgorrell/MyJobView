@@ -1,3 +1,4 @@
+import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect } from 'react';
 import { FileText, LogOut, Star, ArrowRight, Shield, Calendar, MessageSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +15,7 @@ interface ProposalTile {
 }
 
 export function PortalLimitedDashboard() {
+  const securityPortalEnabled = useSecurityPortalEnabled();
   const [proposals, setProposals] = useState<ProposalTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactName, setContactName] = useState('');
@@ -158,6 +160,10 @@ export function PortalLimitedDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {securityPortalEnabled && <a href="/portal/security" className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl p-5 mb-6 hover:border-blue-400">
+          <div><p className="font-semibold text-gray-900">Security agreements</p><p className="text-sm text-gray-600">Resume onboarding, review terms, and print your agreements.</p></div>
+          <ArrowRight className="w-5 h-5 text-blue-700" />
+        </a>}
         {/* Your Proposals Section */}
         {proposalsEnabled && (
         <div className="mb-8">

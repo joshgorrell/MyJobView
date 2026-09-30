@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import React, { useState, useEffect, useRef } from 'react';
+import { securityOnboardingRequest, securityPaymentRequest, type SecurityDraftForm, type PortalSecurityAgreement, type SecurityAgreementDocument } from '../../lib/securityOnboarding';
+import SecurityPaymentEnrollment from './SecurityPaymentEnrollment';
+import { safeSecurityDraft, restoredSecurityStep } from '../../lib/securityOnboardingDraft';
+import { readableAgreementTerms, securityAgreementHtml, printSecurityAgreement, downloadSecurityAgreement } from '../../lib/securityAgreementDocument';
 import { formatCurrency } from '../../lib/utils';
 import {
   ArrowRight, ArrowLeft, Check, User, Shield, Phone, CreditCard,
   Ligature as FileSignature, HelpCircle, Mail, Plus, Trash2, Lock,
-  Building2, Loader2, AlertCircle, Receipt
+  Loader2, AlertCircle, Receipt, Printer, Download, Save
 } from 'lucide-react';
 import { SignaturePad } from '../Production/SignaturePad';
 import { calculateAnnualDiscount, type BillingPreference } from '../../lib/types';
 
 interface OnboardingWizardProps {
-  contract: any;
+  contract: PortalSecurityAgreement & SecurityAgreementDocument;
   token: string;
   onComplete: () => void;
 }
@@ -19,29 +22,38 @@ const inputClass = 'w-full px-4 py-3.5 border border-gray-200 rounded-xl bg-gray
 const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5';
 
 export default function OnboardingWizard({ contract, token, onComplete }: OnboardingWizardProps) {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(restoredSecurityStep(contract.draft?.current_step || 1));
   const [saving, setSaving] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
-  const [billingPreference, setBillingPreference] = useState<BillingPreference>('monthly');
-  const [billingConfig, setBillingConfig] = useState<any>(null);
-  const [formData, setFormData] = useState({
+  const billingConfig = contract.document.dealer;
+  const [billingPreference, setBillingPreference] = useState<BillingPreference>(
+    contract.draft?.form_data?.billingPreference === 'annual' && billingConfig?.annual_billing_enabled ? 'annual' : 'monthly');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
+  const [saveError, setSaveError] = useState('');
+  const [paused, setPaused] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const [autopayAccepted, setAutopayAccepted] = useState(false);
+  const revision = useRef(contract.draft?.revision || 0);
+  const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true));
+  const submitted = useRef(false);
+  const [formData, setFormData] = useState<SecurityDraftForm>(() => ({
     personalInfo: {
-      full_name: contract.contact?.full_name || '',
-      email: contract.contact?.email || '',
-      phone: contract.contact?.phone || ''
+      full_name: contract.draft?.form_data?.personalInfo?.full_name ?? contract.contact?.full_name ?? '',
+      email: contract.draft?.form_data?.personalInfo?.email ?? contract.contact?.email ?? '',
+      phone: contract.draft?.form_data?.personalInfo?.phone ?? contract.contact?.phone ?? ''
     },
     propertyInfo: {
-      address_line1: contract.contact?.address_line1 || '',
-      city: contract.contact?.city || '',
-      state: contract.contact?.state || '',
-      zip_code: contract.contact?.zip_code || ''
+      address_line1: contract.draft?.form_data?.propertyInfo?.address_line1 ?? contract.contact?.address_line1 ?? '',
+      city: contract.draft?.form_data?.propertyInfo?.city ?? contract.contact?.city ?? '',
+      state: contract.draft?.form_data?.propertyInfo?.state ?? contract.contact?.state ?? '',
+      zip_code: contract.draft?.form_data?.propertyInfo?.zip_code ?? contract.contact?.zip_code ?? ''
     },
-    emergencyContacts: [] as any[],
-    paymentMethod: '',
-    paymentDetails: {} as any,
+    emergencyContacts: contract.draft?.form_data?.emergencyContacts || [],
+    paymentMethod: contract.draft?.form_data?.paymentMethod || '',
+    paymentMethodId: contract.draft?.form_data?.paymentMethodId || '',
     signature: ''
-  });
+  }));
 
   const steps = [
     { id: 1, name: 'Personal Info', icon: User },
@@ -52,34 +64,60 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
     { id: 6, name: 'Sign', icon: FileSignature }
   ];
 
-  async function saveProgress() {
-    try {
-      const { error } = await supabase
-        .from('onboarding_progress')
-        .upsert({
-          contract_id: contract.id,
-          current_step: currentStep,
-          form_data: formData,
-          last_activity_at: new Date().toISOString()
-        });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error saving progress:', error);
-    }
+  const draftJson = JSON.stringify({ form_data: safeSecurityDraft(formData, billingPreference), current_step: currentStep });
+  const latestDraft = useRef(draftJson);
+  latestDraft.current = draftJson;
+  const lastSaved = useRef(contract.draft?.saved_at ? draftJson : '');
+  const terms = readableAgreementTerms(contract.template?.contract_terms || '').replace(/\[term\]/g, `${contract.term_months || '__'} months`);
+
+  function saveProgress(step = currentStep): Promise<boolean> {
+    const draft = { form_data: safeSecurityDraft(formData, billingPreference), current_step: step };
+    const serialized = JSON.stringify(draft);
+    saveQueue.current = saveQueue.current.then(async () => {
+      if (submitted.current || serialized === lastSaved.current) return true;
+      setSaveStatus('saving'); setSaveError('');
+      try {
+        const result = await securityOnboardingRequest<{ revision: number }>('save', contract.id, token, { ...draft, revision: revision.current });
+        revision.current = result.revision;
+        lastSaved.current = serialized;
+        setSaveStatus(latestDraft.current === serialized ? 'saved' : 'unsaved');
+        return true;
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Your progress could not be saved. Please try again.');
+        setSaveStatus('error');
+        return false;
+      }
+    });
+    return saveQueue.current;
   }
+  const persist = useRef(saveProgress);
+  persist.current = saveProgress;
 
   useEffect(() => {
-    supabase
-      .from('company_settings')
-      .select('annual_billing_enabled, default_billing_preference, annual_discount_type, annual_discount_percentage, annual_discount_flat_amount')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setBillingConfig(data);
-          setBillingPreference(data.default_billing_preference || 'monthly');
-        }
-      });
+    if (draftJson === lastSaved.current || submitted.current) return;
+    setSaveStatus('unsaved'); setPaused(false);
+    const timer = window.setTimeout(() => { void persist.current(); }, 700);
+    return () => window.clearTimeout(timer);
+  }, [draftJson]);
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (!submitted.current && latestDraft.current !== lastSaved.current) {
+        event.preventDefault(); event.returnValue = '';
+      }
+    };
+    const saveWhenHidden = () => { if (document.visibilityState === 'hidden') void persist.current(); };
+    window.addEventListener('beforeunload', warn);
+    document.addEventListener('visibilitychange', saveWhenHidden);
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+      document.removeEventListener('visibilitychange', saveWhenHidden);
+    };
   }, []);
+
+  function agreementHtml() {
+    return securityAgreementHtml(contract.document, terms, formData, null, null, billingPreference);
+  }
 
   function isStepComplete(): boolean {
     switch (currentStep) {
@@ -102,27 +140,11 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           c => c.name?.trim() && c.phone?.trim() && c.password?.trim()
         );
       case 4:
-        if (!formData.paymentMethod) return false;
-        if (formData.paymentMethod === 'credit_card') {
-          return !!(
-            formData.paymentDetails?.cardNumber?.length >= 15 &&
-            formData.paymentDetails?.expiry?.match(/^\d{2}\/\d{2}$/) &&
-            formData.paymentDetails?.cvv?.length >= 3 &&
-            formData.paymentDetails?.lastFour
-          );
-        } else if (formData.paymentMethod === 'ach') {
-          return !!(
-            formData.paymentDetails?.routingNumber?.length === 9 &&
-            formData.paymentDetails?.accountNumber?.length >= 4 &&
-            formData.paymentDetails?.accountType &&
-            formData.paymentDetails?.lastFour
-          );
-        }
-        return false;
+        return contract.billing_mode === 'mail' || !!formData.paymentMethodId;
       case 5:
         return !!billingPreference;
       case 6:
-        return !!formData.signature;
+        return !!formData.signature && accepted && (contract.billing_mode === 'mail' || autopayAccepted) && !!terms.trim();
       default:
         return false;
     }
@@ -136,91 +158,42 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         3: formData.emergencyContacts.length < 2
           ? 'Please add at least 2 emergency contacts.'
           : 'Please complete all fields for each emergency contact.',
-        4: !formData.paymentMethod
-          ? 'Please select a payment method.'
-          : formData.paymentMethod === 'credit_card'
-            ? 'Please complete all card fields: Card Number, Expiration Date, and CVV.'
-            : 'Please complete all bank fields: Routing Number, Account Number, and Account Type.',
+        4: 'Please add or select a saved payment method for AutoPay.',
         5: 'Please select a billing preference.',
-        6: 'Please provide your signature.'
+        6: 'Please review the terms, acknowledge your agreement, and provide your signature.'
       };
       alert(messages[currentStep] || 'Please complete all required fields.');
       return;
     }
-    await saveProgress();
-    if (currentStep < steps.length) setCurrentStep(currentStep + 1);
+    if (await saveProgress(Math.min(steps.length, currentStep + 1))) {
+      if (currentStep < steps.length) setCurrentStep(currentStep + 1);
+    }
   }
 
   function handleBack() {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
+    if (currentStep > 1) {
+      setFormData(previous => ({ ...previous, signature: '' })); setAccepted(false); setAutopayAccepted(false);
+      setCurrentStep(currentStep - 1);
+    }
   }
 
   async function handleSubmit() {
+    if (!isStepComplete()) return;
     setSaving(true);
     try {
-      let customerIp = '';
-      try {
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
-        const ipData = await ipResponse.json();
-        customerIp = ipData.ip || '';
-      } catch {
-        // IP fetch is best-effort
-      }
-
-      const emergencyContactsPayload = formData.emergencyContacts.map((ec, index) => ({
-        name: ec.name,
-        phone: ec.phone,
-        password: ec.password,
-        canAuthorize: ec.canAuthorize || false,
-        priority_order: index + 1
-      }));
-
-      // Save billing preference
-      if (contract.contact_id) {
-        await supabase.rpc('update_customer_billing_preference', {
-          p_contact_id: contract.contact_id,
-          p_new_preference: billingPreference,
-          p_reason: 'Selected during onboarding',
-          p_changed_by: null,
-          p_changed_by_name: formData.personalInfo.full_name || null
-        });
-      }
-
-      const { data, error } = await supabase.rpc('submit_security_onboarding', {
-        p_token: token,
-        p_full_name: formData.personalInfo.full_name,
-        p_email: formData.personalInfo.email,
-        p_phone: formData.personalInfo.phone,
-        p_address_line1: formData.propertyInfo.address_line1,
-        p_city: formData.propertyInfo.city,
-        p_state: formData.propertyInfo.state,
-        p_zip_code: formData.propertyInfo.zip_code,
-        p_signature: formData.signature,
-        p_customer_ip: customerIp,
-        p_payment_method: formData.paymentMethod,
-        p_payment_token: formData.paymentDetails?.token || null,
-        p_last_four: formData.paymentDetails?.lastFour || null,
-        p_emergency_contacts: emergencyContactsPayload
+      if (!(await saveProgress())) return;
+      if (contract.billing_mode !== 'mail') await securityPaymentRequest('verify', contract.id, token, { methodId: formData.paymentMethodId });
+      const result = await securityOnboardingRequest<{ success: boolean }>('submit', contract.id, token, {
+        revision: revision.current, form_data: safeSecurityDraft(formData, billingPreference),
+        signature: formData.signature, accepted, autopay_accepted: autopayAccepted, document_version: contract.document_version,
       });
-
-      if (error) {
-        console.error('RPC error:', error);
-        throw error;
-      }
-
-      if (!data?.success) {
-        console.error('Submission failed:', data?.error);
-        throw new Error(data?.error || 'Submission failed');
-      }
-
+      if (!result.success) throw new Error('Agreement could not be submitted.');
+      submitted.current = true;
       onComplete();
-    } catch (error: any) {
-      console.error('Error submitting agreement:', error);
-      const msg = error?.message || error?.details || 'Please try again.';
-      alert(`Failed to submit agreement: ${msg}`);
-    } finally {
-      setSaving(false);
-    }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Agreement could not be submitted. Please try again.');
+      setSaveStatus('error');
+    } finally { setSaving(false); }
   }
 
   function addEmergencyContact() {
@@ -237,7 +210,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
     });
   }
 
-  function updateEmergencyContact(index: number, field: string, value: any) {
+  function updateEmergencyContact<K extends keyof SecurityDraftForm['emergencyContacts'][number]>(index: number, field: K, value: SecurityDraftForm['emergencyContacts'][number][K]) {
     const updated = [...formData.emergencyContacts];
     updated[index] = { ...updated[index], [field]: value };
     setFormData({ ...formData, emergencyContacts: updated });
@@ -245,6 +218,29 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
 
   return (
     <div className="relative">
+      <div className="px-4 sm:px-8 py-5 bg-blue-50 border-b border-blue-100 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><p className="font-semibold text-gray-900">Agreement {contract.contract_number}</p>
+            <p className="text-sm text-gray-700">{formatCurrency(Number(contract.monthly_price) || 0)}/month · {contract.term_months} month initial term</p></div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => { try { printSecurityAgreement(agreementHtml()); } catch (e) { setSaveError(e instanceof Error ? e.message : 'Printing failed.'); } }}
+              className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium"><Printer className="w-4 h-4" />Print / Save PDF</button>
+            <button onClick={() => downloadSecurityAgreement(agreementHtml(), contract.contract_number)}
+              className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium"><Download className="w-4 h-4" />Download agreement</button>
+          </div>
+        </div>
+        <details className="bg-white border border-gray-200 rounded-xl p-4">
+          <summary className="font-semibold text-blue-900 cursor-pointer">Review terms and conditions</summary>
+          <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{terms || 'Terms are unavailable. Contact your provider before signing.'}</div>
+        </details>
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <p role="status" aria-live="polite" className="text-sm text-gray-700">{saveStatus === 'saved' ? 'All changes saved' : saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Changes could not be saved' : 'Unsaved changes'}</p>
+          <button onClick={async () => { if (await saveProgress()) setPaused(true); }} disabled={saving || saveStatus === 'saving'}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-blue-900 border border-blue-200 bg-white rounded-lg disabled:opacity-50"><Save className="w-4 h-4" />Save and finish later</button>
+        </div>
+        {paused && <p role="status" className="text-sm text-green-800">Your place is saved. You can close this page and return using your invitation link or the Security section of your customer portal. You will review and sign again when you return.</p>}
+        {saveError && <div role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 p-3 rounded-lg">{saveError}<button onClick={() => void saveProgress()} className="ml-3 underline font-semibold">Retry save</button></div>}
+      </div>
       {/* Step Progress Header */}
       <div className="px-4 sm:px-8 pt-6 pb-4 border-b border-gray-100 bg-white">
         {/* Mobile step indicator */}
@@ -558,196 +554,13 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           </div>
         )}
 
-        {/* Step 4: Payment Method */}
+        {/* Step 4: real processor enrollment; sensitive fields never enter the draft. */}
         {currentStep === 4 && (
           <div className="space-y-5">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Payment Method</h2>
-              <p className="text-gray-500 text-sm mt-1">Set up automatic monthly billing for your monitoring service.</p>
-            </div>
-
-            {/* Billing summary */}
-            <div className="bg-[#0f2347] rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <p className="text-blue-200 text-sm font-medium">Monthly monitoring fee</p>
-                <p className="text-white text-xs mt-0.5 opacity-70">Drafted on the 1st of each month</p>
-              </div>
-              <div className="text-3xl sm:text-4xl font-bold text-white">
-                {contract.monthly_price ? formatCurrency(parseFloat(contract.monthly_price)) : '—'}
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Select Payment Method <span className="text-red-400">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setFormData({ ...formData, paymentMethod: 'credit_card', paymentDetails: {} })}
-                  className={`p-4 sm:p-5 border-2 rounded-2xl transition-all text-left ${
-                    formData.paymentMethod === 'credit_card'
-                      ? 'border-[#0f2347] bg-[#0f2347]/5'
-                      : 'border-gray-200 hover:border-gray-300 bg-white'
-                  }`}
-                >
-                  <CreditCard className={`w-7 h-7 mb-2.5 ${formData.paymentMethod === 'credit_card' ? 'text-[#0f2347]' : 'text-gray-400'}`} />
-                  <div className={`font-semibold text-sm sm:text-base ${formData.paymentMethod === 'credit_card' ? 'text-[#0f2347]' : 'text-gray-700'}`}>
-                    Credit Card
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">Visa, Mastercard, Amex</div>
-                </button>
-
-                <button
-                  onClick={() => setFormData({ ...formData, paymentMethod: 'ach', paymentDetails: {} })}
-                  className={`p-4 sm:p-5 border-2 rounded-2xl transition-all text-left ${
-                    formData.paymentMethod === 'ach'
-                      ? 'border-[#0f2347] bg-[#0f2347]/5'
-                      : 'border-gray-200 hover:border-gray-300 bg-white'
-                  }`}
-                >
-                  <Building2 className={`w-7 h-7 mb-2.5 ${formData.paymentMethod === 'ach' ? 'text-[#0f2347]' : 'text-gray-400'}`} />
-                  <div className={`font-semibold text-sm sm:text-base ${formData.paymentMethod === 'ach' ? 'text-[#0f2347]' : 'text-gray-700'}`}>
-                    Bank Account
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">ACH direct debit</div>
-                </button>
-              </div>
-            </div>
-
-            {formData.paymentMethod === 'credit_card' && (
-              <div className="border border-gray-200 rounded-2xl p-5 bg-gray-50 space-y-4">
-                <h3 className="font-semibold text-gray-900 text-sm">Card Details</h3>
-                <div>
-                  <label className={labelClass}>
-                    Card Number <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="1234 5678 9012 3456"
-                    maxLength={19}
-                    value={formData.paymentDetails?.cardNumber || ''}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '');
-                      const formatted = value.replace(/(\d{4})/g, '$1 ').trim();
-                      setFormData({
-                        ...formData,
-                        paymentDetails: {
-                          ...formData.paymentDetails,
-                          cardNumber: formatted,
-                          lastFour: value.slice(-4),
-                          token: 'mock_token_' + Date.now()
-                        }
-                      });
-                    }}
-                    className={inputClass}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">15–16 digit card number</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClass}>
-                      Expiry <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      maxLength={5}
-                      value={formData.paymentDetails?.expiry || ''}
-                      onChange={(e) => {
-                        let value = e.target.value.replace(/\D/g, '');
-                        if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                        setFormData({ ...formData, paymentDetails: { ...formData.paymentDetails, expiry: value } });
-                      }}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>
-                      CVV <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="123"
-                      maxLength={4}
-                      value={formData.paymentDetails?.cvv || ''}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
-                        setFormData({ ...formData, paymentDetails: { ...formData.paymentDetails, cvv: value } });
-                      }}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {formData.paymentMethod === 'ach' && (
-              <div className="border border-gray-200 rounded-2xl p-5 bg-gray-50 space-y-4">
-                <h3 className="font-semibold text-gray-900 text-sm">Bank Account Details</h3>
-                <div>
-                  <label className={labelClass}>
-                    Routing Number <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="123456789"
-                    maxLength={9}
-                    value={formData.paymentDetails?.routingNumber || ''}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '');
-                      setFormData({ ...formData, paymentDetails: { ...formData.paymentDetails, routingNumber: value } });
-                    }}
-                    className={inputClass}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">9-digit routing number</p>
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Account Number <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Your account number"
-                    value={formData.paymentDetails?.accountNumber || ''}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '');
-                      setFormData({
-                        ...formData,
-                        paymentDetails: {
-                          ...formData.paymentDetails,
-                          accountNumber: value,
-                          lastFour: value.slice(-4),
-                          token: 'mock_token_' + Date.now()
-                        }
-                      });
-                    }}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Account Type <span className="text-red-400">*</span>
-                  </label>
-                  <select
-                    value={formData.paymentDetails?.accountType || ''}
-                    onChange={(e) => setFormData({ ...formData, paymentDetails: { ...formData.paymentDetails, accountType: e.target.value } })}
-                    className={inputClass}
-                  >
-                    <option value="">Select account type</option>
-                    <option value="checking">Checking</option>
-                    <option value="savings">Savings</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {formData.paymentMethod && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <p className="text-xs text-amber-900 leading-relaxed">
-                  Your payment information is securely processed through QuickBooks Online. You will receive an invoice each month before any charge is processed.
-                </p>
-              </div>
-            )}
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Payment Method</h2>
+            {contract.billing_mode === 'mail' ? <p className="text-gray-700 bg-blue-50 p-4 rounded-xl">Your Admin has authorized mailed invoices for this agreement. The monthly price includes a $7 mailed-invoice fee.</p> :
+              <SecurityPaymentEnrollment contractId={contract.id} token={token} selectedId={formData.paymentMethodId}
+                onSelect={method => { setFormData(previous => ({...previous,paymentMethodId:method.id,paymentMethod:method.payment_type === 'card' ? 'credit_card' : 'ach',signature:''})); setAccepted(false);setAutopayAccepted(false); }} />}
           </div>
         )}
 
@@ -771,7 +584,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(parseFloat(contract.monthly_price) || 0)}/month
+                    {formatCurrency(Number(contract.monthly_price) || 0)}/month
                   </span>
                 </div>
               </div>
@@ -782,7 +595,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-700">Monthly Services Total</span>
                 <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(parseFloat(contract.monthly_price) || 0)}/month
+                  {formatCurrency(Number(contract.monthly_price) || 0)}/month
                 </span>
               </div>
             </div>
@@ -810,10 +623,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">Monthly Billing</span>
                         <span className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(parseFloat(contract.monthly_price) || 0)}/month
+                          {formatCurrency(Number(contract.monthly_price) || 0)}/month
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency(parseFloat(contract.monthly_price) || 0)} each month.</p>
+                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency(Number(contract.monthly_price) || 0)} each month.</p>
                     </div>
                   </div>
                 </button>
@@ -838,10 +651,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-gray-900">Annual Billing</span>
                           {(() => {
-                            const monthlyTotal = parseFloat(contract.monthly_price) || 0;
+                            const monthlyTotal = Number(contract.monthly_price) || 0;
                             const annualSubtotal = monthlyTotal * 12;
                             const discount = calculateAnnualDiscount(
-                              annualSubtotal,
+                              annualSubtotal - (Number(contract.mail_invoice_fee) || 0) * 12,
                               billingConfig.annual_discount_type,
                               billingConfig.annual_discount_percentage,
                               billingConfig.annual_discount_flat_amount
@@ -856,10 +669,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Pay one year in advance and receive a discount.</p>
                         {billingPreference === 'annual' && (() => {
-                          const monthlyTotal = parseFloat(contract.monthly_price) || 0;
+                          const monthlyTotal = Number(contract.monthly_price) || 0;
                           const annualSubtotal = monthlyTotal * 12;
                           const discount = calculateAnnualDiscount(
-                            annualSubtotal,
+                            annualSubtotal - (Number(contract.mail_invoice_fee) || 0) * 12,
                             billingConfig.annual_discount_type,
                             billingConfig.annual_discount_percentage,
                             billingConfig.annual_discount_flat_amount
@@ -882,7 +695,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                                 </div>
                               )}
                               <div className="flex justify-between text-sm font-bold text-gray-900 pt-1.5 border-t border-gray-100">
-                                <span>Amount Due Today</span>
+                                <span>Annual Billing Amount</span>
                                 <span>{formatCurrency(amountDue)}</span>
                               </div>
                             </div>
@@ -897,7 +710,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
 
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="text-sm text-blue-800 leading-relaxed">
-                Your billing preference applies to all eligible recurring services on your account. You can change this preference later from your customer portal.
+                This is your billing preference for this agreement. Our team will confirm your payment setup and billing start date before activation.
               </p>
             </div>
           </div>
@@ -920,13 +733,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               </div>
               <div className="p-4 sm:p-6 max-h-56 sm:max-h-80 overflow-y-auto bg-white">
                 <div className="prose prose-sm max-w-none text-gray-700">
-                  <div
-                    className="text-xs sm:text-sm leading-relaxed"
-                    dangerouslySetInnerHTML={{
-                      __html: (contract.template?.contract_terms || '<p>Terms and conditions...</p>')
-                        .replace(/\[term\]/g, `${contract.term_months || '__'} months`)
-                    }}
-                  />
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">{terms || 'Terms are unavailable. Please contact your provider before signing.'}</div>
                 </div>
               </div>
             </div>
@@ -959,10 +766,18 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               )}
             </div>
 
+            {contract.billing_mode !== 'mail' && <label className="flex items-start gap-3 text-sm text-gray-800 bg-gray-50 border rounded-xl p-4 cursor-pointer">
+              <input type="checkbox" checked={autopayAccepted} onChange={e=>setAutopayAccepted(e.target.checked)} className="mt-1" />
+              <span>{contract.autopay_authorization}</span>
+            </label>}
+
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <p className="text-sm text-blue-800 leading-relaxed">
-                By signing, you acknowledge that you have read and agree to all terms and conditions of this security monitoring agreement.
-              </p>
+              <div className="text-sm text-blue-800 leading-relaxed">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} className="mt-1" />
+                  <span>I have reviewed the agreement and agree to its terms and conditions. I intend to sign electronically.</span>
+                </label>
+              </div>
             </div>
           </div>
         )}
@@ -972,7 +787,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
       <div className="px-4 sm:px-8 py-4 sm:py-5 border-t border-gray-100 bg-gray-50 flex flex-col-reverse sm:flex-row justify-between gap-3">
         <button
           onClick={handleBack}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || saving || saveStatus === 'saving'}
           className="flex items-center justify-center gap-2 px-5 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-white font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all text-sm min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -990,7 +805,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={saving || !formData.signature || !formData.paymentMethod || formData.emergencyContacts.length < 2 || !billingPreference}
+            disabled={saving || !isStepComplete()}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm min-h-[44px] shadow-sm"
           >
             {saving ? (

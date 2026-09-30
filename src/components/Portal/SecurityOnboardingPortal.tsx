@@ -1,214 +1,123 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { Shield, CheckCircle, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
-import OnboardingWizard from './OnboardingWizard';
+import { SecurityContractSummary } from './SecurityContractSummary';
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle, Loader2, Printer, Download, Shield } from 'lucide-react';
 import { useTenant } from '../../contexts/TenantContext';
+import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../lib/utils';
+import { securityOnboardingRequest, type PortalSecurityAgreement, type SecurityAgreementListItem } from '../../lib/securityOnboarding';
+import { readableAgreementTerms, securityAgreementHtml, printSecurityAgreement, downloadSecurityAgreement } from '../../lib/securityAgreementDocument';
+import OnboardingWizard from './OnboardingWizard';
 
-interface SecurityOnboardingPortalProps {
-  token?: string;
-}
+interface SecurityOnboardingPortalProps { token?: string }
 
 export default function SecurityOnboardingPortal({ token: propToken }: SecurityOnboardingPortalProps) {
   const { tenant } = useTenant();
-  const dealerName = tenant?.organizationName || 'Electronic Life';
-  const dealerLogo = tenant?.logoUrl;
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlToken = urlParams.get('token');
-  const initialToken = propToken || urlToken || null;
-
+  const params = new URLSearchParams(window.location.search);
+  const token = propToken || params.get('token') || undefined;
+  const contractId = params.get('contract') || undefined;
+  const [agreement, setAgreement] = useState<PortalSecurityAgreement | null>(null);
+  const [agreements, setAgreements] = useState<SecurityAgreementListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [contract, setContract] = useState<any>(null);
-  const [token] = useState<string | null>(initialToken);
+  const [error, setError] = useState('');
+  const [signedIn, setSignedIn] = useState(false);
+  const [printError, setPrintError] = useState('');
+  const [revoking, setRevoking] = useState(false);
+  const dealerName = agreement?.document.dealer?.company_name || tenant?.organizationName || 'Customer Portal';
 
-  useEffect(() => {
-    if (token) {
-      validateToken();
-    } else {
-      setLoading(false);
-      setError('No invitation token provided');
-    }
-  }, []);
-
-  async function validateToken() {
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
     try {
-      setLoading(true);
-      setError(null);
-
-      const { data: contractData, error: contractError } = await supabase
-        .from('security_contracts')
-        .select('id, status, magic_link_expires_at, contact_id, template_id, organization_id, contract_number, monthly_price, term_months, notes, customer_signature, customer_completed_at, payment_method, last_four, payment_token, price_override, invitation_sent_at, customer_signature_date, customer_ip_address')
-        .eq('magic_link_token', token)
-        .maybeSingle();
-
-      if (contractError) throw contractError;
-
-      if (!contractData) {
-        setError('Invalid or expired invitation link');
-        return;
+      const { data: { session } } = await supabase.auth.getSession();
+      setSignedIn(Boolean(session));
+      if (token || contractId) {
+        setAgreement(await securityOnboardingRequest<PortalSecurityAgreement>('get', contractId, token));
+      } else if (session) {
+        setAgreements(await securityOnboardingRequest<SecurityAgreementListItem[]>('list'));
+      } else {
+        window.location.replace('/portal?redirect=' + encodeURIComponent('/portal/security'));
       }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not load your agreements. Please try again.'); }
+    finally { setLoading(false); }
+  }, [token, contractId]);
 
-      if (contractData.magic_link_expires_at && new Date(contractData.magic_link_expires_at) < new Date()) {
-        setError('This invitation link has expired. Please contact us for a new link.');
-        return;
-      }
+  useEffect(() => { void load(); }, [load]);
 
-      if (contractData.status === 'active' || contractData.status === 'cancelled') {
-        setError('This agreement has already been processed.');
-        return;
-      }
-
-      const [contactResult, templateResult] = await Promise.all([
-        contractData.contact_id
-          ? supabase.from('contacts').select('*').eq('id', contractData.contact_id).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        contractData.template_id
-          ? supabase.from('security_contract_templates').select('*, fields:security_contract_fields(*)').eq('id', contractData.template_id).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-      ]);
-
-      setContract({
-        ...contractData,
-        contact: contactResult.data,
-        template: templateResult.data,
-      });
-    } catch (err) {
-      console.error('Error validating token:', err);
-      setError('Failed to load agreement. Please try again or contact support.');
-    } finally {
-      setLoading(false);
-    }
+  function documentHtml() {
+    if (!agreement) return '';
+    const doc = agreement.document;
+    const terms = readableAgreementTerms(doc.template?.contract_terms || '').replace(/\[term\]/g, `${doc.term_months || '__'} months`);
+    return securityAgreementHtml(doc, terms, { personalInfo: agreement.contact, propertyInfo: agreement.contact },
+      agreement.customer_signature, agreement.signed_snapshot_available ? agreement.customer_signature_date : null);
   }
 
-  const PageShell = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-slate-50">
-      <div className="bg-[#0f2347] py-4 px-4 sm:px-6 shadow-md">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          {dealerLogo ? (
-            <img src={dealerLogo} alt={dealerName} className="h-8 sm:h-10 object-contain" />
-          ) : (
-            <span className="text-white font-bold text-lg">{dealerName}</span>
-          )}
-          <div className="border-l border-white/20 pl-3">
-            <p className="text-white font-semibold text-sm leading-tight">Security Agreement</p>
-            <p className="text-blue-300 text-xs">{dealerName}</p>
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center justify-center p-4 sm:p-8 min-h-[calc(100vh-72px)]">
-        {children}
-      </div>
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <PageShell>
-        <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-10 text-center max-w-sm w-full">
-          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5">
-            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Loading Agreement</h2>
-          <p className="text-gray-500 text-sm">Please wait while we retrieve your agreement...</p>
-        </div>
-      </PageShell>
-    );
-  }
-
-  if (error) {
-    return (
-      <PageShell>
-        <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-10 max-w-md w-full">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5 border-4 border-red-100">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-3">Unable to Access Agreement</h1>
-          <p className="text-gray-500 text-center mb-6 text-sm sm:text-base leading-relaxed">{error}</p>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <p className="text-sm text-gray-600 text-center leading-relaxed">
-              If you believe this is an error, please contact {dealerName} for assistance.
-            </p>
-          </div>
-        </div>
-      </PageShell>
-    );
-  }
-
-  if (!contract) {
-    return (
-      <PageShell>
-        <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-10 max-w-md w-full">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <Shield className="w-8 h-8 text-gray-400" />
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-3">Agreement Not Found</h1>
-          <p className="text-gray-500 text-center text-sm sm:text-base leading-relaxed">
-            Please check your invitation link and try again, or contact us for assistance.
-          </p>
-        </div>
-      </PageShell>
-    );
-  }
-
-  if (contract.status === 'pending_approval' || contract.customer_completed_at) {
-    return (
-      <PageShell>
-        <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-10 max-w-md w-full">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-green-100">
-            <CheckCircle className="w-10 h-10 text-green-600" />
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-3">Agreement Submitted!</h1>
-          <p className="text-gray-500 text-center mb-6 text-sm sm:text-base leading-relaxed">
-            Thank you! Your agreement has been submitted successfully and is pending review by our team.
-          </p>
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                <ArrowRight className="w-4 h-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-blue-900 mb-1">What happens next?</p>
-                <p className="text-sm text-blue-700 leading-relaxed">
-                  You'll receive an email notification once your agreement has been approved and your monitoring service is activated.
-                </p>
-              </div>
-            </div>
-          </div>
-          <p className="text-xs text-gray-400 text-center">Have questions? Contact us at any time.</p>
-        </div>
-      </PageShell>
-    );
-  }
-
+  const completed = agreement && (!!agreement.customer_completed_at || ['pending_approval', 'approved', 'active', 'cancelled'].includes(agreement.status));
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="bg-[#0f2347] shadow-md">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {dealerLogo ? (
-                <img src={dealerLogo} alt={dealerName} className="h-8 sm:h-10 object-contain" />
-              ) : (
-                <span className="text-white font-bold text-lg">{dealerName}</span>
-              )}
-              <div className="border-l border-white/20 pl-3">
-                <p className="text-white font-semibold text-sm leading-tight">Security Agreement Onboarding</p>
-                <p className="text-blue-300 text-xs">Complete your monitoring agreement below</p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              <Shield className="w-5 h-5 text-blue-300" />
-              <span className="text-blue-200 text-sm font-medium">Secure &amp; Encrypted</span>
-            </div>
+      <header className="bg-[#0f2347] text-white px-4 sm:px-6 py-4">
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {tenant?.logoUrl ? <img src={tenant.logoUrl} alt={dealerName} className="h-9 object-contain" /> : <Shield className="w-8 h-8" />}
+            <div><p className="font-semibold">Customer Portal · Security</p><p className="text-blue-200 text-sm">{dealerName}</p></div>
           </div>
+          <a href={signedIn ? '/portal/security' : '/portal?redirect=%2Fportal%2Fsecurity'} className="flex items-center gap-2 text-sm text-blue-100 hover:text-white min-h-[44px]">
+            <ArrowLeft className="w-4 h-4" />{signedIn ? 'All security agreements' : 'Sign in to portal'}
+          </a>
+          {signedIn && <a href="/portal/dashboard" className="text-sm text-blue-100 hover:text-white min-h-[44px] flex items-center">Dashboard</a>}
         </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-          <OnboardingWizard contract={contract} token={token || ''} onComplete={() => validateToken()} />
-        </div>
-      </div>
+      </header>
+      <main className="max-w-5xl mx-auto px-4 py-6 sm:py-8">
+        {loading ? <div className="bg-white rounded-2xl p-10 flex justify-center items-center gap-3 text-gray-700"><Loader2 className="w-6 h-6 animate-spin" />Loading your agreements…</div> : error ? (
+          <div role="alert" className="bg-white rounded-2xl p-6 border border-red-200 space-y-4">
+            <AlertCircle className="text-red-600 w-8 h-8" /><h1 className="text-xl font-bold text-gray-900">Unable to open agreement</h1>
+            <p className="text-gray-700">{error}</p>
+            <div className="flex flex-wrap gap-4"><button onClick={() => void load()} className="text-blue-800 underline">Try again</button>
+              <a href="/portal?redirect=%2Fportal%2Fsecurity" className="text-blue-800 underline">Sign in to your portal</a></div>
+            <p className="text-sm text-gray-600">An expired invitation can be replaced by your provider. Your saved progress stays with the agreement.</p>
+          </div>
+        ) : agreement ? completed ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 space-y-5">
+            <CheckCircle className="w-10 h-10 text-green-600" />
+            <h1 className="text-2xl font-bold text-gray-900">{agreement.status === 'active' ? 'Security agreement' : agreement.status === 'cancelled' ? 'Cancelled agreement' : 'Agreement submitted'}</h1>
+            <p className="text-gray-700">Agreement {agreement.document.contract_number} · {agreement.status.replace(/_/g, ' ')}</p>
+            {agreement.status === 'pending_approval' && <p className="text-gray-700">Your agreement is awaiting review. Our team will confirm monitoring activation separately.</p>}
+            {agreement.summary && <SecurityContractSummary summary={agreement.summary} />}
+            {agreement.summary?.billing_mode === 'autopay' && !agreement.summary.autopay_revoked_at && <div className="text-sm text-gray-600 space-y-2">
+              <p>You can revoke future automatic payments. Amounts owed and your monitoring agreement remain in effect. Contact your provider to arrange payment; a debit already submitted requires provider follow-up.</p>
+              <button className="border rounded-lg px-3 py-2 text-gray-900" disabled={revoking} onClick={async () => {
+                if (!window.confirm('Revoke future automatic payments? This does not cancel your monitoring agreement or amounts owed.')) return;
+                setRevoking(true);
+                try { await securityOnboardingRequest('revoke_autopay', agreement.id, token); await load(); }
+                catch (e) { setPrintError(e instanceof Error ? e.message : 'Could not revoke authorization. Contact your provider.'); }
+                finally { setRevoking(false); }
+              }}>{revoking ? 'Updating…' : 'Revoke AutoPay authorization'}</button>
+            </div>}
+            {!agreement.signed_snapshot_available && <p className="text-amber-900 bg-amber-50 p-4 rounded-xl">An original signed document is not available here for this older agreement. The terms below are the current template; ask your provider for the executed copy.</p>}
+            <div className="flex flex-wrap gap-3">
+              <button onClick={() => { try { printSecurityAgreement(documentHtml()); } catch (e) { setPrintError(e instanceof Error ? e.message : 'Printing failed.'); } }} className="flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-300 text-gray-900"><Printer className="w-4 h-4" />Print / Save PDF</button>
+              <button onClick={() => downloadSecurityAgreement(documentHtml(), agreement.document.contract_number)} className="flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-300 text-gray-900"><Download className="w-4 h-4" />Download {agreement.signed_snapshot_available ? 'signed agreement' : 'current terms'}</button>
+            </div>
+            {printError && <p role="alert" className="text-red-700">{printError}</p>}
+            <details className="border border-gray-200 rounded-xl p-4"><summary className="font-semibold text-blue-900 cursor-pointer">Terms and conditions</summary>
+              <div className="whitespace-pre-wrap text-sm text-gray-800 leading-relaxed mt-4">{readableAgreementTerms(agreement.document.template?.contract_terms || '').replace(/\[term\]/g, `${agreement.document.term_months || '__'} months`)}</div></details>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <OnboardingWizard key={agreement.id} contract={{ ...agreement, ...agreement.document, template: agreement.document.template }} token={token || ''} onComplete={() => void load()} />
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div><h1 className="text-2xl font-bold text-gray-900">Your security agreements</h1><p className="text-gray-600 mt-1">Finish onboarding, review your terms, or print an agreement.</p></div>
+            {agreements.length === 0 && <div className="bg-white border border-gray-200 rounded-xl p-6 text-gray-700">No security agreements are available yet. Contact your provider if you were expecting an invitation.</div>}
+            {agreements.map(item => <a key={item.id} href={`/portal/security?contract=${encodeURIComponent(item.id)}`} className="block bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-400">
+              <div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-gray-900">Agreement {item.contract_number}</p>
+                <p className="text-sm text-gray-600 mt-1">{formatCurrency(Number(item.monthly_price))}/month · {item.status.replace(/_/g, ' ')}</p>
+                {item.summary && <p className="text-sm text-gray-600 mt-1">Balance: {item.summary.amount_due === null ? 'Awaiting reconciliation' : formatCurrency(Number(item.summary.amount_due))} · Initial term: {item.summary.months_remaining === null ? 'Awaiting activation' : `${item.summary.months_remaining} months remaining`}</p>}
+                {!item.customer_completed_at && item.saved_at && <p className="text-sm text-green-800 mt-2">Saved at step {item.current_step} of 6 · {new Date(item.saved_at).toLocaleString()}</p>}
+              </div><span className="flex items-center gap-2 text-blue-800 font-semibold text-sm">{item.customer_completed_at || ['active','cancelled'].includes(item.status) ? 'View agreement' : item.saved_at ? 'Resume' : 'Start'}<ArrowRight className="w-4 h-4" /></span></div>
+            </a>)}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +20,8 @@ export interface QBOConnection {
   sync_health: string;
   last_error: Record<string, unknown> | null;
   token_version: number;
+  payments_enabled: boolean;
+  security_monitoring_item_id: string | null;
 }
 
 export function getSupabaseAdmin() {
@@ -43,7 +45,7 @@ export function getTokenUrl(): string {
   return 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 }
 
-export async function getConnection(supabase: ReturnType<typeof createClient>, organizationId: string): Promise<QBOConnection | null> {
+export async function getConnection(supabase: SupabaseClient, organizationId: string): Promise<QBOConnection | null> {
   const { data, error } = await supabase
     .from('quickbooks_settings')
     .select('*')
@@ -57,7 +59,7 @@ export async function getConnection(supabase: ReturnType<typeof createClient>, o
   return data as QBOConnection;
 }
 
-export async function getConnectionByRealm(supabase: ReturnType<typeof createClient>, realmId: string): Promise<QBOConnection | null> {
+export async function getConnectionByRealm(supabase: SupabaseClient, realmId: string): Promise<QBOConnection | null> {
   const { data, error } = await supabase
     .from('quickbooks_settings')
     .select('*')
@@ -81,7 +83,7 @@ export async function getConnectionByRealm(supabase: ReturnType<typeof createCli
  * return the already-rotated access token instead of overwriting it.
  */
 export async function refreshAccessToken(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   connection: QBOConnection
 ): Promise<string | null> {
   const clientId = Deno.env.get('QUICKBOOKS_CLIENT_ID');
@@ -163,7 +165,7 @@ export async function refreshAccessToken(
 }
 
 export async function getValidAccessToken(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   connection: QBOConnection
 ): Promise<string | null> {
   const expiresAt = new Date(connection.token_expires_at);
@@ -180,7 +182,7 @@ export async function getValidAccessToken(
 }
 
 export async function qboRequest(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   connection: QBOConnection,
   method: string,
   path: string,
@@ -243,7 +245,7 @@ export async function qboRequest(
 }
 
 export async function logSyncOperation(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   organizationId: string,
   direction: string,
   operation: string,
@@ -270,7 +272,7 @@ export async function logSyncOperation(
 }
 
 export async function createSyncRun(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   organizationId: string,
   runType: string,
   entityType: string
@@ -295,7 +297,7 @@ export async function createSyncRun(
 }
 
 export async function completeSyncRun(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   runId: string,
   status: string,
   entityCount: number,
@@ -313,7 +315,7 @@ export async function completeSyncRun(
 }
 
 export async function upsertEntityMapping(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   organizationId: string,
   entityType: string,
   localId: string,
@@ -335,7 +337,7 @@ export async function upsertEntityMapping(
 }
 
 export async function getLocalIdByQboId(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   organizationId: string,
   entityType: string,
   qboId: string
@@ -352,7 +354,7 @@ export async function getLocalIdByQboId(
 }
 
 export async function getQboIdByLocalId(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   organizationId: string,
   entityType: string,
   localId: string
@@ -369,7 +371,7 @@ export async function getQboIdByLocalId(
 }
 
 export async function getEntityMapping(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   organizationId: string,
   entityType: string,
   localId: string
