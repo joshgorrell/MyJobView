@@ -948,6 +948,15 @@ export default function ReviewsView() {
 
   const filteredContacts = contacts;
 
+  const reviewChampions = Object.values(requests.reduce<Record<string, { name: string; sent: number; clicked: number; completed: number }>>((acc, request) => {
+    const key = request.sent_by || 'unknown';
+    if (!acc[key]) acc[key] = { name: request.profiles?.full_name || 'Unknown', sent: 0, clicked: 0, completed: 0 };
+    acc[key].sent += 1;
+    if (request.link_clicked) acc[key].clicked += 1;
+    if (request.review_completed) acc[key].completed += 1;
+    return acc;
+  }, {})).sort((a, b) => b.sent - a.sent).slice(0, 5);
+
   const PARTICLES = Array.from({ length: 18 }, (_, i) => {
     const angle = (i / 18) * 360;
     const distance = 80 + (i % 3) * 30;
@@ -1061,7 +1070,7 @@ export default function ReviewsView() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-700 overflow-x-auto">
-        <button
+        {canViewCustomerFeedback && <button
           onClick={() => setActiveTab('dashboard')}
           className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
             activeTab === 'dashboard'
@@ -1071,19 +1080,8 @@ export default function ReviewsView() {
         >
           <TrendingUp className="w-4 h-4 inline mr-2" />
           Customer Feedback
-        </button>
-        <button
-          onClick={() => setActiveTab('satisfaction')}
-          className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'satisfaction'
-              ? 'text-blue-400 border-b-2 border-blue-400'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          <ThumbsUp className="w-4 h-4 inline mr-2" />
-          Satisfaction
-        </button>
-        <button
+        </button>}
+        {canRequestGoogleReviews && <button
           onClick={() => setActiveTab('send')}
           className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
             activeTab === 'send'
@@ -1093,18 +1091,7 @@ export default function ReviewsView() {
         >
           <Send className="w-4 h-4 inline mr-2" />
           Ask / Send
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'history'
-              ? 'text-yellow-400 border-b-2 border-yellow-400'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          <Calendar className="w-4 h-4 inline mr-2" />
-          History
-        </button>
+        </button>}
         {canViewLostOpportunities && <button onClick={() => setActiveTab('lost')} className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>}
       </div>
 
@@ -1118,6 +1105,25 @@ export default function ReviewsView() {
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && canViewCustomerFeedback && (
         <div className="space-y-6">
+          {reviewChampions.length > 0 && (
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div><h2 className="text-lg font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Google review requests attributed to the employee who asked.</p></div>
+                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+              </div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                {reviewChampions.map((champion, index) => (
+                  <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
+                    <div className="text-xs text-gray-500">#{index + 1}</div>
+                    <div className="font-semibold text-white truncate">{champion.name}</div>
+                    <div className="mt-2 text-2xl font-bold text-cyan-300">{champion.sent}</div>
+                    <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
