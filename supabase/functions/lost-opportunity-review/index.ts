@@ -56,21 +56,16 @@ const json = (data: unknown, status = 200) =>
 function buildInvitationEmail(
   settings: any,
   contact: any,
-  opportunityName: string,
+  _opportunityName: string,
   title: string,
   url: URL,
 ): string {
   const company = escape(settings?.company_name || "Our team");
+  const introduction = settings?.invitation_owner_name
+    ? `I’m ${escape(settings.invitation_owner_name)}, the owner of ${company}. Could you help me with something really quick?`
+    : `Could you help our leadership team at ${company} with something really quick?`;
   const html = wrapInEmailLayout(
-    `<p>Hi ${
-      escape(contact.first_name || contact.contact_name || "there")
-    },</p><p>Thank you for giving ${company} the opportunity to help with your <strong>${
-      escape(opportunityName)
-    }</strong>.</p><h2>${
-      escape(title)
-    }</h2><p>Was it price, the design, another company, or something we could have done better?</p><p><strong>Your response is privately reviewed by company leadership.</strong> Only authorized reviewers can see your response and any attachments. Sending this request does not give your salesperson access to your feedback. Constructive criticism is absolutely welcome. We want to improve and earn another chance to win you over.</p><p><a href="${
-      escape(url.toString())
-    }" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Tell Us Why →</a></p><p>${company} price matches. If you would prefer to work with us but price is standing in the way, upload the competing proposal through the form. For comparable equipment and scope, we will work to <strong>meet or beat their price. If we can't, we'll buy you dinner.</strong></p><p>Thank you again for considering us.</p><p><em>Innovate. Integrate. Inspire.</em></p>`,
+    `<p>Hi ${escape(contact.first_name || contact.contact_name || "there")},</p><p>${introduction}</p><h2>${escape(title)}</h2><p>I’d appreciate a quick, honest note about why we lost your business. What could we have done better?</p><p>Your feedback helps us improve, and it’s shared privately with authorized company reviewers.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p>Thank you for your time and for giving us the opportunity to earn your business.</p>${settings?.invitation_owner_name ? `<p>${escape(settings.invitation_owner_name)}<br>Owner, ${company}</p>` : `<p>${company} leadership team</p>`}`,
     company,
     escape(settings?.company_email || ""),
     "#0e7490",
@@ -378,6 +373,10 @@ Deno.serve(async (req) => {
           { error: "Configure the dealer app URL before sending." },
           400,
         );
+      }
+      // Electronic Life's owner introduction is specific to its tenant.
+      if (settings && organization.subdomain === "elife") {
+        settings.invitation_owner_name = "Josh Gorrell";
       }
       if (b.action === "preview") {
         const previewUrl = new URL("/lost-opportunity-review", base);
