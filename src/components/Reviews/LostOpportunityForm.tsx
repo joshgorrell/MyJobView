@@ -1,3 +1,4 @@
+import { LockKeyhole, MessageSquare, ArrowRight, CheckCircle2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { lossReasons, lostReviewAction } from "./lostReview";
 interface Invitation {
@@ -69,9 +70,9 @@ export default function LostOpportunityForm() {
   }
   const price = reasons.includes("price") || reasons.includes("value");
   return (
-    <main className="min-h-screen bg-slate-100 p-4 sm:p-8 text-slate-900" style={{ colorScheme: "light" }}>
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
-        <header className="bg-slate-900 p-6 text-white">
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-cyan-50 p-4 sm:p-10 text-slate-900" style={{ colorScheme: "light" }}>
+      <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200 overflow-hidden">
+        <header className="relative bg-gradient-to-br from-slate-900 to-cyan-950 p-7 sm:p-10 text-white">
           {invitation?.company_logo_url && (
             <img
               src={invitation.company_logo_url}
@@ -82,11 +83,12 @@ export default function LostOpportunityForm() {
           <p className="text-cyan-300 text-sm mb-2">
             {invitation?.company_name}
           </p>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
             {invitation?.title || "A private note to our leadership"}
           </h1>
+          <p className="mt-4 text-slate-200 text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4" aria-hidden="true" /> A moment of feedback. A chance to do better.</p>
         </header>
-        <div className="p-6 sm:p-8">
+        <div className="p-5 sm:p-9">
           {error && (
             <p
               role="alert"
@@ -97,7 +99,8 @@ export default function LostOpportunityForm() {
           )}
           {done
             ? (
-              <div role="status">
+              <div role="status" className="py-6 text-center">
+                <CheckCircle2 className="h-12 w-12 text-cyan-700 mx-auto mb-4" aria-hidden="true" />
                 <h2 className="text-xl font-semibold">
                   Thank you for your honest feedback.
                 </h2>
@@ -110,9 +113,10 @@ export default function LostOpportunityForm() {
             )
             : invitation
             ? (
-              <form onSubmit={submit} className="space-y-6">
-                <section className="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
-                  <h2 className="font-bold">
+              <form onSubmit={submit} className="space-y-8">
+                <section className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <LockKeyhole className="h-4 w-4 text-cyan-700" aria-hidden="true" />
                     Your feedback helps us improve.
                   </h2>
                   <p className="mt-2 text-sm leading-6">
@@ -121,15 +125,15 @@ export default function LostOpportunityForm() {
                   </p>
                 </section>
                 <fieldset>
-                  <legend className="font-semibold">
+                  <legend className="text-xl font-semibold tracking-tight">
                     Why did we lose your business?
                   </legend>
                   <p className="text-sm text-slate-600 my-2">
                     Select all that apply, add a message, or both.
                   </p>
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {lossReasons.map(([value, label]) => (
-                      <label key={value} className="flex gap-3 items-start">
+                      <label key={value} className={`flex gap-3 items-start rounded-xl border p-4 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-cyan-600 ${reasons.includes(value) ? "border-cyan-600 bg-cyan-50" : "border-slate-200 bg-white hover:border-cyan-400 hover:bg-slate-50"}`}>
                         <input
                           type="checkbox"
                           checked={reasons.includes(value)}
@@ -143,7 +147,7 @@ export default function LostOpportunityForm() {
                             )}
                           className="mt-1 h-4 w-4 accent-cyan-700"
                         />
-                        <span>{label}</span>
+                        <span className="text-sm leading-6">{label}</span>
                       </label>
                     ))}
                   </div>
@@ -153,20 +157,20 @@ export default function LostOpportunityForm() {
                     value={message}
                     maxLength={10000}
                     onChange={(e) => setMessage(e.target.value)}
-                    rows={5}
-                    className="block mt-2 w-full border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-500 p-3 font-normal"
-                    placeholder="What could we have done differently? Good, bad, or somewhere in between—your feedback helps us improve."
+                    rows={4}
+                    className="block mt-2 w-full border border-slate-300 rounded-xl bg-white text-slate-900 placeholder:text-slate-500 p-4 font-normal focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600"
+                    placeholder="What could we have done differently? We’d appreciate your honest feedback."
                   />
                 </label>
-                <fieldset>
-                  <legend className="font-semibold mb-3">
+                <fieldset className="border-t border-slate-200 pt-6">
+                  <legend className="font-semibold text-lg mb-4">
                     Is there still a chance for us to earn your business?
                   </legend>
                   {[["yes", "Yes — I’d like you to try"], [
                     "maybe",
                     "Maybe — reach out to me",
                   ], ["no", "No — I’ve made my decision"]].map(([v, l]) => (
-                    <label key={v} className="flex gap-3 mb-3">
+                    <label key={v} className={`flex gap-3 mb-3 rounded-xl border p-4 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-cyan-600 ${chance === v ? "border-cyan-600 bg-cyan-50" : "border-slate-200 bg-white hover:border-cyan-400"}`}>
                       <input
                         required
                         type="radio"
@@ -181,7 +185,7 @@ export default function LostOpportunityForm() {
                   ))}
                 </fieldset>
                 {(price || chance === "yes" || chance === "maybe") && (
-                  <section className="rounded-xl border border-cyan-200 p-5 space-y-4">
+                  <section className="rounded-2xl bg-cyan-50/60 border border-cyan-200 p-5 sm:p-6 space-y-4">
                     <h2 className="text-lg font-bold">Give us another shot.</h2>
                     {price && (
                       <>
@@ -233,7 +237,7 @@ export default function LostOpportunityForm() {
                         maxLength={10000}
                         value={recovery}
                         onChange={(e) => setRecovery(e.target.value)}
-                        className="block mt-2 w-full border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-500 p-3 font-normal"
+                        className="block mt-2 w-full border border-slate-300 rounded-xl bg-white text-slate-900 placeholder:text-slate-500 p-4 font-normal focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600"
                       />
                     </label>
                   </section>
@@ -241,9 +245,10 @@ export default function LostOpportunityForm() {
                 <button
                   disabled={busy || (!reasons.length && !message.trim()) ||
                     !chance}
-                  className="w-full rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white py-3 font-bold disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-cyan-700 hover:bg-cyan-800 text-white py-4 font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {busy ? "Sending…" : "Send Private Feedback"}
+                  {!busy && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
                 </button>
               </form>
             )
