@@ -878,7 +878,23 @@ export default function ReviewsView() {
           throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-review-request`, {
+        const isSurvey = request.method === 'survey';
+        const isSms = request.method === 'sms';
+        const functionName = isSurvey
+          ? 'send-job-completion-survey'
+          : isSms
+            ? 'send-review-request-sms'
+            : 'send-review-request';
+
+        if (isSms) {
+          if (request.contact_id && request.contacts) {
+            delete requestBody.email;
+          } else {
+            throw new Error('SMS resend requires the original contact with a phone number');
+          }
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -899,7 +915,7 @@ export default function ReviewsView() {
             recipient_email: request.recipient_email,
             recipient_name: request.recipient_name,
             sent_by: profile?.id,
-            method: 'email'
+            method: request.method
           });
 
         if (insertError) throw insertError;
