@@ -65,7 +65,10 @@ Deno.serve(async (req: Request) => {
           id,
           amount,
           payment_date,
-          payment_method
+          payment_method,
+          card_fee_amount,
+          card_fee_label,
+          total_collected
         )
       `)
       .eq('id', invoiceId)
@@ -169,7 +172,7 @@ function generateInvoiceHTML(invoice: any, settings: any, hasPartialCO = false):
             <tr>
               <td style="padding: 8px; font-size: 13px; color: #166534;">${new Date(payment.payment_date).toLocaleDateString()}</td>
               <td style="padding: 8px; font-size: 13px; color: #166534;">${payment.payment_method}</td>
-              <td style="text-align: right; padding: 8px; font-size: 13px; color: #166534; font-weight: 500;">$${payment.amount.toFixed(2)}</td>
+              <td style="text-align: right; padding: 8px; font-size: 13px; color: #166534; font-weight: 500;">$${Number(payment.amount).toFixed(2)}${Number(payment.card_fee_amount) > 0 ? `<div style="font-size:11px;">${payment.card_fee_label || 'Card fee'}: $${Number(payment.card_fee_amount).toFixed(2)}<br>Total collected: $${Number(payment.total_collected ?? Number(payment.amount) + Number(payment.card_fee_amount)).toFixed(2)}</div>` : ''}</td>
             </tr>
           `).join('')}
         </tbody>

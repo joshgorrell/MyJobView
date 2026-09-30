@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
     const params = new URLSearchParams({
       client_id: clientId,
       response_type: 'code',
-      scope: 'com.intuit.quickbooks.accounting',
+      scope: 'com.intuit.quickbooks.accounting com.intuit.quickbooks.payment',
       redirect_uri: redirectUri,
       state: state,
     });
