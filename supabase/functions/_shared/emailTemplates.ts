@@ -108,9 +108,14 @@ export function wrapInEmailLayout(
   companyEmail: string,
   headerColor = '#0e7490',
   logoUrl = '',
-  offices: { office_name: string; phone: string }[] = []
+  offices: { office_name: string; phone: string }[] = [],
+  footerTheme: 'dark' | 'light' = 'dark'
 ): string {
   const resolvedLogoUrl = logoUrl || EL_LOGO_FALLBACK;
+  const lightFooter = footerTheme === 'light';
+  const footerBackground = lightFooter ? '#f1f5f9' : '#1e293b';
+  const footerText = lightFooter ? '#334155' : '#94a3b8';
+  const footerNote = lightFooter ? '#334155' : '#475569';
 
   const phonesHtml = offices.length > 0
     ? `<table cellpadding="0" cellspacing="0" style="margin:10px auto 0 auto;border-collapse:collapse;">
@@ -139,12 +144,12 @@ export function wrapInEmailLayout(
       <tr><td style="background:#ffffff;padding:40px 40px 32px;color:#374151;font-size:16px;line-height:1.7;">
         ${content}
       </td></tr>
-      <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 40px;text-align:center;border-top:1px solid #334155;">
-        <img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:0.85;" />
+      <tr><td style="background:${footerBackground};border-radius:0 0 16px 16px;padding:24px 32px;text-align:center;border-top:1px solid ${lightFooter ? '#cbd5e1' : '#334155'};">
+        <img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:${lightFooter ? '1' : '0.85'};" />
         <p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${companyName}</p>
-        ${companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 2px 0;">${companyEmail}</p>` : ''}
+        ${companyEmail ? `<p style="color:${footerText};font-size:13px;margin:0 0 2px 0;">${companyEmail}</p>` : ''}
         ${phonesHtml}
-        <p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">You received this email because you recently worked with us.<br>Thank you for your business.</p>
+        <p style="color:${footerNote};font-size:${lightFooter ? '14' : '12'}px;margin:12px 0 0 0;line-height:1.6;">You received this email because you recently worked with us.<br>Thank you for your business.</p>
       </td></tr>
     </table>
   </td></tr>

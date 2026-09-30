@@ -71,6 +71,8 @@ function buildInvitationEmail(
     escape(settings?.company_email || ""),
     "#0e7490",
     settings?.company_logo_url || "",
+    [],
+    "light",
   ).replace(
     "You received this email because you recently worked with us.<br>Thank you for your business.",
     "Thank you for giving us the opportunity to earn your business.",
