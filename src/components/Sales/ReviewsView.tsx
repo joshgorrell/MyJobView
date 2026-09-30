@@ -275,7 +275,7 @@ export default function ReviewsView() {
   const [manualEmail, setManualEmail] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
-  const [sendMethod, setSendMethod] = useState<'satisfaction' | 'sms' | 'survey'>('satisfaction');
+  const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms' | 'survey'>('email');
 
   // Customer Satisfaction form state
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
@@ -691,8 +691,9 @@ export default function ReviewsView() {
 
   async function sendReviewRequest() {
     const isSurvey = sendMethod === 'survey';
+    const isEmail = sendMethod === 'email';
 
-    if (isSurvey) {
+    if (isSurvey || isEmail) {
       if (useManualEntry) {
         if (!manualEmail) { toast.warning('Please enter an email address'); return; }
         if (!manualEmail.includes('@')) { toast.warning('Please enter a valid email address'); return; }
@@ -716,7 +717,7 @@ export default function ReviewsView() {
       };
 
       if (useManualEntry) {
-        if (isSurvey) {
+        if (isSurvey || isEmail) {
           requestBody.email = manualEmail;
           requestBody.name = manualName;
         } else {
@@ -733,6 +734,8 @@ export default function ReviewsView() {
       let functionName: string;
       if (isSurvey) {
         functionName = 'send-job-completion-survey';
+      } else if (isEmail) {
+        functionName = 'send-review-request';
       } else {
         functionName = 'send-review-request-sms';
       }
@@ -755,7 +758,7 @@ export default function ReviewsView() {
         .from('review_requests')
         .insert({
           contact_id: useManualEntry ? null : selectedContact?.id,
-          recipient_email: isSurvey && useManualEntry ? manualEmail : null,
+          recipient_email: (isSurvey || isEmail) && useManualEntry ? manualEmail : null,
           recipient_name: useManualEntry ? manualName : null,
           sent_by: profile?.id,
           method: isSurvey ? 'survey' : sendMethod
@@ -766,7 +769,7 @@ export default function ReviewsView() {
       const sentName = useManualEntry
         ? (manualName || manualEmail || manualPhone)
         : (selectedContact?.contact_name || '');
-      const sentMethod = isSurvey ? 'Job Completion Survey' : 'SMS Review Request';
+      const sentMethod = isSurvey ? 'Job Completion Survey' : isEmail ? 'Google Review Request' : 'SMS Review Request';
 
       setShowPreview(false);
       setPreviewData(null);
@@ -939,12 +942,12 @@ export default function ReviewsView() {
 
   const isSendDisabled =
     sending ||
-    (sendMethod === 'survey' && !selectedContact && !manualEmail) ||
+    ((sendMethod === 'survey' || sendMethod === 'email') && !selectedContact && !manualEmail) ||
     (sendMethod === 'sms' && !selectedContact && !manualPhone);
 
   const isPreviewDisabled =
     loadingPreview ||
-    (sendMethod === 'survey' && !selectedContact && !manualEmail);
+    ((sendMethod === 'survey' || sendMethod === 'email') && !selectedContact && !manualEmail);
 
   const filteredContacts = contacts;
 
@@ -1213,11 +1216,19 @@ export default function ReviewsView() {
             {/* Send Method Selection */}
             <div className="mb-2">
               <p className="text-xs text-gray-400 mb-3">
-                Choose a method below. Survey and SMS requests are tracked on the History tab.
+                Choose a method below. Every request is attributed to the employee who asks.
               </p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+                {/* Direct Google review email */}
+                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'email' ? 'bg-cyan-900/30 border-cyan-500 shadow-lg shadow-cyan-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                  <button onClick={() => setSendMethod('email')} className="text-left p-4 w-full">
+                    <div className="flex items-center gap-2 mb-2"><div className={`p-1.5 rounded-lg ${sendMethod === 'email' ? 'bg-cyan-600' : 'bg-gray-700'}`}><Mail className="w-4 h-4 text-white" /></div><span className={`font-semibold text-sm ${sendMethod === 'email' ? 'text-cyan-300' : 'text-gray-200'}`}>Google Review Email</span></div>
+                    <p className="text-xs text-gray-400 leading-relaxed">Select a customer or enter an email and send the direct Google review request. Works for projects, service, or any customer.</p>
+                  </button>
+                  <div className="px-4 pb-3"><button onClick={e => { e.stopPropagation(); fetchEmailPreview(); }} disabled={loadingPreview} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-cyan-400"><Eye className="w-3.5 h-3.5" />Preview email</button></div>
+                </div>
                 {/* Customer Satisfaction Survey */}
-                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('satisfaction')}
                     className="text-left p-4 w-full"
@@ -1229,7 +1240,7 @@ export default function ReviewsView() {
                       <span className={`font-semibold text-sm ${sendMethod === 'satisfaction' ? 'text-blue-300' : 'text-gray-200'}`}>
                         Satisfaction Survey
                       </span>
-                      {sendMethod === 'satisfaction' && (
+                      {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
                         <span className="ml-auto w-2 h-2 rounded-full bg-blue-400 shrink-0" />
                       )}
                     </div>
@@ -1247,10 +1258,10 @@ export default function ReviewsView() {
                       Preview email
                     </button>
                   </div>
-                </div>
+                </div>}
 
                 {/* Job Completion Survey */}
-                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'survey' ? 'bg-amber-900/30 border-amber-500 shadow-lg shadow-amber-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'survey' ? 'bg-amber-900/30 border-amber-500 shadow-lg shadow-amber-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('survey')}
                     className="text-left p-4 w-full"
@@ -1280,7 +1291,7 @@ export default function ReviewsView() {
                       Preview email
                     </button>
                   </div>
-                </div>
+                </div>}
 
                 {/* SMS / Text */}
                 <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
