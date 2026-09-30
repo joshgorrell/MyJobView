@@ -16,6 +16,7 @@ export default function LostOpportunityForm() {
   const [done, setDone] = useState(false);
   const [reasons, setReasons] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [addingComment, setAddingComment] = useState(false);
   const [chance, setChance] = useState("");
   const [recovery, setRecovery] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -152,8 +153,10 @@ export default function LostOpportunityForm() {
                     ))}
                   </div>
                 </fieldset>
+                {(reasons.includes("other") || addingComment || !!message) ? (
                 <label className="block font-semibold">
-                  Tell us more<textarea
+                  {reasons.includes("other") ? "What was the other reason?" : "Tell us more"}<textarea
+                    required={reasons.includes("other")}
                     value={message}
                     maxLength={10000}
                     onChange={(e) => setMessage(e.target.value)}
@@ -162,6 +165,9 @@ export default function LostOpportunityForm() {
                     placeholder="What could we have done differently? We’d appreciate your honest feedback."
                   />
                 </label>
+                ) : (
+                  <button type="button" onClick={() => setAddingComment(true)} className="text-cyan-700 font-semibold underline underline-offset-4">Add a comment (optional)</button>
+                )}
                 <fieldset className="border-t border-slate-200 pt-6">
                   <legend className="font-semibold text-lg mb-4">
                     Is there still a chance for us to earn your business?
@@ -243,7 +249,7 @@ export default function LostOpportunityForm() {
                   </section>
                 )}
                 <button
-                  disabled={busy || (!reasons.length && !message.trim()) ||
+                  disabled={busy || (reasons.includes("other") && !message.trim()) || (!reasons.length && !message.trim()) ||
                     !chance}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-cyan-700 hover:bg-cyan-800 text-white py-4 font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
