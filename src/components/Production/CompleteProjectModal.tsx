@@ -135,89 +135,34 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
 
   function handleConfirmNext() {
     if (!confirmed) return;
-    checkExistingAccess();
-    setStep('tt_decision');
+    handleComplete(false);
   }
 
-  async function handleComplete(skipEmail: boolean) {
+  async function handleComplete(_skipEmail: boolean) {
     setLoading(true);
     setStep('sending');
     try {
       const today = new Date();
-      const endDate = new Date(today);
-      endDate.setDate(endDate.getDate() + ttDays);
-
-      // 1. Mark project substantially complete
-      const { error: projectError } = await supabase
-        .from('projects')
-        .update({
-          substantial_completion_date: today.toISOString().split('T')[0],
-          status: 'completed',
-        })
-        .eq('id', customer.project_id);
-
+      const { error: projectError } = await supabase.from('projects').update({
+        substantial_completion_date: today.toISOString().split('T')[0],
+        status: 'completed',
+      }).eq('id', customer.project_id);
       if (projectError) throw projectError;
 
-      // 2. Update associated sales order to complete if one exists
       if (customer.sales_order_id) {
-        await supabase
-          .from('sales_orders')
-          .update({
-            status: 'complete',
-            completed_at: today.toISOString(),
-            test_tune_status: 'active',
-            test_tune_start_date: today.toISOString().split('T')[0],
-            test_tune_end_date: endDate.toISOString().split('T')[0],
-          })
-          .eq('id', customer.sales_order_id);
-      }
-
-      // 3. Create access grant if no existing active access
-      if (existingAccess.type === 'none') {
-        const { data: accessGrant, error: grantError } = await supabase
-          .from('punchlist_access_grants')
-          .insert({
-            contact_id: customer.contact_id,
-            access_type: 'test_and_tune',
-            status: 'active',
-            granted_date: today.toISOString(),
-            expiration_date: endDate.toISOString(),
-            project_id: customer.project_id,
-            sales_order_id: customer.sales_order_id || null,
-            notes: `Test & Tune access granted on project completion — ${customer.project_name}`,
-          })
-          .select()
-          .single();
-
-        if (grantError) throw grantError;
-
-        // 4. Send email if requested
-        if (!skipEmail && emailAddress.trim() && emailAddress.includes('@')) {
-          try {
-            await supabase.functions.invoke('send-punchlist-invite', {
-              body: {
-                contact_email: emailAddress.trim(),
-                contact_name: customer.contact_name,
-                project_name: customer.project_name,
-                expiration_date: accessGrant?.expiration_date,
-                access_type: 'test_and_tune',
-              },
-            });
-          } catch (emailErr) {
-            console.error('Email send error:', emailErr);
-          }
-        }
+        const { error: salesOrderError } = await supabase.from('sales_orders').update({
+          status: 'complete',
+          completed_at: today.toISOString(),
+        }).eq('id', customer.sales_order_id);
+        if (salesOrderError) throw salesOrderError;
       }
 
       setDone(true);
-      setTimeout(() => {
-        onComplete();
-        onClose();
-      }, 2200);
+      setTimeout(() => { onComplete(); onClose(); }, 1800);
     } catch (err: any) {
       console.error('Error completing project:', err);
       toast.error(err.message || 'Failed to complete project', 'Error');
-      setStep('tt_decision');
+      setStep('confirm');
     } finally {
       setLoading(false);
     }
@@ -255,11 +200,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
               </div>
               <h2 className="text-lg font-bold text-white mb-1">Project Marked Complete!</h2>
               <p className="text-sm text-gray-400">
-                {existingAccess.type === 'none'
-                  ? sendEmail
-                    ? `T&T access created and welcome email sent to ${customer.contact_name}.`
-                    : `T&T access created. Welcome email not sent.`
-                  : `Project complete. No new access needed — ${customer.contact_name} already has active access.`}
+                Substantial completion recorded. Test & Tune is scheduled to begin in 7 days; staff can still intentionally invite the customer earlier from Punchlist or an invoice.
               </p>
             </div>
           )}
@@ -378,13 +319,9 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                         <Award className="w-3.5 h-3.5 text-cyan-400" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-white">{ttDays}-Day Test &amp; Tune starts today</p>
+                        <p className="text-xs font-semibold text-white">{ttDays}-Day Test &amp; Tune starts in 7 days</p>
                         <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                          The T&amp;T period runs from today through{' '}
-                          <span className="text-white font-semibold">
-                            {new Date(Date.now() + ttDays * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>.
-                          Post-install service hours count toward performance bonuses.
+                          This gives the customer a week to live with the finished system before the formal Test & Tune period begins. MJV will start it once and send the welcome email automatically.
                         </p>
                       </div>
                     </div>
@@ -393,9 +330,9 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                         <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-white">Customer gets portal access</p>
+                        <p className="text-xs font-semibold text-white">Punchlist can still be invited intentionally</p>
                         <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                          {customer.contact_name} will be granted portal access to submit punchlist items and service requests.
+                          Staff can still send or resend Punchlist access from the Punchlist page or while sending an invoice. Those intentional sends reuse existing access.
                         </p>
                       </div>
                     </div>
@@ -404,9 +341,9 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                         <Mail className="w-3.5 h-3.5 text-violet-400" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-white">Welcome email sent (optional)</p>
+                        <p className="text-xs font-semibold text-white">No duplicate completion invite</p>
                         <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                          You'll choose on the next screen whether to send a welcome email with their portal login link.
+                          Completing the project no longer sends a competing Test & Tune welcome email. The scheduled Day-7 lifecycle owns that automatic send.
                         </p>
                       </div>
                     </div>
@@ -439,7 +376,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                   disabled={!confirmed}
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-2xl transition-colors"
                 >
-                  Next — Set Up T&T Access
+                  Mark Substantially Complete
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
