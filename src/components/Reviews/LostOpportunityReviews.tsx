@@ -150,6 +150,8 @@ export default function LostOpportunityReviews(
   useEffect(() => {
     setProposal("");
     setProposals([]);
+    setName("");
+    if (!titleEdited) setTitle("Why didn’t we win your business?");
     if (!contact) return;
     let active = true;
     supabase.from("proposals").select("id,title,proposal_number").eq(
@@ -184,7 +186,7 @@ export default function LostOpportunityReviews(
   }
   function opportunity(value: string) {
     setName(value);
-    if (!titleEdited) setTitle(value ? `Why didn’t we win your ${value}?` : "");
+    if (!titleEdited) setTitle(value ? `Why didn’t we win your ${value}?` : "Why didn’t we win your business?");
   }
   async function previewEmail() {
     setPreviewing(true);
@@ -370,6 +372,7 @@ export default function LostOpportunityReviews(
                 setProposal(e.target.value);
                 const selected = proposals.find((p) => p.id === e.target.value);
                 if (selected) opportunity(selected.title);
+                else opportunity("");
               }}
               className={input}
             >
@@ -380,15 +383,6 @@ export default function LostOpportunityReviews(
                 </option>
               ))}
             </select>
-          </label>
-          <label className="block text-gray-200">
-            Opportunity / Project Name<input
-              required
-              maxLength={200}
-              value={name}
-              onChange={(e) => opportunity(e.target.value)}
-              className={input}
-            />
           </label>
           <label className="block text-gray-200">
             Review Title / Email Subject<input
@@ -422,15 +416,14 @@ export default function LostOpportunityReviews(
           <button
             type="button"
             disabled={busy || previewing || !canSend || !contact?.email ||
-              !name.trim() || !title.trim()}
+              !title.trim()}
             onClick={previewEmail}
             className="rounded-lg border border-cyan-600 px-5 py-3 text-cyan-200 disabled:opacity-50"
           >
             {previewing ? "Loading Preview…" : "Preview Email"}
           </button>
           <button
-            disabled={busy || !canSend || !contact?.email || !name.trim() ||
-              !title.trim()}
+            disabled={busy || !canSend || !contact?.email || !title.trim()}
             className="rounded-lg bg-cyan-700 px-5 py-3 text-white disabled:opacity-50"
           >
             {busy ? "Sending…" : "Send Lost Opportunity Review"}
