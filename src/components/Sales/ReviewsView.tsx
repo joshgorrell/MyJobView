@@ -46,6 +46,9 @@ interface SatisfactionRecord {
   responded_at: string | null;
   created_by: string;
   follow_up_sent_at: string | null;
+  survey_type?: 'job_completion' | 'post_test_tune' | 'one_year' | 'manual';
+  project_id?: string | null;
+  sales_order_id?: string | null;
   profiles: { full_name: string } | null;
 }
 
@@ -268,6 +271,8 @@ export default function ReviewsView() {
   const satSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activitySearch, setActivitySearch] = useState('');
+  const [activityType, setActivityType] = useState<'all' | 'google' | 'feedback'>('all');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
@@ -453,7 +458,7 @@ export default function ReviewsView() {
           .from('customer_satisfaction')
           .select(`
             id, customer_name, customer_email, sales_rep_name, lead_tech_name,
-            rating, comment, sent_at, responded_at, created_by, follow_up_sent_at,
+            rating, comment, sent_at, responded_at, created_by, follow_up_sent_at, survey_type, project_id, sales_order_id,
             profiles!created_by(full_name)
           `)
           .order('sent_at', { ascending: false }),
@@ -753,6 +758,21 @@ export default function ReviewsView() {
     }
   }
 
+  async function markReviewReceived(request: ReviewRequest) {
+    try {
+      const { error } = await supabase.from('review_requests').update({
+        review_completed: true,
+        notes: [request.notes, 'Google review confirmed received by staff'].filter(Boolean).join(' · ')
+      }).eq('id', request.id);
+      if (error) throw error;
+      toast.success('Review marked as received');
+      await loadReviewRequests();
+    } catch (error) {
+      console.error('Error marking review received:', error);
+      toast.error('Could not update review status.');
+    }
+  }
+
   async function deleteReviewRequest(id: string) {
     toast.confirm('Delete this review request from history? This cannot be undone.', async () => {
       try {
@@ -994,19 +1014,19 @@ export default function ReviewsView() {
       )}
 
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 px-6 py-6 text-white shadow-xl">
-        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 px-5 py-4 text-white shadow-lg">
+        <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+        <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-2.5">
-              <MessageSquare className="w-6 h-6 text-cyan-200" />
-              <h1 className="text-2xl font-bold">Feedback</h1>
+              <MessageSquare className="w-5 h-5 text-cyan-200" />
+              <h1 className="text-xl font-bold">Feedback</h1>
             </div>
-            <p className="mt-1 text-lg font-semibold text-blue-50">Listen. Learn. Improve.</p>
-            <p className="mt-1 max-w-2xl text-sm text-blue-100/90">Turn customer feedback into better experiences, stronger reviews, and lasting relationships.</p>
+            <p className="mt-0.5 text-sm font-semibold text-blue-50">Listen. Learn. Improve.</p>
+            <p className="mt-0.5 max-w-2xl text-xs text-blue-100/90">Turn customer feedback into better experiences, stronger reviews, and lasting relationships.</p>
           </div>
           {canRequestGoogleReviews && (
-            <button onClick={() => setActiveTab('send')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 font-semibold text-indigo-700 shadow-lg transition hover:bg-blue-50">
+            <button onClick={() => setActiveTab('send')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow transition hover:bg-blue-50">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               Ask for a Google Review
             </button>
@@ -1544,6 +1564,25 @@ export default function ReviewsView() {
               </div>
             ) : null;
           })()}
+          <div className="px-5 py-4 border-b border-gray-700 bg-gray-900/35">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-white">Request History</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Search any customer to see every Google review request and Feedback touchpoint, plus what happened next.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input value={activitySearch} onChange={e => setActivitySearch(e.target.value)} placeholder="Search customer or email..." className="w-full sm:w-72 rounded-lg border border-gray-600 bg-gray-950 py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none" />
+                </div>
+                <select value={activityType} onChange={e => setActivityType(e.target.value as 'all' | 'google' | 'feedback')} className="rounded-lg border border-gray-600 bg-gray-950 px-3 py-2 text-sm text-white">
+                  <option value="all">All request types</option>
+                  <option value="google">Google reviews</option>
+                  <option value="feedback">Customer feedback</option>
+                </select>
+              </div>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-900">
@@ -1569,7 +1608,11 @@ export default function ReviewsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
-                {requests.map(request => {
+                {requests.filter(request => {
+                  if (activityType === 'feedback') return false;
+                  const haystack = `${request.contacts?.contact_name || ''} ${request.contacts?.email || ''} ${request.recipient_name || ''} ${request.recipient_email || ''}`.toLowerCase();
+                  return haystack.includes(activitySearch.trim().toLowerCase());
+                }).map(request => {
                   const sentMs = new Date(request.sent_at).getTime();
                   const daysSince = Math.floor((Date.now() - sentMs) / (1000 * 60 * 60 * 24));
                   const isFollowUpDue = !request.review_completed && daysSince >= 14;
@@ -1627,12 +1670,12 @@ export default function ReviewsView() {
                       <div className="flex flex-col gap-1">
                         {request.review_completed && (
                           <span className="flex items-center gap-1 text-green-400 text-xs font-medium">
-                            <Check className="w-4 h-4" /> Completed
+                            <Check className="w-4 h-4" /> Review Received
                           </span>
                         )}
                         {!request.review_completed && request.link_clicked && (
                           <span className="flex items-center gap-1 text-blue-400 text-xs font-medium">
-                            <ExternalLink className="w-4 h-4" /> Clicked
+                            <ExternalLink className="w-4 h-4" /> Clicked Google
                           </span>
                         )}
                         {!request.review_completed && !request.link_clicked && request.email_opened && (
@@ -1642,7 +1685,7 @@ export default function ReviewsView() {
                         )}
                         {!request.review_completed && !request.link_clicked && !request.email_opened && (
                           <span className="flex items-center gap-1 text-gray-500 text-xs font-medium">
-                            <X className="w-4 h-4" /> Pending
+                            <X className="w-4 h-4" /> Sent · no activity yet
                           </span>
                         )}
                         {request.follow_up_sent_at && (
@@ -1659,6 +1702,11 @@ export default function ReviewsView() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
+                        {!request.review_completed && request.link_clicked && (
+                          <button onClick={() => markReviewReceived(request)} className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded text-green-400 hover:text-green-300 hover:bg-green-900/20" title="Confirm that this customer posted a Google review">
+                            <CheckCircle className="w-3 h-3" /> Mark Review Received
+                          </button>
+                        )}
                         {!request.review_completed && (
                           <button
                             onClick={() => resendReviewRequest(request)}
@@ -1687,7 +1735,11 @@ export default function ReviewsView() {
                   </tr>
                   );
                 })}
-                {satisfactionHistory.map(record => {
+                {satisfactionHistory.filter(record => {
+                  if (activityType === 'google') return false;
+                  const haystack = `${record.customer_name || ''} ${record.customer_email || ''}`.toLowerCase();
+                  return haystack.includes(activitySearch.trim().toLowerCase());
+                }).map(record => {
                   const ratingColors: Record<string, string> = {
                     excellent: 'text-green-400',
                     good: 'text-blue-400',
