@@ -69,7 +69,7 @@ export default function LostOpportunityForm() {
   }
   const price = reasons.includes("price") || reasons.includes("value");
   return (
-    <main className="min-h-screen bg-slate-100 p-4 sm:p-8 text-slate-900">
+    <main className="min-h-screen bg-slate-100 p-4 sm:p-8 text-slate-900" style={{ colorScheme: "light" }}>
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
         <header className="bg-slate-900 p-6 text-white">
           {invitation?.company_logo_url && (
@@ -113,20 +113,16 @@ export default function LostOpportunityForm() {
               <form onSubmit={submit} className="space-y-6">
                 <section className="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
                   <h2 className="font-bold">
-                    This feedback is privately reviewed by company leadership.
+                    Your feedback helps us improve.
                   </h2>
                   <p className="mt-2 text-sm leading-6">
-                    Only authorized reviewers can see your response and
-                    attachments. Sending this request does not give your
-                    salesperson access to your feedback. Please be
-                    candid—constructive criticism is absolutely welcome. We want
-                    to know where we fell short, how we can improve, and whether
-                    we can win you over.
+                    Your response and attachments are shared privately with
+                    authorized company reviewers. Please tell us where we fell short.
                   </p>
                 </section>
                 <fieldset>
                   <legend className="font-semibold">
-                    Why did you decide not to move forward with us?
+                    Why did we lose your business?
                   </legend>
                   <p className="text-sm text-slate-600 my-2">
                     Select all that apply, add a message, or both.
@@ -145,7 +141,7 @@ export default function LostOpportunityForm() {
                                   r !== value
                                 ),
                             )}
-                          className="mt-1 h-4 w-4"
+                          className="mt-1 h-4 w-4 accent-cyan-700"
                         />
                         <span>{label}</span>
                       </label>
@@ -158,7 +154,7 @@ export default function LostOpportunityForm() {
                     maxLength={10000}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={5}
-                    className="block mt-2 w-full border border-slate-300 rounded-lg p-3 font-normal"
+                    className="block mt-2 w-full border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-500 p-3 font-normal"
                     placeholder="What could we have done differently? Good, bad, or somewhere in between—your feedback helps us improve."
                   />
                 </label>
@@ -175,6 +171,7 @@ export default function LostOpportunityForm() {
                         required
                         type="radio"
                         name="chance"
+                        className="mt-1 h-4 w-4 accent-cyan-700"
                         value={v}
                         checked={chance === v}
                         onChange={() => setChance(v)}
@@ -224,7 +221,7 @@ export default function LostOpportunityForm() {
                           setFiles(selected);
                           setError("");
                         }}
-                        className="block w-full text-sm"
+                        className="block w-full rounded-lg border border-slate-300 bg-white text-slate-900 p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-900"
                       />
                     </label>
                     {files.map((f) => (
@@ -236,7 +233,7 @@ export default function LostOpportunityForm() {
                         maxLength={10000}
                         value={recovery}
                         onChange={(e) => setRecovery(e.target.value)}
-                        className="block mt-2 w-full border border-slate-300 rounded-lg p-3 font-normal"
+                        className="block mt-2 w-full border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-500 p-3 font-normal"
                       />
                     </label>
                   </section>
