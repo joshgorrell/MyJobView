@@ -62,6 +62,9 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     can_edit_contact_assignments: false,
     can_edit_products: true,
     can_see_all_review_requests: false,
+    can_send_lost_opportunity_reviews: true,
+    can_view_lost_opportunity_submissions: false,
+    notify_lost_opportunity_submissions: false,
     can_edit_contacts: true,
     has_calendar_access: true,
     proposal_visibility_scope: 'company' as 'own' | 'office' | 'company',
@@ -279,6 +282,9 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
             can_edit_contact_assignments: formData.can_edit_contact_assignments,
             can_edit_products: formData.can_edit_products,
             can_see_all_review_requests: formData.can_see_all_review_requests,
+        can_send_lost_opportunity_reviews: formData.can_send_lost_opportunity_reviews,
+        can_view_lost_opportunity_submissions: formData.can_view_lost_opportunity_submissions,
+        notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
             can_edit_contacts: formData.can_edit_contacts,
             has_calendar_access: formData.has_calendar_access,
             proposal_visibility_scope: formData.proposal_visibility_scope,
@@ -522,6 +528,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                   ...formData,
                   role_id: e.target.value,
                   role: roleKey,
+                  can_send_lost_opportunity_reviews: ['sales','sales_v2','sales_manager','admin','manager'].includes(roleKey),
+                  can_view_lost_opportunity_submissions: roleKey === 'admin',
                   can_view_prospects: canViewProspects
                 });
               }}
@@ -720,6 +728,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
               </div>
             </label>
 
+            {(['can_send_lost_opportunity_reviews', 'can_view_lost_opportunity_submissions'] as const).map(key => <label key={key} className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={formData[key]} onChange={e => setFormData({...formData, [key]: e.target.checked})} /><span className="text-white">{key === 'can_send_lost_opportunity_reviews' ? 'Can Send Lost Opportunity Reviews' : 'Can View Lost Opportunity Responses'}</span></label>)}
+            <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={formData.notify_lost_opportunity_submissions} onChange={e=>setFormData({...formData,notify_lost_opportunity_submissions:e.target.checked})}/><span className="text-white">Notify this user by email and in-app when a Lost Opportunity response arrives (requires Can View Responses)</span></label>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"

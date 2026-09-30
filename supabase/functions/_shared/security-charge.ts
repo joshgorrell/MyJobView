@@ -4,7 +4,8 @@ export interface ChargeOutcome {state:'paid'|'pending'|'declined'|'unknown';proc
 export function classifySecurityCharge(raw:Record<string,unknown>,type:'card'|'ach',settledAchStatus:string):ChargeOutcome {
   const id=String(raw.id||'');const status=String(raw.status||'').toUpperCase();
   if(!id) return {state:'unknown',message:'Provider response had no transaction ID; reconcile before retrying'};
-  if(type==='card' && status==='CAPTURED' || type==='ach' && !!settledAchStatus && status===settledAchStatus.toUpperCase())
+  const unsettled=['PENDING','PROCESSING','SUBMITTED','CREATED','AUTHORIZED','DECLINED','FAILED','RETURNED','CANCELLED','VOIDED'];
+  if(type==='card' && status==='CAPTURED' || type==='ach' && !!settledAchStatus && !unsettled.includes(status) && status===settledAchStatus.toUpperCase())
     return {state:'paid',processor_id:id,processor_status:status};
   if(['DECLINED','FAILED','RETURNED','CANCELLED','VOIDED'].includes(status)) return {state:'declined',processor_id:id,processor_status:status,message:'Payment was not completed'};
   return {state:'pending',processor_id:id,processor_status:status,message:'Awaiting confirmed payment completion'};

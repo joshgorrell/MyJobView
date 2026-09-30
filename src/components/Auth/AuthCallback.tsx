@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { parseAuthCallbackTokens, getReturnPath } from '../../lib/crossDomainAuth';
+import { BrandedLoading } from '../Shared/BrandedLoading';
 
 export function AuthCallback() {
   const [error, setError] = useState<string | null>(null);
@@ -53,12 +54,5 @@ export function AuthCallback() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full text-center">
-        <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-4"></div>
-        <p className="text-gray-300 text-lg">Signing you in...</p>
-      </div>
-    </div>
-  );
+  return <BrandedLoading message="Signing you in..." />;
 }

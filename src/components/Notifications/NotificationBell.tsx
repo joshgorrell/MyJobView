@@ -330,6 +330,11 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
       return;
     }
 
+    if (notifType === 'review_request' && notification.title === 'Lost opportunity feedback received') {
+      window.location.assign('/?tab=reviews&reviewType=lost');
+      return;
+    }
+
     // Default: just close the notification panel
     setIsOpen(false);
   }

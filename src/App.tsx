@@ -13,6 +13,7 @@ import { OfflineIndicator } from './components/Offline/OfflineIndicator';
 import BugReportModal from './components/Shared/BugReportModal';
 import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
+import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
@@ -25,6 +26,8 @@ import { useNotificationCount } from './hooks/useNotificationCount';
 import { supabase } from './lib/supabase';
 import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
+
+const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
 // Lazy load components
 const ContactForm = lazy(() => import('./components/Contacts/ContactForm').then(m => ({ default: m.ContactForm })));
@@ -242,7 +245,6 @@ function AppContent() {
   const [resetSuccess, setResetSuccess] = useState(false);
 
   const notificationCount = useNotificationCount();
-  const [footerLogoUrl, setFooterLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = notificationCount > 0 ? `(${notificationCount}) MyJobView` : 'MyJobView';
@@ -269,25 +271,6 @@ function AppContent() {
 
     return () => window.clearInterval(interval);
   }, [activeTab, user?.id, profile?.id, isPortalUser]);
-
-  useEffect(() => {
-    async function loadFooterLogo() {
-      if (!profile?.organization_id) return;
-      try {
-        const { data } = await supabase
-          .from('organizations')
-          .select('footer_logo_url')
-          .eq('id', profile.organization_id)
-          .maybeSingle();
-        if (data?.footer_logo_url) {
-          setFooterLogoUrl(data.footer_logo_url);
-        }
-      } catch {
-        // silently use text fallback
-      }
-    }
-    if (user) loadFooterLogo();
-  }, [user, profile?.organization_id]);
 
   const toggleSidebar = () => {
     if (sidebarPinned) return;
@@ -481,17 +464,7 @@ function AppContent() {
   }, [activeTab]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0a1628] flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <div className="text-gray-300 text-lg mb-2">Loading...</div>
-          <div className="text-gray-400 text-sm">
-            If this takes more than a few seconds, try refreshing the page.
-          </div>
-        </div>
-      </div>
-    );
+    return <BrandedLoading message="Loading your workspace..." />;
   }
 
   // --- PORTAL USER ISOLATION ---
@@ -508,6 +481,7 @@ function AppContent() {
     '/portal/contact',
     '/portal/membership',
     '/portal/signup',
+    '/lost-opportunity-review',
     '/security-onboarding',
     '/onboarding',
     '/login',
@@ -540,6 +514,10 @@ function AppContent() {
   }
   // --- END PORTAL USER ISOLATION ---
 
+  if (currentPath === '/lost-opportunity-review') {
+    return <Suspense fallback={<LoadingFallback />}><LostOpportunityForm /></Suspense>;
+  }
+
   // Portal & public routes — must come AFTER the portal isolation guard above
   if (currentPath === '/portal/security' || currentPath === '/security-onboarding' || currentPath === '/onboarding') {
     const urlParams = new URLSearchParams(window.location.search);
@@ -560,7 +538,7 @@ function AppContent() {
   // the dealer subdomain with a short-lived token transfer via URL fragment.
   if (currentPath === '/auth-bridge') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<BrandedLoading message="Connecting to your portal..." />}>
         <AuthBridge />
       </Suspense>
     );
@@ -570,7 +548,7 @@ function AppContent() {
   // establishes it in this origin's localStorage.
   if (currentPath === '/auth-callback') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<BrandedLoading message="Signing you in..." />}>
         <AuthCallback />
       </Suspense>
     );
@@ -1228,41 +1206,7 @@ function AppContent() {
       {!isStandalone && (
         <footer className="bg-gray-900/50 border-t border-purple-500/30 mt-8 sm:mt-12 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-            <div className="flex-shrink-0">
-              {footerLogoUrl ? (
-                <img
-                  src={footerLogoUrl}
-                  alt="Company Logo"
-                  className="h-7 sm:h-8 object-contain"
-                />
-              ) : (
-                <p className="text-gray-400 text-xs sm:text-sm text-center sm:text-left">
-                  MyJobView
-                </p>
-              )}
-            </div>
-            {/* Legal links */}
-            <div className="flex items-center gap-3 text-xs text-gray-600">
-              <a
-                href="/privacy-policy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gray-400 transition-colors"
-              >
-                Privacy Policy
-              </a>
-              <span className="text-gray-700">·</span>
-              <a
-                href="/eula"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gray-400 transition-colors"
-              >
-                Terms of Service
-              </a>
-            </div>
-
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4">
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
               {footerDepartments.map((dept) => {
                 const modules = getUserModules(dept.id);

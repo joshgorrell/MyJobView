@@ -197,6 +197,7 @@ Deno.serve(async (req: Request) => {
         .from('review_requests')
         .select('id, contact_id, recipient_email, recipient_name, method, contacts:contact_id(contact_name, first_name, email)')
         .eq('organization_id', orgId)
+        .eq('request_type', 'customer_review')
         .eq('review_completed', false)
         .eq('auto_followup_enabled', true)
         .is('follow_up_sent_at', null)

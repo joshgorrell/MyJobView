@@ -15,6 +15,8 @@ assert.equal((await charge('ach',fake({id:'ach-1',status:'PENDING',amount:'35.00
 assert.equal(JSON.parse(requests[1].init.body).paymentMode,'WEB');
 assert.equal((await charge('ach',fake({id:'ach-1',status:'SETTLED',amount:'35.00'}),'ach-1')).state,'paid');assert.equal(requests[2].init.method,'GET');assert.equal(requests[2].init.body,undefined);
 assert.equal(classifySecurityCharge({id:'ach-1',status:'PENDING'},'ach','').state,'pending');
+assert.equal(classifySecurityCharge({id:'ach-1',status:'PENDING'},'ach','PENDING').state,'pending','Misconfiguration cannot mark pending ACH as settled');
+assert.equal(classifySecurityCharge({id:'ach-1',status:'DECLINED'},'ach','DECLINED').state,'declined');
 assert.equal((await charge('card',fake({id:'charge-2',status:'DECLINED',amount:'35.00'}))).state,'declined');
 assert.equal((await charge('card',fake({id:'charge-3',status:'CAPTURED',amount:'350.00'}))).state,'unknown');
 assert.equal((await charge('card',fake({id:'wrong',status:'CAPTURED',amount:'35.00'}),'expected')).state,'unknown');

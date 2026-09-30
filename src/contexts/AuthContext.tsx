@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         setUser(session.user);
         setIsPasswordRecovery(false);
+        setLoading(true);
         loadProfile(session.user.id);
         if (window.location.hash) {
           window.history.replaceState(null, '', window.location.pathname);

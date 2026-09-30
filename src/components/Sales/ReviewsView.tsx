@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Shared/Toast';
 import { Star, Mail, QrCode, TrendingUp, Users, ExternalLink, Send, Check, Eye, X, Search, Calendar, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, ClipboardList, ThumbsUp, ChevronDown, CheckCircle, Lock } from 'lucide-react';
+import LostOpportunityReviews from '../Reviews/LostOpportunityReviews';
 import { CustomerSatisfactionDashboard } from './CustomerSatisfactionDashboard';
 
 interface Contact {
@@ -252,7 +253,7 @@ export default function ReviewsView() {
   const { profile } = useAuth();
   const canSeeAllRequests = profile?.can_see_all_review_requests ?? false;
   const isAdmin = profile?.role === 'admin';
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'satisfaction' | 'send' | 'history'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'satisfaction' | 'send' | 'history' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [satisfactionHistory, setSatisfactionHistory] = useState<SatisfactionRecord[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -438,6 +439,7 @@ export default function ReviewsView() {
             contacts(id, contact_name, company_name, email, phone),
             profiles(full_name)
           `)
+          .eq('request_type', 'customer_review')
           .order('sent_at', { ascending: false }),
         supabase
           .from('customer_satisfaction')
@@ -749,7 +751,7 @@ export default function ReviewsView() {
         .from('review_requests')
         .insert({
           contact_id: useManualEntry ? null : selectedContact?.id,
-          recipient_email: isEmailBased && useManualEntry ? manualEmail : null,
+          recipient_email: isSurvey && useManualEntry ? manualEmail : null,
           recipient_name: useManualEntry ? manualName : null,
           sent_by: profile?.id,
           method: isSurvey ? 'survey' : sendMethod
@@ -878,7 +880,23 @@ export default function ReviewsView() {
           throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-review-request`, {
+        const isSurvey = request.method === 'survey';
+        const isSms = request.method === 'sms';
+        const functionName = isSurvey
+          ? 'send-job-completion-survey'
+          : isSms
+            ? 'send-review-request-sms'
+            : 'send-review-request';
+
+        if (isSms) {
+          if (request.contact_id && request.contacts) {
+            delete requestBody.email;
+          } else {
+            throw new Error('SMS resend requires the original contact with a phone number');
+          }
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -899,7 +917,7 @@ export default function ReviewsView() {
             recipient_email: request.recipient_email,
             recipient_name: request.recipient_name,
             sent_by: profile?.id,
-            method: 'email'
+            method: request.method
           });
 
         if (insertError) throw insertError;
@@ -1071,7 +1089,10 @@ export default function ReviewsView() {
           <Calendar className="w-4 h-4 inline mr-2" />
           History
         </button>
+        <button onClick={() => setActiveTab('lost')} className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>
       </div>
+
+      {activeTab === 'lost' && <LostOpportunityReviews />}
 
       {/* Satisfaction Tab */}
       {activeTab === 'satisfaction' && (
@@ -1164,6 +1185,8 @@ export default function ReviewsView() {
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h2 className="text-xl font-bold text-white mb-4">Send Review Request</h2>
+            <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Review</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>
+
 
             {/* Send Method Selection */}
             <div className="mb-2">

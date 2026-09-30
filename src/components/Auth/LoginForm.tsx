@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BrowserDiagnostics } from '../Shared/BrowserDiagnostics';
-import { isDealerSubdomain, getRootAuthBridgeUrl, isValidReturnHost } from '../../lib/crossDomainAuth';
+import { isValidReturnHost } from '../../lib/crossDomainAuth';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -14,7 +14,6 @@ export function LoginForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { signIn, signUp, resetPassword, resendConfirmation } = useAuth();
-  const [redirectingToRoot, setRedirectingToRoot] = useState(false);
   const [returnToDealer, setReturnToDealer] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,13 +21,6 @@ export function LoginForm() {
     const redirect = urlParams.get('redirect_to');
     if (redirect && isValidReturnHost(redirect)) {
       setReturnToDealer(redirect);
-    }
-    if (isDealerSubdomain() && !isForgotPassword && !isSignUp) {
-      const portalToken = urlParams.get('portal_token');
-      if (!portalToken) {
-        setRedirectingToRoot(true);
-        window.location.replace(getRootAuthBridgeUrl(window.location.pathname));
-      }
     }
   }, []);
 
@@ -74,17 +66,6 @@ export function LoginForm() {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (redirectingToRoot) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-gray-300 text-lg">Redirecting to login...</p>
-        </div>
-      </div>
-    );
   }
 
   return (

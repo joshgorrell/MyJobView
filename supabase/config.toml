@@ -254,3 +254,6 @@ verify_jwt = true
 # Dedicated server cron secret is checked by the handler. Never called by portal sessions.
 [functions.security-recurring-billing]
 verify_jwt = false
+
+[functions.lost-opportunity-review]
+verify_jwt = false
