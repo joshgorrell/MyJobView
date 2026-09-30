@@ -1195,17 +1195,11 @@ export default function ReviewsView() {
                   </div>
                 )}
 
-                <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-white">{lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'test_tune_welcome' ? 'Test & Tune Welcome' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'General Customer Feedback'}</div>
-                      <div className="mt-1 text-xs text-gray-400">Choose the recipient below, then preview or send this communication.</div>
-                    </div>
-                    <button type="button" onClick={fetchSatisfactionPreview} disabled={loadingPreview}
-                      className="inline-flex items-center gap-2 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:border-cyan-500 hover:text-cyan-300 disabled:opacity-50">
-                      <Eye className="w-4 h-4" /> Preview Email
-                    </button>
-                  </div>
+                <div className="flex justify-end">
+                  <button type="button" onClick={fetchSatisfactionPreview} disabled={loadingPreview}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:border-cyan-500 hover:text-cyan-300 disabled:opacity-50">
+                    <Eye className="w-4 h-4" /> Preview Email
+                  </button>
                 </div>
 
                 {/* Contact toggle */}
@@ -1324,7 +1318,7 @@ export default function ReviewsView() {
                   {satSending ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Sending...</>
                   ) : (
-                    <><ThumbsUp className="w-5 h-5" />Send {lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'test_tune_welcome' ? 'Test & Tune Welcome' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'Customer Feedback'}</>
+                    <><ThumbsUp className="w-5 h-5" />Send {lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'test_tune_welcome' ? 'Test & Tune Welcome' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'Email'}</>
                   )}
                 </button>
               </div>
