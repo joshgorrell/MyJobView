@@ -124,18 +124,24 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const isServiceCall = authHeader === `Bearer ${serviceKey}`;
+    let user: { id: string } | null = null;
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!isServiceCall) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data, error: authError } = await supabaseClient.auth.getUser();
+      if (authError || !data.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      user = data.user;
     }
 
     const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType = 'job_completion', projectId, salesOrderId } = await req.json();
@@ -147,13 +153,16 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .maybeSingle();
+    const { data: contactOrg } = contactId
+      ? await supabaseAdmin.from('contacts').select('organization_id').eq('id', contactId).maybeSingle()
+      : { data: null };
 
-    if (!profile?.organization_id) {
+    const { data: profile } = user
+      ? await supabaseAdmin.from('profiles').select('organization_id').eq('id', user.id).maybeSingle()
+      : { data: null };
+
+    const organizationId = profile?.organization_id || contactOrg?.organization_id;
+    if (!organizationId) {
       return new Response(JSON.stringify({ error: 'Could not determine organization' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -167,7 +176,7 @@ Deno.serve(async (req: Request) => {
         .from('customer_satisfaction')
         .select('id, response_token, customer_name, customer_email')
         .eq('id', resendRecordId)
-        .eq('organization_id', profile.organization_id)
+        .eq('organization_id', organizationId)
         .maybeSingle();
 
       if (fetchError || !existing) {
@@ -183,7 +192,7 @@ Deno.serve(async (req: Request) => {
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from('customer_satisfaction')
         .insert({
-          organization_id: profile.organization_id,
+          organization_id: organizationId,
           contact_id: contactId || null,
           customer_name: customerName || '',
           customer_email: customerEmail,
@@ -192,7 +201,7 @@ Deno.serve(async (req: Request) => {
           lead_tech_id: leadTechId || null,
           lead_tech_name: leadTechName || '',
           response_token: responseToken,
-          created_by: user.id,
+          created_by: user?.id || null,
           survey_type: surveyType,
           project_id: projectId || null,
           sales_order_id: salesOrderId || null,
