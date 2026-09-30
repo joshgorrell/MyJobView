@@ -151,7 +151,7 @@ export default function LostOpportunityReviews(
     setProposal("");
     setProposals([]);
     setName("");
-    if (!titleEdited) setTitle("Why didn’t we win your business?");
+    if (!titleEdited) setTitle("");
     if (!contact) return;
     let active = true;
     supabase.from("proposals").select("id,title,proposal_number").eq(
@@ -186,7 +186,7 @@ export default function LostOpportunityReviews(
   }
   function opportunity(value: string) {
     setName(value);
-    if (!titleEdited) setTitle(value ? `Why didn’t we win your ${value}?` : "Why didn’t we win your business?");
+    if (!titleEdited) setTitle(value ? `Why didn’t we win your ${value}?` : "");
   }
   async function previewEmail() {
     setPreviewing(true);
@@ -197,7 +197,7 @@ export default function LostOpportunityReviews(
           action: "preview",
           contact_id: contact?.id,
           proposal_id: proposal || null,
-          opportunity_name: name,
+          opportunity_name: name || title,
           title,
         }),
       );
@@ -214,7 +214,7 @@ export default function LostOpportunityReviews(
         action: "create",
         contact_id: contact?.id,
         proposal_id: proposal || null,
-        opportunity_name: name,
+        opportunity_name: name || title,
         title,
       })
     ) {
@@ -399,7 +399,7 @@ export default function LostOpportunityReviews(
           <div className="bg-gray-900 rounded-lg p-4 text-gray-300 space-y-2 text-sm">
             <p>
               Thank you for giving us the opportunity to help with{" "}
-              <strong>{name || "your project"}</strong>.
+              <strong>{name || title || "your project"}</strong>.
             </p>
             <p>
               Your feedback is privately reviewed by company leadership.
