@@ -280,7 +280,8 @@ export default function ReviewsView() {
   const [manualEmail, setManualEmail] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
-  const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms' | 'survey'>('email');
+  const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms'>('email');
+  const [lifecycleType, setLifecycleType] = useState<'job_completion' | 'post_test_tune' | 'one_year' | 'manual'>('job_completion');
 
   // Customer Satisfaction form state
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
@@ -373,6 +374,7 @@ export default function ReviewsView() {
         leadTechId: satLeadTechId || undefined,
         leadTechName: leadTech?.full_name || '',
         appUrl: window.location.origin,
+        surveyType: lifecycleType,
       };
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-satisfaction-email`, {
@@ -399,7 +401,8 @@ export default function ReviewsView() {
       setSatSalesRepId(profile?.id ?? '');
       setSatLeadTechId('');
       setTimeout(() => setSatSuccess(false), 4000);
-      showSuccessAnimation(sentName || 'Customer', 'Satisfaction Survey');
+      const lifecycleLabels = { job_completion: 'Job Completion Feedback', post_test_tune: 'Post-Test & Tune Feedback', one_year: '1-Year Check-In', manual: 'Customer Feedback' };
+      showSuccessAnimation(sentName || 'Customer', lifecycleLabels[lifecycleType]);
     } catch (error: any) {
       toast.error(`Failed to send: ${error.message || 'Please try again.'}`);
     } finally {
@@ -410,33 +413,32 @@ export default function ReviewsView() {
   async function fetchSatisfactionPreview() {
     setLoadingPreview(true);
     try {
-      const customerName = satUseManual
-        ? (satManualName || 'Valued Customer')
-        : (satContact?.contact_name || 'Valued Customer');
-
-      const settingsRes = await supabase
-        .from('company_settings')
-        .select('company_name, company_email, company_logo_url')
-        .maybeSingle();
-
-      const settings = settingsRes.data || { company_name: 'Your Company', company_email: '', company_logo_url: '' };
-
-      const subject = `How did we do, ${customerName}?`;
-      const html = buildSatisfactionEmailPreview({
-        customerName,
-        companyName: settings.company_name,
-        companyEmail: settings.company_email || '',
-        companyLogoUrl: settings.company_logo_url || '',
-      });
-
+      const customerName = satUseManual ? (satManualName || 'Valued Customer') : (satContact?.contact_name || 'Valued Customer');
       const recipientEmail = satUseManual ? satManualEmail : (satContact?.email || '');
-      setPreviewData({ subject, html, recipientEmail, recipientName: customerName });
-      setEditedSubject(subject);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-satisfaction-email`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: !satUseManual && satContact ? satContact.id : undefined,
+          customerName,
+          customerEmail: recipientEmail || 'preview@example.com',
+          surveyType: lifecycleType,
+          appUrl: window.location.origin,
+          previewOnly: true,
+        }),
+      });
+      if (!response.ok) throw new Error('Unable to load lifecycle email preview');
+      const data = await response.json();
+      setPreviewData({ subject: data.subject, html: data.html, recipientEmail, recipientName: customerName });
+      setEditedSubject(data.subject);
       setPersonalNote('');
       setEditMode(false);
       setShowPreview(true);
     } catch (err) {
-      console.error('Error building satisfaction preview:', err);
+      console.error('Error building lifecycle preview:', err);
+      toast.error('Could not load the email preview.');
     } finally {
       setLoadingPreview(false);
     }
@@ -1267,6 +1269,28 @@ export default function ReviewsView() {
                   </div>
                 )}
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Lifecycle Email</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {[
+                      ['job_completion', 'Job Completion Feedback', 'Normally sent at substantial completion'],
+                      ['post_test_tune', 'Post-Test & Tune Feedback', 'Normally sent when Test & Tune ends'],
+                      ['one_year', '1-Year Check-In', 'Normally sent one year after completion'],
+                      ['manual', 'General Customer Feedback', 'Use anytime outside the automated lifecycle'],
+                    ].map(([value, label, description]) => (
+                      <button key={value} type="button" onClick={() => setLifecycleType(value as typeof lifecycleType)}
+                        className={`rounded-lg border p-3 text-left transition-colors ${lifecycleType === value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'}`}>
+                        <div className="text-sm font-semibold text-white">{label}</div>
+                        <div className="text-xs text-gray-400 mt-1">{description}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" onClick={fetchSatisfactionPreview} disabled={loadingPreview}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-gray-200 hover:border-cyan-500 hover:text-cyan-300 disabled:opacity-50">
+                    <Eye className="w-4 h-4" /> Preview selected lifecycle email
+                  </button>
+                </div>
+
                 {/* Contact toggle */}
                 <div className="flex gap-2">
                   <button
@@ -1383,7 +1407,7 @@ export default function ReviewsView() {
                   {satSending ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Sending...</>
                   ) : (
-                    <><ThumbsUp className="w-5 h-5" />Send Satisfaction Survey</>
+                    <><ThumbsUp className="w-5 h-5" />Send {lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'Customer Feedback'}</>
                   )}
                 </button>
               </div>
@@ -1765,7 +1789,7 @@ export default function ReviewsView() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-900/40 text-blue-300 border border-blue-700/50">
-                          Satisfaction Survey
+                          Lifecycle Email
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
