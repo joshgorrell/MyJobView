@@ -246,3 +246,6 @@ verify_jwt = false
 
 [functions.zip-tax-lookup]
 verify_jwt = true
+
+[functions.lost-opportunity-review]
+verify_jwt = false
