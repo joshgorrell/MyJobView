@@ -82,11 +82,14 @@ export default function LostOpportunityForm() {
               className="max-h-16 max-w-56 mb-5"
             />
           )}
-          <p className="text-cyan-300 text-sm mb-2">
-            {invitation?.company_name}
+          {!invitation?.company_logo_url && invitation?.company_name && (
+            <p className="text-cyan-300 text-sm mb-3">{invitation.company_name}</p>
+          )}
+          <p className="text-cyan-200 text-xl sm:text-2xl mb-3" style={{ fontFamily: '"Segoe Script", "Bradley Hand", "Brush Script MT", cursive' }}>
+            A private note to our leadership
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
-            {invitation?.title || "A private note to our leadership"}
+            {invitation?.title || (error ? "Review unavailable" : "Loading your invitation…")}
           </h1>
           <p className="mt-4 text-slate-200 text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4" aria-hidden="true" /> A moment of feedback. A chance to do better.</p>
         </header>
