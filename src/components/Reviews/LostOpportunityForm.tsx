@@ -59,8 +59,8 @@ export default function LostOpportunityForm() {
         reasons,
         message,
         recoverable: chance,
-        recovery_message: recovery,
-        files: encoded,
+        recovery_message: canRecover ? recovery : "",
+        files: showBidOffer ? encoded : [],
       });
       setDone(true);
     } catch (e) {
@@ -69,7 +69,8 @@ export default function LostOpportunityForm() {
       setBusy(false);
     }
   }
-  const price = reasons.includes("price");
+  const canRecover = chance === "yes" || chance === "maybe";
+  const showBidOffer = reasons.includes("price") || reasons.includes("company");
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-cyan-50 p-4 sm:p-10 text-slate-900" style={{ colorScheme: "light" }}>
       <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200 overflow-hidden">
@@ -190,23 +191,27 @@ export default function LostOpportunityForm() {
                     </label>
                   ))}
                 </fieldset>
-                {(price || chance === "yes" || chance === "maybe") && (
+                {canRecover && (
+                  <div>
+                    <label className="block font-semibold">
+                      What would it take to earn your business?<textarea
+                        rows={3}
+                        maxLength={10000}
+                        value={recovery}
+                        onChange={(e) => setRecovery(e.target.value)}
+                        className="block mt-2 w-full border border-slate-300 rounded-xl bg-white text-slate-900 placeholder:text-slate-500 p-4 font-normal focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600"
+                      />
+                    </label>
+                  </div>
+                )}
+                {showBidOffer && (
                   <section className="rounded-2xl bg-cyan-50/60 border border-cyan-200 p-5 sm:p-6 space-y-4">
-                    <h2 className="text-lg font-bold">Give us another shot.</h2>
-                    {price && (
-                      <>
-                        <p>
-                          If you would rather work with{" "}
-                          {invitation.company_name}{" "}
-                          but price is standing in the way, upload the competing
-                          proposal. For comparable equipment and scope, we will
-                          work to <strong>meet or beat their price.</strong>
-                        </p>
-                        <p className="font-bold">
-                          If we can’t, we’ll buy you dinner.
-                        </p>
-                      </>
-                    )}
+                    <h2 className="text-lg font-bold">Our best-price policy</h2>
+                    <p>
+                      For comparable equipment and the same scope of work, we’ll meet or beat the competing price.
+                      Upload the competing bid so we can compare it.
+                    </p>
+                    <p className="font-bold">If we can’t, we’ll buy you dinner!</p>
                     <label className="block font-semibold">
                       Upload Competing
                       Bid<span className="block text-sm font-normal text-slate-600 my-2">
@@ -237,15 +242,7 @@ export default function LostOpportunityForm() {
                     {files.map((f) => (
                       <p key={f.name + f.size} className="text-sm">{f.name}</p>
                     ))}
-                    <label className="block font-semibold">
-                      What would it take to earn your business?<textarea
-                        rows={3}
-                        maxLength={10000}
-                        value={recovery}
-                        onChange={(e) => setRecovery(e.target.value)}
-                        className="block mt-2 w-full border border-slate-300 rounded-xl bg-white text-slate-900 placeholder:text-slate-500 p-4 font-normal focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600"
-                      />
-                    </label>
+
                   </section>
                 )}
                 <button
