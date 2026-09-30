@@ -149,6 +149,22 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
       }).eq('id', customer.project_id);
       if (projectError) throw projectError;
 
+      // Day-0 Job Completion Feedback. Failure should not block substantial completion;
+      // the daily lifecycle worker retries any unsent project idempotently.
+      if (customer.contact_email) {
+        const { error: feedbackError } = await supabase.functions.invoke('send-satisfaction-email', {
+          body: {
+            contactId: customer.contact_id,
+            customerName: customer.contact_name,
+            customerEmail: customer.contact_email,
+            surveyType: 'job_completion',
+            projectId: customer.project_id,
+            salesOrderId: customer.sales_order_id || null,
+          }
+        });
+        if (feedbackError) console.error('Day-0 feedback send failed; lifecycle worker will retry:', feedbackError);
+      }
+
       if (customer.sales_order_id) {
         const { error: salesOrderError } = await supabase.from('sales_orders').update({
           status: 'complete',
