@@ -1035,12 +1035,10 @@ export default function ReviewsView() {
       )}
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg p-6 text-white">
-        <div className="flex items-center gap-3 mb-2">
-          <Star className="w-8 h-8" />
-          <h1 className="text-2xl font-bold">Reviews</h1>
-        </div>
-        <p className="text-yellow-50">Request and track customer reviews to build your online reputation</p>
+      <div className="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg px-4 py-2.5 text-white flex items-center gap-2.5">
+        <Star className="w-5 h-5 shrink-0" />
+        <h1 className="text-base font-bold">Reviews</h1>
+        <span className="text-yellow-50 text-sm hidden sm:inline">— request and track customer reviews</span>
       </div>
 
       {/* Tabs */}

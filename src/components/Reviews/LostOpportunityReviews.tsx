@@ -275,23 +275,38 @@ export default function LostOpportunityReviews(
   }
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-white">
+          <h2 className="text-lg font-semibold text-white">
             Lost Opportunity Reviews
           </h2>
-          <p className="text-gray-400 text-sm mt-1">
+          <p className="text-gray-400 text-sm mt-0.5">
             Learn why we lost and earn another chance. Customer feedback is
             visible only to users with submission viewing permission.
           </p>
         </div>
-        <button
-          disabled={!canSend}
-          onClick={() => setCreating(!creating)}
-          className="bg-cyan-700 text-white rounded-lg px-4 py-2"
-        >
-          {creating ? "Cancel" : "Create Review Request"}
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-gray-300 text-sm">
+            Filter
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="rounded-lg bg-gray-800 border border-gray-600 p-2 text-sm"
+            >
+              <option value="all">All</option>
+              <option value="needs_review">Needs Review</option>
+              <option value="winnable">Still Winnable</option>
+              <option value="bids">Competing Bid Uploaded</option>
+            </select>
+          </label>
+          <button
+            disabled={!canSend}
+            onClick={() => setCreating(!creating)}
+            className="bg-cyan-700 text-white rounded-lg px-4 py-2 text-sm whitespace-nowrap"
+          >
+            {creating ? "Cancel" : "Create Review Request"}
+          </button>
+        </div>
       </div>
       {error && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
@@ -467,20 +482,6 @@ export default function LostOpportunityReviews(
           </div>
         </div>
       )}
-      <label className="flex items-center gap-3 text-gray-300">
-        Filter<select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="rounded-lg bg-gray-800 border border-gray-600 p-2"
-        >
-          <option value="all">All Lost Opportunities</option>
-          <option value="needs_review">Needs Review</option>
-          <option value="winnable">Still Winnable (visible responses)</option>
-          <option value="bids">
-            Competing Bid Uploaded (visible responses)
-          </option>
-        </select>
-      </label>
       {loading
         ? <p className="text-gray-400">Loading…</p>
         : visible.length === 0
