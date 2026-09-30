@@ -68,7 +68,7 @@ export default function LostOpportunityForm() {
       setBusy(false);
     }
   }
-  const price = reasons.includes("price") || reasons.includes("value");
+  const price = reasons.includes("price");
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-cyan-50 p-4 sm:p-10 text-slate-900" style={{ colorScheme: "light" }}>
       <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200 overflow-hidden">
