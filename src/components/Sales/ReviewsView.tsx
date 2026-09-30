@@ -280,7 +280,9 @@ export default function ReviewsView() {
   const [manualEmail, setManualEmail] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
-  const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms' | 'survey'>('email');
+  const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms'>('email');
+  const [googleOnlyMode, setGoogleOnlyMode] = useState(false);
+  const [lifecycleType, setLifecycleType] = useState<'job_completion' | 'test_tune_welcome' | 'post_test_tune' | 'one_year' | 'manual'>('job_completion');
 
   // Customer Satisfaction form state
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
@@ -320,7 +322,7 @@ export default function ReviewsView() {
   const [editedSubject, setEditedSubject] = useState('');
 
   useEffect(() => {
-    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') setActiveTab('send');
+    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }
   }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab]);
 
   useEffect(() => {
@@ -351,6 +353,27 @@ export default function ReviewsView() {
   }, [staffProfiles, profile?.id]);
 
   async function sendSatisfactionSurvey() {
+    if (lifecycleType === 'test_tune_welcome') {
+      const email = satUseManual ? satManualEmail : satContact?.email;
+      const name = satUseManual ? satManualName : satContact?.contact_name;
+      if (!email || !email.includes('@')) { toast.warning('Please provide a valid customer email address.'); return; }
+      setSatSending(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-punchlist-invite`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contact_email: email, contact_name: name || 'Valued Customer', project_name: 'your project', access_type: 'test_and_tune' })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false) throw new Error(result.error || 'Failed to send Test & Tune Welcome');
+        showSuccessAnimation(name || email, 'Test & Tune Welcome');
+      } catch (error: any) {
+        toast.error(`Failed to send: ${error.message || 'Please try again.'}`);
+      } finally { setSatSending(false); }
+      return;
+    }
     const email = satUseManual ? satManualEmail : satContact?.email;
     const name = satUseManual ? satManualName : satContact?.contact_name;
     if (!email) { toast.warning('Please provide a customer email address.'); return; }
@@ -373,6 +396,7 @@ export default function ReviewsView() {
         leadTechId: satLeadTechId || undefined,
         leadTechName: leadTech?.full_name || '',
         appUrl: window.location.origin,
+        surveyType: lifecycleType,
       };
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-satisfaction-email`, {
@@ -399,7 +423,8 @@ export default function ReviewsView() {
       setSatSalesRepId(profile?.id ?? '');
       setSatLeadTechId('');
       setTimeout(() => setSatSuccess(false), 4000);
-      showSuccessAnimation(sentName || 'Customer', 'Satisfaction Survey');
+      const lifecycleLabels = { job_completion: 'Job Completion Feedback', post_test_tune: 'Post-Test & Tune Feedback', one_year: '1-Year Check-In', manual: 'Customer Feedback' };
+      showSuccessAnimation(sentName || 'Customer', lifecycleLabels[lifecycleType]);
     } catch (error: any) {
       toast.error(`Failed to send: ${error.message || 'Please try again.'}`);
     } finally {
@@ -410,33 +435,35 @@ export default function ReviewsView() {
   async function fetchSatisfactionPreview() {
     setLoadingPreview(true);
     try {
-      const customerName = satUseManual
-        ? (satManualName || 'Valued Customer')
-        : (satContact?.contact_name || 'Valued Customer');
-
-      const settingsRes = await supabase
-        .from('company_settings')
-        .select('company_name, company_email, company_logo_url')
-        .maybeSingle();
-
-      const settings = settingsRes.data || { company_name: 'Your Company', company_email: '', company_logo_url: '' };
-
-      const subject = `How did we do, ${customerName}?`;
-      const html = buildSatisfactionEmailPreview({
-        customerName,
-        companyName: settings.company_name,
-        companyEmail: settings.company_email || '',
-        companyLogoUrl: settings.company_logo_url || '',
-      });
-
+      const customerName = satUseManual ? (satManualName || 'Valued Customer') : (satContact?.contact_name || 'Valued Customer');
       const recipientEmail = satUseManual ? satManualEmail : (satContact?.email || '');
-      setPreviewData({ subject, html, recipientEmail, recipientName: customerName });
-      setEditedSubject(subject);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const isTestTuneWelcome = lifecycleType === 'test_tune_welcome';
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${isTestTuneWelcome ? 'send-punchlist-invite' : 'send-satisfaction-email'}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(isTestTuneWelcome
+          ? { contact_name: customerName, project_name: 'your project', access_type: 'test_and_tune', preview: true }
+          : {
+              contactId: !satUseManual && satContact ? satContact.id : undefined,
+              customerName,
+              customerEmail: recipientEmail || 'preview@example.com',
+              surveyType: lifecycleType,
+              appUrl: window.location.origin,
+              previewOnly: true,
+            }),
+      });
+      if (!response.ok) throw new Error('Unable to load lifecycle email preview');
+      const data = await response.json();
+      setPreviewData({ subject: data.subject, html: data.html, recipientEmail, recipientName: customerName });
+      setEditedSubject(data.subject);
       setPersonalNote('');
       setEditMode(false);
       setShowPreview(true);
     } catch (err) {
-      console.error('Error building satisfaction preview:', err);
+      console.error('Error building lifecycle preview:', err);
+      toast.error('Could not load the email preview.');
     } finally {
       setLoadingPreview(false);
     }
@@ -1026,7 +1053,7 @@ export default function ReviewsView() {
             <p className="mt-0.5 max-w-2xl text-xs text-blue-100/90">Turn customer feedback into better experiences, stronger reviews, and lasting relationships.</p>
           </div>
           {canRequestGoogleReviews && (
-            <button onClick={() => setActiveTab('send')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow transition hover:bg-blue-50">
+            <button onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow transition hover:bg-blue-50">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               Ask for a Google Review
             </button>
@@ -1048,7 +1075,7 @@ export default function ReviewsView() {
           Customer Feedback
         </button>}
         {canRequestGoogleReviews && <button
-          onClick={() => setActiveTab('send')}
+          onClick={() => { setGoogleOnlyMode(!canManageCustomerFeedback); setSendMethod('email'); setActiveTab('send'); }}
           className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
             activeTab === 'send'
               ? 'text-yellow-400 border-b-2 border-yellow-400'
@@ -1173,10 +1200,10 @@ export default function ReviewsView() {
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
-              <div><h2 className="text-xl font-bold text-white">Ask for a Google Review</h2><p className="text-sm text-gray-400 mt-1">Show the QR in person or send the customer a direct request.</p></div>
+              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Show the QR in person or email the customer a direct Google review request.' : 'Send a Google review request or an authorized customer lifecycle email.'}</p></div>
               {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Hand the customer your screen. No email required.</div></div></div>}
             </div>
-            {canViewLostOpportunities && <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Feedback</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>}
+            {!googleOnlyMode && canViewLostOpportunities && <button type="button" onClick={() => setActiveTab('lost')} className="w-full rounded-xl border border-cyan-600 bg-cyan-950/30 p-4 text-left text-cyan-200 mb-4"><strong>Lost Opportunity Feedback</strong><span className="block text-sm mt-1">Ask why we didn’t win, privately to authorized reviewers. Proposal optional.</span></button>}
 
 
             {/* Send Method Selection */}
@@ -1194,7 +1221,7 @@ export default function ReviewsView() {
                   <div className="px-4 pb-3"><button onClick={e => { e.stopPropagation(); fetchEmailPreview(); }} disabled={loadingPreview} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-cyan-400"><Eye className="w-3.5 h-3.5" />Preview email</button></div>
                 </div>
                 {/* Customer Satisfaction Survey */}
-                {canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {!googleOnlyMode && canManageCustomerFeedback && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'satisfaction' ? 'bg-blue-900/30 border-blue-500 shadow-lg shadow-blue-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('satisfaction')}
                     className="text-left p-4 w-full"
@@ -1206,7 +1233,7 @@ export default function ReviewsView() {
                       <span className={`font-semibold text-sm ${sendMethod === 'satisfaction' ? 'text-blue-300' : 'text-gray-200'}`}>
                         Satisfaction Survey
                       </span>
-                      {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
+                      {!googleOnlyMode && canManageCustomerFeedback && sendMethod === 'satisfaction' && (
                         <span className="ml-auto w-2 h-2 rounded-full bg-blue-400 shrink-0" />
                       )}
                     </div>
@@ -1227,7 +1254,7 @@ export default function ReviewsView() {
                 </div>}
 
                 {/* SMS / Text */}
-                <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
+                {!googleOnlyMode && <div className={`rounded-xl border-2 transition-all ${sendMethod === 'sms' ? 'bg-green-900/30 border-green-500 shadow-lg shadow-green-900/20' : 'bg-gray-900 border-gray-700 hover:border-gray-500'}`}>
                   <button
                     onClick={() => setSendMethod('sms')}
                     className="text-left p-4 w-full"
@@ -1253,7 +1280,7 @@ export default function ReviewsView() {
                       No preview for SMS
                     </span>
                   </div>
-                </div>
+                </div>}
               </div>
             </div>
 
@@ -1266,6 +1293,29 @@ export default function ReviewsView() {
                     <span className="font-medium">Satisfaction survey sent successfully!</span>
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Lifecycle Email</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {[
+                      ['job_completion', 'Job Completion Feedback', 'Normally sent at substantial completion'],
+                      ['test_tune_welcome', 'Test & Tune Welcome', 'Normally sent 7 days after substantial completion'],
+                      ['post_test_tune', 'Post-Test & Tune Feedback', 'Normally sent when Test & Tune ends'],
+                      ['one_year', '1-Year Check-In', 'Normally sent one year after completion'],
+                      ['manual', 'General Customer Feedback', 'Use anytime outside the automated lifecycle'],
+                    ].map(([value, label, description]) => (
+                      <button key={value} type="button" onClick={() => setLifecycleType(value as typeof lifecycleType)}
+                        className={`rounded-lg border p-3 text-left transition-colors ${lifecycleType === value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'}`}>
+                        <div className="text-sm font-semibold text-white">{label}</div>
+                        <div className="text-xs text-gray-400 mt-1">{description}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" onClick={fetchSatisfactionPreview} disabled={loadingPreview}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-gray-200 hover:border-cyan-500 hover:text-cyan-300 disabled:opacity-50">
+                    <Eye className="w-4 h-4" /> Preview selected lifecycle email
+                  </button>
+                </div>
 
                 {/* Contact toggle */}
                 <div className="flex gap-2">
@@ -1383,7 +1433,7 @@ export default function ReviewsView() {
                   {satSending ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Sending...</>
                   ) : (
-                    <><ThumbsUp className="w-5 h-5" />Send Satisfaction Survey</>
+                    <><ThumbsUp className="w-5 h-5" />Send {lifecycleType === 'job_completion' ? 'Job Completion Feedback' : lifecycleType === 'test_tune_welcome' ? 'Test & Tune Welcome' : lifecycleType === 'post_test_tune' ? 'Post-Test & Tune Feedback' : lifecycleType === 'one_year' ? '1-Year Check-In' : 'Customer Feedback'}</>
                   )}
                 </button>
               </div>
@@ -1765,7 +1815,7 @@ export default function ReviewsView() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-900/40 text-blue-300 border border-blue-700/50">
-                          Satisfaction Survey
+                          Lifecycle Email
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
