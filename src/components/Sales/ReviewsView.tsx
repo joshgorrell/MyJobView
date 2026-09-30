@@ -1332,7 +1332,7 @@ export default function ReviewsView() {
             </div>
 
             {/* Satisfaction Survey Form */}
-            {sendMethod === 'satisfaction' && (
+            {canManageCustomerFeedback && sendMethod === 'satisfaction' && (
               <div className="space-y-4">
                 {satSuccess && (
                   <div className="flex items-center gap-3 p-4 bg-green-900/30 border border-green-600/50 rounded-xl text-green-300">
@@ -1561,7 +1561,7 @@ export default function ReviewsView() {
                         className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                       />
                     </div>
-                    {sendMethod === 'survey' ? (
+                    {(sendMethod === 'survey' || sendMethod === 'email') ? (
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                           Email Address <span className="text-red-400">*</span>
