@@ -26,6 +26,8 @@ import { supabase } from './lib/supabase';
 import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
 
+const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
+
 // Lazy load components
 const ContactForm = lazy(() => import('./components/Contacts/ContactForm').then(m => ({ default: m.ContactForm })));
 const ContactsView = lazy(() => import('./components/Contacts/ContactsView').then(m => ({ default: m.ContactsView })));
@@ -506,6 +508,7 @@ function AppContent() {
     '/portal/contact',
     '/portal/membership',
     '/portal/signup',
+    '/lost-opportunity-review',
     '/security-onboarding',
     '/onboarding',
     '/login',
@@ -537,6 +540,10 @@ function AppContent() {
     return <LoadingFallback />;
   }
   // --- END PORTAL USER ISOLATION ---
+
+  if (currentPath === '/lost-opportunity-review') {
+    return <Suspense fallback={<LoadingFallback />}><LostOpportunityForm /></Suspense>;
+  }
 
   // Portal & public routes — must come AFTER the portal isolation guard above
   if (currentPath === '/security-onboarding' || currentPath === '/onboarding') {
