@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
-import { lossReasons, lostReviewAction } from "./lostReview";
+import { responseReasons, lostReviewAction } from "./lostReview";
 interface Contact {
   id: string;
   contact_name: string;
@@ -534,7 +534,7 @@ export default function LostOpportunityReviews(
                 <div className="space-y-3 text-gray-200">
                   <p>
                     {v.response.reasons.map((r) =>
-                      lossReasons.find(([key]) => key === r)?.[1] || r
+                      responseReasons.find(([key]) => key === r)?.[1] || r
                     ).join(" • ")}
                   </p>
                   {v.response.message && (
