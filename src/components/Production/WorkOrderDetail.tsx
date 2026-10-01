@@ -191,6 +191,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [showPartRequestForm, setShowPartRequestForm] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [photoContext, setPhotoContext] = useState<'general' | 'work_order_notes' | 'vip_sales_lead'>('general');
   const [showCompletionWizard, setShowCompletionWizard] = useState(false);
   const [showAddPartsModal, setShowAddPartsModal] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
@@ -968,7 +969,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
-        {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} />}
+        {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} onAddSalesLeadPhoto={() => { setPhotoContext('vip_sales_lead'); setShowPhotoCapture(true); }} />}
         {/* Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
@@ -1372,7 +1373,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="space-y-4">
             {isAssignedTech && (
               <button
-                onClick={() => setShowPhotoCapture(true)}
+                onClick={() => { setPhotoContext('general'); setShowPhotoCapture(true); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
               >
                 <Camera className="w-4 h-4" />
@@ -1726,8 +1727,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       {showPhotoCapture && (
         <JobPhotoCapture
           workOrderId={workOrderId}
-          onComplete={() => { setShowPhotoCapture(false); loadWorkOrderData(); }}
-          onCancel={() => setShowPhotoCapture(false)}
+          context={photoContext}
+          onComplete={() => { setShowPhotoCapture(false); setPhotoContext('general'); loadWorkOrderData(); }}
+          onCancel={() => { setShowPhotoCapture(false); setPhotoContext('general'); }}
         />
       )}
 
