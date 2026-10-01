@@ -14,6 +14,7 @@ BEGIN
  SELECT * INTO f FROM public.vip_maintenance_findings WHERE id=p_finding_id FOR UPDATE;
  IF NOT FOUND OR p.organization_id IS DISTINCT FROM f.organization_id THEN RAISE EXCEPTION 'Finding not found' USING ERRCODE='42501'; END IF;
  IF cardinality(f.dispositions)<>1 THEN RAISE EXCEPTION 'Choose exactly one finding outcome'; END IF;
+ IF NOT ('punchlist'=ANY(f.dispositions)) THEN RAISE EXCEPTION 'Only Needs Follow-Up findings create Punchlist items.'; END IF;
  IF nullif(btrim(f.description),'') IS NULL THEN RAISE EXCEPTION 'Describe what needs follow-up before creating a Punchlist item'; END IF;
  IF 'no_action'=ANY(f.dispositions) AND coalesce(nullif(btrim(f.notes),''),'')='' THEN RAISE EXCEPTION 'A reason is required when No Action is selected.'; END IF;
  SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=f.visit_id;
