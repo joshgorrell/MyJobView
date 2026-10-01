@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { X, Search, Plus, User, Briefcase, Users, MapPin, AlertTriangle, Bell, Mail, MessageSquare, Link, Calendar, PhoneCall, LayoutGrid, ExternalLink, Package, ChevronDown, ChevronUp, ClipboardList, Phone, Repeat } from 'lucide-react';
@@ -143,6 +143,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>('');
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
+  const [showAllProjectPhases, setShowAllProjectPhases] = useState(false);
   const [selectedProjectTasks, setSelectedProjectTasks] = useState<Set<string>>(new Set());
 
   // Labor categories for Test & Tune tracking
@@ -262,15 +263,27 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     }
   }, [formData.project_id]);
 
+  const previousProjectId = useRef(formData.project_id);
+  useEffect(() => {
+    if (previousProjectId.current !== formData.project_id) {
+      previousProjectId.current = formData.project_id;
+      setTasks(previous => previous.filter(task => !task.project_task_id));
+      setSelectedProjectTasks(new Set());
+      setSelectedPhaseId('');
+      setProjectTasks([]);
+    }
+  }, [formData.project_id]);
+
   // Load project tasks when project or phase is selected
   useEffect(() => {
     if (formData.project_id) {
-      loadProjectTasks(formData.project_id, selectedPhaseId);
+      loadProjectTasks(formData.project_id, showAllProjectPhases ? undefined : selectedPhaseId);
     } else {
+      projectTaskRequest.current++;
       setProjectTasks([]);
       setSelectedProjectTasks(new Set());
     }
-  }, [formData.project_id, selectedPhaseId]);
+  }, [formData.project_id, selectedPhaseId, showAllProjectPhases]);
 
   async function loadTechnicians() {
     try {
@@ -483,13 +496,17 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     }
   }
 
+  const projectTaskRequest = useRef(0);
   async function loadProjectTasks(projectId: string, phaseId?: string) {
+    const request = ++projectTaskRequest.current;
+    setProjectTasks([]);
+    setSelectedProjectTasks(new Set());
     try {
       let query = supabase
         .from('project_tasks')
         .select('id, title, description, estimated_hours, labor_phase_id, status')
         .eq('project_id', projectId)
-        .neq('status', 'done')
+        .eq('status', 'open')
         .gt('estimated_hours', 0) // Only items with labor/time can be tasks
         .not('labor_phase_id', 'is', null) // Only items with labor phase can be tasks
         .order('sort_order');
@@ -502,9 +519,10 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       const { data, error } = await query;
 
       if (error) throw error;
-      setProjectTasks(data || []);
+      if (request === projectTaskRequest.current) setProjectTasks(data || []);
     } catch (error) {
       console.error('Error loading project tasks:', error);
+      if (request === projectTaskRequest.current) setProjectTasks([]);
     }
   }
 
@@ -520,7 +538,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
   function handleAddSelectedProjectTasks() {
     const tasksToAdd = projectTasks
-      .filter(pt => selectedProjectTasks.has(pt.id))
+      .filter(pt => selectedProjectTasks.has(pt.id) && !tasks.some(task => task.project_task_id === pt.id))
       .map(pt => ({
         id: crypto.randomUUID(),
         title: pt.title,
@@ -783,7 +801,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
           .insert(tasksToCreate);
 
         if (tasksError) {
-          console.error('Error creating tasks:', tasksError);
+          throw new Error('Work orders were created, but their task assignments could not be saved. Open the work orders to review before creating another.');
         }
       }
 
@@ -1768,11 +1786,11 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
                   Labor Phase *
                 </h3>
                 <p className="text-sm text-gray-600 mb-3">
-                  Select a labor phase so clocked hours are tracked correctly in the project breakdown
+                  Choose the phase for this visit to see its unfinished tasks. Select tasks to assign them to this work order.
                 </p>
                 <select
                   value={selectedPhaseId}
-                  onChange={(e) => setSelectedPhaseId(e.target.value)}
+                  onChange={(e) => { setSelectedPhaseId(e.target.value); setShowAllProjectPhases(false); setSelectedProjectTasks(new Set()); }}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     validationErrors.labor_phase_id ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
@@ -1789,11 +1807,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
                 )}
               </div>
 
+              <button type="button" onClick={() => { setShowAllProjectPhases(value => !value); setSelectedProjectTasks(new Set()); }} className="min-h-11 px-3 py-2 border border-blue-200 rounded-lg text-sm text-blue-700">{showAllProjectPhases ? 'Show this phase' : 'Browse all phases'}</button>
               {projectTasks.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium text-gray-900">
-                      Available Project Tasks ({projectTasks.length})
+                      Unfinished project tasks ({projectTasks.length})
                     </h4>
                     <button
                       type="button"
@@ -1808,7 +1827,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2">
                     <p className="text-xs text-blue-800">
-                      Only project items with labor hours and an assigned labor phase are shown as tasks
+                      Choose only what needs to be done on this visit. Other project tasks remain available for reference.
                     </p>
                   </div>
 
@@ -1871,14 +1890,14 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
               {projectTasks.length === 0 && selectedPhaseId && (
                 <div className="text-center py-4 text-gray-500 text-sm">
                   <p>No open tasks found for this phase</p>
-                  <p className="text-xs mt-1 text-gray-400">Only items with labor hours and an assigned labor phase are shown</p>
+                  <p className="text-xs mt-1 text-gray-400">Only unfinished items with labor hours and an assigned labor phase are shown</p>
                 </div>
               )}
 
               {projectTasks.length === 0 && !selectedPhaseId && (
                 <div className="text-center py-4 text-gray-500 text-sm">
                   <p>Select a phase to view available tasks, or leave empty to show all project tasks</p>
-                  <p className="text-xs mt-1 text-gray-400">Only items with labor hours and an assigned labor phase are shown</p>
+                  <p className="text-xs mt-1 text-gray-400">Only unfinished items with labor hours and an assigned labor phase are shown</p>
                 </div>
               )}
             </div>
@@ -1889,7 +1908,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900">
-                  Tasks Added to Work Order ({tasks.length})
+                  Tasks for this work order ({tasks.length})
                 </h3>
                 <span className="text-sm text-gray-600">
                   Est: {tasks.reduce((sum, t) => sum + t.estimated_hours, 0).toFixed(1)} hrs total

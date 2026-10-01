@@ -5,6 +5,7 @@ import {
   CheckSquare, Square, ListChecks, Layers, ChevronsUpDown
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { QuickActionModal } from '../Shared/QuickActionModal';
 import { AvailabilityBrowserModal } from '../Shared/AvailabilityBrowserModal';
 
 interface CreateProjectWorkOrderModalProps {
@@ -107,7 +108,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
       .from('project_tasks')
       .select('id, title, description, estimated_hours, labor_phase_id, status')
       .eq('project_id', projectId)
-      .neq('status', 'done')
+      .eq('status', 'open')
       .order('sort_order');
     setAllProjectTasks(data || []);
   }
@@ -147,7 +148,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
   function toggleProjectTask(id: string) {
     setSelectedProjectTaskIds(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
@@ -166,7 +167,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
   function togglePhaseExpanded(phaseKey: string) {
     setExpandedPhases(prev => {
       const next = new Set(prev);
-      next.has(phaseKey) ? next.delete(phaseKey) : next.add(phaseKey);
+      if (next.has(phaseKey)) next.delete(phaseKey); else next.add(phaseKey);
       return next;
     });
   }
@@ -222,6 +223,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
       alert('Please enter a work order title');
       return;
     }
+    if (!selectedPhaseId) { alert('Please select a phase for this visit'); return; }
     if (selectedTechnicians.length === 0) {
       alert('Please select at least one technician');
       return;
@@ -275,13 +277,14 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
           }))
         );
 
-        await supabase.from('work_order_tasks').insert(tasksToCreate);
+        const { error: taskError } = await supabase.from('work_order_tasks').insert(tasksToCreate);
+        if (taskError) throw new Error('Work orders were created, but their task assignments could not be saved. Open the work orders to review before creating another.');
       }
 
       onSuccess();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating work order:', err);
-      alert(`Failed to create work order: ${err?.message || 'Unknown error'}`);
+      alert(`Failed to create work order: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -303,25 +306,14 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
   const pickerAvailableCount = pickerTasks.filter(t => !tasks.some(a => a.project_task_id === t.id)).length;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 flex-shrink-0">
-          <div>
-            <h2 className="text-lg font-bold text-white">New Work Order</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Project work order — customer & project pre-linked</p>
-          </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+    <QuickActionModal title="New Project Work Order" subtitle="Define the work for this visit"
+      icon={<ListChecks className="w-5 h-5" />} onClose={onClose} scrollBody={false}>
+        <form onSubmit={handleSubmit} className="qam-scroll overflow-y-auto min-h-0 flex-1 px-4 sm:px-6 py-5 space-y-5">
 
           {/* Title & Description */}
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-secondary uppercase tracking-wider mb-1.5">
                 Title <span className="text-red-400">*</span>
               </label>
               <input
@@ -329,25 +321,24 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                 value={form.title}
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
                 placeholder="e.g. Install camera system — east wing"
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                autoFocus
+                className="w-full bg-surface border border-strong rounded-lg px-3 py-2.5 text-primary placeholder:text-muted text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Description</label>
+              <label className="block text-xs font-semibold text-secondary uppercase tracking-wider mb-1.5">Instructions for this work order</label>
               <textarea
                 value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 placeholder="Work scope, special instructions..."
                 rows={3}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
+                className="w-full bg-surface border border-strong rounded-lg px-3 py-2.5 text-primary placeholder:text-muted text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
               />
             </div>
           </div>
 
           {/* Labor Phase */}
           <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Labor Phase</label>
+            <label className="block text-xs font-semibold text-secondary uppercase tracking-wider mb-1.5">Labor Phase</label>
             <select
               value={selectedPhaseId}
               onChange={e => {
@@ -355,9 +346,9 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                 setTaskPickerView('none');
                 setSelectedProjectTaskIds(new Set());
               }}
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-surface border border-strong rounded-lg px-3 py-2.5 text-primary text-sm focus:outline-none focus:border-blue-500"
             >
-              <option value="">— None —</option>
+              <option value="">— Select a phase —</option>
               {laborPhases.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
@@ -367,7 +358,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
           {/* Schedule */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Schedule</label>
+              <label className="block text-xs font-semibold text-secondary uppercase tracking-wider">Schedule</label>
               <button
                 type="button"
                 onClick={() => setShowAvailabilityBrowser(true)}
@@ -393,43 +384,43 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+                <label className="block text-xs text-muted mb-1">Start Date</label>
                 <input
                   type="date"
                   value={form.start_date}
                   onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full bg-surface border border-strong rounded-lg px-3 py-2 text-primary text-sm focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Target Completion</label>
+                <label className="block text-xs text-muted mb-1">Target Completion</label>
                 <input
                   type="date"
                   value={form.target_completion_date}
                   onChange={e => setForm(p => ({ ...p, target_completion_date: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full bg-surface border border-strong rounded-lg px-3 py-2 text-primary text-sm focus:outline-none focus:border-blue-500"
                 />
               </div>
               {form.start_date && (
                 <>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Start Time</label>
+                    <label className="block text-xs text-muted mb-1">Start Time</label>
                     <input
                       type="time"
                       step="1800"
                       value={form.start_time}
                       onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                      className="w-full bg-surface border border-strong rounded-lg px-3 py-2 text-primary text-sm focus:outline-none focus:border-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">End Time</label>
+                    <label className="block text-xs text-muted mb-1">End Time</label>
                     <input
                       type="time"
                       step="1800"
                       value={form.end_time}
                       onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                      className="w-full bg-surface border border-strong rounded-lg px-3 py-2 text-primary text-sm focus:outline-none focus:border-blue-500"
                     />
                   </div>
                 </>
@@ -439,7 +430,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
 
           {/* Technicians */}
           <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-secondary uppercase tracking-wider mb-2">
               Technician(s) <span className="text-red-400">*</span>
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -453,10 +444,10 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${
                       selected
                         ? 'bg-blue-600/20 border-blue-500 text-blue-300'
-                        : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'
+                        : 'bg-surface border-strong text-secondary hover:border-gray-500'
                     }`}
                   >
-                    <Users className={`w-3.5 h-3.5 flex-shrink-0 ${selected ? 'text-blue-400' : 'text-gray-500'}`} />
+                    <Users className={`w-3.5 h-3.5 flex-shrink-0 ${selected ? 'text-blue-400' : 'text-muted'}`} />
                     <span className="truncate">{tech.full_name}</span>
                   </button>
                 );
@@ -468,7 +459,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Tasks</label>
+                <label className="block text-xs font-semibold text-secondary uppercase tracking-wider">Project task selection</label>
                 {tasks.length > 0 && (
                   <span className="px-2 py-0.5 bg-teal-500/20 text-teal-400 text-xs rounded-full font-medium">
                     {tasks.length} added{totalAddedHours > 0 ? ` · ${totalAddedHours}h` : ''}
@@ -481,17 +472,19 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                 )}
               </div>
               {phaseFilteredTasks.length > 0 && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted">
                   {pickerAvailableCount} available
                 </span>
               )}
             </div>
 
+            <p className="text-sm text-secondary">Select only what needs to be done on this visit. The technician can browse other unfinished project tasks separately.</p>
+            {selectedPhaseId && <button type="button" onClick={() => { setTaskPickerView(taskPickerView === 'by-phase' ? 'none' : 'by-phase'); setSelectedProjectTaskIds(new Set()); }} className="min-h-11 px-3 py-2 border border-subtle rounded-lg text-sm text-info">{taskPickerView === 'by-phase' ? 'Show this phase' : 'Browse all phases'}</button>}
             {/* Phase-filtered task list — shown inline when a phase is selected */}
             {selectedPhaseId && phaseFilteredTasks.length > 0 && taskPickerView === 'none' && (
-              <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-                  <span className="text-xs font-medium text-gray-300">
+              <div className="bg-surface border border-subtle rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-subtle">
+                  <span className="text-xs font-medium text-secondary">
                     {phaseMap[selectedPhaseId]} tasks
                   </span>
                   <button
@@ -514,23 +507,23 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                         type="button"
                         disabled={alreadyAdded}
                         onClick={() => toggleProjectTask(pt.id)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors border-b border-gray-700/50 last:border-0 ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors border-b border-subtle/50 last:border-0 ${
                           alreadyAdded
                             ? 'opacity-40 cursor-not-allowed'
                             : selected
-                            ? 'bg-blue-600/15 text-blue-200'
-                            : 'hover:bg-gray-700/60 text-gray-300'
+                            ? 'bg-blue-600/15 text-info'
+                            : 'hover:bg-surface/60 text-secondary'
                         }`}
                       >
                         {alreadyAdded
                           ? <CheckSquare className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
                           : selected
                           ? <CheckSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                          : <Square className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                          : <Square className="w-3.5 h-3.5 text-muted flex-shrink-0" />
                         }
                         <span className="flex-1 truncate">{pt.title}</span>
                         {pt.estimated_hours > 0 && (
-                          <span className="text-xs text-gray-500 flex-shrink-0">{pt.estimated_hours}h</span>
+                          <span className="text-xs text-muted flex-shrink-0">{pt.estimated_hours}h</span>
                         )}
                         {alreadyAdded && <span className="text-xs text-teal-500 flex-shrink-0">added</span>}
                       </button>
@@ -538,7 +531,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                   })}
                 </div>
                 {selectedProjectTaskIds.size > 0 && (
-                  <div className="px-3 py-2.5 border-t border-gray-700">
+                  <div className="px-3 py-2.5 border-t border-subtle">
                     <button
                       type="button"
                       onClick={addSelectedTasks}
@@ -577,7 +570,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                 <button
                   type="button"
                   onClick={() => setTaskPickerView('all')}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 rounded-lg text-xs font-medium transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-surface hover:bg-gray-600 border border-strong text-secondary rounded-lg text-xs font-medium transition-all"
                 >
                   <ChevronsUpDown className="w-3.5 h-3.5" />
                   Pick Tasks
@@ -587,10 +580,10 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
 
             {/* Flat task picker */}
             {taskPickerView === 'all' && (
-              <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-                  <span className="text-xs font-medium text-gray-300">Select tasks to add</span>
-                  <button type="button" onClick={() => { setTaskPickerView('none'); setSelectedProjectTaskIds(new Set()); }} className="text-gray-500 hover:text-gray-300 transition-colors">
+              <div className="bg-surface border border-subtle rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-subtle">
+                  <span className="text-xs font-medium text-secondary">Select tasks to add</span>
+                  <button type="button" onClick={() => { setTaskPickerView('none'); setSelectedProjectTaskIds(new Set()); }} className="text-muted hover:text-secondary transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -605,26 +598,26 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                         type="button"
                         disabled={alreadyAdded}
                         onClick={() => toggleProjectTask(pt.id)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors border-b border-gray-700/50 last:border-0 ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors border-b border-subtle/50 last:border-0 ${
                           alreadyAdded
                             ? 'opacity-40 cursor-not-allowed'
                             : selected
-                            ? 'bg-blue-600/15 text-blue-200'
-                            : 'hover:bg-gray-700/60 text-gray-300'
+                            ? 'bg-blue-600/15 text-info'
+                            : 'hover:bg-surface/60 text-secondary'
                         }`}
                       >
                         {alreadyAdded
                           ? <CheckSquare className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
                           : selected
                           ? <CheckSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                          : <Square className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                          : <Square className="w-3.5 h-3.5 text-muted flex-shrink-0" />
                         }
                         <span className="flex-1 truncate">{pt.title}</span>
                         {phaseName && (
-                          <span className="text-xs text-gray-500 bg-gray-700 px-1.5 py-0.5 rounded flex-shrink-0">{phaseName}</span>
+                          <span className="text-xs text-muted bg-surface px-1.5 py-0.5 rounded flex-shrink-0">{phaseName}</span>
                         )}
                         {pt.estimated_hours > 0 && (
-                          <span className="text-xs text-gray-500 flex-shrink-0">{pt.estimated_hours}h</span>
+                          <span className="text-xs text-muted flex-shrink-0">{pt.estimated_hours}h</span>
                         )}
                         {alreadyAdded && <span className="text-xs text-teal-500 flex-shrink-0">added</span>}
                       </button>
@@ -632,7 +625,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                   })}
                 </div>
                 {selectedProjectTaskIds.size > 0 && (
-                  <div className="px-3 py-2.5 border-t border-gray-700 bg-gray-800/80">
+                  <div className="px-3 py-2.5 border-t border-subtle bg-surface">
                     <button
                       type="button"
                       onClick={addSelectedTasks}
@@ -647,10 +640,10 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
 
             {/* Phase-grouped picker */}
             {taskPickerView === 'by-phase' && (
-              <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-                  <span className="text-xs font-medium text-gray-300">Select tasks by phase</span>
-                  <button type="button" onClick={() => { setTaskPickerView('none'); setSelectedProjectTaskIds(new Set()); }} className="text-gray-500 hover:text-gray-300 transition-colors">
+              <div className="bg-surface border border-subtle rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-subtle">
+                  <span className="text-xs font-medium text-secondary">Select tasks by phase</span>
+                  <button type="button" onClick={() => { setTaskPickerView('none'); setSelectedProjectTaskIds(new Set()); }} className="text-muted hover:text-secondary transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -663,8 +656,8 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                     const phaseHours = phaseTasks.reduce((s, t) => s + (t.estimated_hours || 0), 0);
 
                     return (
-                      <div key={phaseKey} className="border-b border-gray-700/60 last:border-0">
-                        <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-700/40 transition-colors">
+                      <div key={phaseKey} className="border-b border-subtle/60 last:border-0">
+                        <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-surface/40 transition-colors">
                           <button
                             type="button"
                             onClick={() => available.length > 0 && togglePhaseAll(phaseKey)}
@@ -675,7 +668,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                               ? <CheckSquare className="w-4 h-4 text-blue-400" />
                               : someSelected
                               ? <CheckSquare className="w-4 h-4 text-blue-400/50" />
-                              : <Square className="w-4 h-4 text-gray-500" />
+                              : <Square className="w-4 h-4 text-muted" />
                             }
                           </button>
                           <button
@@ -683,12 +676,12 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                             onClick={() => togglePhaseExpanded(phaseKey)}
                             className="flex-1 flex items-center gap-2 text-left"
                           >
-                            <span className="text-sm font-semibold text-gray-200">{phaseName}</span>
-                            <span className="text-xs text-gray-500">{phaseTasks.length} task{phaseTasks.length !== 1 ? 's' : ''}</span>
-                            {phaseHours > 0 && <span className="text-xs text-gray-500">· {phaseHours}h</span>}
+                            <span className="text-sm font-semibold text-primary">{phaseName}</span>
+                            <span className="text-xs text-muted">{phaseTasks.length} task{phaseTasks.length !== 1 ? 's' : ''}</span>
+                            {phaseHours > 0 && <span className="text-xs text-muted">· {phaseHours}h</span>}
                             {available.length === 0 && <span className="text-xs text-teal-500 ml-auto mr-1">all added</span>}
                           </button>
-                          <button type="button" onClick={() => togglePhaseExpanded(phaseKey)} className="text-gray-500 flex-shrink-0">
+                          <button type="button" onClick={() => togglePhaseExpanded(phaseKey)} className="text-muted flex-shrink-0">
                             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </button>
                         </div>
@@ -704,12 +697,12 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                                   type="button"
                                   disabled={alreadyAdded}
                                   onClick={() => toggleProjectTask(pt.id)}
-                                  className={`w-full flex items-center gap-2.5 pl-10 pr-3 py-2 text-sm text-left transition-colors border-t border-gray-700/30 ${
+                                  className={`w-full flex items-center gap-2.5 pl-10 pr-3 py-2 text-sm text-left transition-colors border-t border-subtle/30 ${
                                     alreadyAdded
-                                      ? 'opacity-40 cursor-not-allowed text-gray-400'
+                                      ? 'opacity-40 cursor-not-allowed text-secondary'
                                       : selected
-                                      ? 'bg-blue-600/10 text-blue-200'
-                                      : 'hover:bg-gray-700/40 text-gray-300'
+                                      ? 'bg-blue-600/10 text-info'
+                                      : 'hover:bg-surface/40 text-secondary'
                                   }`}
                                 >
                                   {alreadyAdded
@@ -720,7 +713,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                                   }
                                   <span className="flex-1 truncate">{pt.title}</span>
                                   {pt.estimated_hours > 0 && (
-                                    <span className="text-xs text-gray-500 flex-shrink-0">{pt.estimated_hours}h</span>
+                                    <span className="text-xs text-muted flex-shrink-0">{pt.estimated_hours}h</span>
                                   )}
                                   {alreadyAdded && <span className="text-xs text-teal-500 flex-shrink-0">added</span>}
                                 </button>
@@ -733,7 +726,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                   })}
                 </div>
                 {selectedProjectTaskIds.size > 0 && (
-                  <div className="px-3 py-2.5 border-t border-gray-700 bg-gray-800/80">
+                  <div className="px-3 py-2.5 border-t border-subtle bg-surface">
                     <button
                       type="button"
                       onClick={addSelectedTasks}
@@ -749,21 +742,22 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
             {/* Added tasks grouped by phase */}
             {tasks.length > 0 && (
               <div className="space-y-2">
+                <h3 className="font-semibold text-primary">Tasks for this work order ({tasks.length})</h3>
                 {Object.entries(addedTasksByPhase).map(([phaseKey, { phaseName, tasks: phaseTasks }]) => (
                   <div key={phaseKey}>
                     {Object.keys(addedTasksByPhase).length > 1 && (
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{phaseName}</span>
-                        <div className="flex-1 h-px bg-gray-700" />
+                        <span className="text-xs font-semibold text-muted uppercase tracking-wider">{phaseName}</span>
+                        <div className="flex-1 h-px bg-surface" />
                       </div>
                     )}
                     <div className="space-y-1">
                       {phaseTasks.map(task => (
-                        <div key={task.id} className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                        <div key={task.id} className="flex items-center gap-2 bg-surface border border-subtle rounded-lg px-3 py-2">
                           <CheckSquare className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
-                          <span className="flex-1 text-sm text-gray-200 truncate">{task.title}</span>
+                          <span className="flex-1 text-sm text-primary truncate">{task.title}</span>
                           {task.estimated_hours > 0 && (
-                            <span className="text-xs text-gray-500">{task.estimated_hours}h</span>
+                            <span className="text-xs text-muted">{task.estimated_hours}h</span>
                           )}
                           <button
                             type="button"
@@ -782,7 +776,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
                     <button
                       type="button"
                       onClick={() => setTasks([])}
-                      className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                      className="text-xs text-muted hover:text-red-400 transition-colors"
                     >
                       Clear all tasks
                     </button>
@@ -795,23 +789,23 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
           {/* Notes */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Customer Notes</label>
+              <label className="block text-xs text-muted mb-1">Customer Notes</label>
               <textarea
                 value={form.notes}
                 onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
                 placeholder="Visible to customer..."
                 rows={2}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 resize-none"
+                className="w-full bg-surface border border-strong rounded-lg px-3 py-2 text-primary placeholder:text-muted text-sm focus:outline-none focus:border-blue-500 resize-none"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Internal Notes</label>
+              <label className="block text-xs text-muted mb-1">Internal Notes</label>
               <textarea
                 value={form.internal_notes}
                 onChange={e => setForm(p => ({ ...p, internal_notes: e.target.value }))}
                 placeholder="Internal use only..."
                 rows={2}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 resize-none"
+                className="w-full bg-surface border border-strong rounded-lg px-3 py-2 text-primary placeholder:text-muted text-sm focus:outline-none focus:border-blue-500 resize-none"
               />
             </div>
           </div>
@@ -819,18 +813,18 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
         </form>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700 flex-shrink-0 bg-gray-900/80">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-subtle flex-shrink-0 bg-surface">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors"
+            className="px-4 py-2 text-secondary hover:text-white text-sm transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             onClick={handleSubmit}
-            disabled={loading || !form.title.trim() || selectedTechnicians.length === 0}
+            disabled={loading || !form.title.trim() || !selectedPhaseId || selectedTechnicians.length === 0}
             className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2"
           >
             {loading ? (
@@ -847,7 +841,6 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
             )}
           </button>
         </div>
-      </div>
-    </div>
+    </QuickActionModal>
   );
 }

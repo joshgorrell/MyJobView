@@ -947,7 +947,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
               {/* Left column */}
               <div className="space-y-5">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Instructions for this work order</label>
                   {editing ? (
                     <textarea
                       value={editedWorkOrder.description || ''}
@@ -1257,6 +1257,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         {/* Tasks */}
         {activeTab === 'tasks' && (
           <div className="space-y-6">
+            <section className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-2">Instructions for this work order</h3>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{workOrder.description || 'No instructions provided.'}</p>
+            </section>
             <WorkOrderTasksChecklist
               workOrderId={workOrderId}
               projectId={workOrder.project_id}
