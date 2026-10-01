@@ -177,7 +177,7 @@ CREATE TRIGGER guard_vip_work_order_archive
 BEFORE UPDATE OF is_archived ON public.work_orders
 FOR EACH ROW EXECUTE FUNCTION public.guard_vip_work_order_archive();
 
-DO $
+DO $lead_source_reconcile$
 DECLARE constraint_name text;
 BEGIN
   SELECT con.conname INTO constraint_name
@@ -190,7 +190,7 @@ BEGIN
   IF constraint_name IS NOT NULL THEN
     EXECUTE format('ALTER TABLE public.leads DROP CONSTRAINT %I',constraint_name);
   END IF;
-END $;
+END $lead_source_reconcile$;
 ALTER TABLE public.leads ADD CONSTRAINT leads_lead_source_check
 CHECK (lead_source IN ('manual','kiosk','website','referral','import','other','email_forward','vip_maintenance'));
 
@@ -226,7 +226,7 @@ REVOKE ALL ON FUNCTION public.create_vip_sales_lead(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.create_vip_sales_lead(uuid) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.guard_vip_work_order_completion() RETURNS trigger
-LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $vip_completion_guard$
 DECLARE missing text[];
 BEGIN
  IF NEW.status='completed' AND OLD.status IS DISTINCT FROM 'completed'
@@ -237,7 +237,7 @@ BEGIN
    UPDATE vip_maintenance_visits SET completed_at=COALESCE(completed_at,now()),completed_by=COALESCE(completed_by,auth.uid()),updated_at=now() WHERE work_order_id=NEW.id;
  END IF;
  RETURN NEW;
-END $;
+END $vip_completion_guard$;
 
 DROP TRIGGER IF EXISTS guard_vip_work_order_completion ON public.work_orders;
 CREATE TRIGGER guard_vip_work_order_completion
