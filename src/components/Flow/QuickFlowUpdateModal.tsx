@@ -18,12 +18,11 @@ export function QuickFlowUpdateModal({ onClose }: { onClose: () => void }) {
     subtitle="Share a quick note without leaving this page"
     icon={<FlowWaveIcon className="text-2xl" />}
     accentColor="from-cyan-600 to-blue-700"
-    maxWidth="sm:max-w-xl"
     onClose={onClose}
     showSuccess={posted}
     successMessage="Added to Flow"
   >
-    <div className="flow flow--dark flow-quick-composer">
+    <div className="flow flow-quick-composer">
       <PostFlowUpdate scope={{}} compact onClose={onClose} onPosted={() => setPosted(true)} />
     </div>
   </QuickActionModal>;

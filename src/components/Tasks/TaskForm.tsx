@@ -315,6 +315,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   return (
     <>
     <QuickActionModal
+      scrollBody={false}
+      stableHeight
       title={task ? 'Edit Task' : 'New Task'}
       subtitle={task ? 'Update task details' : 'Assign and track a new task'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
@@ -324,8 +326,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       successMessage={task ? 'Task Updated!' : 'Task Created!'}
 
     >
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+          <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 space-y-4">
             {error && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
                 {error}
@@ -344,7 +346,6 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 placeholder="Follow up with customer"
-                autoFocus
               />
             </div>
 

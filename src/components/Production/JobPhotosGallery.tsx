@@ -1193,7 +1193,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
           }}
 
         >
-          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="p-4 sm:p-6 space-y-4 min-w-0">
 
             <div className="p-3 bg-blue-950/40 rounded-lg border border-blue-700/50">
               <div className="flex items-center gap-2 text-info mb-1">

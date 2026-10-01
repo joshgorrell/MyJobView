@@ -1322,20 +1322,20 @@ function AppContent() {
 
         >
           <div className="p-4 sm:p-6 space-y-5">
-            <p className="text-gray-400 text-sm leading-relaxed">
+            <p className="text-secondary text-sm leading-relaxed">
               You will be taken to the Messages module where you can compose and send your message to team members or customers.
             </p>
             <div className="flex items-start gap-3 p-3 rounded-lg bg-teal-950/40 border border-teal-700/50">
               <MessageSquare className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-teal-300 text-sm font-medium">Full Messaging Available</p>
-                <p className="text-teal-400/70 text-xs mt-0.5">Start threads, attach files, and manage conversations all in one place.</p>
+                <p className="text-info text-sm font-medium">Full Messaging Available</p>
+                <p className="text-secondary text-xs mt-0.5">Start threads, attach files, and manage conversations all in one place.</p>
               </div>
             </div>
             <div className="flex gap-3 pt-1">
               <button
                 onClick={() => setShowMessageForm(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                className="flex-1 px-4 py-2.5 border border-subtle text-secondary rounded-lg hover:bg-surface transition-colors text-sm font-medium"
               >
                 Cancel
               </button>
