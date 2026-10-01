@@ -1815,6 +1815,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           customerSalesRepId={workOrder.customer_sales_rep_id}
           initialTitle={vipFollowUpFinding ? vipFollowUpFinding.description.slice(0, 120) : undefined}
           initialDescription={vipFollowUpFinding ? `VIP Maintenance follow-up\n\n${vipFollowUpFinding.description}\n\nWork Order #${workOrder.work_order_number} - ${workOrder.title}\nCustomer: ${workOrder.contact.full_name || workOrder.contact.company_name}` : undefined}
+          compact={!!vipFollowUpFinding}
           onClose={() => { setShowCreateTaskModal(false); setVipFollowUpFinding(null); }}
           onSuccess={async (taskId) => {
             const findingId = vipFollowUpFinding?.id;
