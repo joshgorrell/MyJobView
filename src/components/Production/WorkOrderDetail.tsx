@@ -14,6 +14,7 @@ import { AddPartsModal } from './AddPartsModal';
 import { CreateTaskFromWorkOrderModal } from './CreateTaskFromWorkOrderModal';
 import WorkOrderTasksChecklist from './WorkOrderTasksChecklist';
 import ServiceWorkOrderTaskManager from './ServiceWorkOrderTaskManager';
+import VipMaintenanceChecklist from './VipMaintenanceChecklist';
 import { ContactLogModal } from '../Shared/ContactLogModal';
 import { ContactLogHistory } from '../Shared/ContactLogHistory';
 
@@ -183,7 +184,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [jobCompletion, setJobCompletion] = useState<JobCompletion | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'materials' | 'time' | 'parts' | 'photos' | 'completion' | 'history' | 'flow'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'vip' | 'tasks' | 'materials' | 'time' | 'parts' | 'photos' | 'completion' | 'history' | 'flow'>('overview');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [showPartRequestForm, setShowPartRequestForm] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
@@ -650,8 +651,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const pendingParts = partRequests.filter(p => p.status === 'pending').length;
   const canComplete = workOrder.status !== 'completed' && isAssignedTech && !jobCompletion;
 
+  const isVipMaintenance = workOrder.type === 'vip_program' || workOrderOptions.some(o => o.id === workOrder.work_order_type_id && o.system_key === 'vip_program');
+
   const tabs = [
     { id: 'flow', label: 'Flow', icon: History },
+    ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
     { id: 'overview', label: 'Overview', icon: FileText },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
@@ -946,6 +950,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
+        {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist workOrderId={workOrderId} onChange={loadWorkOrderData} />}
         {/* Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
