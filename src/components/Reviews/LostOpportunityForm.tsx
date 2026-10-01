@@ -1,6 +1,7 @@
 import { LockKeyhole, ArrowRight, CheckCircle2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { lossReasons, lostReviewAction } from "./lostReview";
+import { bidFileAccept, bidFileFormat, bidFileHelp } from "../../../supabase/functions/lost-opportunity-review/bidFileTypes";
 interface Invitation {
   title: string;
   customer_first_name?: string;
@@ -45,7 +46,7 @@ export default function LostOpportunityForm() {
               reader.onload = () =>
                 resolve({
                   name: file.name,
-                  type: file.type,
+                  type: bidFileFormat(file.name)!.mime,
                   data: String(reader.result).split(",")[1],
                 });
               reader.onerror = () =>
@@ -223,20 +224,20 @@ export default function LostOpportunityForm() {
                     <label className="block font-semibold">
                       Upload Competing
                       Bid<span className="block text-sm font-normal text-slate-600 my-2">
-                        Optional. Up to 5 PDF, JPG, PNG or WebP files, 10 MB
+                        Optional. Up to 5 {bidFileHelp} files, 10 MB
                         each.
                       </span>
                       <input
                         type="file"
                         multiple
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        accept={bidFileAccept}
                         onChange={(e) => {
                           const selected = Array.from(e.target.files || []);
                           if (
                             selected.length > 5 ||
-                            selected.some((f) => f.size > 10485760)
+                            selected.some((f) => f.size > 10485760 || !bidFileFormat(f.name))
                           ) {
-                            setError("Upload up to five files, 10 MB each.");
+                            setError(`Upload up to five ${bidFileHelp} files, 10 MB each.`);
                             e.target.value = "";
                             setFiles([]);
                             return;

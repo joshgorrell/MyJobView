@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { responseReasons, lostReviewAction } from "./lostReview";
 import { printLostReview } from "./printLostReview";
+import { bidFileFormat } from "../../../supabase/functions/lost-opportunity-review/bidFileTypes";
 interface Contact {
   id: string;
   contact_name: string;
@@ -641,7 +642,7 @@ export default function LostOpportunityReviews(
                           <FileText size={20} className="shrink-0 text-cyan-300" aria-hidden="true" />
                           <span className="min-w-0 flex-1 basis-[calc(100%-32px)] sm:basis-auto break-words text-sm">
                             {a.name}
-                            <span className="block text-xs text-gray-400">{a.name.toLowerCase().endsWith(".pdf") ? "PDF document" : "Image attachment"}</span>
+                            <span className="block text-xs text-gray-400">{bidFileFormat(a.name)?.label || "File attachment"}</span>
                           </span>
                           <div className="flex w-full sm:w-auto items-center gap-3 pl-8 sm:pl-0">
                           <button type="button" disabled={busy}

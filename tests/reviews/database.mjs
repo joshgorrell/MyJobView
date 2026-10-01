@@ -283,6 +283,10 @@ assert.equal((await db.query('SELECT reviewed_by FROM lost_review_details WHERE 
 await as(11);
 await assert.rejects(db.exec(`UPDATE lost_review_details SET reviewed_by='${id(11)}'`), 'Employees cannot forge review audit directly');
 await db.exec('RESET ROLE');
+await db.exec(await readFile(new URL('../../supabase/migrations/20261001162100_lost_review_office_bid_formats.sql', import.meta.url), 'utf8'));
+const bucket = (await db.query("SELECT public,allowed_mime_types FROM storage.buckets WHERE id='lost-review-bids'")).rows[0];
+assert.equal(bucket.public, false, 'Office bids retain private storage');
+for (const type of ['application/msword','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']) assert.ok(bucket.allowed_mime_types.includes(type), 'Office type accepted by bucket: ' + type);
 await db.close();
 console.log(
   "Lost opportunity review privacy, sharing, completion, owner notification, external proposal and tenant tests passed.",
