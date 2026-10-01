@@ -8,7 +8,7 @@ const sections = [
   ['network_internet','Network & Internet',['Internet connection tested','Speed test recorded/reviewed','Router/gateway operating normally','Access points online','Wi-Fi coverage/issues reviewed','Firmware/software reviewed where appropriate']],
   ['av_automation','A/V & Automation',['Displays/TVs checked','Audio zones checked','Sources/streaming checked','Remotes/control interfaces checked','Automation checked','Lighting/shades checked if applicable']],
   ['security_surveillance','Security & Surveillance',['Security panel/system checked','Sensors/devices checked as appropriate','Cameras checked','Recording/playback checked','Doorbells/locks/access checked if applicable','Notifications and customer app reviewed']],
-  ['room_by_room','Room-by-Room',['Applicable rooms/systems reviewed','Each checked area passed, documented, or unable to test','Relevant notes/photos captured']],
+  ['room_by_room','Room / System Walk-Through',['Check all rooms with systems that are relevant to this VIP visit','Verify applicable installed systems are operating normally','Document any issue found or anything unable to be tested','Capture relevant notes/photos when helpful']],
   ['preventive_maintenance','Preventive Maintenance',['Equipment/rack visually inspected','Ventilation/cleanliness checked','Connections/cabling visually checked','Obvious UPS/battery backup alerts checked','Batteries/consumables replaced as needed','Firmware/software updated where appropriate']],
 ] as const;
 
