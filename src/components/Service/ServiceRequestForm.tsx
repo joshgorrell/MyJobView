@@ -263,7 +263,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .or('role.eq.sales,role.eq.admin,role.eq.manager')
+        .eq('is_sales_rep', true)
+        .eq('is_active', true)
         .order('full_name');
 
       setSalesReps(data || []);
