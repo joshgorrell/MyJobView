@@ -223,26 +223,26 @@ BEFORE UPDATE OF status ON public.work_orders
 FOR EACH ROW EXECUTE FUNCTION public.guard_vip_work_order_completion();
 
 CREATE OR REPLACE FUNCTION public.lock_completed_vip_visit()
-RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $vip_visit_lock$
 BEGIN
   IF OLD.completed_at IS NOT NULL THEN
     RAISE EXCEPTION 'Completed VIP Maintenance visits are read-only.';
   END IF;
   RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
-END $;
+END $vip_visit_lock$;
 DROP TRIGGER IF EXISTS lock_completed_vip_visit ON public.vip_maintenance_visits;
 CREATE TRIGGER lock_completed_vip_visit BEFORE UPDATE OR DELETE ON public.vip_maintenance_visits
 FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_visit();
 
 CREATE OR REPLACE FUNCTION public.lock_completed_vip_finding()
-RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $vip_finding_lock$
 DECLARE completed timestamptz;
 BEGIN
   SELECT completed_at INTO completed FROM public.vip_maintenance_visits
   WHERE id=CASE WHEN TG_OP='DELETE' THEN OLD.visit_id ELSE NEW.visit_id END;
   IF completed IS NOT NULL THEN RAISE EXCEPTION 'Findings on a completed VIP Maintenance visit are read-only.'; END IF;
   RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
-END $;
+END $vip_finding_lock$;
 DROP TRIGGER IF EXISTS lock_completed_vip_finding ON public.vip_maintenance_findings;
 CREATE TRIGGER lock_completed_vip_finding BEFORE INSERT OR UPDATE OR DELETE ON public.vip_maintenance_findings
 FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_finding();
