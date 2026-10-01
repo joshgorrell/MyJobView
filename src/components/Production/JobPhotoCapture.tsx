@@ -7,6 +7,9 @@ import { gpsTrackingService } from '../../lib/gpsTracking';
 interface JobPhotoCaptureProps {
   workOrderId: string;
   onSuccess?: () => void;
+  onComplete?: () => void;
+  onCancel?: () => void;
+  context?: 'work_order_notes' | 'vip_sales_lead' | 'general';
   compact?: boolean;
 }
 
@@ -19,12 +22,13 @@ interface PhotoPreview {
   longitude?: number;
 }
 
-export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: JobPhotoCaptureProps) {
+export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, context = 'general', compact = false }: JobPhotoCaptureProps) {
   const { profile } = useAuth();
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [uploading, setUploading] = useState(false);
   const [photoPoints, setPhotoPoints] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     loadSettings();
@@ -82,9 +86,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
 
     setPhotos([...photos, ...newPhotos]);
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   }
 
   function removePhoto(index: number) {
@@ -99,13 +102,6 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
 
   async function handleUpload() {
     if (!profile || photos.length === 0) return;
-
-    // Check that all photos have captions
-    const missingCaptions = photos.some(photo => !photo.caption.trim());
-    if (missingCaptions) {
-      alert('Please add a caption to all photos before uploading');
-      return;
-    }
 
     setUploading(true);
 
@@ -137,7 +133,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
             metadata: {
               file_name: photo.file.name,
               file_size: photo.file.size,
-              file_type: photo.file.type
+              file_type: photo.file.type,
+              context
             },
             taken_at: new Date().toISOString()
           });
@@ -157,7 +154,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
       }
 
       setPhotos([]);
-      if (onSuccess) onSuccess();
+      onSuccess?.();
+      onComplete?.();
     } catch (error) {
       console.error('Error uploading photos:', error);
       alert('Failed to upload photos');
@@ -173,6 +171,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          capture="environment"
           multiple
           onChange={handlePhotoCapture}
           className="hidden"
@@ -191,26 +190,15 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
 
   return (
     <div className="space-y-4">
-      {/* Photo Input */}
-      <div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handlePhotoCapture}
-          className="hidden"
-          id="job-photo-input"
-        />
-        <label
-          htmlFor="job-photo-input"
-          className="flex items-center justify-center gap-2 w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
-        >
-          <Camera className="w-8 h-8 text-gray-400" />
-          <div className="text-center">
-            <div className="text-gray-600 font-medium">Tap to capture photos</div>
-            <div className="text-sm text-gray-500 mt-1">Multiple photos supported</div>
-          </div>
+      {/* Separate camera and library inputs behave reliably on iPhone/iPad. */}
+      <div className="grid grid-cols-2 gap-3">
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} className="hidden" id="job-photo-camera-input" />
+        <label htmlFor="job-photo-camera-input" className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-3 text-center hover:border-blue-500 hover:bg-blue-50">
+          <Camera className="w-7 h-7 text-gray-400" /><span className="text-sm font-medium text-gray-700">Take Photo</span>
+        </label>
+        <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoCapture} className="hidden" id="job-photo-library-input" />
+        <label htmlFor="job-photo-library-input" className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-3 text-center hover:border-blue-500 hover:bg-blue-50">
+          <ImageIcon className="w-7 h-7 text-gray-400" /><span className="text-sm font-medium text-gray-700">Choose Photos</span><span className="text-xs text-gray-500">Select several</span>
         </label>
       </div>
 
@@ -244,7 +232,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
               {/* Caption */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Caption *
+                  Caption <span className="font-normal text-gray-400">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -252,7 +240,6 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
                   onChange={(e) => updatePhoto(index, { caption: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Describe what's in this photo..."
-                  required
                 />
               </div>
             </div>
@@ -261,7 +248,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
           {/* Upload Button */}
           <button
             onClick={handleUpload}
-            disabled={uploading || photos.some(p => !p.caption.trim())}
+            disabled={uploading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
           >
             {uploading ? (
@@ -278,7 +265,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
           </button>
 
           <button
-            onClick={() => setPhotos([])}
+            onClick={() => { setPhotos([]); onCancel?.(); }}
             disabled={uploading}
             className="w-full py-2 text-gray-600 hover:text-gray-900 font-medium"
           >
