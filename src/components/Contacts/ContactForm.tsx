@@ -1410,6 +1410,9 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           </div>
           )}
 
+          <details className="rounded-lg border border-subtle p-3">
+            <summary className="cursor-pointer min-h-11 flex items-center text-sm font-medium text-primary">Notes and tags (optional)</summary>
+            <div className="space-y-4 pt-3">
           <div>
             <label className="block text-sm font-medium text-secondary mb-1">
               Notes
@@ -1436,6 +1439,9 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             />
             <p className="text-xs text-muted mt-1">Separate tags with spaces. Use # prefix.</p>
           </div>
+
+            </div>
+          </details>
 
           {offices.length > 0 && (
             <div>

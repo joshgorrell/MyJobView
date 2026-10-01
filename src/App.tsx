@@ -18,8 +18,7 @@ import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
 import { getIcon } from './lib/iconMap';
-import { X, LogOut, FileText, Bug, MessageSquare, TrendingUp } from 'lucide-react';
-import { QuickActionModal } from './components/Shared/QuickActionModal';
+import { X, LogOut, FileText, Bug, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
@@ -879,7 +878,7 @@ function AppContent() {
           <Header
             onCreateContact={() => setShowContactForm(true)}
             onCreateLead={() => setShowLeadForm(true)}
-            onCreateMessage={() => setShowMessageForm(true)}
+            onCreateMessage={() => { setShowMessageForm(true); setActiveTab('messages'); }}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
             onCreateServiceRequest={() => setShowServiceRequestForm(true)}
             onCreateTask={() => {
@@ -983,6 +982,8 @@ function AppContent() {
           {activeTab === 'messages' && checkModuleAccess('messages') && (
             <MessagesView
               key={activeTab}
+              createRequested={showMessageForm}
+              onCreateOpened={() => setShowMessageForm(false)}
               openThreadId={openThreadId}
               onThreadOpened={() => setOpenThreadId(null)}
               onOpenProposal={(proposalId, threadId) => {
@@ -1312,47 +1313,6 @@ function AppContent() {
         </Suspense>
       )}
 
-      {showMessageForm && (
-        <QuickActionModal
-          title="New Message"
-          subtitle="Send a message to your team or a customer"
-          icon={<MessageSquare className="w-5 h-5 text-white" />}
-          accentColor="from-teal-600 to-cyan-700"
-          onClose={() => setShowMessageForm(false)}
-
-        >
-          <div className="p-4 sm:p-6 space-y-5">
-            <p className="text-secondary text-sm leading-relaxed">
-              You will be taken to the Messages module where you can compose and send your message to team members or customers.
-            </p>
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-teal-950/40 border border-teal-700/50">
-              <MessageSquare className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-info text-sm font-medium">Full Messaging Available</p>
-                <p className="text-secondary text-xs mt-0.5">Start threads, attach files, and manage conversations all in one place.</p>
-              </div>
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => setShowMessageForm(false)}
-                className="flex-1 px-4 py-2.5 border border-subtle text-secondary rounded-lg hover:bg-surface transition-colors text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowMessageForm(false);
-                  setActiveTab('messages');
-                }}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-700 text-white rounded-lg hover:from-teal-500 hover:to-cyan-600 transition-all text-sm font-medium shadow-lg shadow-teal-900/30"
-              >
-                Go to Messages
-              </button>
-            </div>
-          </div>
-        </QuickActionModal>
-      )}
-
       {showFlowUpdate && (
         <Suspense fallback={null}>
           <QuickFlowUpdateModal onClose={() => setShowFlowUpdate(false)} />
@@ -1425,6 +1385,7 @@ function AppContent() {
               setShowServiceRequestForm(true);
             } else if (action.type === 'CREATE_MESSAGE') {
               setShowMessageForm(true);
+              setActiveTab('messages');
             } else if (action.type === 'CREATE_PROPOSAL') {
               if (action.prefill) setAiProposalPrefill(action.prefill as ProposalPrefill);
               setActiveTab('proposals');
