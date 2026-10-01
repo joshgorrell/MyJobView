@@ -535,70 +535,145 @@ export default function LostOpportunityReviews(
       {loading
         ? <p className="text-gray-400">Loading…</p>
         : visible.length === 0
-        ? (
-          <p className="text-gray-400">
-            No lost opportunity reviews match this filter.
-          </p>
-        )
-        : visible.map((v) => (
-          <article
-            key={v.request_id}
-            onClick={e => {
-              if (v.response && !busy && expandedReview !== v.request_id && !(e.target as HTMLElement).closest('button,a,input,select,textarea,label')) openResponse(v);
-            }}
-            className="rounded-lg border border-gray-700 bg-gray-800 p-3 space-y-2"
+        ? <p className="text-gray-400">No lost opportunity reviews match this filter.</p>
+        : (
+          <div className="space-y-3">
+            {visible.map((v) => {
+              const status = v.responded_at
+                ? (v.reviewed_at ? "Complete" : "NEW!")
+                : v.delivery_status === "failed"
+                ? "Delivery Failed"
+                : v.delivery_status === "pending"
+                ? "Delivery Pending"
+                : "Awaiting Response";
+              const activityAt = v.response_created_at || v.responded_at || v.sent_at;
+              return (
+                <button
+                  type="button"
+                  key={v.request_id}
+                  disabled={busy}
+                  onClick={() => {
+                    setExpandedReview(v.request_id);
+                    if (v.response) void markViewed(v);
+                  }}
+                  className="w-full min-h-[108px] rounded-xl border border-gray-700 bg-gray-800 p-4 text-left transition hover:border-gray-600 hover:bg-gray-750 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-60"
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-semibold text-white">{v.recipient || "Customer"}</h3>
+                      <p className="mt-0.5 truncate text-sm text-gray-400">{v.title || v.opportunity_name}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      status === "NEW!" ? "bg-cyan-700 text-white" :
+                      status === "Delivery Failed" ? "bg-red-950 text-red-200" :
+                      "bg-gray-700 text-cyan-300"
+                    }`}>{status}</span>
+                  </div>
+                  <div className="mt-3 flex min-w-0 items-center gap-3 text-xs text-gray-400">
+                    <span className="truncate">
+                      {v.responded_at ? "Customer responded" : "Sent"}{activityAt ? ` · ${formatDateTime(activityAt)}` : ""}
+                    </span>
+                    {canView && !!v.response?.attachments.length && (
+                      <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-gray-300">
+                        <Paperclip size={14} aria-hidden="true" />
+                        {v.response.attachments.length}
+                      </span>
+                    )}
+                    <span className="shrink-0 text-cyan-300" aria-hidden="true">›</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+      {expandedReview && (() => {
+        const v = reviews.find((item) => item.request_id === expandedReview);
+        if (!v) return null;
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`lost-review-detail-${v.request_id}`}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+            onClick={() => setExpandedReview(null)}
           >
-            <div className="flex flex-col items-start gap-2">
-              <div className="w-full min-w-0">
-                {v.response ? (
-                  <button type="button"
-                    aria-expanded={expandedReview === v.request_id}
-                    aria-controls={`lost-response-${v.request_id}`}
-                    disabled={busy}
-                    onClick={() => openResponse(v)}
-                    className="text-left w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
-                    <span className="block text-white text-lg font-semibold">{v.recipient}</span>
-                    <span className="block text-gray-400 text-sm">{v.title || v.opportunity_name} <span className="text-cyan-300 ml-2">{expandedReview === v.request_id ? "Hide answers ↑" : "View answers →"}</span></span>
-                  </button>
-                ) : (
+            <div
+              className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-gray-700 bg-gray-800 p-5 sm:max-w-2xl sm:rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-gray-700 pb-4">
+                <div className="min-w-0">
+                  <h3 id={`lost-review-detail-${v.request_id}`} className="text-xl font-semibold text-white">{v.recipient || "Customer"}</h3>
+                  <p className="mt-1 text-sm text-gray-400">{v.title || v.opportunity_name}</p>
+                </div>
+                <button type="button" onClick={() => setExpandedReview(null)} className="min-h-11 shrink-0 px-2 text-sm text-gray-300">Close</button>
+              </div>
+
+              <div className="space-y-4 py-4">
+                <HistoryLine v={v} />
+                {v.responded_at && !v.response && (
+                  <p className="text-sm text-gray-400">Private — viewing this response requires the View Lost Opportunity Submissions permission.</p>
+                )}
+                {v.response && (
                   <>
-                    <h3 className="text-white text-lg font-semibold">{v.recipient}</h3>
-                    <p className="text-gray-400 text-sm">{v.title || v.opportunity_name}</p>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400">Reasons</h4>
+                      <p className="mt-1 text-gray-200">{v.response.reasons.map((r) => responseReasons.find(([key]) => key === r)?.[1] || r).join(" • ") || "Comment only"}</p>
+                    </div>
+                    {v.response.message && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-400">Customer comments</h4>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-gray-200">{v.response.message}</p>
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400">Is there still a chance to earn your business?</h4>
+                      <p className="mt-1 text-cyan-300">{({ yes: "Yes", maybe: "Maybe", no: "No" } as Record<string, string>)[v.response.recoverable] || v.response.recoverable}</p>
+                    </div>
+                    {v.response.recovery_message && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-400">What would it take to earn your business?</h4>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-gray-200">{v.response.recovery_message}</p>
+                      </div>
+                    )}
+                    {!!v.response.attachments.length && (
+                      <section aria-label="Attachments" className="space-y-2">
+                        <h4 className="text-sm font-semibold text-gray-400">Competing bid attachments ({v.response.attachments.length})</h4>
+                        {v.response.attachments.map((a) => (
+                          <div key={a.path} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-600 bg-gray-900/40 p-3">
+                            <FileText size={20} className="shrink-0 text-cyan-300" aria-hidden="true" />
+                            <span className="min-w-0 flex-1 break-words text-sm text-gray-200">{a.name}<span className="block text-xs text-gray-400">{bidFileFormat(a.name)?.label || "File attachment"}</span></span>
+                            <button type="button" disabled={busy} onClick={() => openAttachment(v, a, false)} className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300"><ExternalLink size={14} /> View</button>
+                            <button type="button" disabled={busy} onClick={() => openAttachment(v, a, true)} className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300"><Download size={14} /> Download</button>
+                          </div>
+                        ))}
+                      </section>
+                    )}
                   </>
                 )}
               </div>
-              <div className="w-full min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                <p className={v.responded_at && !v.reviewed_at ? "rounded-full bg-cyan-700 px-3 py-1 font-bold text-white" : "text-cyan-300"}>
-                  {v.responded_at
-                    ? (v.reviewed_at ? "Complete" : "NEW!")
-                    : v.delivery_status === "failed"
-                    ? "Delivery Failed"
-                    : v.delivery_status === "pending"
-                    ? "Delivery Pending"
-                    : "Awaiting Response"}
-                </p>
-                <HistoryLine v={v} />
-                {canView && !!v.response?.attachments.length && (
-                  <span className="inline-flex items-center gap-1 text-gray-300">
-                    <Paperclip size={14} aria-hidden="true" />
-                    {v.response.attachments.length} {v.response.attachments.length === 1 ? "attachment" : "attachments"}
-                  </span>
-                )}
+
+              <div className="flex flex-wrap items-center gap-3 border-t border-gray-700 pt-4">
                 {canView && profile?.role === "admin" && v.response && (
-                  <button type="button" disabled={busy} onClick={() => {
-                    setAdminReview(v);
-                    void markViewed(v);
-                  }} className="text-cyan-300 hover:underline whitespace-nowrap">Admin Review</button>
+                  <button type="button" disabled={busy} onClick={() => setAdminReview(v)} className="min-h-11 rounded-lg border border-cyan-700 px-3 text-sm text-cyan-300">Admin Review</button>
                 )}
                 {canView && v.response && (
-                  <button type="button"
-                    onClick={() => {
-                      try { printLostReview(v, companySettings?.company_name || "Customer Feedback"); void markViewed(v); }
-                      catch (e) { setError(e instanceof Error ? e.message : "Unable to open printable review."); }
-                    }}
-                    className="text-cyan-300 hover:underline whitespace-nowrap">
-                    Print / Save PDF
-                  </button>
+                  <button type="button" onClick={() => {
+                    try { printLostReview(v, companySettings?.company_name || "Customer Feedback"); void markViewed(v); }
+                    catch (e) { setError(e instanceof Error ? e.message : "Unable to open printable review."); }
+                  }} className="min-h-11 rounded-lg border border-gray-600 px-3 text-sm text-cyan-300">Print / Save PDF</button>
+                )}
+                {canView && v.response && (
+                  <label className="w-full text-sm text-gray-300 sm:ml-auto sm:w-auto">
+                    Follow-up
+                    <select disabled={busy} value={v.recovery_outcome} onChange={(e) => action({ action: "outcome", request_id: v.request_id, outcome: e.target.value })} className="ml-2 min-h-11 rounded-lg border border-gray-600 bg-gray-900 p-2">
+                      <option value="unreviewed" disabled>Not started</option>
+                      <option value="following_up">Following Up</option>
+                      <option value="recovered">Recovered</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </label>
                 )}
                 {canView && (
                   <button
@@ -607,113 +682,22 @@ export default function LostOpportunityReviews(
                     aria-label="Delete lost opportunity review"
                     title="Delete review"
                     onClick={async () => {
-                      if (
-                        !window.confirm(
-                          "Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.",
-                        )
-                      ) return;
+                      if (!window.confirm("Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.")) return;
                       if (await action({ action: "delete", request_id: v.request_id })) {
+                        setExpandedReview(null);
                         setNotice("Lost opportunity review deleted.");
                       }
                     }}
-                    className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                    className="ml-auto min-h-11 px-2 text-red-400 hover:text-red-300 disabled:opacity-50"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={18} />
                   </button>
                 )}
               </div>
             </div>
-            {v.response && expandedReview === v.request_id
-              ? (
-                <div id={`lost-response-${v.request_id}`} className="border-t border-gray-700 pt-3 space-y-3 text-gray-200">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-400">Reasons</h4>
-                    <p className="mt-1">{v.response.reasons.map((r) =>
-                      responseReasons.find(([key]) => key === r)?.[1] || r
-                    ).join(" • ") || "Comment only"}</p>
-                  </div>
-                  {v.response.message && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-400">Customer comments</h4>
-                      <p className="mt-1 whitespace-pre-wrap break-words">{v.response.message}</p>
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-400">Is there still a chance to earn your business?</h4>
-                    <p className="mt-1 text-cyan-300">
-                      {({ yes: "Yes", maybe: "Maybe", no: "No" } as Record<string, string>)[v.response.recoverable] || v.response.recoverable}
-                    </p>
-                  </div>
-                  {v.response.recovery_message && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-400">What would it take to earn your business?</h4>
-                      <p className="mt-1 whitespace-pre-wrap break-words">{v.response.recovery_message}</p>
-                    </div>
-                  )}
-                  {!!v.response.attachments.length && (
-                    <section aria-label="Attachments" className="space-y-2">
-                      <h4 className="text-sm font-semibold text-gray-400">Competing bid attachments ({v.response.attachments.length})</h4>
-                      {v.response.attachments.map((a) => (
-                        <div key={a.path} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-600 bg-gray-900/40 p-3">
-                          <FileText size={20} className="shrink-0 text-cyan-300" aria-hidden="true" />
-                          <span className="min-w-0 flex-1 basis-[calc(100%-32px)] sm:basis-auto break-words text-sm">
-                            {a.name}
-                            <span className="block text-xs text-gray-400">{bidFileFormat(a.name)?.label || "File attachment"}</span>
-                          </span>
-                          <div className="flex w-full sm:w-auto items-center gap-3 pl-8 sm:pl-0">
-                          <button type="button" disabled={busy}
-                            aria-label={`View ${a.name}`}
-                            onClick={() => openAttachment(v, a, false)}
-                            className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
-                            <ExternalLink size={14} aria-hidden="true" /> View
-                          </button>
-                          <button type="button" disabled={busy}
-                            aria-label={`Download ${a.name}`}
-                            onClick={() => openAttachment(v, a, true)}
-                            className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
-                            <Download size={14} aria-hidden="true" /> Download
-                          </button>
-                          </div>
-                        </div>
-                      ))}
-                    </section>
-                  )}
-                </div>
-              )
-              : v.responded_at && !v.response
-              ? (
-                <p className="text-gray-400 text-sm">
-                  Private — viewing this response requires the View Lost
-                  Opportunity Submissions permission.
-                </p>
-              )
-              : null}
-            {canView && v.response && expandedReview === v.request_id && (
-              <div className="flex flex-wrap gap-3 items-center">
-                {v.response && (
-                  <label className="w-full sm:w-auto text-gray-300">
-                    Follow-up status<select
-                      disabled={busy}
-                      value={v.recovery_outcome}
-                      onChange={(e) =>
-                        action({
-                          action: "outcome",
-                          request_id: v.request_id,
-                          outcome: e.target.value,
-                        })}
-                      className="block sm:inline-block w-full sm:w-auto mt-2 sm:mt-0 sm:ml-2 min-h-11 rounded-lg bg-gray-900 border border-gray-600 p-2"
-                    >
-                      <option value="unreviewed" disabled>Not started</option>
-                      <option value="following_up">Following Up</option>
-                      <option value="recovered">Recovered</option>
-                      <option value="closed">Closed</option>
-                    </select>
-                  </label>
-                )}
-              </div>
-            )}
-          </article>
-        ))}
+          </div>
+        );
+      })()}
     </section>
   );
 }
