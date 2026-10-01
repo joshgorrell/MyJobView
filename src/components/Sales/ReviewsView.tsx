@@ -1122,10 +1122,10 @@ export default function ReviewsView() {
       {/* Send Request Tab */}
       {activeTab === 'send' && (
         <div className="space-y-6">
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
-              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Show the QR in person or email the customer a direct Google review request.' : 'Preview or manually send an authorized customer lifecycle communication.'}</p></div>
-              {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Hand the customer your screen. No email required.</div></div></div>}
+              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Send a customer directly to your Google review page.' : 'Preview or manually send an authorized customer lifecycle communication.'}</p></div>
+              {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3 lg:shrink-0"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 shrink-0 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Customer scans this from your screen.</div></div></div>}
             </div>
             {!googleOnlyMode && canManageCustomerFeedback && (
               <div className="mb-6 rounded-xl border border-blue-700/50 bg-blue-950/20 p-5">
@@ -1174,23 +1174,7 @@ export default function ReviewsView() {
             )}
 
             {googleOnlyMode && (
-              <div className="mb-2">
-                <div className="mb-3">
-                  <h3 className="text-base font-bold text-white">Google Review <span className="ml-2 text-xs font-medium text-amber-300">Anytime</span></h3>
-                  <p className="mt-1 text-xs text-gray-400">Separate from lifecycle feedback. Ask any happy customer by email, text, or QR code.</p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button onClick={() => setSendMethod('email')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'email' ? 'border-cyan-500 bg-cyan-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
-                    <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-cyan-300" /><span className="text-sm font-semibold text-white">Google Review Email</span></div>
-                    <p className="mt-2 text-xs text-gray-400">Email a direct Google review request.</p>
-                  </button>
-                  {!googleOnlyMode && <button onClick={() => setSendMethod('sms')} className={`rounded-xl border-2 p-4 text-left transition-all ${sendMethod === 'sms' ? 'border-green-500 bg-green-900/30' : 'border-gray-700 bg-gray-900 hover:border-gray-500'}`}>
-                    <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-green-300" /><span className="text-sm font-semibold text-white">Google Review SMS</span></div>
-                    <p className="mt-2 text-xs text-gray-400">Text the direct Google review link.</p>
-                  </button>}
-                </div>
-              </div>
-  
+              <h3 className="mb-3 text-base font-semibold text-white">Send Review Request</h3>
             )}
 
             {/* Satisfaction Survey Form */}
@@ -1335,63 +1319,66 @@ export default function ReviewsView() {
             {/* Toggle between contact and manual entry (for survey/sms methods) */}
             {sendMethod !== 'satisfaction' && (
               <>
-                <div className="flex gap-2 mb-6">
+                <div className="flex gap-1 mb-4 rounded-lg border border-gray-700 bg-gray-900 p-1" role="group" aria-label="Review request recipient method">
                   <button
+                    type="button"
+                    aria-pressed={!useManualEntry}
                     onClick={() => {
                       setUseManualEntry(false);
                       setManualEmail('');
                       setManualName('');
                       setSelectedContact(null);
                     }}
-                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    className={`flex-1 min-w-0 min-h-10 px-2 py-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
                       !useManualEntry
-                        ? 'bg-yellow-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        ? 'bg-gray-700 text-white'
+                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                     }`}
                   >
-                    <Users className="w-4 h-4 inline mr-2" />
-                    Select from Contacts
+                    Select Customer
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={useManualEntry}
                     onClick={() => {
                       setUseManualEntry(true);
                       setSelectedContact(null);
                     }}
-                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    className={`flex-1 min-w-0 min-h-10 px-2 py-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
                       useManualEntry
-                        ? 'bg-yellow-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        ? 'bg-gray-700 text-white'
+                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                     }`}
                   >
-                    <UserPlus className="w-4 h-4 inline mr-2" />
-                    Enter Email Manually
+                    {sendMethod === 'sms' ? 'Enter Phone' : 'Enter Email'}
                   </button>
                 </div>
 
                 {!useManualEntry ? (
                   <>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Select Contact</label>
+                      <label htmlFor="google-review-customer-search" className="sr-only">Search customers by name, company, or email</label>
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <input
+                          id="google-review-customer-search"
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search contacts by name, company, or email..."
-                          className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                          placeholder="Search customers..."
+                          className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                         />
                       </div>
                     </div>
-                    <div className="max-h-96 overflow-y-auto space-y-2 mb-4">
+                    <div className="max-h-60 overflow-y-auto space-y-2 mb-4">
                       {contactsLoading ? (
                         <div className="flex items-center justify-center py-8 text-gray-400">
                           <Loader2 className="w-4 h-4 animate-spin mr-2" />
                           <span className="text-sm">Searching...</span>
                         </div>
                       ) : !searchQuery.trim() ? (
-                        <div className="text-center py-8 text-gray-400 text-sm">
-                          Type a name, company, or email to search
+                        <div className="text-gray-400 text-xs">
+                          Search by name, company, or email.
                         </div>
                       ) : filteredContacts.length === 0 ? (
                         <div className="text-center py-8 text-gray-400">
@@ -1403,7 +1390,7 @@ export default function ReviewsView() {
                           onClick={() => setSelectedContact(contact)}
                           className={`w-full text-left p-4 rounded-lg border transition-colors ${
                             selectedContact?.id === contact.id
-                              ? 'bg-yellow-900/20 border-yellow-500'
+                              ? 'bg-cyan-900/20 border-cyan-500'
                               : 'bg-gray-900 border-gray-700 hover:border-gray-600'
                           }`}
                         >
@@ -1427,7 +1414,7 @@ export default function ReviewsView() {
                         value={manualName}
                         onChange={(e) => setManualName(e.target.value)}
                         placeholder="Customer name..."
-                        className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                     </div>
                     {sendMethod === 'email' ? (
@@ -1440,7 +1427,7 @@ export default function ReviewsView() {
                           value={manualEmail}
                           onChange={(e) => setManualEmail(e.target.value)}
                           placeholder="customer@example.com"
-                          className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                          className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                           required
                         />
                       </div>
@@ -1454,7 +1441,7 @@ export default function ReviewsView() {
                           value={manualPhone}
                           onChange={(e) => setManualPhone(e.target.value)}
                           placeholder="+1 (555) 123-4567"
-                          className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                          className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                           required
                         />
                       </div>
@@ -1467,14 +1454,14 @@ export default function ReviewsView() {
                   <button
                     onClick={sendReviewRequest}
                     disabled={isSendDisabled}
-                    className={`w-full px-6 py-3 text-white rounded-lg font-medium transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                    className={`w-full px-4 py-3 text-white rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
                       sendMethod === 'email' ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-green-600 hover:bg-green-700'
                     }`}
                   >
                     {sendMethod === 'sms' ? <MessageSquare className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
                     {sending
                       ? 'Sending...'
-                      : sendMethod === 'email' ? 'Send Google Review Email' : 'Send via SMS'
+                      : sendMethod === 'email' ? 'Send Review Request' : 'Send via SMS'
                     }
                   </button>
                 </div>
