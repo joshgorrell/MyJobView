@@ -61,3 +61,7 @@
 
 .flow-tag-results{display:flex;flex-direction:column;max-height:180px;overflow:auto;border:1px solid var(--flow-line);border-radius:7px;background:var(--flow-bg);margin:4px 0 10px}.flow-tag-results button{justify-content:flex-start;text-align:left;border-radius:0}.flow-tag-results span{padding:9px;color:var(--flow-secondary)}
 .flow-tag-results button[aria-selected=true]{background:var(--flow-new);color:var(--flow-accent);font-weight:600}
+
+/* Quick actions follow the application theme, including light and classic. */
+.flow.flow-quick-composer{--flow-bg:rgb(var(--canvas));--flow-muted:rgb(var(--surface));--flow-text:rgb(var(--text-primary));--flow-secondary:rgb(var(--text-secondary));--flow-line:rgb(var(--border-subtle));--flow-hover:rgb(var(--surface));--flow-accent:rgb(var(--brand-text));min-width:0}
+@media(max-width:640px){.flow-quick-composer .flow-composer{padding:16px}.flow-quick-composer .flow-composer-footer{flex-direction:column;align-items:stretch}.flow-quick-composer .flow-composer-footer button{min-height:44px}.flow-quick-composer .flow-kind select{max-width:100%}}

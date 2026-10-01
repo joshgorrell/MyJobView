@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Plus, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react';
+import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { insertFlowTag, useFlowTags, TagChoice } from '../Flow/useFlowTags';
@@ -54,6 +55,8 @@ interface Contact {
 }
 
 interface MessagesViewProps {
+  createRequested?: boolean;
+  onCreateOpened?: () => void;
   openThreadId?: string | null;
   onThreadOpened?: () => void;
   onOpenProposal?: (proposalId: string, threadId?: string) => void;
@@ -110,7 +113,7 @@ function formatTime(dateString: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: MessagesViewProps = {}) {
+export function MessagesView({ createRequested, onCreateOpened, openThreadId, onThreadOpened, onOpenProposal }: MessagesViewProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const [threads, setThreads] = useState<EnrichedThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<EnrichedThread | null>(null);
@@ -121,6 +124,9 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
   const messageInput = useRef<HTMLTextAreaElement>(null);
   const { tag: messageTag, choices: messageChoices } = useFlowTags(newMessage, messageCursor, profile?.organization_id);
   const [showNewThread, setShowNewThread] = useState(false);
+  useEffect(() => {
+    if (createRequested) { setShowNewThread(true); onCreateOpened?.(); }
+  }, [createRequested, onCreateOpened]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,6 +142,9 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
   const [uploading, setUploading] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [relatedRecords, setRelatedRecords] = useState<{id: string; label: string}[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
+
   const [replyContextLabel, setReplyContextLabel] = useState<string | null>(null);
   const [showQuestionSummary, setShowQuestionSummary] = useState(true);
   const [newThreadForm, setNewThreadForm] = useState({
@@ -145,6 +154,21 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
     visibility: 'public' as 'internal' | 'public',
     first_message: '',
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    setRelatedRecords([]);
+    if (!showNewThread || newThreadForm.context_type === 'contact' || !profile?.organization_id) return;
+    setLoadingRelated(true);
+    const table = newThreadForm.context_type === 'proposal' ? 'proposals' : 'projects';
+    const columns = table === 'proposals' ? 'id, proposal_number, title' : 'id, name';
+    supabase.from(table).select(columns).eq('organization_id', profile.organization_id).then(({data, error}) => {
+      if (cancelled) return;
+      setRelatedRecords(error ? [] : (data || []).map((record: any) => ({id: record.id, label: record.name || [record.proposal_number, record.title].filter(Boolean).join(' — ') || record.id})));
+      setLoadingRelated(false);
+    });
+    return () => { cancelled = true; };
+  }, [showNewThread, newThreadForm.context_type, profile?.organization_id]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -448,6 +472,9 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
           .eq('id', newThreadForm.context_id)
           .maybeSingle();
         contactId = proposal?.contact_id || null;
+      } else if (newThreadForm.context_type === 'project') {
+        const { data: project } = await supabase.from('projects').select('contact_id').eq('id', newThreadForm.context_id).eq('organization_id', profile.organization_id).maybeSingle();
+        contactId = project?.contact_id || null;
       }
 
       const { data: thread, error: threadError } = await supabase
@@ -990,36 +1017,27 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
 
       {/* New Thread Modal */}
       {showNewThread && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] sm:max-h-[85vh] sm:mx-4 flex flex-col">
-            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-900">New Message Thread</h3>
-              <button
-                onClick={() => setShowNewThread(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 active:text-gray-700 rounded-lg hover:bg-gray-100 active:bg-gray-200 touch-manipulation"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        <QuickActionModal title="New Message" subtitle="Start a customer or internal conversation"
+          icon={<MessageSquare className="w-5 h-5" />} accentColor="from-teal-600 to-cyan-700"
+          onClose={() => setShowNewThread(false)} scrollBody={false}>
+            <div className="qam-scroll flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject</label>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Subject</label>
                 <input
                   type="text"
                   value={newThreadForm.subject}
                   onChange={(e) => setNewThreadForm({ ...newThreadForm, subject: e.target.value })}
-                  className="w-full px-3 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter subject..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Related To</label>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Related To</label>
                 <select
                   value={newThreadForm.context_type}
                   onChange={(e) => setNewThreadForm({ ...newThreadForm, context_type: e.target.value as 'contact' | 'proposal' | 'project', context_id: '' })}
-                  className="w-full px-3 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="contact">Contact</option>
                   <option value="proposal">Proposal</option>
@@ -1029,11 +1047,11 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
 
               {newThreadForm.context_type === 'contact' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Contact</label>
+                  <label className="block text-sm font-medium text-secondary mb-1.5">Contact</label>
                   <select
                     value={newThreadForm.context_id}
                     onChange={(e) => setNewThreadForm({ ...newThreadForm, context_id: e.target.value })}
-                    className="w-full px-3 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select a contact...</option>
                     {contacts.map((contact) => (
@@ -1043,12 +1061,25 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
                 </div>
               )}
 
+              {newThreadForm.context_type !== 'contact' && (
+                <div>
+                  <label className="block text-sm font-medium text-secondary mb-1.5">{newThreadForm.context_type === 'proposal' ? 'Proposal' : 'Project'}</label>
+                  <select value={newThreadForm.context_id} disabled={loadingRelated}
+                    onChange={(e) => setNewThreadForm({...newThreadForm, context_id: e.target.value})}
+                    className="w-full px-3 py-2.5 text-base bg-surface text-primary border border-strong rounded-lg">
+                    <option value="">{loadingRelated ? 'Loading…' : 'Select a record…'}</option>
+                    {relatedRecords.map(record => <option key={record.id} value={record.id}>{record.label}</option>)}
+                  </select>
+                  {!loadingRelated && !relatedRecords.length && <p className="text-sm text-muted mt-1">No accessible records found.</p>}
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Visibility</label>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Visibility</label>
                 <select
                   value={newThreadForm.visibility}
                   onChange={(e) => setNewThreadForm({ ...newThreadForm, visibility: e.target.value as 'internal' | 'public' })}
-                  className="w-full px-3 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="public">Customer Visible</option>
                   <option value="internal">Internal Only</option>
@@ -1056,34 +1087,33 @@ export function MessagesView({ openThreadId, onThreadOpened, onOpenProposal }: M
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">First Message</label>
+                <label className="block text-sm font-medium text-secondary mb-1.5">First Message</label>
                 <textarea
                   value={newThreadForm.first_message}
                   onChange={(e) => setNewThreadForm({ ...newThreadForm, first_message: e.target.value })}
                   rows={4}
-                  className="w-full px-3 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   placeholder="Type your message..."
                 />
               </div>
             </div>
 
-            <div className="flex gap-3 p-4 sm:p-6 border-t border-gray-200 flex-shrink-0">
+            <div className="flex gap-3 p-4 sm:p-6 border-t border-subtle flex-shrink-0">
               <button
                 onClick={() => setShowNewThread(false)}
-                className="flex-1 px-4 py-3 sm:py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
+                className="flex-1 px-4 py-3 sm:py-2 border border-strong text-secondary rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateThread}
-                disabled={sending}
+                disabled={sending || !newThreadForm.subject.trim() || !newThreadForm.context_id || !newThreadForm.first_message.trim()}
                 className="flex-1 px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               >
                 {sending ? 'Creating...' : 'Create Thread'}
               </button>
             </div>
-          </div>
-        </div>
+        </QuickActionModal>
       )}
     </div>
   );

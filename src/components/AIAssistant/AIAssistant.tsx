@@ -122,6 +122,7 @@ interface AIAssistantProps {
   contactName?: string;
   contactId?: string;
   salesRepContext?: {
+    repId: string;
     repName: string;
     thisMonthTotal: number;
     ytdTotal: number;
@@ -173,11 +174,18 @@ export function AIAssistant({
   const [checkingEnabled, setCheckingEnabled] = useState(true);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    checkEnabled();
-  }, []);
+    activeRequestRef.current?.abort();
+    setLoading(false);
+    setMessages([]);
+    setInput('');
+    setEnabled(false);
+    if (profile?.organization_id) void checkEnabled();
+  }, [profile?.id, profile?.organization_id, profile?.role]);
 
   useEffect(() => {
     if (onRegisterOpen) onRegisterOpen(() => setIsOpen(true));
@@ -186,13 +194,14 @@ export function AIAssistant({
   useEffect(() => {
     if (isOpen) {
       setHasUnread(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && !isMinimized) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const scroller = messagesScrollRef.current;
+      scroller?.scrollTo({ top: scroller.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     }
   }, [messages, isOpen, isMinimized]);
 
@@ -200,9 +209,10 @@ export function AIAssistant({
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('ai_assistant_enabled, openai_api_key')
+        .select('ai_assistant_enabled')
+        .eq('organization_id', profile?.organization_id)
         .maybeSingle();
-      setEnabled(!!(data?.ai_assistant_enabled && data?.openai_api_key));
+      setEnabled(!!data?.ai_assistant_enabled);
     } catch {
       setEnabled(false);
     } finally {
@@ -214,6 +224,8 @@ export function AIAssistant({
     const content = (text ?? input).trim();
     if (!content || loading) return;
 
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -233,23 +245,26 @@ export function AIAssistant({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      if (!token) throw new Error('Please sign in again to use the assistant.');
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-assistant`,
         {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             messages: history,
-            context: { activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext },
+            context: { activeTab, proposalId, contactId, salesRepId: ['sales_dashboard', 'sales'].includes(activeTab || '') ? salesRepContext?.repId : undefined },
           }),
         }
       );
 
       const data = await res.json();
+      if (controller.signal.aborted) return;
       if (!res.ok) throw new Error(data.error || 'Request failed');
 
       const assistantMessage: ChatMessage = {
@@ -265,6 +280,7 @@ export function AIAssistant({
 
       if (!isOpen || isMinimized) setHasUnread(true);
     } catch (err) {
+      if (controller.signal.aborted) return;
       setMessages(prev => [
         ...prev,
         {
@@ -275,9 +291,9 @@ export function AIAssistant({
         },
       ]);
     } finally {
-      setLoading(false);
+      if (activeRequestRef.current === controller) { activeRequestRef.current = null; setLoading(false); }
     }
-  }, [input, loading, messages, activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext, isOpen, isMinimized]);
+  }, [input, loading, messages, activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext?.repId, isOpen, isMinimized]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -353,6 +369,8 @@ export function AIAssistant({
 
       {isOpen && !isMinimized && (
         <QuickActionModal
+          scrollBody={false}
+          stableHeight
           title="AI Assistant"
           subtitle={activeTab ? activeTab.replace(/_/g, ' ') : 'Ask anything or create with AI'}
           icon={<Sparkles className="w-5 h-5 text-white" />}
@@ -360,7 +378,7 @@ export function AIAssistant({
           onClose={() => { setIsOpen(false); setIsMinimized(false); }}
 
         >
-          <div className="flex flex-col min-h-0">
+          <div className="flex flex-col flex-1 min-h-0 min-w-0">
             {messages.length > 0 && (
               <div className="flex justify-end px-4 py-2 border-b border-subtle/50">
                 <button onClick={clearConversation} className="flex items-center gap-1.5 text-xs text-muted hover:text-primary" title="Clear conversation">
@@ -369,7 +387,7 @@ export function AIAssistant({
               </div>
             )}
               {/* Messages area */}
-              <div className="overflow-y-auto p-4 sm:p-6 space-y-3 min-h-[200px] max-h-[min(460px,55svh)]">
+              <div ref={messagesScrollRef} className="qam-scroll overflow-y-auto flex-1 min-h-0 p-4 sm:p-6 space-y-3">
                 {messages.length === 0 && (
                   <div className="space-y-4">
                     <div className="text-center pt-4">
@@ -425,7 +443,7 @@ export function AIAssistant({
                           : 'bg-surface text-primary rounded-bl-sm'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                     </div>
 
                     {msg.action && msg.action.type !== 'NAVIGATE_TO' && onAction && (
@@ -475,7 +493,7 @@ export function AIAssistant({
                     onKeyDown={handleKeyDown}
                     placeholder="Describe what you need..."
                     rows={1}
-                    className="flex-1 resize-none px-3 py-2.5 text-sm border border-subtle rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-28 min-h-[40px] leading-relaxed"
+                    className="min-w-0 flex-1 bg-surface text-primary placeholder:text-muted resize-none px-3 py-2.5 text-sm border border-subtle rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-28 min-h-[40px] leading-relaxed"
                     style={{ height: 'auto' }}
                     onInput={e => {
                       const el = e.currentTarget;
@@ -484,9 +502,10 @@ export function AIAssistant({
                     }}
                   />
                   <button
+                    aria-label="Send message"
                     onClick={() => sendMessage()}
                     disabled={!input.trim() || loading}
-                    className="w-9 h-9 flex-shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-colors"
+                    className="w-11 h-11 flex-shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-elevated disabled:text-muted disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-colors"
                   >
                     <Send className="w-4 h-4" />
                   </button>

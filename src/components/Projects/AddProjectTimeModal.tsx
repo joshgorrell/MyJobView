@@ -192,6 +192,7 @@ export function AddProjectTimeModal({
 
   return (
     <QuickActionModal
+      scrollBody={false}
       title="Add Project Time"
       subtitle="Log time outside of a work order"
       icon={<Clock className="w-5 h-5 text-white" />}
@@ -200,7 +201,7 @@ export function AddProjectTimeModal({
 
     >
           {/* Form body */}
-          <div className="p-4 sm:p-6 space-y-4">
+          <div className="qam-scroll overflow-y-auto min-h-0 flex-1 p-4 sm:p-6 space-y-4">
 
             {/* Project */}
             <div>
@@ -236,7 +237,6 @@ export function AddProjectTimeModal({
                       <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-subtle rounded-lg shadow-xl z-20 max-h-52 overflow-hidden flex flex-col">
                         <div className="p-2 border-b border-subtle">
                           <input
-                            autoFocus
                             type="text"
                             placeholder="Search projects..."
                             value={projectSearch}
@@ -330,7 +330,6 @@ export function AddProjectTimeModal({
               {isCustom && (
                 <div className="mt-2 flex items-center gap-2">
                   <input
-                    autoFocus
                     type="number"
                     inputMode="decimal"
                     min="0.25"

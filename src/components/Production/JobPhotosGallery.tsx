@@ -373,6 +373,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
   const [showUploadModal, setShowUploadModal] = useState(initialShowUpload);
   const [selectedPhoto, setSelectedPhoto] = useState<JobPhoto | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [photoCaption, setPhotoCaption] = useState('');
   const [photoPoints, setPhotoPoints] = useState(1);
   const [selectedContactId, setSelectedContactId] = useState<string>('');
@@ -673,8 +674,8 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
     });
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+  const handleFileUpload = async () => {
+    const files = pendingFiles;
     if (!files || files.length === 0) return;
 
     if (!profile) {
@@ -809,6 +810,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
       await loadPhotos();
       setShowUploadModal(false);
       setPhotoCaption('');
+      setPendingFiles([]);
       setSelectedContactId('');
       setSelectedProjectId('');
       setSelectedPaparazziRequestId('');
@@ -896,6 +898,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
       await loadPhotos();
       setEditingPhoto(null);
       setPhotoCaption('');
+      setPendingFiles([]);
       setSelectedContactId('');
       setSelectedProjectId('');
       setProjects([]);
@@ -1186,6 +1189,8 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
           icon={<Upload className="w-5 h-5 text-white" />}
           accentColor="from-blue-600 to-cyan-700"
           onClose={() => {
+            if (uploading) return;
+            setPendingFiles([]);
             setShowUploadModal(false);
             setPhotoCaption('');
             setSelectedPaparazziRequestId('');
@@ -1193,7 +1198,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
           }}
 
         >
-          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="p-4 sm:p-6 space-y-4 min-w-0">
 
             <div className="p-3 bg-blue-950/40 rounded-lg border border-blue-700/50">
               <div className="flex items-center gap-2 text-info mb-1">
@@ -1294,7 +1299,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
                 type="file"
                 multiple
                 accept="image/*,video/*"
-                onChange={handleFileUpload}
+                onChange={(e) => { setPendingFiles(Array.from(e.target.files || [])); e.target.value = ""; }}
                 disabled={uploading || !photoCaption.trim()}
                 className="hidden"
                 id="photo-upload"
@@ -1312,7 +1317,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
                   <>
                     <Upload className="w-10 h-10 text-gray-500 mb-3" />
                     <span className="text-sm font-medium text-primary mb-1">
-                      {photoCaption.trim() ? 'Click to upload photos or videos' : 'Enter a caption first'}
+                      {photoCaption.trim() ? 'Choose photos or videos' : 'Enter a caption first'}
                     </span>
                     <span className="text-xs text-gray-500">
                       Images: PNG, JPG • Videos: MP4, MOV
@@ -1321,7 +1326,15 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
                 )}
               </label>
             </div>
-
+            {pendingFiles.length > 0 && (
+              <ul className="space-y-1 text-sm text-secondary" aria-label="Selected files">
+                {pendingFiles.map((file, index) => <li className="break-words" key={`${file.name}-${index}`}>{file.name}</li>)}
+              </ul>
+            )}
+            <div className="flex gap-3">
+              <button type="button" disabled={uploading} onClick={() => setPendingFiles([])} className="flex-1 px-4 py-3 rounded-lg border border-subtle text-secondary disabled:opacity-50">Clear selection</button>
+              <button type="button" disabled={uploading || !pendingFiles.length || !photoCaption.trim()} onClick={handleFileUpload} className="flex-1 px-4 py-3 rounded-lg bg-blue-600 text-white disabled:opacity-50">{uploading ? 'Uploading…' : `Upload${pendingFiles.length ? ` (${pendingFiles.length})` : ''}`}</button>
+            </div>
           </div>
         </QuickActionModal>
       )}

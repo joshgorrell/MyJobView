@@ -21,6 +21,7 @@ import { DailyRecap } from './DailyRecap';
 import { DailySalesTotalsPanel } from './DailySalesTotalsPanel';
 
 export interface SalesRepAIContext {
+  repId: string;
   repName: string;
   thisMonthTotal: number;
   ytdTotal: number;
@@ -80,6 +81,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     const currentMonth = data.monthlyTrend[0]?.total ?? 0;
 
     onRepContextChange({
+      repId: data.repId,
       repName: data.repDisplayName,
       thisMonthTotal: currentMonth,
       ytdTotal: data.ytdTotal ?? data.bookedSales.total,

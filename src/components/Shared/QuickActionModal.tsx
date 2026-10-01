@@ -1,8 +1,9 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState, useId } from 'react';
 import { X, CheckCircle2 } from 'lucide-react';
 
 interface QuickActionModalProps {
   stableHeight?: boolean;
+  scrollBody?: boolean;
   title: string;
   subtitle?: string;
   icon: ReactNode;
@@ -15,6 +16,7 @@ interface QuickActionModalProps {
 
 export function QuickActionModal({
   stableHeight = false,
+  scrollBody = true,
   title,
   subtitle,
   icon,
@@ -24,21 +26,30 @@ export function QuickActionModal({
   showSuccess = false,
   successMessage = 'Created!',
 }: QuickActionModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const subtitleId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null);
 
   useEffect(() => {
-    if (!stableHeight || !window.visualViewport) return;
+    if (!window.visualViewport) return;
     const visibleViewport = window.visualViewport;
     const update = () => setViewport({ top: visibleViewport.offsetTop, height: visibleViewport.height });
     update();
     visibleViewport.addEventListener('resize', update);
     visibleViewport.addEventListener('scroll', update);
-    return () => {
+    useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => { if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
+  }, []);
+
+  return () => {
       visibleViewport.removeEventListener('resize', update);
       visibleViewport.removeEventListener('scroll', update);
     };
-  }, [stableHeight]);
+  }, []);
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -91,10 +102,12 @@ export function QuickActionModal({
           to   { opacity: 1; }
         }
         .qam-sheet {
+          --qam-max-height: 92svh;
           animation: qamSlideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
         }
         @media (min-width: 640px) {
           .qam-sheet {
+            --qam-max-height: 90svh;
             animation: qamFadeIn 0.22s ease-out both;
           }
         }
@@ -107,10 +120,21 @@ export function QuickActionModal({
           padding-bottom: max(env(safe-area-inset-bottom), 0px);
         }
         /* Prevent iOS Safari auto-zoom on focus (requires font-size >= 16px) */
-        .qam-scroll input,
-        .qam-scroll select,
-        .qam-scroll textarea {
+        .qam-body input,
+        .qam-body select,
+        .qam-body textarea {
+          min-width: 0;
+          max-width: 100%;
           font-size: max(16px, 1em) !important;
+        }
+        .qam-header-icon svg { color: white; }
+        @media (max-width: 639px) {
+          .qam-body button { min-height: 44px; }
+          .qam-body input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+          .qam-body select { min-height: 44px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .qam-sheet { animation: none; }
         }
       `}</style>
 
@@ -125,21 +149,39 @@ export function QuickActionModal({
       <div
         className={`
           fixed bottom-0 left-0 right-0 z-[61]
-          ${stableHeight ? 'flex items-end' : ''}
+          flex items-end
           sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4
         `}
-        style={stableHeight && viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
+        style={viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
       >
         <div
           className={`
-            qam-sheet bg-canvas text-primary w-full sm:max-w-2xl
+            qam-sheet min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-2xl
             rounded-t-2xl sm:rounded-xl
             shadow-2xl border-t sm:border border-subtle
             flex flex-col
             ${stableHeight ? 'h-[92svh] sm:h-[90svh]' : 'max-h-[92svh] sm:max-h-[90svh]'}
             relative
           `}
-          style={stableHeight ? { maxHeight: '100%' } : undefined}
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={subtitle ? subtitleId : undefined}
+          tabIndex={-1}
+          style={{ maxHeight: 'min(var(--qam-max-height), 100%)' }}
+          onKeyDown={event => {
+            if (event.defaultPrevented) return;
+            if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
+            if (event.key !== 'Tab') return;
+            const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]') || [])
+              .filter(control => control.getClientRects().length > 0);
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (!first) { event.preventDefault(); return; }
+            if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { event.preventDefault(); first.focus(); }
+          }}
           onClick={(e) => e.stopPropagation()}
         >
 
@@ -185,17 +227,18 @@ export function QuickActionModal({
           {/* Header */}
           <div className={`flex items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4 flex-shrink-0 bg-gradient-to-r ${accentColor} rounded-t-2xl sm:rounded-t-xl`}>
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+              <div className="qam-header-icon w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
                 {icon}
               </div>
               <div className="min-w-0">
-                <h2 className="text-base sm:text-lg font-bold text-white leading-tight truncate">{title}</h2>
-                {subtitle && <p className="text-white/70 text-xs mt-0.5 truncate">{subtitle}</p>}
+                <h2 id={titleId} className="text-base sm:text-lg font-bold text-white leading-tight truncate">{title}</h2>
+                {subtitle && <p id={subtitleId} className="text-white/70 text-xs mt-0.5 truncate">{subtitle}</p>}
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0 ml-2 touch-manipulation"
+              aria-label="Close dialog"
+              className="h-11 w-11 flex items-center justify-center p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0 ml-2 touch-manipulation"
               type="button"
             >
               <X className="w-5 h-5" />
@@ -205,7 +248,7 @@ export function QuickActionModal({
           {/* Scrollable body — ref for future touch drag if needed */}
           <div
             ref={scrollRef}
-            className="qam-scroll qam-safe-bottom overflow-y-auto flex flex-col flex-1 min-h-0"
+            className={`qam-body qam-safe-bottom flex flex-col flex-1 min-h-0 min-w-0 ${scrollBody ? 'qam-scroll overflow-y-auto' : 'overflow-hidden'}`}
           >
             {children}
           </div>

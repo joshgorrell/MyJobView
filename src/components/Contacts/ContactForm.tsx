@@ -726,7 +726,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
       showSuccess={showSuccess}
       successMessage="Contact Created!"
     >
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 min-w-0">
           {hasDraft && (
             <div className="flex items-center justify-between px-3 py-2 bg-blue-950/40 border border-blue-700/50 rounded-lg text-sm">
               <span className="text-blue-300">Draft restored from your last session.</span>
@@ -1410,6 +1410,9 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           </div>
           )}
 
+          <details className="rounded-lg border border-subtle p-3">
+            <summary className="cursor-pointer min-h-11 flex items-center text-sm font-medium text-primary">Notes and tags (optional)</summary>
+            <div className="space-y-4 pt-3">
           <div>
             <label className="block text-sm font-medium text-secondary mb-1">
               Notes
@@ -1418,7 +1421,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-2 bg-surface text-primary placeholder:text-muted border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               placeholder="Additional notes about this contact..."
             />
           </div>
@@ -1436,6 +1439,9 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
             />
             <p className="text-xs text-muted mt-1">Separate tags with spaces. Use # prefix.</p>
           </div>
+
+            </div>
+          </details>
 
           {offices.length > 0 && (
             <div>

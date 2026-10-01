@@ -302,7 +302,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       showSuccess={showSuccess}
       successMessage="Lead Created!"
     >
-        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4 min-w-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
@@ -315,7 +315,6 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
                 className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="John Doe"
-                autoFocus
               />
             </div>
             <div>
