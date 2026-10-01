@@ -1821,7 +1821,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           onSuccess={async (taskId) => {
             const findingId = vipFollowUpFinding?.id;
             if (findingId && taskId) {
-              const { error } = await supabase.from('vip_maintenance_findings').update({ follow_up_task_id: taskId, routed_at: new Date().toISOString() }).eq('id', findingId);
+              const { error } = await supabase.rpc('link_vip_follow_up_task', { p_finding_id: findingId, p_task_id: taskId });
               if (error) {
                 alert(`Task was created, but the VIP Finding could not be linked: ${error.message}`);
                 return;
