@@ -122,3 +122,35 @@ FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_finding();
 
 REVOKE ALL ON FUNCTION public.lock_completed_vip_visit(),public.lock_completed_vip_finding() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.lock_completed_vip_visit(),public.lock_completed_vip_finding() TO authenticated;
+
+
+-- Patch one VIP response section atomically so concurrent autosaves cannot overwrite sibling sections.
+CREATE OR REPLACE FUNCTION public.patch_vip_maintenance_response(
+  p_visit_id uuid,
+  p_section text,
+  p_patch jsonb
+) RETURNS public.vip_maintenance_visits
+LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+DECLARE v public.vip_maintenance_visits;
+BEGIN
+  IF p_section IS NULL OR btrim(p_section)='' OR p_patch IS NULL OR jsonb_typeof(p_patch) <> 'object' THEN
+    RAISE EXCEPTION 'A VIP response section and object patch are required.';
+  END IF;
+  SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=p_visit_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'VIP Maintenance visit not found.'; END IF;
+  IF v.completed_at IS NOT NULL THEN RAISE EXCEPTION 'Completed VIP Maintenance visits are read-only.'; END IF;
+  UPDATE public.vip_maintenance_visits
+  SET responses=jsonb_set(
+        COALESCE(responses,'{}'::jsonb),
+        ARRAY[p_section],
+        COALESCE(responses->p_section,'{}'::jsonb) || p_patch,
+        true
+      ),
+      updated_at=now()
+  WHERE id=p_visit_id
+  RETURNING * INTO v;
+  RETURN v;
+END $$;
+
+REVOKE ALL ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb) TO authenticated;
