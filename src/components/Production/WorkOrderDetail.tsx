@@ -202,6 +202,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [showAddPartsModal, setShowAddPartsModal] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [vipFollowUpFinding, setVipFollowUpFinding] = useState<{id?:string;description:string}|null>(null);
+  const [vipRefreshKey, setVipRefreshKey] = useState(0);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [linkedWorkOrders, setLinkedWorkOrders] = useState<any[]>([]);
@@ -1011,7 +1012,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
-        {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} onAddSalesLeadPhoto={() => { setPhotoContext('vip_sales_lead'); setShowPhotoCapture(true); }} onCreateFollowUpTask={(finding) => { setVipFollowUpFinding({id:finding.id,description:finding.description}); setShowCreateTaskModal(true); }} />}
+        {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist key={`${workOrderId}-${vipRefreshKey}`} workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} onAddSalesLeadPhoto={() => { setPhotoContext('vip_sales_lead'); setShowPhotoCapture(true); }} onCreateFollowUpTask={(finding) => { setVipFollowUpFinding({id:finding.id,description:finding.description}); setShowCreateTaskModal(true); }} />}
         {activeTab === 'notes' && (
           <div className="max-w-3xl space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -1828,6 +1829,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             }
             setShowCreateTaskModal(false);
             setVipFollowUpFinding(null);
+            setVipRefreshKey(k => k + 1);
             loadWorkOrderData();
           }}
         />
