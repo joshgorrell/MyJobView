@@ -32,6 +32,20 @@ FOR EACH ROW EXECUTE FUNCTION public.guard_vip_finding_routing_change();
 REVOKE ALL ON FUNCTION public.guard_vip_finding_routing_change() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.guard_vip_finding_routing_change() TO authenticated;
 
+CREATE OR REPLACE FUNCTION public.guard_vip_finding_delete()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+BEGIN
+  IF OLD.follow_up_task_id IS NOT NULL OR OLD.punchlist_task_id IS NOT NULL THEN
+    RAISE EXCEPTION 'A VIP finding that created downstream work cannot be deleted.';
+  END IF;
+  RETURN OLD;
+END $;
+DROP TRIGGER IF EXISTS guard_vip_finding_delete ON public.vip_maintenance_findings;
+CREATE TRIGGER guard_vip_finding_delete BEFORE DELETE ON public.vip_maintenance_findings
+FOR EACH ROW EXECUTE FUNCTION public.guard_vip_finding_delete();
+REVOKE ALL ON FUNCTION public.guard_vip_finding_delete() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.guard_vip_finding_delete() TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.route_vip_maintenance_finding(p_finding_id uuid)
 RETURNS public.vip_maintenance_findings
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
