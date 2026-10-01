@@ -132,17 +132,14 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
   const isVipMaintenance = workOrder?.type === 'vip_program' || workOrder?.work_order_option?.system_key === 'vip_program';
 
   function canProceedToNextStep(): boolean {
-    if (step === 2 && template) {
+    if (step === 2 && template && !isVipMaintenance) {
       const requiredItems = template.checklist_items.filter(item => item.required);
       return requiredItems.every(item => checklist[item.id]);
     }
-    if (step === 3 && template?.required_photos) {
+    if (step === 3 && template?.required_photos && !isVipMaintenance) {
       return template.required_photos.every(category =>
         jobPhotos.some(photo => photo.category === category)
       );
-    }
-    if (step === 4 && isVipMaintenance) {
-      return !!techNotes.trim();
     }
     if (step === 5 && template?.requires_signature) {
       if (isVipMaintenance && vipCustomerNotPresent) return true;
@@ -318,8 +315,18 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
     );
   }
 
-  const totalSteps = 5;
-  const progress = (step / totalSteps) * 100;
+  const visibleSteps = isVipMaintenance ? [1, 4, 5] : [1, 2, 3, 4, 5];
+  const totalSteps = visibleSteps.length;
+  const visibleStepIndex = Math.max(0, visibleSteps.indexOf(step));
+  const progress = ((visibleStepIndex + 1) / totalSteps) * 100;
+  const goNext = () => {
+    const index = visibleSteps.indexOf(step);
+    if (index >= 0 && index < visibleSteps.length - 1) setStep(visibleSteps[index + 1]);
+  };
+  const goBack = () => {
+    const index = visibleSteps.indexOf(step);
+    if (index > 0) setStep(visibleSteps[index - 1]);
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-lg max-w-2xl mx-auto">
@@ -335,7 +342,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-xs text-gray-600 mt-2">Step {step} of {totalSteps}</p>
+        <p className="text-xs text-gray-600 mt-2">Step {visibleStepIndex + 1} of {totalSteps}</p>
       </div>
 
       {/* Step Content */}
@@ -385,13 +392,13 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
               <AlertCircle className="w-4 h-4 inline mr-2" />
-              You will need to complete all required checklist items and obtain customer signature.
+              {isVipMaintenance ? 'Your VIP Maintenance inspection is the checklist. Review your work order notes, then capture customer acknowledgment if present.' : 'You will need to complete all required checklist items and obtain customer signature.'}
             </div>
           </div>
         )}
 
         {/* Step 2: Checklist */}
-        {step === 2 && (
+        {step === 2 && !isVipMaintenance && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-green-100 rounded-lg">
@@ -441,7 +448,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         )}
 
         {/* Step 3: Photos */}
-        {step === 3 && (
+        {step === 3 && !isVipMaintenance && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-purple-100 rounded-lg">
@@ -509,18 +516,18 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {isVipMaintenance ? 'Technician Summary' : 'Notes (Optional)'}
+                {isVipMaintenance ? 'Visit Recap (Optional)' : 'Notes (Optional)'}
               </label>
               <textarea
                 value={techNotes}
                 onChange={(e) => setTechNotes(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={8}
-                placeholder={isVipMaintenance ? "Summarize the VIP visit, what was checked, and anything the next person should know..." : "Enter any notes about the job, parts used, customer concerns, recommendations, etc..."}
+                placeholder={isVipMaintenance ? "Optional completion note. Use the Work Order Notes tab for the ongoing visit recap." : "Enter any notes about the job, parts used, customer concerns, recommendations, etc..."}
               />
             </div>
 
-            {isVipMaintenance && !techNotes.trim() && <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">Technician summary is required for a VIP Maintenance visit.</div>}
+            
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -681,7 +688,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         <div className="flex-1" />
         {step > 1 && (
           <button
-            onClick={() => setStep(step - 1)}
+            onClick={goBack}
             className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -690,7 +697,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         )}
         {step < totalSteps ? (
           <button
-            onClick={() => setStep(step + 1)}
+            onClick={goNext}
             disabled={!canProceedToNextStep()}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
