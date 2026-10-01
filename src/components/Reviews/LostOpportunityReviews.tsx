@@ -172,6 +172,25 @@ export default function LostOpportunityReviews(
       active = false;
     };
   }, [contact, org]);
+  async function openResponse(review: Review) {
+    if (expandedReview === review.request_id) {
+      setExpandedReview(null);
+      return;
+    }
+    setExpandedReview(review.request_id);
+    if (review.reviewed_at) return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await lostReviewAction({ action: "review", request_id: review.request_id });
+      setReviews(current => current.map(item => item.request_id === review.request_id
+        ? { ...item, reviewed_at: data.reviewed_at } : item));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to mark this response Complete. Reopen it to retry.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function action(body: Record<string, unknown>) {
     setBusy(true);
     setError("");
@@ -265,8 +284,10 @@ export default function LostOpportunityReviews(
     }
   }
   const visible = reviews.filter((v) =>
-    filter === "all" ||
-    filter === "needs_review" && !!v.responded_at && !v.reviewed_at ||
+    filter === "all" || v.request_id === expandedReview ||
+    filter === "new" && !!v.responded_at && !v.reviewed_at ||
+    filter === "awaiting" && !v.responded_at ||
+    filter === "complete" && !!v.reviewed_at ||
     filter === "winnable" &&
       ["yes", "maybe"].includes(v.response?.recoverable || "") ||
     filter === "bids" && !!v.response?.attachments.length
@@ -336,7 +357,9 @@ export default function LostOpportunityReviews(
               className="min-h-11 min-w-0 flex-1 rounded-lg bg-gray-800 border border-gray-600 p-2 text-base sm:text-sm"
             >
               <option value="all">All</option>
-              <option value="needs_review">Needs Review</option>
+              <option value="awaiting">Awaiting Response</option>
+              <option value="new">NEW!</option>
+              <option value="complete">Complete</option>
               <option value="winnable">Still Winnable</option>
               <option value="bids">Competing Bid Uploaded</option>
             </select>
@@ -520,7 +543,8 @@ export default function LostOpportunityReviews(
                   <button type="button"
                     aria-expanded={expandedReview === v.request_id}
                     aria-controls={`lost-response-${v.request_id}`}
-                    onClick={() => setExpandedReview(expandedReview === v.request_id ? null : v.request_id)}
+                    disabled={busy}
+                    onClick={() => openResponse(v)}
                     className="text-left w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
                     <span className="block text-white font-semibold">{v.opportunity_name}</span>
                     <span className="block text-gray-400 text-sm">{v.recipient} <span className="text-cyan-300 ml-2">{expandedReview === v.request_id ? "Hide answers ↑" : "View answers →"}</span></span>
@@ -533,9 +557,9 @@ export default function LostOpportunityReviews(
                 )}
               </div>
               <div className="w-full min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                <p className="text-cyan-300">
+                <p className={v.responded_at && !v.reviewed_at ? "rounded-full bg-cyan-700 px-3 py-1 font-bold text-white" : "text-cyan-300"}>
                   {v.responded_at
-                    ? (v.reviewed_at ? "Reviewed" : "Needs Review")
+                    ? (v.reviewed_at ? "Complete" : "NEW!")
                     : v.delivery_status === "failed"
                     ? "Delivery Failed"
                     : v.delivery_status === "pending"
@@ -611,7 +635,7 @@ export default function LostOpportunityReviews(
                   )}
                   {!!v.response.attachments.length && (
                     <section aria-label="Attachments" className="space-y-2">
-                      <h4 className="text-sm font-semibold text-gray-400">Attachments</h4>
+                      <h4 className="text-sm font-semibold text-gray-400">Competing bid attachments ({v.response.attachments.length})</h4>
                       {v.response.attachments.map((a) => (
                         <div key={a.path} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-600 bg-gray-900/40 p-3">
                           <FileText size={20} className="shrink-0 text-cyan-300" aria-hidden="true" />
@@ -649,16 +673,6 @@ export default function LostOpportunityReviews(
               : null}
             {canView && v.response && expandedReview === v.request_id && (
               <div className="flex flex-wrap gap-3 items-center">
-                {v.response && !v.reviewed_at && (
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      action({ action: "review", request_id: v.request_id })}
-                    className="bg-gray-700 text-white rounded-lg px-3 py-2"
-                  >
-                    Mark Reviewed
-                  </button>
-                )}
                 {v.response && (
                   <label className="w-full sm:w-auto text-gray-300">
                     Follow-up status<select
