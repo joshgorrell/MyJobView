@@ -15,6 +15,8 @@ interface ChatMessage {
 }
 
 interface RequestBody {
+  mode?: 'chat' | 'cleanup_sales_lead';
+  text?: string;
   messages: ChatMessage[];
   context?: {
     activeTab?: string;
@@ -152,6 +154,24 @@ Deno.serve(async (req: Request) => {
     }
     // Browser-supplied assistant history can contain stale privileged responses.
     // Rebuild model context from current authorized data and user turns only.
+    if (body.mode === "cleanup_sales_lead") {
+      if (typeof body.text !== "string" || !body.text.trim() || body.text.length > 12000) {
+        return new Response(JSON.stringify({ error: "Sales lead notes are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const cleanupResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
+        body: JSON.stringify({ model: "gpt-4o", temperature: 0.1, max_tokens: 800, messages: [
+          { role: "system", content: "Clean up a field technician's dictated sales-lead notes. Return only the polished lead note. Preserve every factual detail, customer request, uncertainty, product/room reference, timing statement, and qualification. Remove filler, repetition, false starts, and speech-to-text noise. Do not invent, infer, recommend, add prices, or add facts. Keep it concise and useful for the assigned sales representative." },
+          { role: "user", content: body.text.trim() }
+        ] })
+      });
+      if (!cleanupResponse.ok) return new Response(JSON.stringify({ error: "AI provider request failed" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const cleanupData = await cleanupResponse.json();
+      const cleaned = cleanupData.choices?.[0]?.message?.content?.trim();
+      if (!cleaned) return new Response(JSON.stringify({ error: "No cleaned text returned" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ cleaned }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const recentMessages = body.messages.filter(message => message.role === "user").slice(-10);
     if (!recentMessages.length) return new Response(JSON.stringify({ error: "A user message is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (unsupportedPersonnelQuestion(recentMessages[recentMessages.length - 1].content)) {
