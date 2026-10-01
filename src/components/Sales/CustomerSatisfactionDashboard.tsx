@@ -210,9 +210,9 @@ export function CustomerSatisfactionDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6 [overflow-wrap:anywhere]">
       {/* Date Range Filter */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-gray-400">Date range:</span>
         {(['30', '90', 'all'] as DateRange[]).map(r => (
           <button
@@ -230,8 +230,8 @@ export function CustomerSatisfactionDashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-4">
+        <div className="bg-gray-800 min-w-0 rounded-xl p-3 sm:p-5 border border-gray-700">
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-sm">Feedback Requests</span>
             <Users className="w-5 h-5 text-gray-500" />
@@ -240,7 +240,7 @@ export function CustomerSatisfactionDashboard() {
           <div className="text-xs text-gray-500 mt-1">{totalResponded} responded</div>
         </div>
 
-        <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
+        <div className="bg-gray-800 min-w-0 rounded-xl p-3 sm:p-5 border border-gray-700">
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-sm">Response Rate</span>
             <TrendingUp className="w-5 h-5 text-blue-400" />
@@ -249,7 +249,7 @@ export function CustomerSatisfactionDashboard() {
           <div className="text-xs text-gray-500 mt-1">{totalResponded} of {totalSent}</div>
         </div>
 
-        <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
+        <div className="bg-gray-800 min-w-0 rounded-xl p-3 sm:p-5 border border-gray-700">
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-sm">Satisfaction Score</span>
             <CheckCircle className="w-5 h-5 text-green-400" />
@@ -258,7 +258,7 @@ export function CustomerSatisfactionDashboard() {
           <div className="text-xs text-gray-500 mt-1">from customer responses</div>
         </div>
 
-        <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
+        <div className="bg-gray-800 min-w-0 rounded-xl p-3 sm:p-5 border border-gray-700">
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-sm">Needs Attention</span>
             <AlertCircle className="w-5 h-5 text-red-400" />
@@ -273,7 +273,7 @@ export function CustomerSatisfactionDashboard() {
       {/* Needs Attention List */}
       {allNeedsAttention.length > 0 && (
         <div className="bg-gray-800 rounded-xl border border-red-900/40 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between gap-3">
+          <div className="px-4 sm:px-5 py-4 border-b border-gray-700 flex flex-wrap items-center justify-between gap-3 gap-3">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-400" />
               <h3 className="text-white font-semibold">
@@ -310,7 +310,7 @@ export function CustomerSatisfactionDashboard() {
               const isClearing = clearingId === r.id;
               return (
                 <div key={r.id} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-4 mb-2">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-3 mb-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-white font-medium">{r.customer_name || 'Unknown Customer'}</p>
                       <p className="text-gray-400 text-sm">{r.customer_email}</p>
@@ -328,7 +328,7 @@ export function CustomerSatisfactionDashboard() {
                           onClick={() => clearFollowUp(r.id)}
                           disabled={isClearing}
                           title="Mark follow-up as cleared"
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+                          className={`flex items-center gap-1.5 min-h-11 px-2.5 py-2 rounded-lg text-xs font-medium border transition-all
                             bg-gray-700 text-gray-300 border-gray-600 hover:bg-green-900/30 hover:text-green-400 hover:border-green-700/50
                             ${isClearing ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -342,7 +342,7 @@ export function CustomerSatisfactionDashboard() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-4 text-xs text-gray-500">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                     {r.sales_rep_name && <span>Sales: <span className="text-gray-300">{r.sales_rep_name}</span></span>}
                     {r.lead_tech_name && <span>Tech: <span className="text-gray-300">{r.lead_tech_name}</span></span>}
                   </div>
@@ -371,7 +371,7 @@ export function CustomerSatisfactionDashboard() {
               const isClearing = clearingId === r.id;
               return (
                 <div key={r.id} className="px-5 py-4 opacity-60">
-                  <div className="flex items-start justify-between gap-4 mb-2">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-3 mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-gray-400 font-medium line-through">{r.customer_name || 'Unknown Customer'}</p>
@@ -391,7 +391,7 @@ export function CustomerSatisfactionDashboard() {
                           onClick={() => unclearFollowUp(r.id)}
                           disabled={isClearing}
                           title="Reopen follow-up"
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+                          className={`flex items-center gap-1.5 min-h-11 px-2.5 py-2 rounded-lg text-xs font-medium border transition-all
                             bg-gray-700 text-gray-400 border-gray-600 hover:bg-amber-900/30 hover:text-amber-400 hover:border-amber-700/50
                             ${isClearing ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -405,7 +405,7 @@ export function CustomerSatisfactionDashboard() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-4 text-xs text-gray-500">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                     {r.sales_rep_name && <span>Sales: <span className="text-gray-300">{r.sales_rep_name}</span></span>}
                     {r.lead_tech_name && <span>Tech: <span className="text-gray-300">{r.lead_tech_name}</span></span>}
                   </div>
@@ -421,7 +421,7 @@ export function CustomerSatisfactionDashboard() {
       {/* Comments Card */}
       {commentsRecords.length > 0 && (
         <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
+          <div className="px-4 sm:px-5 py-4 border-b border-gray-700 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-blue-400" />
               <h3 className="text-white font-semibold">Recent Customer Feedback</h3>
@@ -439,7 +439,7 @@ export function CustomerSatisfactionDashboard() {
               const isToggling = togglingId === r.id;
               return (
                 <div key={r.id} className="px-5 py-4 group">
-                  <div className="flex items-start gap-4">
+                  <div className="flex flex-col sm:flex-row items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1.5">
                         <span className="text-white font-medium text-sm">{r.customer_name || 'Unknown Customer'}</span>
@@ -467,7 +467,7 @@ export function CustomerSatisfactionDashboard() {
                       <blockquote className="text-gray-300 text-sm italic border-l-2 border-gray-600 pl-3 leading-relaxed">
                         "{r.comment}"
                       </blockquote>
-                      <div className="flex gap-4 text-xs text-gray-500 mt-2">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-2">
                         {r.sales_rep_name && <span>Sales: <span className="text-gray-400">{r.sales_rep_name}</span></span>}
                         {r.lead_tech_name && <span>Tech: <span className="text-gray-400">{r.lead_tech_name}</span></span>}
                         {r.responded_at && (
@@ -484,7 +484,7 @@ export function CustomerSatisfactionDashboard() {
                         onClick={() => toggleCommentVisibility(r)}
                         disabled={isToggling}
                         title={r.comment_public ? 'Make private (hide from team)' : 'Make public (show to team)'}
-                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                        className={`shrink-0 flex items-center gap-1.5 min-h-11 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${
                           r.comment_public
                             ? 'bg-green-900/20 text-green-400 border-green-700/50 hover:bg-red-900/20 hover:text-red-400 hover:border-red-700/50'
                             : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-green-900/20 hover:text-green-400 hover:border-green-700/50'
