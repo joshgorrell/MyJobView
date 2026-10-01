@@ -21,7 +21,6 @@ BEGIN
  WHERE wo.id=v.work_order_id;
  IF NOT FOUND THEN RAISE EXCEPTION 'VIP Work Order not found in this organization' USING ERRCODE='42501'; END IF;
  description := coalesce(nullif(btrim(f.description),''),'VIP Maintenance finding') ||
-   CASE WHEN f.room IS NOT NULL THEN E'\nRoom/Area: '||f.room ELSE '' END ||
    CASE WHEN 'no_action'=ANY(f.dispositions) AND nullif(btrim(f.notes),'') IS NOT NULL THEN E'\nNo Action Reason: '||f.notes ELSE '' END ||
    E'\nSource: VIP Maintenance • '||coalesce(w.work_order_number,w.id::text)||' • '||current_date::text;
 
