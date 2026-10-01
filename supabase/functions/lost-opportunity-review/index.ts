@@ -119,7 +119,27 @@ Deno.serve(async (req) => {
             "company_name,company_logo_url",
           ).eq("organization_id", detail.organization_id).maybeSingle(),
         );
+        const request = await checked(
+          await admin.from("review_requests").select("contact_id")
+            .eq("id", detail.request_id)
+            .eq("organization_id", detail.organization_id).single(),
+        );
+        const contact = request.contact_id
+          ? await checked(
+            await admin.from("contacts").select("first_name")
+              .eq("id", request.contact_id)
+              .eq("organization_id", detail.organization_id).maybeSingle(),
+          )
+          : null;
+        const organization = await checked(
+          await admin.from("organizations").select("subdomain")
+            .eq("id", detail.organization_id).single(),
+        );
         return json({
+          personal_contact_email: organization.subdomain === "elife"
+            ? "josh@electroniclife.com"
+            : null,
+          customer_first_name: contact?.first_name?.trim() || null,
           title: detail.title,
           opportunity_name: detail.opportunity_name,
           company_name: settings?.company_name || "Our team",

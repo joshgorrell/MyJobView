@@ -3,6 +3,8 @@ import React, { useEffect, useState } from "react";
 import { lossReasons, lostReviewAction } from "./lostReview";
 interface Invitation {
   title: string;
+  customer_first_name?: string;
+  personal_contact_email?: string;
   opportunity_name: string;
   company_name: string;
   company_logo_url?: string;
@@ -89,7 +91,11 @@ export default function LostOpportunityForm() {
             A private note to our leadership
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
-            {invitation?.title || (error ? "Review unavailable" : "Loading your invitation…")}
+            {invitation
+              ? invitation.customer_first_name?.trim()
+                ? `Thank you, ${invitation.customer_first_name.trim()}!`
+                : "Thank you!"
+              : error ? "Review unavailable" : "Loading your invitation…"}
           </h1>
         </header>
         <div className="p-5 sm:p-9">
@@ -255,6 +261,14 @@ export default function LostOpportunityForm() {
                   {busy ? "Sending…" : "Send Private Feedback"}
                   {!busy && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
                 </button>
+                {invitation.personal_contact_email && (
+                  <p className="text-center text-sm leading-6 text-slate-600">
+                    Have more questions, concerns, or suggestions? Feel free to reach out to Josh personally at{" "}
+                    <a href={`mailto:${invitation.personal_contact_email}`} className="text-cyan-700 underline underline-offset-2 break-words">
+                      {invitation.personal_contact_email}
+                    </a>.
+                  </p>
+                )}
               </form>
             )
             : !error
