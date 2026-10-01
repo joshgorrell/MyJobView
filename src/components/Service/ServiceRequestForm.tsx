@@ -23,7 +23,8 @@ import {
   CheckCircle2,
   Camera,
   Trash2,
-  Briefcase
+  Briefcase,
+  ExternalLink
 } from 'lucide-react';
 
 interface EditingRequest {
@@ -844,9 +845,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                         setFormData(prev => ({ ...prev, contact_id: null, customer_location_id: null, customer_name: '', customer_phone: '', customer_email: '', job_location_address: '', job_location_city: '', job_location_state: '', job_location_zip: '' }));
                       }}>Change</button>}
                     </div>
+                    <div className="flex flex-wrap items-center gap-x-4">
+                    <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-blue-500">
+                      Open customer record <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
                     <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 text-sm text-blue-500">
-                      {showCustomerDetails ? 'Hide contact details' : 'Edit contact details'}
+                      {showCustomerDetails ? 'Hide request contact details' : 'Edit request contact details'}
                     </button>
+                    </div>
                   </div>
                 )}
 
