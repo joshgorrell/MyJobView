@@ -128,7 +128,8 @@ GRANT EXECUTE ON FUNCTION public.lock_completed_vip_visit(),public.lock_complete
 CREATE OR REPLACE FUNCTION public.patch_vip_maintenance_response(
   p_visit_id uuid,
   p_section text,
-  p_patch jsonb
+  p_patch jsonb,
+  p_clear_no_opportunities boolean DEFAULT false
 ) RETURNS public.vip_maintenance_visits
 LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
 DECLARE v public.vip_maintenance_visits;
@@ -146,11 +147,12 @@ BEGIN
         COALESCE(responses->p_section,'{}'::jsonb) || p_patch,
         true
       ),
+      no_opportunities_identified=CASE WHEN p_clear_no_opportunities THEN false ELSE no_opportunities_identified END,
       updated_at=now()
   WHERE id=p_visit_id
   RETURNING * INTO v;
   RETURN v;
 END $$;
 
-REVOKE ALL ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb) FROM PUBLIC,anon;
+REVOKE ALL ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb,boolean) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb) TO authenticated;
