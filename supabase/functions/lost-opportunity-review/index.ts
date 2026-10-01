@@ -131,7 +131,14 @@ Deno.serve(async (req) => {
               .eq("organization_id", detail.organization_id).maybeSingle(),
           )
           : null;
+        const organization = await checked(
+          await admin.from("organizations").select("subdomain")
+            .eq("id", detail.organization_id).single(),
+        );
         return json({
+          personal_contact_email: organization.subdomain === "elife"
+            ? "josh@electroniclife.com"
+            : null,
           customer_first_name: contact?.first_name?.trim() || null,
           title: detail.title,
           opportunity_name: detail.opportunity_name,
