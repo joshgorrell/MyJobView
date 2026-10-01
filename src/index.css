@@ -65,6 +65,22 @@
     text-decoration: underline;
     text-underline-offset: 2px;
   }
+
+  /* Writing-heavy fields stay light in every theme for maximum readability. */
+  .mjv-writing-field {
+    background-color: #ffffff;
+    color: #111827;
+    border-color: #cbd5e1;
+    color-scheme: light;
+  }
+  .mjv-writing-field::placeholder {
+    color: #6b7280;
+  }
+  .mjv-writing-field:disabled,
+  .mjv-writing-field[readonly] {
+    background-color: #f1f5f9;
+    color: #475569;
+  }
 }
 
 @layer utilities {
