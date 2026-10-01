@@ -1,3 +1,4 @@
+import {useWorkOrderOptions} from '../../lib/workOrderOptions';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -120,6 +121,8 @@ interface ProductResult {
 
 export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId, initialTechnicianIds = [], serviceRequest }: CreateWorkOrderModalProps) {
   const { profile } = useAuth();
+  const workOrderOptions = useWorkOrderOptions();
+  const [workOrderTypeId,setWorkOrderTypeId] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
@@ -407,7 +410,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
           sales_orders(order_number, contract_total)
         `)
         .eq('contact_id', contactId)
-        .in('status', ['planning', 'active'])
+        .in('status', ['planning', 'active', 'completed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -734,11 +737,19 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         finalContactId = newContact.id;
       }
 
+      let vipSubscriptionId: string | null = null;
+      if ((formData.type as string) === 'vip_program') {
+        const {data:subscription,error:subscriptionError}=await supabase.from('recurring_subscriptions').select('id,plan:recurring_plans!inner(plan_type)').eq('plan.plan_type','vip_plan').eq('contact_id',finalContactId).eq('organization_id',profile.organization_id).eq('status','active').order('start_date',{ascending:false}).limit(1).maybeSingle();
+        if(subscriptionError || !subscription) throw new Error('VIP maintenance requires an active subscription. Review the customer’s plan first.');
+        vipSubscriptionId=subscription.id;
+      }
       // Generate a unique group ID for linked work orders
       const groupId = crypto.randomUUID();
 
       // Create work orders for each technician
       const workOrdersToCreate = selectedTechnicians.map((techId, index) => ({
+        work_order_type_id: workOrderTypeId || workOrderOptions.find(option => option.kind === 'type' && option.system_key === formData.type)?.id || null,
+        recurring_subscription_id: vipSubscriptionId,
         company_id: profile.organization_id,
         contact_id: finalContactId,
         customer_location_id: selectedContact?.id === serviceRequest?.contact_id ? serviceRequest?.customer_location_id || null : null,
@@ -943,96 +954,14 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
           )}
 
-          {/* Work Order Type Selection - hidden when opened from a project context */}
-          {!projectId && <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 space-y-3">
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-blue-600" />
-              Work Order Type *
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                formData.type === 'project'
-                  ? 'bg-blue-100 border-blue-500'
-                  : 'bg-white border-gray-300 hover:border-blue-400'
-              }`}>
-                <input
-                  type="radio"
-                  name="type"
-                  value="project"
-                  checked={formData.type === 'project'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                  className="mt-1"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Project</div>
-                  <div className="text-xs text-gray-600">Linked to sales order</div>
-                </div>
-              </label>
-
-              <label className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                formData.type === 'service'
-                  ? 'bg-blue-100 border-blue-500'
-                  : 'bg-white border-gray-300 hover:border-blue-400'
-              }`}>
-                <input
-                  type="radio"
-                  name="type"
-                  value="service"
-                  checked={formData.type === 'service'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                  className="mt-1"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Service</div>
-                  <div className="text-xs text-gray-600">Billable T&M work</div>
-                </div>
-              </label>
-
-              <label className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                formData.type === 'site_survey'
-                  ? 'bg-blue-100 border-blue-500'
-                  : 'bg-white border-gray-300 hover:border-blue-400'
-              }`}>
-                <input
-                  type="radio"
-                  name="type"
-                  value="site_survey"
-                  checked={formData.type === 'site_survey'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                  className="mt-1"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Site Survey</div>
-                  <div className="text-xs text-gray-600">Non-billable assessment</div>
-                </div>
-              </label>
-
-              <label className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                formData.type === 'warranty'
-                  ? 'bg-blue-100 border-blue-500'
-                  : 'bg-white border-gray-300 hover:border-blue-400'
-              }`}>
-                <input
-                  type="radio"
-                  name="type"
-                  value="warranty"
-                  checked={formData.type === 'warranty'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                  className="mt-1"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Warranty</div>
-                  <div className="text-xs text-gray-600">Non-billable warranty work</div>
-                </div>
-              </label>
-            </div>
-
-            <div className="text-sm text-gray-700 bg-white rounded p-3 border border-blue-200">
-              <AlertTriangle className="w-4 h-4 inline mr-1 text-blue-600" />
-              {workOrderTypeHelp[formData.type]}
-            </div>
-          </div>}
+          <div className="space-y-2">
+            <label className="block font-medium text-gray-900">Work Order Type</label>
+            <select className="w-full p-3 border rounded-lg" value={workOrderTypeId || workOrderOptions.find(option=>option.kind==='type'&&option.system_key===formData.type)?.id || ''}
+              onChange={e=>{const option=workOrderOptions.find(o=>o.id===e.target.value);if(option){setWorkOrderTypeId(option.id);setFormData({...formData,type:option.behavior as typeof formData.type});}}}>
+              {!workOrderOptions.length && <option value="">{formData.type.replace(/_/g,' ')}</option>}
+              {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active&&(!projectId||o.behavior==='project')).map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
+          </div>
 
           {/* Customer Selection */}
           <div className="space-y-4">

@@ -62,7 +62,7 @@ const BENEFITS = [
   {
     icon: Award,
     title: '90-Day Test & Tune Trial',
-    description: 'New project customers get a complimentary 90-day trial so you can experience VIP benefits before committing to a plan.',
+    description: 'Test & Tune provides 90 days of included project adjustments after substantial completion. A promotional VIP trial may be offered separately.',
     color: 'orange',
   },
 ];
@@ -100,6 +100,7 @@ interface CurrentSubscription {
   status: string;
   start_date: string;
   next_billing_date: string;
+  trial_source?: 'vip_trial'|'test_and_tune_legacy';
   trial_end_date: string | null;
   trial_started_date: string | null;
   plan: {
@@ -204,28 +205,15 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
       setAvailablePlans(plans || []);
 
       // Load current subscription (active or trial only - pending_payment doesn't grant access)
-      const { data: subscription, error: subError } = await supabase
-        .from('recurring_subscriptions')
-        .select(`
-          id,
-          status,
-          start_date,
-          next_billing_date,
-          trial_end_date,
-          trial_started_date,
-          plan:recurring_plans(
-            plan_name,
-            description,
-            amount,
-            billing_frequency
-          )
-        `)
-        .eq('contact_id', contactId)
-        .in('status', ['active', 'trial'])
-        .maybeSingle();
+      const columns='id,status,start_date,next_billing_date,trial_source,trial_end_date,trial_started_date,plan:recurring_plans(plan_name,description,amount,billing_frequency)';
+      const [paid,trial]=await Promise.all([
+        supabase.from('recurring_subscriptions').select('id,status,start_date,next_billing_date,trial_source,trial_end_date,trial_started_date,plan:recurring_plans!inner(plan_name,description,amount,billing_frequency)').eq('contact_id',contactId).eq('status','active').eq('plan.plan_type','vip_plan').order('start_date',{ascending:false}).limit(1).maybeSingle(),
+        supabase.from('recurring_subscriptions').select(columns).eq('contact_id',contactId).eq('status','trial').eq('trial_source','vip_trial').gte('trial_end_date',new Date().toISOString().split('T')[0]).order('start_date',{ascending:false}).limit(1).maybeSingle()
+      ]);
+      if(paid.error)throw paid.error;if(trial.error)throw trial.error;
+      const subscription=paid.data || trial.data;
+      setCurrentSubscription(subscription ? {...subscription,plan:Array.isArray(subscription.plan)?subscription.plan[0] || null:subscription.plan} as CurrentSubscription : null);
 
-      if (subError && subError.code !== 'PGRST116') throw subError;
-      setCurrentSubscription(subscription);
 
     } catch (error) {
       console.error('Error loading VIP membership data:', error);
@@ -588,7 +576,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                       Free Trial - {daysRemaining} {daysRemaining === 1 ? 'Day' : 'Days'} Remaining
                     </h4>
                     <p className="text-amber-700 text-sm mb-3">
-                      Your 90-day test and tune trial expires on {trialEnd.toLocaleDateString('en-US', {
+                      Your {currentSubscription.trial_source==='test_and_tune_legacy'?'Test & Tune period':'VIP trial'} expires on {trialEnd.toLocaleDateString('en-US', {
                         month: 'long',
                         day: 'numeric',
                         year: 'numeric'
@@ -745,6 +733,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           {currentSubscription?.status === 'trial' && currentSubscription.trial_end_date && (
             <div className="mb-6">
               <TrialStatusBanner
+                program={currentSubscription.trial_source==='test_and_tune_legacy'?'test_and_tune':'vip_trial'}
                 daysRemaining={(() => {
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);

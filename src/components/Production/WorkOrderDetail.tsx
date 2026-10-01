@@ -1,3 +1,4 @@
+import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import Flow from '../Flow/Flow';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -26,6 +27,8 @@ interface WorkOrder {
   work_order_number: string;
   title: string;
   description: string;
+  work_order_type_id?: string | null;
+  work_order_status_id?: string | null;
   type: string;
   status: string;
   priority: string;
@@ -169,6 +172,7 @@ interface PartUsed {
 
 export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const { profile } = useAuth();
+  const workOrderOptions = useWorkOrderOptions();
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -414,6 +418,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           title: editedWorkOrder.title,
           description: editedWorkOrder.description,
           status: editedWorkOrder.status,
+          work_order_status_id: editedWorkOrder.work_order_status_id,
           priority: editedWorkOrder.priority,
           assigned_to: editedWorkOrder.assigned_to,
           start_date: editedWorkOrder.start_date,
@@ -692,20 +697,22 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
               <span className="text-gray-300">•</span>
               {editing ? (
                 <select
-                  value={editedWorkOrder.status || workOrder.status}
-                  onChange={(e) => setEditedWorkOrder({ ...editedWorkOrder, status: e.target.value })}
+                  value={editedWorkOrder.work_order_status_id || workOrderOptions.find(o=>o.kind==='status'&&o.system_key===(editedWorkOrder.status||workOrder.status))?.id || editedWorkOrder.status || workOrder.status}
+                  onChange={(e) => {const option=workOrderOptions.find(o=>o.id===e.target.value);setEditedWorkOrder({...editedWorkOrder,status:option?.behavior || e.target.value,work_order_status_id:option?.id || null});}}
                   className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getStatusColor(editedWorkOrder.status || workOrder.status)}`}
                 >
+                  {workOrderOptions.length ? workOrderOptions.filter(o=>o.kind==='status'&&(o.is_active||o.id===workOrder.work_order_status_id)).map(option=><option key={option.id} value={option.id}>{option.label}</option>) : <>
                   <option value="pending">Pending</option>
                   <option value="assigned">Assigned</option>
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Completed</option>
                   <option value="on_hold">On Hold</option>
                   <option value="cancelled">Cancelled</option>
+                  </>}
                 </select>
               ) : (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(workOrder.status)}`}>
-                  {(workOrder.status || '').replace('_', ' ')}
+                <span style={workOrderOptionStyle(workOrderOptions,'status',workOrder.status,workOrder.work_order_status_id)} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(workOrder.status)}`}>
+                  {workOrderOptionLabel(workOrderOptions,'status',workOrder.status,workOrder.work_order_status_id)}
                 </span>
               )}
               {workOrder.is_archived && (
@@ -1081,7 +1088,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
                   <div className="px-4 py-3 flex items-center justify-between">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</span>
-                    <span className="text-sm text-gray-900 capitalize">{(workOrder.type || '').replace(/_/g, ' ')}</span>
+                    <span className="text-sm text-gray-900 capitalize">{workOrderOptionLabel(workOrderOptions,'type',workOrder.type,workOrder.work_order_type_id)}</span>
                   </div>
 
                   {(workOrder.labor_phase || editing) && (
@@ -1625,7 +1632,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                             wo.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                             'bg-gray-100 text-gray-600'
                           }`}>
-                            {wo.status.replace(/_/g, ' ')}
+                            {workOrderOptionLabel(workOrderOptions,'status',wo.status,wo.work_order_status_id)}
                           </span>
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs capitalize">
                             {(wo.type || '').replace(/_/g, ' ')}

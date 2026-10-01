@@ -66,7 +66,7 @@ const BENEFITS = [
     icon: Award,
     title: '90-Day Test & Tune Trial',
     description:
-      'New project customers get a complimentary 90-day trial so you can experience VIP benefits before committing to a plan.',
+      'Test & Tune provides 90 days of included project adjustments after substantial completion. Promotional VIP trials are offered separately.',
     color: 'orange',
   },
 ];

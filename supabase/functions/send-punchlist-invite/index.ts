@@ -103,7 +103,7 @@ function buildTestTuneEmail(params: {
         ${buildMagicLinkNotice(accentColor)}
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0 0 20px 0;">
-          After the 90-day Test &amp; Tune period, manufacturer warranties remain in effect, and you&rsquo;ll have the option to continue using the Customer Portal through an optional subscription if you&rsquo;d like ongoing access for service requests and support.
+          After the 90-day Test &amp; Tune period, manufacturer warranties remain in effect, and you&rsquo;ll have the option to continue using Punchlist with a VIP subscription. Service coverage and charges depend on the selected VIP plan.
         </p>
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0;">
@@ -417,7 +417,7 @@ function buildPromotionalEmail(params: {
         ${buildMagicLinkNotice(accentColor)}
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0 0 20px 0;">
-          After the 90-day promotional access, you&rsquo;ll have the option to continue using the VIP Customer Portal through an optional subscription if you find it valuable.
+          After the 90-day promotional access, you&rsquo;ll have the option to continue using Punchlist with a VIP subscription. This promotional trial is separate from a project&rsquo;s Test &amp; Tune period; service coverage and charges depend on the selected VIP plan.
         </p>
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0 0 28px 0;">

@@ -432,7 +432,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
   const [expiredAccess, setExpiredAccess] = useState<any[]>([]);
   const [declinedInvites, setDeclinedInvites] = useState<PendingInvite[]>([]);
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
-  const [accessTypeFilter, setAccessTypeFilter] = useState<'all' | 'vip_membership' | 'test_and_tune' | 'test_and_tune_no_portal'>('all');
+  const [accessTypeFilter, setAccessTypeFilter] = useState<'all' | 'vip_membership' | 'test_and_tune' | 'test_and_tune_no_portal' | 'vip_trial'>('all');
   const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'awaiting' | 'active' | 'expired' | 'declined'>('all');
   const [loading, setLoading] = useState(true);
   const [declineReason, setDeclineReason] = useState('');
@@ -457,7 +457,10 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
   const [vipSignupLinkCopied, setVipSignupLinkCopied] = useState(false);
   const [showManualSendConfirmation, setShowManualSendConfirmation] = useState(false);
   const [manualInviteEmail, setManualInviteEmail] = useState('');
-  const [manualInviteType, setManualInviteType] = useState<'test_and_tune' | 'test_and_tune_no_portal' | 'vip_signup' | null>(null);
+  const [manualInviteType, setManualInviteType] = useState<'test_and_tune' | 'test_and_tune_no_portal' | 'vip_signup' | 'vip_trial' | null>(null);
+  const [manualProjectId,setManualProjectId]=useState('');
+  const [manualProjects,setManualProjects]=useState<{id:string;name:string;substantial_completion_date:string|null}[]>([]);
+  useEffect(()=>{let cancelled=false;setManualProjectId('');setManualProjects([]);if(selectedContact?.id)supabase.from('projects').select('id,name,substantial_completion_date').eq('contact_id',selectedContact.id).not('substantial_completion_date','is',null).then(({data})=>{if(!cancelled)setManualProjects(data||[]);});return()=>{cancelled=true;};},[selectedContact?.id]);
   const [sendingInvite, setSendingInvite] = useState(false);
   const [sendingManualInvite, setSendingManualInvite] = useState(false);
   const [resendingEmailFor, setResendingEmailFor] = useState<string | null>(null);
@@ -1041,6 +1044,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
       return;
     }
 
+    if ((manualInviteType === 'test_and_tune' || manualInviteType === 'test_and_tune_no_portal') && !manualProjectId) { toast.warning('Select the substantially completed project'); return; }
     setShowManualSendConfirmation(true);
   }
 
@@ -1060,23 +1064,6 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
             .update({ email: manualInviteEmail.trim() })
             .eq('id', selectedContact.id);
           if (updateError) throw updateError;
-        }
-
-        const { error: grantError } = await supabase
-          .from('punchlist_access_grants')
-          .insert({
-            contact_id: selectedContact.id,
-            access_type: 'vip_signup',
-            status: 'active',
-            granted_date: new Date().toISOString(),
-            expiration_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-            notes: inviteNotes.trim() || null
-          });
-
-        if (grantError) {
-          console.error('[Punchlist] VIP Signup access grant error:', grantError);
-          toast.error('Failed to create access grant. ' + grantError.message);
-          return;
         }
 
         const emailResult = await supabase.functions.invoke('send-punchlist-invite', {
@@ -1114,7 +1101,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
     }
 
     setSendingManualInvite(true);
-    const dbAccessType = manualInviteType === 'test_and_tune_no_portal' ? 'test_and_tune' : manualInviteType;
+
     console.log('[Punchlist] Starting invite process, type:', manualInviteType, 'for contact:', selectedContact.id);
 
     try {
@@ -1132,24 +1119,17 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
         console.log('[Punchlist] Email updated successfully');
       }
 
-      console.log('[Punchlist] Creating access grant with type:', dbAccessType);
-      const { data: accessGrant, error: grantError } = await supabase
-        .from('punchlist_access_grants')
-        .insert({
-          contact_id: selectedContact.id,
-          access_type: dbAccessType,
-          status: 'active',
-          granted_date: new Date().toISOString(),
-          expiration_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-          notes: inviteNotes.trim() || null
-        })
-        .select()
-        .single();
 
+      const {data:grantId,error:grantError}=await supabase.rpc('grant_customer_program',{
+        p_contact_id:selectedContact.id,p_program:manualInviteType==='vip_trial'?'vip_trial':'test_and_tune',
+        p_project_id:manualInviteType==='vip_trial'?null:manualProjectId,p_days:90
+      });
+      const {data:accessGrant}=grantError?{data:null}:await supabase.from('punchlist_access_grants').select('id,expiration_date').eq('id',grantId).single();
       if (grantError) {
         console.error('[Punchlist] Access grant creation error:', grantError);
         throw grantError;
       }
+      if (!accessGrant) throw new Error('Access was granted, but its details could not be loaded. Refresh the customer record before sending again.');
       console.log('[Punchlist] Access grant created:', accessGrant.id);
 
       console.log('[Punchlist] Sending email notification...');
@@ -1160,7 +1140,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
             contact_name: selectedContact.full_name,
             project_name: null,
             expiration_date: accessGrant.expiration_date,
-            access_type: manualInviteType
+            access_type: manualInviteType === 'vip_trial' ? 'promotional' : manualInviteType
           }
         });
 
@@ -1375,6 +1355,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
               >
                 <option value="all">All Types</option>
                 <option value="vip_membership">VIP ({allCustomers.filter(c => c.access_type === 'vip_membership').length})</option>
+                <option value="vip_trial">VIP Trials</option>
                 <option value="test_and_tune">T&amp;T ({allCustomers.filter(c => c.access_type === 'test_and_tune').length})</option>
                 <option value="test_and_tune_no_portal">No Portal ({allCustomers.filter(c => c.access_type === 'test_and_tune_no_portal').length})</option>
               </select>
@@ -1610,7 +1591,11 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Invite Type <span className="text-red-400">*</span>
               </label>
+              {(manualInviteType==='test_and_tune'||manualInviteType==='test_and_tune_no_portal')&&<label className="block text-sm text-gray-300 mb-3">Project<select value={manualProjectId} onChange={e=>setManualProjectId(e.target.value)} className="block w-full min-h-11 mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg p-2"><option value="">Select a substantially completed project…</option>{manualProjects.map(project=><option key={project.id} value={project.id}>{project.name} · {project.substantial_completion_date}</option>)}</select><span className="text-xs">Access ends 90 days after substantial completion.</span></label>}
               <div className="space-y-2">
+                <button onClick={()=>setManualInviteType('vip_trial')} className={`w-full text-left p-3 rounded-xl border-2 ${manualInviteType==='vip_trial'?'border-yellow-500 bg-yellow-900/20':'border-gray-700'}`}>
+                  <span className="font-semibold text-yellow-400">90-Day VIP Trial</span><p className="text-sm text-gray-300 mt-1">Optional promotional access. Separate from the project's Test &amp; Tune period.</p>
+                </button>
                 <button
                   onClick={() => setManualInviteType('test_and_tune')}
                   className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
@@ -1724,6 +1709,11 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
               accessLabel = 'VIP Member';
               accessColor = 'text-amber-400 bg-amber-900/30 border-amber-700';
               daysRemaining = null;
+            } else if (customer.access_type === 'vip_trial' || customer.access_type === 'promotional') {
+              accessIcon = <Star className="w-3.5 h-3.5" />;
+              accessLabel = 'VIP Trial';
+              accessColor = 'text-yellow-400 bg-yellow-900/30 border-yellow-700';
+              daysRemaining = customer.days_remaining;
             } else if (customer.access_type === 'test_and_tune') {
               accessIcon = <TrendingUp className="w-3.5 h-3.5" />;
               accessLabel = 'Test & Tune';
@@ -2623,7 +2613,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                          'VIP Signup'}
                       </div>
                       <div className="text-xs text-gray-400">
-                        {selectedInviteType === 'test_and_tune' && '90-day free trial · Welcome email included'}
+                        {selectedInviteType === 'test_and_tune' && '90-day project support period · Welcome email included'}
                         {selectedInviteType === 'test_and_tune_no_portal' && '90 days · Email only · No portal link sent'}
                         {selectedInviteType === 'vip_signup' && 'Share the signup link with your customer'}
                       </div>
@@ -2687,7 +2677,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                       {selectedInviteType === 'test_and_tune' && (
                         <div className="p-3 bg-cyan-900/20 border border-cyan-800 rounded-lg text-xs text-cyan-300 space-y-1">
                           <div className="font-semibold text-cyan-200 mb-1.5">This will:</div>
-                          <div>• Grant 90-day free Test &amp; Tune trial access</div>
+                          <div>• Grant Test &amp; Tune access through the project’s 90-day period</div>
                           <div>• Send a personalized welcome email with program details</div>
                           <div>• Provide full portal access (proposals, punchlist, messaging)</div>
                           <div>• <span className="text-yellow-400">Access expires after 90 days</span> unless customer subscribes</div>
@@ -3026,8 +3016,8 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                     : isVIP
                     ? 'VIP membership invitation delivered'
                     : isNoPortal
-                    ? '90-Day Test & Tune trial activated'
-                    : '90-Day Test & Tune trial activated';
+                    ? 'Test & Tune project access activated'
+                    : 'Test & Tune project access activated';
                   const showStars = !isResend;
                   const starColor = isVIP ? 'text-amber-400 fill-amber-400' : 'text-amber-400 fill-amber-400';
 

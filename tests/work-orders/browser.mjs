@@ -13,7 +13,7 @@ try {
   await page.goto('http://127.0.0.1:5187');
   const dialog=page.getByRole('dialog');await dialog.waitFor();
   await page.getByPlaceholder('e.g. Install camera system — east wing').fill('Rough-in visit');
-  const phase=page.locator('select').first();await phase.selectOption('rough');
+  const phase=page.locator('select').last();await phase.selectOption('rough');
   await page.getByRole('button',{name:'Test Technician'}).click();
   await page.getByRole('button',{name:'Assigned install',exact:false}).click();
   await page.getByRole('button',{name:'Add 1 task',exact:true}).click();
@@ -38,6 +38,13 @@ try {
   await page.getByRole('button',{name:'Browse all phases',exact:true}).click();await page.getByText('Trim work',{exact:true}).waitFor();
   assert.equal(await page.locator('ul button').count(),0);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.goto('http://127.0.0.1:5187?settings');
+  await page.getByRole('heading',{name:'Work Order Settings'}).waitFor();
+  await page.getByLabel('Name',{exact:true}).fill('Custom service');
+  await page.getByLabel('Workflow behavior',{exact:true}).selectOption('service');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByText('Custom service',{exact:true}).waitFor();
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Settings fit mobile');
   assert.deepEqual(errors,[],'No browser runtime errors');
   await page.close();
  }
