@@ -1061,7 +1061,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
                 <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Source: VIP Maintenance</div>
                 <div className="text-sm text-gray-700 mt-1">Created from {vipOrigin.work_order_number ? `Work Order ${vipOrigin.work_order_number}` : 'a completed VIP visit'}.</div>
               </div>
-              <button type="button" onClick={() => { window.location.href = `/dispatch?workorder=${vipOrigin.work_order_id}&tab=vip`; }} className="min-h-11 px-4 py-2 rounded-lg bg-white border border-blue-300 text-blue-700 font-medium text-sm touch-manipulation hover:bg-blue-100">View VIP Visit</button>
+              <button type="button" onClick={() => { window.location.href = `/?tab=work_orders&workOrderId=${vipOrigin.work_order_id}&tab=vip`; }} className="min-h-11 px-4 py-2 rounded-lg bg-white border border-blue-300 text-blue-700 font-medium text-sm touch-manipulation hover:bg-blue-100">View VIP Visit</button>
             </div>
           )}
 
