@@ -108,7 +108,7 @@ DECLARE v_completed_at timestamptz;
 BEGIN
   SELECT completed_at INTO v_completed_at
   FROM public.vip_maintenance_visits
-  WHERE id=COALESCE(NEW.visit_id,OLD.visit_id);
+  WHERE id=CASE WHEN TG_OP='DELETE' THEN OLD.visit_id ELSE NEW.visit_id END;
   IF v_completed_at IS NOT NULL THEN
     RAISE EXCEPTION 'Findings on a completed VIP Maintenance visit are read-only.';
   END IF;
@@ -117,7 +117,7 @@ END $$;
 
 DROP TRIGGER IF EXISTS lock_completed_vip_finding ON public.vip_maintenance_findings;
 CREATE TRIGGER lock_completed_vip_finding
-BEFORE UPDATE OR DELETE ON public.vip_maintenance_findings
+BEFORE INSERT OR UPDATE OR DELETE ON public.vip_maintenance_findings
 FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_finding();
 
 REVOKE ALL ON FUNCTION public.lock_completed_vip_visit(),public.lock_completed_vip_finding() FROM PUBLIC,anon;
