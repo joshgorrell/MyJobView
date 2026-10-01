@@ -1,3 +1,6 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -135,7 +138,49 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Supabase server configuration is incomplete');
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const token = authHeader.slice('Bearer '.length);
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authData.user) {
+      return new Response(JSON.stringify({ error: 'Invalid or expired session' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name, username, email, organization_id')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+    if (profileError || !profile) {
+      return new Response(JSON.stringify({ error: 'User profile not found' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    let verifiedDealerName = 'Unknown dealer';
+    if (profile.organization_id) {
+      const { data: company } = await supabase
+        .from('company_settings')
+        .select('company_name')
+        .eq('organization_id', profile.organization_id)
+        .maybeSingle();
+      verifiedDealerName = company?.company_name || verifiedDealerName;
+    }
+
     const payload = (await req.json()) as FeedbackPayload;
+    payload.organizationId = profile.organization_id || null;
+    payload.userName = profile.full_name || profile.username || authData.user.email || 'Unknown user';
+    payload.userEmail = profile.email || authData.user.email || '';
+    payload.dealerName = verifiedDealerName;
     if (!payload || !['bug', 'idea', 'general'].includes(payload.type)) {
       return new Response(JSON.stringify({ error: 'Invalid feedback type' }), {
         status: 400,
