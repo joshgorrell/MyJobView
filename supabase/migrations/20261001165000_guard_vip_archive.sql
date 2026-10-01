@@ -155,4 +155,4 @@ BEGIN
 END $$;
 
 REVOKE ALL ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb,boolean) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.patch_vip_maintenance_response(uuid,text,jsonb,boolean) TO authenticated;
