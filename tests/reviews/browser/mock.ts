@@ -14,6 +14,8 @@ export const supabase = {
     return query;
   },
   functions: { async invoke(_name: string, { body }: any) {
+    if (body.action === 'load') return { data: { title: 'Tell us why', opportunity_name: 'Home theater', company_name: 'Electronic Life', completed: false } };
+    if (body.action === 'submit') { (window as any).submittedFiles = body.files; return { data: { success: true } }; }
     if (body.action === 'review') {
       (window as any).reviewCalls++;
       if ((window as any).failReview) return { data: { error: 'Simulated review save failure' } };

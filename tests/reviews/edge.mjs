@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
+import XLSX from 'xlsx';
 const moduleFrom = source => import('data:text/javascript;base64,' + Buffer.from(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText).toString('base64'));
 const { bidEmailBatches } = await moduleFrom(await readFile(new URL('../../supabase/functions/lost-opportunity-review/bidEmailBatches.ts', import.meta.url), 'utf8'));
 const huge = Array.from({ length: 5 }, (_, i) => ({ filename: `bid-${i}.pdf`, content: 'a'.repeat(14_000_000) }));
@@ -9,6 +10,7 @@ assert.equal(batches.length, 5);
 assert.deepEqual(batches.flat().map(a => a.filename), huge.map(a => a.filename));
 assert.ok(batches.every(b => b.reduce((n, a) => n + a.content.length, 0) <= 18_000_000));
 assert.deepEqual(bidEmailBatches([]), [[]], 'No-file response still generates one email');
+const { bidFileFormat, bidFileHelp, validBidFile } = await moduleFrom(await readFile(new URL('../../supabase/functions/lost-opportunity-review/bidFileTypes.ts', import.meta.url), 'utf8'));
 let detail, stored, permitted = true, moduleAccess = true, user = 'employee-1';
 const emails = [], uploads = [];
 function reset() { detail = { request_id: 'request-1', organization_id: 'org-1', opportunity_name: 'Home theater', responded_at: null, reviewed_at: null, reviewed_by: null }; stored = null; emails.length = uploads.length = 0; }
@@ -39,9 +41,9 @@ const client = { from, auth: { getUser: async () => ({ data: { user: user ? { id
   storage: { from: () => ({ upload: async (path, bytes) => { uploads.push({ path, bytes }); return { data: {} }; }, remove: async () => ({ data: {} }), createSignedUrl: async path => ({ data: { signedUrl: 'https://private.example/' + path } }) }) } };
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/emails'); emails.push(JSON.parse(options.body)); return new Response('{}', { status: 200 }); };
-globalThis.__lostDeps = { createClient: () => client, bidEmailBatches, wrapInEmailLayout: html => html };
+globalThis.__lostDeps = { createClient: () => client, bidEmailBatches, bidFileFormat, bidFileHelp, validBidFile, wrapInEmailLayout: html => html };
 const source = (await readFile(new URL('../../supabase/functions/lost-opportunity-review/index.ts', import.meta.url), 'utf8')).replace(/^import[^;]+;\n/gm, '');
-await moduleFrom(`const {createClient,bidEmailBatches,wrapInEmailLayout}=globalThis.__lostDeps;
+await moduleFrom(`const {createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
 const Deno={env:{get:key=>key==='RESEND_API_KEY'?'test-key':''},serve:handler=>{globalThis.__lostHandler=handler;}};
 ${source}`);
 async function call(body) { const r = await globalThis.__lostHandler(new Request('https://test.example', { method: 'POST', body: JSON.stringify(body) })); return { status: r.status, body: await r.json() }; }
@@ -81,6 +83,35 @@ reset();
 assert.equal((await call({ action: 'review', request_id: 'request-1' })).status, 400, 'Awaiting response cannot be completed');
 assert.equal((await call({ ...submission, files: [] })).status, 200);
 assert.deepEqual(emails[0].attachments, []);
+// Office fixtures exercise the real submit/upload/email flow, including browser MIME gaps.
+const book = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['Bid', 'Amount'], ['Installation', 1200]]), 'Quote');
+const wordPackage = XLSX.CFB.utils.cfb_new();
+XLSX.CFB.utils.cfb_add(wordPackage, '[Content_Types].xml', Buffer.from('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'));
+XLSX.CFB.utils.cfb_add(wordPackage, 'word/document.xml', Buffer.from('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Competing bid</w:t></w:r></w:p></w:body></w:document>'));
+const legacyWord = XLSX.CFB.utils.cfb_new();
+XLSX.CFB.utils.cfb_add(legacyWord, 'WordDocument', Buffer.from('Legacy Word container fixture'));
+const officeFiles = [
+  { name: 'Competitor.DOCX', bytes: XLSX.CFB.write(wordPackage, {type:'buffer',fileType:'zip'}) },
+  { name: 'Competitor.xlsx', bytes: XLSX.write(book, {type:'buffer',bookType:'xlsx'}) },
+  { name: 'Competitor.xls', bytes: XLSX.write(book, {type:'buffer',bookType:'biff8'}) },
+  { name: 'Competitor.doc', bytes: XLSX.CFB.write(legacyWord, {type:'buffer'}) },
+];
+for (const office of officeFiles) {
+  reset();
+  const encoded = Buffer.from(office.bytes).toString('base64');
+  assert.equal((await call({...submission, files:[{name:office.name,type:'',data:encoded}]})).status, 200);
+  assert.equal(stored.attachments[0].type, bidFileFormat(office.name).mime, 'Canonical Office MIME stored despite empty browser type');
+  assert.equal(emails[0].attachments[0].filename, office.name);
+  assert.equal(emails[0].attachments[0].content, encoded, 'Original Office bytes attached without conversion');
+  assert.deepEqual(Buffer.from(uploads[0].bytes), Buffer.from(office.bytes));
+}
+reset();
+assert.equal((await call({...submission,files:[{name:'renamed.docx',type:'application/octet-stream',data:file.data}]})).status,400,'Renamed PDF is not a Word package');
+assert.equal((await call({...submission,files:[{name:'wrong.docx',data:Buffer.from(officeFiles[1].bytes).toString('base64')}]})).status,400,'Excel ZIP does not pass as Word');
+assert.equal((await call({...submission,files:[{name:'app.exe',data:file.data}]})).status,400,'Unsupported file extension denied');
+assert.equal((await call({...submission,files:[{name:'broken.xlsx',data:Buffer.from('PK').toString('base64')}]})).status,400,'Truncated archive denied');
+assert.equal(emails.length,0);
 globalThis.fetch = async () => new Response('{}', { status: 500 });
 reset();
 assert.equal((await call(submission)).body.success, true, 'Mail failure does not discard customer feedback');

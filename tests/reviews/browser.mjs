@@ -43,5 +43,19 @@ try {
   await page.evaluate(() => { window.failReview = false; });
   await page.getByRole('button', { name: /Home theater/ }).click();
   await page.locator('article').getByText('Complete', { exact: true }).waitFor();
+  const customer = await browser.newPage({ viewport: { width: 390, height: 900 } });
+  await customer.goto('http://127.0.0.1:5189/?customer=1&token=test');
+  await customer.getByRole('checkbox', { name: 'Price was too high' }).check();
+  await customer.getByRole('radio', { name: 'Maybe — reach out to me' }).check();
+  const picker = customer.locator('input[type=file]');
+  for (const extension of ['.doc', '.docx', '.xls', '.xlsx']) assert.ok((await picker.getAttribute('accept')).includes(extension));
+  await picker.setInputFiles(['doc','docx','xls','xlsx'].map(ext => ({ name: `Competing bid.${ext}`, mimeType: '', buffer: Buffer.from(`original ${ext} bytes`) })));
+  await customer.getByRole('button', { name: 'Send Private Feedback' }).click();
+  await customer.getByRole('status').waitFor();
+  const sentFiles = await customer.evaluate(() => window.submittedFiles);
+  assert.equal(sentFiles.length, 4);
+  assert.deepEqual(sentFiles.map(f => f.type), ['application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+  for (const file of sentFiles) assert.equal(Buffer.from(file.data, 'base64').toString(), `original ${file.name.split('.').pop()} bytes`);
+  console.log('Word and Excel customer picker and byte-preserving submission checks passed.');
   console.log('Lost review browser checks passed at phone and desktop widths: list remains NEW, open completes, attachments visible, repeat viewing and save failure retry.');
 } finally { await browser?.close(); server.kill(); }

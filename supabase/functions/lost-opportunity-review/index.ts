@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { bidFileFormat, bidFileHelp, validBidFile } from "./bidFileTypes.ts";
 import { bidEmailBatches } from "./bidEmailBatches.ts";
 import { wrapInEmailLayout } from "../_shared/emailTemplates.ts";
 const cors = {
@@ -31,7 +32,6 @@ const reasonLabels: Record<string, string> = {
   cancelled: "Project cancelled",
   other: "Something else",
 };
-const types = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 const escape = (v: string) =>
   v.replace(
     /[&<>"']/g,
@@ -182,31 +182,23 @@ Deno.serve(async (req) => {
       const decoded = [];
       for (const f of files) {
         if (
-          !types.includes(f.type) || typeof f.name !== "string" ||
+          typeof f.name !== "string" || !bidFileFormat(f.name) ||
           f.name.length > 200 || typeof f.data !== "string" ||
           f.data.length > 14000000
         ) {
           return json({
-            error: "Use PDF, JPG, PNG or WebP files, up to 10 MB each.",
+            error: `Use ${bidFileHelp} files, up to 10 MB each.`,
           }, 400);
         }
         const bytes = Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0));
         if (bytes.length > 10485760) {
           return json({ error: "File exceeds 10 MB." }, 400);
         }
-        const valid = f.type === "application/pdf"
-          ? new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-"
-          : f.type === "image/jpeg"
-          ? bytes[0] === 255 && bytes[1] === 216
-          : f.type === "image/png"
-          ? bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 &&
-            bytes[3] === 71
-          : new TextDecoder().decode(bytes.slice(0, 4)) === "RIFF" &&
-            new TextDecoder().decode(bytes.slice(8, 12)) === "WEBP";
+        const valid = validBidFile(f.name, bytes);
         if (!valid) {
-          return json({ error: "File contents do not match its type." }, 400);
+          return json({ error: "File contents do not match its format. Use an unencrypted PDF, Word, Excel or image file." }, 400);
         }
-        decoded.push({ f, bytes });
+        decoded.push({ f: { ...f, type: bidFileFormat(f.name)!.mime }, bytes });
       }
       const attachments = [];
       try {
