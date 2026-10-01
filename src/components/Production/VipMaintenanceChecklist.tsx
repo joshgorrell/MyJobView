@@ -36,6 +36,7 @@ export default function VipMaintenanceChecklist({workOrderId,onChange}:{workOrde
   if(findings.some(f=>(f.dispositions||[]).includes('no_action')&&!f.notes?.trim()))m.push('No Action Reason');
   if(findings.some(f=>(f.dispositions||[]).some(d=>(d==='punchlist'&&!f.punchlist_task_id)||(d==='service_follow_up'&&!f.service_request_id)||(d==='sales'&&!f.sales_task_id))))m.push('Unrouted Findings');
   if(!visit.no_opportunities_identified&&!(visit.responses?.opportunities||[]).length)m.push('Opportunities / Wish List');
+  if(opportunities().some(o=>!o.request.trim()))m.push('Incomplete Opportunity');
   if(!visit.customer_not_present&&!visit.customer_acknowledged_at)m.push('Customer Acknowledgment'); return m;
  },[visit,findings]);
  async function patch(p:any){if(!visit)return;setSaving(true);const next={...visit,...p,updated_at:new Date().toISOString()};setVisit(next);await supabase.from('vip_maintenance_visits').update(p).eq('id',visit.id);setSaving(false);onChange?.();}
