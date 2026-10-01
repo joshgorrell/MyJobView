@@ -39,16 +39,16 @@ export function QuickActionModal({
     update();
     visibleViewport.addEventListener('resize', update);
     visibleViewport.addEventListener('scroll', update);
-    useEffect(() => {
-    const previousFocus = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus({ preventScroll: true });
-    return () => { if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
-  }, []);
-
-  return () => {
+    return () => {
       visibleViewport.removeEventListener('resize', update);
       visibleViewport.removeEventListener('scroll', update);
     };
+  }, []);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => { if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
   }, []);
 
   useEffect(() => {
