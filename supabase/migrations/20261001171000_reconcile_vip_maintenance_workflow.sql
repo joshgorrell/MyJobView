@@ -2,8 +2,11 @@
 -- This migration is intentionally additive/replacing so deployed environments converge without replaying old files.
 
 ALTER TABLE public.vip_maintenance_findings
+  ADD COLUMN IF NOT EXISTS punchlist_task_id uuid REFERENCES public.punchlist_tasks(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS routed_at timestamptz,
   ADD COLUMN IF NOT EXISTS follow_up_type text,
   ADD COLUMN IF NOT EXISTS follow_up_task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL;
+ALTER TABLE public.vip_maintenance_visits ADD COLUMN IF NOT EXISTS sales_lead_id uuid REFERENCES public.leads(id) ON DELETE SET NULL;
 
 DO $$
 BEGIN
@@ -15,36 +18,45 @@ END $$;
 
 -- Once a Finding has created downstream work, keep its routing attached to that Finding.
 CREATE OR REPLACE FUNCTION public.guard_vip_finding_routing_change()
-RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
 BEGIN
-  IF OLD.follow_up_task_id IS NOT NULL AND (NEW.dispositions IS DISTINCT FROM OLD.dispositions OR NEW.follow_up_type IS DISTINCT FROM OLD.follow_up_type) THEN
+  IF OLD.follow_up_task_id IS NOT NULL AND
+     (NEW.dispositions IS DISTINCT FROM OLD.dispositions OR NEW.follow_up_type IS DISTINCT FROM OLD.follow_up_type OR NEW.follow_up_task_id IS DISTINCT FROM OLD.follow_up_task_id) THEN
     RAISE EXCEPTION 'This VIP finding already created a Task. Its follow-up routing cannot be changed.';
   END IF;
-  IF OLD.punchlist_task_id IS NOT NULL AND (NEW.dispositions IS DISTINCT FROM OLD.dispositions OR NEW.follow_up_type IS DISTINCT FROM OLD.follow_up_type) THEN
+  IF OLD.punchlist_task_id IS NOT NULL AND
+     (NEW.dispositions IS DISTINCT FROM OLD.dispositions OR NEW.follow_up_type IS DISTINCT FROM OLD.follow_up_type OR NEW.punchlist_task_id IS DISTINCT FROM OLD.punchlist_task_id) THEN
     RAISE EXCEPTION 'This VIP finding already created a Punchlist item. Its follow-up routing cannot be changed.';
   END IF;
+  IF NEW.follow_up_task_id IS NOT NULL AND (NEW.follow_up_type IS DISTINCT FROM 'task' OR NOT ('punchlist'=ANY(NEW.dispositions))) THEN
+    RAISE EXCEPTION 'A linked Task requires Needs Follow-Up routed to Task.';
+  END IF;
+  IF NEW.punchlist_task_id IS NOT NULL AND (NEW.follow_up_type IS DISTINCT FROM 'punchlist' OR NOT ('punchlist'=ANY(NEW.dispositions))) THEN
+    RAISE EXCEPTION 'A linked Punchlist item requires Needs Follow-Up routed to Service / Technical Work.';
+  END IF;
+  IF NEW.follow_up_task_id IS NOT NULL AND NEW.punchlist_task_id IS NOT NULL THEN
+    RAISE EXCEPTION 'A VIP finding can route to either a Task or Punchlist item, not both.';
+  END IF;
   RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS guard_vip_finding_routing_change ON public.vip_maintenance_findings;
-CREATE TRIGGER guard_vip_finding_routing_change
-BEFORE UPDATE ON public.vip_maintenance_findings
+CREATE TRIGGER guard_vip_finding_routing_change BEFORE UPDATE ON public.vip_maintenance_findings
 FOR EACH ROW EXECUTE FUNCTION public.guard_vip_finding_routing_change();
-REVOKE ALL ON FUNCTION public.guard_vip_finding_routing_change() FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.guard_vip_finding_routing_change() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.guard_vip_finding_delete()
-RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
 BEGIN
   IF OLD.follow_up_task_id IS NOT NULL OR OLD.punchlist_task_id IS NOT NULL THEN
     RAISE EXCEPTION 'A VIP finding that created downstream work cannot be deleted.';
   END IF;
   RETURN OLD;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS guard_vip_finding_delete ON public.vip_maintenance_findings;
 CREATE TRIGGER guard_vip_finding_delete BEFORE DELETE ON public.vip_maintenance_findings
 FOR EACH ROW EXECUTE FUNCTION public.guard_vip_finding_delete();
-REVOKE ALL ON FUNCTION public.guard_vip_finding_delete() FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.guard_vip_finding_delete() TO authenticated;
+
+REVOKE ALL ON FUNCTION public.guard_vip_finding_routing_change(),public.guard_vip_finding_delete() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.guard_vip_finding_routing_change(),public.guard_vip_finding_delete() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.route_vip_maintenance_finding(p_finding_id uuid)
 RETURNS public.vip_maintenance_findings
