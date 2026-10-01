@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.vip_maintenance_findings (
   created_by uuid REFERENCES public.profiles(id),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (array_length(dispositions,1) IS NULL OR dispositions <@ ARRAY['resolved_today','punchlist','service_follow_up','sales','no_action']::text[])
+  CHECK (array_length(dispositions,1) IS NULL OR dispositions <@ ARRAY['resolved_today','punchlist','no_action']::text[])
 );
 
 CREATE INDEX IF NOT EXISTS idx_vip_maintenance_visits_org ON public.vip_maintenance_visits(organization_id);
