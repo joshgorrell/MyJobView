@@ -1,3 +1,6 @@
+ALTER TABLE public.vip_maintenance_findings ADD COLUMN IF NOT EXISTS follow_up_type text CHECK (follow_up_type IS NULL OR follow_up_type IN ('punchlist','task'));
+ALTER TABLE public.vip_maintenance_findings ADD COLUMN IF NOT EXISTS follow_up_task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL;
+
 -- Reconcile the final validator here too so environments that applied an earlier draft of
 -- the VIP migrations converge on the final Sales Lead / Punchlist workflow.
 CREATE OR REPLACE FUNCTION public.vip_maintenance_incomplete_sections(p_work_order_id uuid)
@@ -20,7 +23,10 @@ BEGIN
  THEN missing:=array_append(missing,'finding_description'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='')
  THEN missing:=array_append(missing,'no_action_reason'); END IF;
- IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL)
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'punchlist'=ANY(x.dispositions) AND x.follow_up_type IS NULL)
+ THEN missing:=array_append(missing,'follow_up_type'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'punchlist'=ANY(x.dispositions) AND
+   ((x.follow_up_type='punchlist' AND x.punchlist_task_id IS NULL) OR (x.follow_up_type='task' AND x.follow_up_task_id IS NULL)))
  THEN missing:=array_append(missing,'unrouted_findings'); END IF;
  IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'notes'),'') IS NOT NULL)
  THEN missing:=array_append(missing,'sales_lead'); END IF;
