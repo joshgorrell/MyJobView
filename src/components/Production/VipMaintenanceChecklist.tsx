@@ -38,7 +38,9 @@ export default function VipMaintenanceChecklist({workOrderId,onChange,onAddPart,
   sections.forEach(([k,l])=>{const x=visit.responses?.[k];if(!x?.complete&&!(k!=='customer_check_in'&&x?.na))m.push(l);});
   if(!visit.responses?.customer_training?.complete&&!visit.training_not_needed&&!visit.customer_not_present)m.push('Customer Training');
   if(!visit.no_issues_found&&!findings.length)m.push('Findings / Issues');
-  if(findings.some(f=>!f.dispositions?.length))m.push('Finding Dispositions');
+  if(visit.no_issues_found&&findings.length)m.push('Findings / Issues');
+  if(findings.some(f=>!f.description?.trim()))m.push('Finding Description');
+  if(findings.some(f=>f.dispositions?.length!==1))m.push('Finding Dispositions');
   if(findings.some(f=>(f.dispositions||[]).includes('no_action')&&!f.notes?.trim()))m.push('No Action Reason');
   if(findings.some(f=>(f.dispositions||[]).includes('punchlist')&&!f.follow_up_type))m.push('Follow-Up Type');
   if(findings.some(f=>(f.dispositions||[]).includes('punchlist')&&((f.follow_up_type==='punchlist'&&!f.punchlist_task_id)||(f.follow_up_type==='task'&&!f.follow_up_task_id))))m.push('Unrouted Findings');
