@@ -40,7 +40,11 @@ BEGIN
  IF v.sales_lead_id IS NOT NULL THEN RETURN v.sales_lead_id; END IF;
  lead:=v.responses->'sales_lead';
  IF nullif(btrim(lead->>'notes'),'') IS NULL THEN RETURN NULL; END IF;
- SELECT * INTO w FROM public.work_orders WHERE id=p_work_order_id;
+ SELECT wo.* INTO w FROM public.work_orders wo
+ JOIN public.contacts wc ON wc.id=wo.contact_id
+ JOIN public.profiles actor ON actor.id=auth.uid() AND actor.is_active AND actor.contact_id IS NULL AND actor.organization_id=wc.organization_id
+ WHERE wo.id=p_work_order_id;
+ IF NOT FOUND THEN RAISE EXCEPTION 'VIP Work Order not found in this organization' USING ERRCODE='42501'; END IF;
  SELECT * INTO c FROM public.contacts WHERE id=w.contact_id;
  rep:=w.customer_sales_rep_id;
  IF rep IS NULL THEN RAISE EXCEPTION 'Customer has no assigned sales rep. Assign one before completing this VIP visit.'; END IF;
