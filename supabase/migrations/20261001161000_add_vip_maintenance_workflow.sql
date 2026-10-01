@@ -79,6 +79,7 @@ BEGIN
  AND EXISTS (SELECT 1 FROM work_order_options o WHERE o.id=NEW.work_order_type_id AND o.system_key='vip_program') THEN
    missing:=vip_maintenance_incomplete_sections(NEW.id);
    IF cardinality(missing)>0 THEN RAISE EXCEPTION 'VIP Maintenance incomplete: %',array_to_string(missing,', '); END IF;
+   PERFORM create_vip_sales_lead(NEW.id);
    UPDATE vip_maintenance_visits SET completed_at=COALESCE(completed_at,now()),completed_by=COALESCE(completed_by,auth.uid()),updated_at=now() WHERE work_order_id=NEW.id;
  END IF;
  RETURN NEW;
