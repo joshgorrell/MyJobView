@@ -315,7 +315,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
     );
   }
 
-  const visibleSteps = isVipMaintenance ? [1, 4, 5] : [1, 2, 3, 4, 5];
+  const visibleSteps = isVipMaintenance ? [1, 5] : [1, 2, 3, 4, 5];
   const totalSteps = visibleSteps.length;
   const visibleStepIndex = Math.max(0, visibleSteps.indexOf(step));
   const progress = ((visibleStepIndex + 1) / totalSteps) * 100;
@@ -502,7 +502,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         )}
 
         {/* Step 4: Notes */}
-        {step === 4 && (
+        {step === 4 && !isVipMaintenance && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-orange-100 rounded-lg">
@@ -516,14 +516,14 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {isVipMaintenance ? 'Visit Recap (Optional)' : 'Notes (Optional)'}
+                Notes (Optional)
               </label>
               <textarea
                 value={techNotes}
                 onChange={(e) => setTechNotes(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={8}
-                placeholder={isVipMaintenance ? "Optional completion note. Use the Work Order Notes tab for the ongoing visit recap." : "Enter any notes about the job, parts used, customer concerns, recommendations, etc..."}
+                placeholder="Enter any notes about the job, parts used, customer concerns, recommendations, etc..."
               />
             </div>
 
