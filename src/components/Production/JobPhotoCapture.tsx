@@ -7,6 +7,9 @@ import { gpsTrackingService } from '../../lib/gpsTracking';
 interface JobPhotoCaptureProps {
   workOrderId: string;
   onSuccess?: () => void;
+  onComplete?: () => void;
+  onCancel?: () => void;
+  context?: 'work_order_notes' | 'vip_sales_lead' | 'general';
   compact?: boolean;
 }
 
@@ -19,7 +22,7 @@ interface PhotoPreview {
   longitude?: number;
 }
 
-export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: JobPhotoCaptureProps) {
+export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, context = 'general', compact = false }: JobPhotoCaptureProps) {
   const { profile } = useAuth();
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -137,7 +140,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
             metadata: {
               file_name: photo.file.name,
               file_size: photo.file.size,
-              file_type: photo.file.type
+              file_type: photo.file.type,
+              context
             },
             taken_at: new Date().toISOString()
           });
@@ -157,7 +161,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
       }
 
       setPhotos([]);
-      if (onSuccess) onSuccess();
+      onSuccess?.();
+      onComplete?.();
     } catch (error) {
       console.error('Error uploading photos:', error);
       alert('Failed to upload photos');
@@ -278,7 +283,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, compact = false }: Job
           </button>
 
           <button
-            onClick={() => setPhotos([])}
+            onClick={() => { setPhotos([]); onCancel?.(); }}
             disabled={uploading}
             className="w-full py-2 text-gray-600 hover:text-gray-900 font-medium"
           >
