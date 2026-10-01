@@ -11,16 +11,24 @@ assert.deepEqual(batches.flat().map(a => a.filename), huge.map(a => a.filename))
 assert.ok(batches.every(b => b.reduce((n, a) => n + a.content.length, 0) <= 18_000_000));
 assert.deepEqual(bidEmailBatches([]), [[]], 'No-file response still generates one email');
 const { bidFileFormat, bidFileHelp, validBidFile } = await moduleFrom(await readFile(new URL('../../supabase/functions/lost-opportunity-review/bidFileTypes.ts', import.meta.url), 'utf8'));
+const { validateAssessment } = await moduleFrom(await readFile(new URL('../../supabase/functions/lost-opportunity-review/adminReview.ts', import.meta.url), 'utf8'));
+let assessment = null, role = 'admin', repValid = true;
 let detail, stored, permitted = true, moduleAccess = true, user = 'employee-1';
 const emails = [], uploads = [];
 function reset() { detail = { request_id: 'request-1', organization_id: 'org-1', opportunity_name: 'Home theater', responded_at: null, reviewed_at: null, reviewed_by: null }; stored = null; emails.length = uploads.length = 0; }
 function from(table) {
   const filters = {}; let update, insert;
-  const q = { select: () => q, eq: (k, v) => { filters[k] = v; return q; }, is: (k, v) => { filters[k] = v; return q; },
+  const q = { order: () => q, select: () => q, eq: (k, v) => { filters[k] = v; return q; }, is: (k, v) => { filters[k] = v; return q; },
     update: v => { update = v; return q; }, insert: v => { insert = v; return q; }, single: async () => result(), maybeSingle: async () => result(), then: (ok, fail) => Promise.resolve(result()).then(ok, fail) };
   function result() {
     if (table === 'lost_review_tokens') return { data: { request_id: 'request-1', expires_at: '2099-01-01' } };
-    if (table === 'profiles') return { data: { organization_id: 'org-1', is_active: true, can_view_lost_opportunity_submissions: permitted } };
+    if (table === 'lost_review_assessments') {
+      if (insert) assessment = insert;
+      if (update && filters.updated_at === assessment?.updated_at) assessment = { ...assessment, ...update };
+      return { data: assessment };
+    }
+    if (table === 'profiles' && filters.id === 'rep-1') return { data: repValid ? { id: 'rep-1' } : null };
+    if (table === 'profiles') return { data: { role, organization_id: 'org-1', is_active: true, can_view_lost_opportunity_submissions: permitted } };
     if (table === 'lost_review_details') {
       if (filters.organization_id && filters.organization_id !== detail.organization_id) return { error: { message: 'Not found' } };
       if (update && Object.entries(filters).every(([k, v]) => detail[k] === v)) Object.assign(detail, update);
@@ -41,9 +49,9 @@ const client = { from, auth: { getUser: async () => ({ data: { user: user ? { id
   storage: { from: () => ({ upload: async (path, bytes) => { uploads.push({ path, bytes }); return { data: {} }; }, remove: async () => ({ data: {} }), createSignedUrl: async path => ({ data: { signedUrl: 'https://private.example/' + path } }) }) } };
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/emails'); emails.push(JSON.parse(options.body)); return new Response('{}', { status: 200 }); };
-globalThis.__lostDeps = { createClient: () => client, bidEmailBatches, bidFileFormat, bidFileHelp, validBidFile, wrapInEmailLayout: html => html };
+globalThis.__lostDeps = { validateAssessment, createClient: () => client, bidEmailBatches, bidFileFormat, bidFileHelp, validBidFile, wrapInEmailLayout: html => html };
 const source = (await readFile(new URL('../../supabase/functions/lost-opportunity-review/index.ts', import.meta.url), 'utf8')).replace(/^import[^;]+;\n/gm, '');
-await moduleFrom(`const {createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
+await moduleFrom(`const {validateAssessment,createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
 const Deno={env:{get:key=>key==='RESEND_API_KEY'?'test-key':''},serve:handler=>{globalThis.__lostHandler=handler;}};
 ${source}`);
 async function call(body) { const r = await globalThis.__lostHandler(new Request('https://test.example', { method: 'POST', body: JSON.stringify(body) })); return { status: r.status, body: await r.json() }; }
@@ -119,5 +127,22 @@ assert.ok(stored);
 console.error = realConsoleError;
 assert.ok(expectedErrors.includes('Lost review notification email failed'));
 globalThis.fetch = realFetch;
-delete globalThis.__lostDeps; delete globalThis.__lostHandler;
+
 console.log('Lost review edge checks passed: actual bid attachments, large-file batches, downloads, automatic review audit, authorization, tenant isolation, repeat submissions and notification failure.');
+
+reset(); user = "employee-1"; permitted = moduleAccess = true; detail.responded_at = new Date().toISOString();
+const values = { sales_rep_id: 'rep-1', primary_reason: 'lowest_price', contributing_reasons: ['budget_mismatch'], preventability: 'no', strengths: 'Excellent walkthrough', improvements: '', findings: '', discovery_rating: 5, attention_rating: 5, explanation_rating: 5, communication_rating: 5, value_rating: null };
+const saveAssessment = (assessment, expected_updated_at = null) => call({ action: 'assessment_save', request_id: detail.request_id, assessment, expected_updated_at });
+role = 'sales'; assert.equal((await saveAssessment(values)).status,403,'Non-admin denied assessment writes');
+role = 'admin'; permitted = false; assert.equal((await saveAssessment(values)).status,403); permitted = true;
+repValid = false; assert.equal((await saveAssessment(values)).status,400,'Other-tenant sales rep rejected'); repValid = true;
+assert.equal((await saveAssessment({ ...values, attention_rating: 6 })).status,400);
+assert.equal((await saveAssessment({ ...values, primary_reason: 'invented' })).status,400);
+assert.equal((await saveAssessment(values)).status,200);
+assert.equal(assessment.created_by,user); assert.equal(assessment.attention_rating,5,'Price loss permits excellent sales score');
+assert.equal((await saveAssessment({ ...values, findings: 'Updated' },'stale')).status,409,'Stale revision cannot overwrite');
+assert.equal((await saveAssessment({ ...values, findings: 'Updated' },assessment.updated_at)).status,200);
+assert.equal(assessment.findings,'Updated');
+console.log('Admin assessment permission, tenant, validation, save and conflict checks passed.');
+
+delete globalThis.__lostDeps; delete globalThis.__lostHandler;

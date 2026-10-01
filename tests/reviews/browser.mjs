@@ -18,7 +18,7 @@ try {
     assert.equal(await page.evaluate(() => window.reviewCalls), 0, 'Loading list does not complete responses');
     await page.getByRole('combobox').selectOption('new');
     assert.equal(await page.getByText('Awaiting customer', { exact: true }).count(), 0);
-    await page.getByRole('button', { name: /Home theater/ }).click();
+    await page.locator('article').first().getByText('NEW!', { exact: true }).click();
     await page.locator('article').getByText('Complete', { exact: true }).waitFor();
     await page.getByRole('heading', { name: 'Competing bid attachments (1)' }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'View John Valley.pdf' }).count(), 1);
@@ -29,6 +29,29 @@ try {
     await page.getByRole('combobox').selectOption('complete');
     await page.getByRole('button', { name: /Home theater/ }).click();
     assert.equal(await page.evaluate(() => window.reviewCalls), 1, 'Reopening preserves first review');
+    const card = page.locator('article').first();
+    assert.ok(await card.getByRole('button', { name: /John Valley/ }).evaluate(el => {
+      const spans = el.querySelectorAll(':scope > span');
+      return parseFloat(getComputedStyle(spans[0]).fontSize) > parseFloat(getComputedStyle(spans[1]).fontSize);
+    }), 'Customer name is larger than title');
+    await card.getByRole('button', { name: 'Admin Review', exact: true }).click();
+    const modal = page.getByRole('dialog', { name: 'Admin Review' });
+    await modal.getByLabel('Primary reason we lost the job').selectOption('lowest_price');
+    await modal.getByLabel('Personal attention', { exact: true }).selectOption('5');
+    await modal.getByLabel('What went well').fill('Excellent attention despite price loss');
+    await page.evaluate(() => { window.failAssessment = true; });
+    await modal.getByRole('button', { name: 'Save Admin Review' }).click();
+    await modal.getByRole('alert').waitFor();
+    assert.equal(await modal.getByLabel('What went well').inputValue(), 'Excellent attention despite price loss', 'Failed save retains notes');
+    await page.evaluate(() => { window.failAssessment = false; });
+    await modal.getByRole('button', { name: 'Save Admin Review' }).click();
+    await modal.getByRole('status').waitFor();
+    await modal.getByRole('button', { name: 'Close' }).click();
+    await card.getByRole('button', { name: 'Admin Review', exact: true }).click();
+    await modal.getByLabel('What went well').waitFor();
+    assert.equal(await modal.getByLabel('What went well').inputValue(), 'Excellent attention despite price loss');
+    assert.equal(await modal.getByLabel('Personal attention', { exact: true }).inputValue(), '5');
+    await modal.getByRole('button', { name: 'Close' }).click();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Fits viewport');
     await page.close();
   }
@@ -43,6 +66,10 @@ try {
   await page.evaluate(() => { window.failReview = false; });
   await page.getByRole('button', { name: /Home theater/ }).click();
   await page.locator('article').getByText('Complete', { exact: true }).waitFor();
+  const sales = await browser.newPage();
+  await sales.goto('http://127.0.0.1:5189/?sales=1');
+  await sales.locator('article').first().waitFor();
+  assert.equal(await sales.getByRole('button', { name: 'Admin Review', exact: true }).count(), 0, 'Sales cannot open admin assessments');
   const customer = await browser.newPage({ viewport: { width: 390, height: 900 } });
   await customer.goto('http://127.0.0.1:5189/?customer=1&token=test');
   await customer.getByRole('checkbox', { name: 'Price was too high' }).check();
