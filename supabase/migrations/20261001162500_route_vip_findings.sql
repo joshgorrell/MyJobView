@@ -2,7 +2,6 @@
 ALTER TABLE public.vip_maintenance_findings
   ADD COLUMN IF NOT EXISTS punchlist_task_id uuid REFERENCES public.punchlist_tasks(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS service_request_id uuid REFERENCES public.service_requests(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS sales_task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS routed_at timestamptz;
 
 CREATE OR REPLACE FUNCTION public.route_vip_maintenance_finding(p_finding_id uuid)
@@ -46,17 +45,9 @@ BEGIN
    RETURNING id INTO f.service_request_id;
  END IF;
 
- IF 'sales'=ANY(f.dispositions) AND f.sales_task_id IS NULL THEN
-   sales_rep:=w.customer_sales_rep_id;
-   IF sales_rep IS NULL THEN RAISE EXCEPTION 'Customer has no assigned sales rep. Assign one before routing this finding to Sales.'; END IF;
-   INSERT INTO public.tasks(title,description,assigned_to,contact_id,priority,status,user_id)
-   VALUES('VIP opportunity: '||left(f.description,90),description,sales_rep,w.contact_id,'medium','pending',auth.uid())
-   RETURNING id INTO f.sales_task_id;
-   INSERT INTO public.task_comments(task_id,user_id,content) VALUES(f.sales_task_id,auth.uid(),'Created automatically from VIP Maintenance '||coalesce(w.work_order_number,w.id::text));
- END IF;
 
- UPDATE public.vip_maintenance_findings SET punchlist_task_id=f.punchlist_task_id,service_request_id=f.service_request_id,
-   sales_task_id=f.sales_task_id,routed_at=now(),updated_at=now() WHERE id=f.id RETURNING * INTO f;
+
+ UPDATE public.vip_maintenance_findings SET punchlist_task_id=f.punchlist_task_id,service_request_id=f.service_request_id,routed_at=now(),updated_at=now() WHERE id=f.id RETURNING * INTO f;
  RETURN f;
 END $$;
 REVOKE ALL ON FUNCTION public.route_vip_maintenance_finding(uuid) FROM PUBLIC,anon;
