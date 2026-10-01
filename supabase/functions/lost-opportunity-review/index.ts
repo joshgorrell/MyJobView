@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { bidEmailBatches } from "./bidEmailBatches.ts";
 import { wrapInEmailLayout } from "../_shared/emailTemplates.ts";
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -275,62 +276,67 @@ Deno.serve(async (req) => {
           : settings?.app_url;
         const key = Deno.env.get("RESEND_API_KEY");
         if (key && base) {
+          const batches = bidEmailBatches(decoded.map(({ f }) => ({ filename: f.name, content: f.data })));
           for (const viewer of viewers) {
             if (!viewer.email) continue;
             const link = new URL("/?tab=reviews&reviewType=lost", base)
               .toString();
-            const body =
-              `<h2>Lost Opportunity feedback received</h2><p><strong>Customer:</strong> ${
-                escape(
-                  request.recipient_name || request.recipient_email ||
-                    "Customer",
-                )
-              }</p><p><strong>Project:</strong> ${
-                escape(detail.opportunity_name)
-              }</p><p><strong>Reasons:</strong> ${
-                escape(
-                  selected.map((r) => reasonLabels[String(r)] || String(r))
-                    .join(", ") || "Comment only",
-                )
-              }</p><p><strong>Another chance:</strong> ${
-                escape(b.recoverable)
-              }</p><p style="white-space:pre-wrap">${
-                escape(b.message)
-              }</p><p style="white-space:pre-wrap">${
-                escape(b.recovery_message)
-              }</p><p><strong>Competing bid files:</strong> ${attachments.length}</p><p><a href="${
-                escape(link)
-              }">View the private response and attachments in MJV</a></p>`;
-            const sent = await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${key}`,
-                "Content-Type": "application/json",
-                "Idempotency-Key":
-                  `lost-review-${detail.request_id}-${viewer.email}`,
-              },
-              body: JSON.stringify({
-                from: `${
-                  settings?.from_name || settings?.company_name || "MJV"
-                } <${settings?.from_email || settings?.company_email}>`,
-                to: viewer.email,
-                reply_to: settings?.reply_to_email || settings?.company_email,
-                subject:
-                  `Lost Opportunity feedback: ${detail.opportunity_name}`,
-                html: wrapInEmailLayout(
-                  body,
-                  escape(settings?.company_name || "MJV"),
-                  escape(settings?.company_email || ""),
-                  "#0e7490",
-                  settings?.company_logo_url || "",
-                ),
-              }),
-            });
-            if (!sent.ok) {
-              console.error(
-                "Lost review notification email failed",
-                sent.status,
-              );
+            for (const [batchIndex, emailAttachments] of batches.entries()) {
+              const part = batches.length > 1 ? ` (part ${batchIndex + 1} of ${batches.length})` : "";
+              const body =
+                `<h2>Lost Opportunity feedback received</h2><p><strong>Customer:</strong> ${
+                  escape(
+                    request.recipient_name || request.recipient_email ||
+                      "Customer",
+                  )
+                }</p><p><strong>Project:</strong> ${
+                  escape(detail.opportunity_name)
+                }</p><p><strong>Reasons:</strong> ${
+                  escape(
+                    selected.map((r) => reasonLabels[String(r)] || String(r))
+                      .join(", ") || "Comment only",
+                  )
+                }</p><p><strong>Another chance:</strong> ${
+                  escape(b.recoverable)
+                }</p><p style="white-space:pre-wrap">${
+                  escape(b.message)
+                }</p><p style="white-space:pre-wrap">${
+                  escape(b.recovery_message)
+                }</p><p><strong>Competing bid files:</strong> ${attachments.length}</p>${emailAttachments.length ? `<p>Attached to this email${part}: ${emailAttachments.map(a => escape(a.filename)).join(", ")}</p>` : ""}<p><a href="${
+                  escape(link)
+                }">View the private response and attachments in MJV</a></p>`;
+              const sent = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${key}`,
+                  "Content-Type": "application/json",
+                  "Idempotency-Key":
+                    `lost-review-${detail.request_id}-${viewer.email}-part-${batchIndex + 1}`,
+                },
+                body: JSON.stringify({
+                  from: `${
+                    settings?.from_name || settings?.company_name || "MJV"
+                  } <${settings?.from_email || settings?.company_email}>`,
+                  to: viewer.email,
+                  reply_to: settings?.reply_to_email || settings?.company_email,
+                  subject:
+                    `Lost Opportunity feedback: ${detail.opportunity_name}${part}`,
+                  attachments: emailAttachments,
+                  html: wrapInEmailLayout(
+                    body,
+                    escape(settings?.company_name || "MJV"),
+                    escape(settings?.company_email || ""),
+                    "#0e7490",
+                    settings?.company_logo_url || "",
+                  ),
+                }),
+              });
+              if (!sent.ok) {
+                console.error(
+                  "Lost review notification email failed",
+                  sent.status,
+                );
+              }
             }
           }
         }
@@ -515,9 +521,20 @@ Deno.serve(async (req) => {
         return json({ error: "There is no response yet." }, 400);
       }
       const now = new Date().toISOString();
-      const update = b.action === "review"
-        ? { reviewed_at: now }
-        : { recovery_outcome: b.outcome };
+      if (b.action === "review") {
+        // The first viewer wins, even when multiple employees open it together.
+        if (!detail.reviewed_at) {
+          await checked(await admin.from("lost_review_details")
+            .update({ reviewed_at: now, reviewed_by: user.id })
+            .eq("request_id", detail.request_id).eq("organization_id", org)
+            .is("reviewed_at", null));
+        }
+        const reviewed = await checked(await admin.from("lost_review_details")
+          .select("reviewed_at,reviewed_by")
+          .eq("request_id", detail.request_id).eq("organization_id", org).single());
+        return json({ success: true, ...reviewed });
+      }
+      const update = { recovery_outcome: b.outcome };
       if (
         b.action === "outcome" &&
         !["following_up", "recovered", "closed"].includes(b.outcome)

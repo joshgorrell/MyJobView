@@ -277,6 +277,12 @@ assert.deepEqual(
 console.log(
   "Independent permissions, defaults, self-grant protection, revocation and legacy sharing tests passed.",
 );
+await db.exec(await readFile(new URL('../../supabase/migrations/20261001160418_lost_review_viewed_audit.sql', import.meta.url), 'utf8'));
+await db.exec(`SET ROLE service_role; UPDATE lost_review_details SET reviewed_by='${id(10)}' WHERE request_id='${id(30)}'; RESET ROLE;`);
+assert.equal((await db.query('SELECT reviewed_by FROM lost_review_details WHERE request_id=$1', [id(30)])).rows[0].reviewed_by, id(10), 'First reviewer can be recorded');
+await as(11);
+await assert.rejects(db.exec(`UPDATE lost_review_details SET reviewed_by='${id(11)}'`), 'Employees cannot forge review audit directly');
+await db.exec('RESET ROLE');
 await db.close();
 console.log(
   "Lost opportunity review privacy, sharing, completion, owner notification, external proposal and tenant tests passed.",
