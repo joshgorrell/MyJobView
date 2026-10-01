@@ -171,11 +171,11 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white rounded-none sm:rounded-xl shadow-xl max-w-4xl w-full flex flex-col h-screen sm:h-auto sm:max-h-[90vh]">
-        <div className="bg-white border-b border-gray-200 px-5 sm:px-6 py-4 flex items-center justify-between shrink-0">
+      <div className="bg-white rounded-none sm:rounded-xl shadow-xl max-w-4xl w-full flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]">
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
             <Package className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-            Add Parts Used
+            Add Item
           </h2>
           <button
             onClick={onClose}
@@ -185,7 +185,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
           </button>
         </div>
 
-        <form id="add-parts-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <form id="add-parts-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5 pb-28 sm:pb-6">
           {/* Product Search */}
           <div className="space-y-3">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -200,7 +200,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Type to search by product name or SKU, or scroll the catalog below..."
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-3.5 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -212,15 +212,15 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
             )}
 
             {!searching && searchResults.length > 0 && (
-              <div className="border-2 border-blue-200 rounded-lg max-h-80 overflow-y-auto bg-blue-50"><div className="sticky top-0 z-10 px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs font-medium text-gray-600">{searchQuery.trim() ? `Search results (${searchResults.length})` : `Product Catalog — scroll or type above (${searchResults.length} shown)`}</div>
+              <div className="border border-gray-200 rounded-xl max-h-[48dvh] sm:max-h-80 overflow-y-auto overscroll-contain bg-white"><div className="sticky top-0 z-10 px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs font-medium text-gray-600">{searchQuery.trim() ? `Search results (${searchResults.length})` : `Product Catalog — scroll or type above (${searchResults.length} shown)`}</div>
                 {searchResults.map(product => (
                   <button
                     key={product.id}
                     type="button"
                     onClick={() => addProductPart(product)}
-                    className="w-full text-left p-3 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors"
+                    className="w-full min-h-16 text-left px-3 py-3.5 active:bg-blue-50 sm:hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors touch-manipulation"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium text-gray-900">{product.name}</p>
                         {product.sku && (
@@ -405,11 +405,11 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
 
         </form>
 
-        <div className="flex gap-3 px-5 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-none sm:rounded-b-xl shrink-0">
+        <div className="flex gap-2 sm:gap-3 px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:py-4 border-t border-gray-200 bg-white sm:bg-gray-50 rounded-b-none sm:rounded-b-xl shrink-0 sticky bottom-0">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="flex-1 min-h-12 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 touch-manipulation"
           >
             Cancel
           </button>
@@ -417,7 +417,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
             type="submit"
             form="add-parts-form"
             disabled={loading || parts.length === 0}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="flex-[1.4] min-h-12 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 touch-manipulation"
           >
             {loading ? 'Adding Parts...' : `Add ${parts.length} Part${parts.length !== 1 ? 's' : ''}`}
           </button>
