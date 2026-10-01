@@ -216,6 +216,28 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
       if (updateError) throw updateError;
 
+      // VIP completion creates the lead in the database trigger. Mirror the normal LeadForm email preference here.
+      if (isVipMaintenance) {
+        try {
+          const { data: vipVisit } = await supabase.from('vip_maintenance_visits').select('sales_lead_id').eq('work_order_id', workOrderId).maybeSingle();
+          if (vipVisit?.sales_lead_id) {
+            const { data: lead } = await supabase.from('leads').select('id, contact_name, company_name, assigned_to').eq('id', vipVisit.sales_lead_id).maybeSingle();
+            if (lead?.assigned_to) {
+              const { data: rep } = await supabase.from('profiles').select('email, email_leads').eq('id', lead.assigned_to).maybeSingle();
+              if (rep?.email && rep.email_leads) {
+                const { data: { session } } = await supabase.auth.getSession();
+                await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-lead-notification`, {
+                  method: 'POST', headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ to: [rep.email], leadId: lead.id, leadName: lead.contact_name, companyName: lead.company_name || undefined, isFishbowl: false })
+                });
+              }
+            }
+          }
+        } catch (emailError) {
+          console.error('Error sending VIP lead email notification:', emailError);
+        }
+      }
+
       // Capture GPS coordinates for job clock-out
       const gpsResult = await gpsTrackingService.captureLocationForClockEvent(true);
 
