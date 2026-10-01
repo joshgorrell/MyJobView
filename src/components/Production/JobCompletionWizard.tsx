@@ -686,7 +686,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
           Cancel
         </button>
         <div className="flex-1" />
-        {step > 1 && (
+        {visibleStepIndex > 0 && (
           <button
             onClick={goBack}
             className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300"
@@ -695,7 +695,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
             Back
           </button>
         )}
-        {step < totalSteps ? (
+        {visibleStepIndex < totalSteps - 1 ? (
           <button
             onClick={goNext}
             disabled={!canProceedToNextStep()}
