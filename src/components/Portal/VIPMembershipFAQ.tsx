@@ -17,15 +17,15 @@ const faqs: FAQItem[] = [
   },
   {
     question: "What if I need to extend my trial period?",
-    answer: "We understand that sometimes 90 days isn't enough. Contact us and we'll work with you to extend your Test & Tune trial if needed. We want you to have enough time to fully experience the benefits."
+    answer: "We understand that sometimes 90 days isn't enough. Contact us and we'll work with you to extend your Test & Tune period if needed. We want you to have enough time to fully experience the benefits."
   },
   {
     question: "Do I get billed during the 90-day trial?",
-    answer: "No! The 90-Day Test & Tune trial is completely free with no billing or credit card required. You only get billed if you choose to continue with a paid VIP membership after your trial expires."
+    answer: "No! Included Test & Tune adjustments are free during the project’s 90-day period. A promotional VIP trial has no membership charge during its offer period; service coverage follows the offer. A paid VIP membership requires a separate subscription."
   },
   {
     question: "What's the difference between Test & Tune and VIP membership?",
-    answer: "Test & Tune is our 90-day free trial program offered after project completion to help perfect your system. VIP membership is the ongoing paid subscription that provides the same benefits year-round, including punchlist access, priority service, and regular maintenance."
+    answer: "Test & Tune provides free project adjustments and tuning for 90 days after substantial completion. Punchlist is the tool for reporting issues. VIP membership continues Punchlist access afterward, with service benefits defined by your plan. A promotional VIP trial is a separate offer with its own dates."
   },
   {
     question: "Can I change my VIP plan later?",
@@ -73,7 +73,7 @@ export function VIPMembershipFAQ() {
       <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <p className="text-gray-700 text-sm">
           <strong>Have more questions?</strong> We're here to help! Contact us anytime and we'll be happy to answer
-          any questions about VIP membership or your Test & Tune trial.
+          any questions about VIP membership or your Test & Tune period.
         </p>
       </div>
     </div>

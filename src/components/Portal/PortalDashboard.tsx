@@ -231,17 +231,12 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         }
       }
 
-      const { data: vipSub } = await supabase
-        .from('recurring_subscriptions')
-        .select(`
-          status,
-          next_billing_date,
-          trial_end_date,
-          plan:recurring_plans(plan_name, billing_frequency, amount)
-        `)
-        .eq('contact_id', contactId)
-        .in('status', ['active', 'trial'])
-        .maybeSingle();
+      const columns='status,next_billing_date,trial_end_date,plan:recurring_plans(plan_name,billing_frequency,amount)';
+      const [paid,trial]=await Promise.all([
+        supabase.from('recurring_subscriptions').select('status,next_billing_date,trial_end_date,plan:recurring_plans!inner(plan_name,billing_frequency,amount)').eq('contact_id',contactId).eq('status','active').eq('plan.plan_type','vip_plan').order('start_date',{ascending:false}).limit(1).maybeSingle(),
+        supabase.from('recurring_subscriptions').select(columns).eq('contact_id',contactId).eq('status','trial').eq('trial_source','vip_trial').gte('trial_end_date',new Date().toISOString().split('T')[0]).order('start_date',{ascending:false}).limit(1).maybeSingle()
+      ]);
+      const vipSub=paid.data || trial.data;
       setHasVipMembership(!!vipSub);
       if (vipSub) {
         const plan = Array.isArray(vipSub.plan) ? vipSub.plan[0] : vipSub.plan;

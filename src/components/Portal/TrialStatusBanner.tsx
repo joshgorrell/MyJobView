@@ -2,6 +2,7 @@ import { Clock, Star, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react
 import { useState } from 'react';
 
 interface TrialStatusBannerProps {
+  program?: 'test_and_tune' | 'vip_trial';
   daysRemaining: number;
   expirationDate: string;
   subscriptionPlanName?: string | null;
@@ -10,12 +11,14 @@ interface TrialStatusBannerProps {
 }
 
 export function TrialStatusBanner({
+  program='test_and_tune',
   daysRemaining,
   expirationDate,
   subscriptionPlanName,
   showDetails = true,
   compact = false
 }: TrialStatusBannerProps) {
+  const programName=program==='vip_trial'?'VIP Trial':'Test & Tune';
   const [showBenefits, setShowBenefits] = useState(false);
 
   const isExpiringSoon = daysRemaining <= 7;
@@ -66,7 +69,7 @@ export function TrialStatusBanner({
 
   const benefits = [
     'Create unlimited punchlist items',
-    'Priority service scheduling',
+    program==='test_and_tune'?'Included project adjustments and tuning':'Benefits defined by your VIP trial offer',
     'Direct communication with your team',
     'Photo documentation and tracking',
     'Service history and notes access'
@@ -84,7 +87,7 @@ export function TrialStatusBanner({
             )}
             <div>
               <div className={`text-sm font-semibold ${colors.text}`}>
-                {isExpiringSoon ? 'Trial Ending Soon!' : '90-Day Test & Tune Program'}
+                {isExpiringSoon ? `${programName} Ending Soon` : programName}
               </div>
               <div className={`text-xs ${colors.textLight}`}>
                 {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining
@@ -119,8 +122,8 @@ export function TrialStatusBanner({
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <h3 className={`text-lg font-bold ${colors.text}`}>
               {isExpiringSoon
-                ? 'Your Free Trial is Ending Soon!'
-                : '90-Day Test & Tune Program - Free VIP Trial'}
+                ? `${programName} is Ending Soon`
+                : programName}
             </h3>
             <span className={`px-3 py-1 rounded-full text-sm font-semibold ${colors.badge}`}>
               {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining
@@ -130,7 +133,7 @@ export function TrialStatusBanner({
           <p className={`mb-3 ${colors.textLight}`}>
             {isExpiringSoon ? (
               <>
-                Your complimentary Test & Tune access expires on{' '}
+                Your complimentary {programName} access expires on{' '}
                 <strong>
                   {new Date(expirationDate).toLocaleDateString('en-US', {
                     month: 'long',
@@ -142,7 +145,7 @@ export function TrialStatusBanner({
               </>
             ) : (
               <>
-                Thank you for choosing us! Enjoy complimentary VIP access until{' '}
+                Enjoy complimentary {programName} access until{' '}
                 <strong>
                   {new Date(expirationDate).toLocaleDateString('en-US', {
                     month: 'long',
@@ -150,7 +153,7 @@ export function TrialStatusBanner({
                     year: 'numeric'
                   })}
                 </strong>
-                {' '}to help us perfect your system.
+                {program==='test_and_tune'?' to help us refine and tune your project.':' to try the VIP program.'}
               </>
             )}
           </p>

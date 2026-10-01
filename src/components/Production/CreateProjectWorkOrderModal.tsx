@@ -1,3 +1,4 @@
+import {useWorkOrderOptions} from '../../lib/workOrderOptions';
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -48,6 +49,8 @@ type TaskPickerView = 'none' | 'all' | 'by-phase';
 
 export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, contactId }: CreateProjectWorkOrderModalProps) {
   const { profile } = useAuth();
+  const workOrderOptions=useWorkOrderOptions();
+  const [workOrderTypeId,setWorkOrderTypeId]=useState('');
   const [loading, setLoading] = useState(false);
 
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -234,6 +237,7 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
       const groupId = selectedTechnicians.length > 1 ? crypto.randomUUID() : null;
 
       const workOrdersToCreate = selectedTechnicians.map(techId => ({
+        work_order_type_id: workOrderTypeId || workOrderOptions.find(option=>option.kind==='type'&&option.system_key==='project')?.id || null,
         company_id: profile.organization_id,
         contact_id: contactId || null,
         project_id: projectId,
@@ -310,6 +314,10 @@ export function CreateProjectWorkOrderModal({ onClose, onSuccess, projectId, con
       icon={<ListChecks className="w-5 h-5" />} onClose={onClose} scrollBody={false}>
         <form onSubmit={handleSubmit} className="qam-scroll overflow-y-auto min-h-0 flex-1 px-4 sm:px-6 py-5 space-y-5">
 
+          <label className="block text-sm text-primary">Work Order Type<select className="block w-full p-3 mt-1 bg-surface border border-strong rounded-lg" value={workOrderTypeId || workOrderOptions.find(o=>o.kind==='type'&&o.system_key==='project')?.id || ''} onChange={e=>setWorkOrderTypeId(e.target.value)}>
+            {!workOrderOptions.length && <option value="">Project</option>}
+            {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active&&o.behavior==='project').map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
+          </select></label>
           {/* Title & Description */}
           <div className="space-y-3">
             <div>

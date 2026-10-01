@@ -1,3 +1,4 @@
+import { WorkOrderSettings } from './WorkOrderSettings';
 import { useState, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon, Users, Building2, CreditCard, Plug, Lightbulb, Package, Award, Flag, Mail, Shield, Menu, Lock, Receipt, Layers, FileText, Clock, Wrench, Tags, AlertCircle, Activity, Megaphone, MapPin, Target, Monitor, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,7 +41,7 @@ function SettingsLoadingFallback() {
 export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNavigate?: (tab: string) => void } = {}) {
   const { jobModuleEnabled, profile } = useAuth();
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
-  const [activeTab, setActiveTab] = useState<'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import'>((initialTab as any) || 'users');
+  const [activeTab, setActiveTab] = useState<'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders'>((initialTab as any) || 'users');
 
   return (
     <div className="space-y-6">
@@ -330,6 +331,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
                 <span>Proposals</span>
               </div>
             </button>
+            {profile?.role === 'admin' && <button onClick={() => setActiveTab('work_orders')} className={`px-4 py-3 whitespace-nowrap text-sm ${activeTab === 'work_orders' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-secondary'}`}>Work Orders</button>}
             <button
               onClick={() => setActiveTab('labor')}
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
@@ -404,6 +406,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
 
         <div className="p-4 sm:p-6 bg-white">
           <Suspense fallback={<SettingsLoadingFallback />}>
+            {activeTab === 'work_orders' && <WorkOrderSettings />}
             {activeTab === 'users' && <UserManagement onNavigate={onNavigate} />}
             {activeTab === 'sessions' && <UserSessionsViewerEnhanced />}
             {activeTab === 'roles' && <RolePermissionManagement />}

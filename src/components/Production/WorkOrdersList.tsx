@@ -1,3 +1,4 @@
+import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Search, Filter, Clock, Calendar, User, AlertCircle, Camera, Wrench, CheckCircle, X, Mail, MailCheck, Phone, PhoneOff, ArrowUpDown, ArrowDown, ArrowUp, Repeat } from 'lucide-react';
@@ -9,6 +10,8 @@ interface WorkOrder {
   work_order_number: string;
   title: string;
   description: string;
+  work_order_type_id?: string | null;
+  work_order_status_id?: string | null;
   type: string;
   status: string;
   priority: string;
@@ -52,6 +55,7 @@ interface WorkOrdersListProps {
 
 export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
   const { profile } = useAuth();
+  const workOrderOptions = useWorkOrderOptions();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -274,7 +278,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       wo.project?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       wo.project?.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter.length === 0 || statusFilter.includes(wo.status);
+    const matchesStatus = statusFilter.length === 0 || statusFilter.includes(wo.work_order_status_id || workOrderOptions.find(o=>o.kind==='status'&&o.system_key===wo.status)?.id || wo.status) || statusFilter.includes(wo.status);
     const matchesSalesRep = salesRepFilter.length === 0 || (wo.created_by && salesRepFilter.includes(wo.created_by));
     const matchesTech = techFilter.length === 0 || (wo.assigned_to && techFilter.includes(wo.assigned_to));
 
@@ -373,17 +377,17 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
               <div className="flex flex-wrap gap-2">
-                {['pending', 'assigned', 'in_progress', 'completed', 'on_hold', 'cancelled'].map(status => (
+                {(workOrderOptions.length ? workOrderOptions.filter(o=>o.kind==='status'&&o.is_active).map(o=>({value:o.id,label:o.label,behavior:o.behavior})) : ['pending', 'assigned', 'in_progress', 'completed', 'on_hold', 'cancelled'].map(value=>({value,label:value.replace(/_/g,' '),behavior:value}))).map(({value:status,label,behavior}) => (
                   <button
                     key={status}
                     onClick={() => toggleStatusFilter(status)}
                     className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
                       statusFilter.includes(status)
-                        ? getStatusColor(status)
+                        ? getStatusColor(behavior)
                         : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    {status.replace('_', ' ')}
+                    {label}
                     {statusFilter.includes(status) && (
                       <span className="ml-1">✓</span>
                     )}
@@ -471,8 +475,9 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="font-semibold text-gray-900">{wo.work_order_number}</span>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(wo.status)}`}>
-                      {wo.status.replace('_', ' ')}
+                    <span className="text-xs text-gray-600">{workOrderOptionLabel(workOrderOptions,'type',wo.type,wo.work_order_type_id)}</span>
+                    <span style={workOrderOptionStyle(workOrderOptions,'status',wo.status,wo.work_order_status_id)} className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(wo.status)}`}>
+                      {workOrderOptionLabel(workOrderOptions,'status',wo.status,wo.work_order_status_id)}
                     </span>
                     {wo.is_completed && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">

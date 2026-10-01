@@ -5,6 +5,10 @@ on:
       - 'src/components/Production/**'
       - 'src/components/Shared/QuickActionModal.tsx'
       - 'tests/work-orders/**'
+      - 'tests/program-access/**'
+      - 'src/components/Admin/WorkOrderSettings.tsx'
+      - 'src/lib/workOrderOptions.ts'
+      - 'supabase/migrations/*work_order_configuration*'
       - 'package*.json'
       - '.github/workflows/work-order-scope-review.yml'
   workflow_dispatch:
@@ -23,6 +27,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:work-orders
+      - run: npm run test:program-access
       - run: npx eslint src/components/Shared/QuickActionModal.tsx
       - run: npm install --no-save --package-lock=false playwright@1.55.1
       - run: npx playwright install --with-deps chromium

@@ -29,6 +29,7 @@ interface Subscription {
   status: string;
   start_date: string;
   next_billing_date: string | null;
+  trial_source?: 'vip_trial'|'test_and_tune_legacy';
   trial_end_date: string | null;
   trial_started_date: string | null;
   notes: string | null;
@@ -116,6 +117,7 @@ export function VIPPlanManagement() {
           status,
           start_date,
           next_billing_date,
+          trial_source,
           trial_end_date,
           trial_started_date,
           notes,
@@ -345,7 +347,7 @@ export function VIPPlanManagement() {
           <div className="text-sm text-blue-200">
             <p className="font-medium mb-1">VIP Membership Access Rules</p>
             <ul className="space-y-1 mt-2">
-              <li><strong>Trial Customers:</strong> Get free 90-day access (admin-initiated only via punchlist invites)</li>
+              <li><strong>VIP Trials:</strong> Promotional access with its own dates. Test &amp; Tune follows the project’s 90-day period.</li>
               <li><strong>Pending Payment:</strong> Self-service signups that need payment before activation</li>
               <li><strong>Active Subscriptions:</strong> Paid members with full portal access</li>
             </ul>
@@ -621,12 +623,13 @@ export function VIPPlanManagement() {
                     <div className="flex flex-col items-end gap-2">
                       <div className="flex items-center gap-2">
                         <span className="px-3 py-1 bg-blue-900/50 text-blue-300 rounded text-sm font-medium">
-                          Trial Access
+                          {sub.trial_source==='test_and_tune_legacy'?'Legacy Test & Tune record':'VIP Trial'}
                         </span>
                         <CheckCircle2 className="w-5 h-5 text-green-400" title="Punchlist & Messages" />
                       </div>
                       <button
                         onClick={async () => {
+                          if (sub.trial_source === 'test_and_tune_legacy') { alert('Manage Test & Tune dates on the project access grant. This historical subscription is not a VIP trial.'); return; }
                           const daysToAdd = prompt('How many days would you like to extend the trial?', '30');
                           if (!daysToAdd) return;
 

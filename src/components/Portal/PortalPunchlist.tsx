@@ -824,8 +824,9 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         </div>
       )}
 
-      {accessInfo.access_type === 'test_and_tune' && accessInfo.days_remaining !== null && accessInfo.expiration_date && (
+      {['test_and_tune','vip_trial','promotional'].includes(accessInfo.access_type || '') && accessInfo.days_remaining !== null && accessInfo.expiration_date && (
         <TrialStatusBanner
+          program={accessInfo.access_type==='test_and_tune'?'test_and_tune':'vip_trial'}
           daysRemaining={accessInfo.days_remaining}
           expirationDate={accessInfo.expiration_date}
           subscriptionPlanName={accessInfo.subscription_plan_name}
