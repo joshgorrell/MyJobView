@@ -120,6 +120,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     role: user.role,
     role_id: (user as any).role_id || '',
     email_leads: user.email_leads,
+    is_sales_rep: (user as any).is_sales_rep ?? false,
     can_create_proposals: (user as any).can_create_proposals ?? true,
     can_create_purchase_orders: (user as any).can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(user.role),
     can_view_prospects: (user as any).can_view_prospects ?? false,
@@ -607,6 +608,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         role: formData.role,
         role_id: formData.role_id || null,
         email_leads: formData.email_leads,
+        is_sales_rep: formData.is_sales_rep,
         can_create_proposals: formData.can_create_proposals,
         can_create_purchase_orders: formData.can_create_purchase_orders,
         can_view_prospects: formData.can_view_prospects,
@@ -965,7 +967,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Permissions</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                      { key: 'can_create_proposals', icon: Briefcase, label: 'Can Create Proposals', desc: 'Create and manage proposals; appears in sales rep selector' },
+                      { key: 'is_sales_rep', icon: Briefcase, label: 'Sales Rep', desc: 'Business designation: appears anywhere MJV asks for a Sales Rep' },
+                      { key: 'can_create_proposals', icon: Briefcase, label: 'Can Create Proposals', desc: 'Permission to create and manage proposals' },
                       { key: 'can_create_purchase_orders', icon: Briefcase, label: 'Can Create Purchase Orders', desc: 'Create, submit, email, and delete draft POs' },
                       { key: 'email_leads', icon: Mail, label: 'Email Leads', desc: 'Receive email notifications for new leads' },
                       { key: 'can_view_prospects', icon: Shield, label: 'Can View Prospects', desc: 'Access to prospect contacts and competitor tracking' },
