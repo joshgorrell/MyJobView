@@ -79,3 +79,46 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+
+
+-- Completed VIP visits are permanent service records. Prevent later edits/deletes at the database layer,
+-- while allowing the completion transaction itself to stamp completed_at/completed_by.
+CREATE OR REPLACE FUNCTION public.lock_completed_vip_visit()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+BEGIN
+  IF TG_OP='DELETE' AND OLD.completed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Completed VIP Maintenance visits are read-only.';
+  END IF;
+  IF TG_OP='UPDATE' AND OLD.completed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Completed VIP Maintenance visits are read-only.';
+  END IF;
+  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $$;
+
+DROP TRIGGER IF EXISTS lock_completed_vip_visit ON public.vip_maintenance_visits;
+CREATE TRIGGER lock_completed_vip_visit
+BEFORE UPDATE OR DELETE ON public.vip_maintenance_visits
+FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_visit();
+
+CREATE OR REPLACE FUNCTION public.lock_completed_vip_finding()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+DECLARE v_completed_at timestamptz;
+BEGIN
+  SELECT completed_at INTO v_completed_at
+  FROM public.vip_maintenance_visits
+  WHERE id=COALESCE(NEW.visit_id,OLD.visit_id);
+  IF v_completed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Findings on a completed VIP Maintenance visit are read-only.';
+  END IF;
+  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $$;
+
+DROP TRIGGER IF EXISTS lock_completed_vip_finding ON public.vip_maintenance_findings;
+CREATE TRIGGER lock_completed_vip_finding
+BEFORE UPDATE OR DELETE ON public.vip_maintenance_findings
+FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_finding();
+
+REVOKE ALL ON FUNCTION public.lock_completed_vip_visit(),public.lock_completed_vip_finding() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.lock_completed_vip_visit(),public.lock_completed_vip_finding() TO authenticated;
