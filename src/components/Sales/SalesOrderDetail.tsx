@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, DollarSign, GitBranch, FolderOpen, BarChart3, Activity, Percent, Clock, CheckCircle, AlertCircle, User, Calendar, Layers, RotateCcw, X, Award, CheckCircle2, AlignLeft, Package } from 'lucide-react';
@@ -115,7 +115,19 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
   const [order, setOrder] = useState<SalesOrderFull | null>(null);
   const [changeOrders, setChangeOrders] = useState<ChangeOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'scope');
+  const validTabs: TabType[] = ['scope', 'primary_scope', 'products', 'billing', 'change_orders', 'project', 'reports', 'stats', 'commissions'];
+  const getTabFromUrl = (): TabType => {
+    const tab = new URLSearchParams(window.location.search).get('orderTab') as TabType | null;
+    return tab && validTabs.includes(tab) ? tab : (initialTab ?? 'scope');
+  };
+  const [activeTab, setActiveTabState] = useState<TabType>(getTabFromUrl);
+  const setActiveTab = useCallback((tab: TabType) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'scope') url.searchParams.delete('orderTab');
+    else url.searchParams.set('orderTab', tab);
+    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
   const [showCommissions, setShowCommissions] = useState(false);
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [reverting, setReverting] = useState(false);
@@ -123,6 +135,12 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
   const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'finance';
+
+  useEffect(() => {
+    const handlePopState = () => setActiveTabState(getTabFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [initialTab]);
 
   useEffect(() => {
     loadOrder();

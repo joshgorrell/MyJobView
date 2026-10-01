@@ -260,7 +260,21 @@ export default function ReviewsView() {
   const canViewCustomerFeedback = isAdmin || ((profile as any)?.can_view_customer_feedback ?? canSeeAllRequests);
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'send' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
+  type ReviewTab = 'dashboard' | 'send' | 'lost';
+  const getReviewTabFromUrl = (): ReviewTab => {
+    const tab = new URLSearchParams(window.location.search).get('reviewType');
+    return tab === 'send' || tab === 'lost' || tab === 'dashboard' ? tab : 'dashboard';
+  };
+  const [activeTab, setActiveTabState] = useState<ReviewTab>(getReviewTabFromUrl);
+  const setActiveTab = useCallback((tab: ReviewTab, options?: { replace?: boolean }) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'dashboard') url.searchParams.delete('reviewType');
+    else url.searchParams.set('reviewType', tab);
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    if (options?.replace) window.history.replaceState(window.history.state, '', nextUrl);
+    else window.history.pushState(window.history.state, '', nextUrl);
+  }, []);
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [satisfactionHistory, setSatisfactionHistory] = useState<SatisfactionRecord[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -322,8 +336,14 @@ export default function ReviewsView() {
   const [editedSubject, setEditedSubject] = useState('');
 
   useEffect(() => {
-    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }
-  }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab]);
+    const handlePopState = () => setActiveTabState(getReviewTabFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send', { replace: true }); }
+  }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab, setActiveTab]);
 
   useEffect(() => {
     loadReviewRequests();

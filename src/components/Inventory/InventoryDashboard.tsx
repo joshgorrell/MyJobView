@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Package, Warehouse, AlertTriangle, TrendingUp, TrendingDown, BarChart3, Inbox, PackageSearch, ArrowRightLeft, List, ClipboardList } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,7 +30,25 @@ export function InventoryDashboard() {
     total_warehouses: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const validTabs: TabType[] = ['overview', 'inventory', 'alerts', 'receive', 'pick', 'transfer', 'stock_levels', 'purchase_orders'];
+  const getTabFromUrl = (): TabType => {
+    const tab = new URLSearchParams(window.location.search).get('inventoryTab') as TabType | null;
+    return tab && validTabs.includes(tab) ? tab : 'overview';
+  };
+  const [activeTab, setActiveTabState] = useState<TabType>(getTabFromUrl);
+  const setActiveTab = useCallback((tab: TabType) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'overview') url.searchParams.delete('inventoryTab');
+    else url.searchParams.set('inventoryTab', tab);
+    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => setActiveTabState(getTabFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     void loadStats();
