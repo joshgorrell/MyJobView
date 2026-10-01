@@ -63,6 +63,8 @@ BEGIN
  THEN missing:=array_append(missing,'findings'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)<>1)
  THEN missing:=array_append(missing,'finding_dispositions'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND nullif(btrim(x.description),'') IS NULL)
+ THEN missing:=array_append(missing,'finding_description'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='')
  THEN missing:=array_append(missing,'no_action_reason'); END IF;
  IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'notes'),'') IS NOT NULL)
