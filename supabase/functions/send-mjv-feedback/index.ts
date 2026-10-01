@@ -177,16 +177,17 @@ Deno.serve(async (req: Request) => {
     }
 
     const payload = (await req.json()) as FeedbackPayload;
-    payload.organizationId = profile.organization_id || null;
-    payload.userName = profile.full_name || profile.username || authData.user.email || 'Unknown user';
-    payload.userEmail = profile.email || authData.user.email || '';
-    payload.dealerName = verifiedDealerName;
     if (!payload || !['bug', 'idea', 'general'].includes(payload.type)) {
       return new Response(JSON.stringify({ error: 'Invalid feedback type' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    payload.organizationId = profile.organization_id || null;
+    payload.userName = profile.full_name || profile.username || authData.user.email || 'Unknown user';
+    payload.userEmail = profile.email || authData.user.email || '';
+    payload.dealerName = verifiedDealerName;
 
     const message = String(payload.message || '').trim();
     if (!message || message.length > 10000) {
