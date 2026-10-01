@@ -278,7 +278,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         onKeyUp={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         placeholder="Start a discussion... Use @ to mention users/leads, # for hashtags"
         rows={3}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+        className="mjv-writing-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
       />
 
       {tag?.symbol === '#' && <div className="flow flow-tag-results" role="listbox" aria-label="Matching customers and jobs">{choices.filter(c => c.kind !== 'person').map((choice, index) => <button type="button" role="option" aria-selected={index === highlight} key={`${choice.kind}:${choice.id}`} onClick={() => chooseRoute(choice as FlowTarget)}>{choice.label} · {choice.kind.replace('_', ' ')}</button>)}</div>}
