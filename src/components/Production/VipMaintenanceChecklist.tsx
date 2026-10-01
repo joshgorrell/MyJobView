@@ -33,7 +33,7 @@ export default function VipMaintenanceChecklist({workOrderId,onChange}:{workOrde
   if(!visit.responses?.customer_training?.complete&&!visit.training_not_needed&&!visit.customer_not_present)m.push('Customer Training');
   if(!visit.no_issues_found&&!findings.length)m.push('Findings / Issues');
   if(findings.some(f=>!f.dispositions?.length))m.push('Finding Dispositions');
-  if(findings.some(f=>(f.dispositions||[]).some(d=>d==='punchlist'&&!f.punchlist_task_id||d==='service_follow_up'&&!f.service_request_id||d==='sales'&&!f.sales_task_id)))m.push('Unrouted Findings');
+  if(findings.some(f=>(f.dispositions||[]).some(d=>(d==='punchlist'&&!f.punchlist_task_id)||(d==='service_follow_up'&&!f.service_request_id)||(d==='sales'&&!f.sales_task_id))))m.push('Unrouted Findings');
   if(!visit.no_opportunities_identified&&!(visit.responses?.opportunities||[]).length)m.push('Opportunities / Wish List');
   if(!visit.customer_not_present&&!visit.customer_acknowledged_at)m.push('Customer Acknowledgment'); return m;
  },[visit,findings]);
