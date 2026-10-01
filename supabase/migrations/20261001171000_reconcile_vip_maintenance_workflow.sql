@@ -60,7 +60,7 @@ GRANT EXECUTE ON FUNCTION public.guard_vip_finding_routing_change(),public.guard
 
 CREATE OR REPLACE FUNCTION public.link_vip_follow_up_task(p_finding_id uuid,p_task_id uuid)
 RETURNS public.vip_maintenance_findings
-LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $vip_task_link$
 DECLARE f public.vip_maintenance_findings%ROWTYPE; p public.profiles%ROWTYPE; t public.tasks%ROWTYPE; v public.vip_maintenance_visits%ROWTYPE; w public.work_orders%ROWTYPE;
 BEGIN
  SELECT * INTO p FROM public.profiles WHERE id=auth.uid() AND is_active AND contact_id IS NULL;
@@ -76,7 +76,7 @@ BEGIN
  IF NOT FOUND OR t.contact_id IS DISTINCT FROM w.contact_id THEN RAISE EXCEPTION 'Task does not belong to this VIP customer.' USING ERRCODE='42501'; END IF;
  UPDATE public.vip_maintenance_findings SET follow_up_task_id=p_task_id,routed_at=now(),updated_at=now() WHERE id=f.id RETURNING * INTO f;
  RETURN f;
-END $;
+END $vip_task_link$;
 REVOKE ALL ON FUNCTION public.link_vip_follow_up_task(uuid,uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.link_vip_follow_up_task(uuid,uuid) TO authenticated;
 
