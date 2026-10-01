@@ -23,6 +23,7 @@ export interface ServiceRequestContext {
   priority: string;
   notes: string | null;
   contact_id: string | null;
+  customer_location_id?: string | null;
   requested_tech_ids: string[] | null;
   requested_date: string | null;
   requested_time: string | null;
@@ -547,7 +548,9 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   }
 
   function getFullAddress(): string {
-    const addr = selectedContact
+    const addr = serviceRequest
+      ? [formData.customer_address, formData.customer_city, formData.customer_state, formData.customer_zip].filter(Boolean).join(', ')
+      : selectedContact
       ? [selectedContact.street_address, selectedContact.city, selectedContact.state, selectedContact.zip_code].filter(Boolean).join(', ')
       : [formData.customer_address, formData.customer_city, formData.customer_state, formData.customer_zip].filter(Boolean).join(', ');
     return addr;
@@ -720,6 +723,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       const workOrdersToCreate = selectedTechnicians.map((techId, index) => ({
         company_id: profile.organization_id,
         contact_id: finalContactId,
+        customer_location_id: selectedContact?.id === serviceRequest?.contact_id ? serviceRequest?.customer_location_id || null : null,
         project_id: formData.type === 'project' ? formData.project_id : (formData.project_id || null),
         labor_phase_id: selectedPhaseId || null, // Store selected labor phase
         labor_category_id: formData.labor_category_id || null, // Store labor category for Test & Tune tracking
@@ -817,7 +821,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
           .eq('id', serviceRequest.id);
 
         const contactName = selectedContact?.full_name || selectedContact?.company_name || serviceRequest.customer_name;
-        const address = selectedContact?.street_address || serviceRequest.job_location_address;
+        const address = serviceRequest.job_location_address || selectedContact?.street_address;
         for (let i = 0; i < selectedTechnicians.length; i++) {
           const wo = createdWorkOrders[i] || createdWorkOrders[0];
           await notifyTechJobAssigned(selectedTechnicians[i], {

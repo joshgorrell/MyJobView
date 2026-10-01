@@ -64,6 +64,7 @@ interface ServiceRequest {
   attachments: any;
   created_by: string;
   contact_id: string | null;
+  customer_location_id?: string | null;
   source_type: 'punchlist' | 'staff_form' | 'customer_portal' | 'other';
   kickback_reason: string | null;
   kicked_back_by: string | null;
@@ -910,6 +911,7 @@ export function ServiceRequestQueue() {
           priority: req.priority,
           notes: req.notes,
           contact_id: req.contact_id,
+          customer_location_id: req.customer_location_id,
           requested_tech_ids: req.requested_tech_ids,
           requested_date: req.requested_date,
           requested_time: req.requested_time,
