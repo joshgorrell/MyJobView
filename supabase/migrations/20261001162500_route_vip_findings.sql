@@ -79,7 +79,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND
    (('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL) OR ('service_follow_up'=ANY(x.dispositions) AND x.service_request_id IS NULL) OR ('sales'=ANY(x.dispositions) AND x.sales_task_id IS NULL)))
  THEN missing:=array_append(missing,'unrouted_findings'); END IF;
- IF NOT (v.no_opportunities_identified OR COALESCE(jsonb_array_length(COALESCE(v.responses->'opportunities','[]'::jsonb)),0)>0) THEN missing:=array_append(missing,'opportunities'); END IF;
+ IF NOT (v.no_opportunities_identified OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v.responses->'opportunities','[]'::jsonb)) o WHERE nullif(btrim(CASE WHEN jsonb_typeof(o)='string' THEN trim(both '"' from o::text) ELSE o->>'request' END),'') IS NOT NULL)) THEN missing:=array_append(missing,'opportunities'); END IF;
  IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL) THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
  RETURN missing;
 END $$;
