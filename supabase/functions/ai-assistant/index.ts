@@ -17,7 +17,7 @@ interface ChatMessage {
 interface RequestBody {
   mode?: 'chat' | 'cleanup_sales_lead';
   text?: string;
-  messages: ChatMessage[];
+  messages?: ChatMessage[];
   context?: {
     activeTab?: string;
     proposalId?: string;
@@ -149,12 +149,13 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json(); } catch {
       return new Response(JSON.stringify({ error: "Invalid request" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    if (!body || !Array.isArray(body.messages) || body.messages.length > 100 || !body.messages.length || body.messages.some(message => !message || !["user", "assistant"].includes(message.role) || typeof message.content !== "string" || message.content.length > 12000)) {
-      return new Response(JSON.stringify({ error: "Invalid messages" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    // Browser-supplied assistant history can contain stale privileged responses.
-    // Rebuild model context from current authorized data and user turns only.
+    if (!body) return new Response(JSON.stringify({ error: "Invalid request" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Sales-note cleanup is a narrow Work Order helper. It does not need chat history,
+    // but it does require the caller to have access to the production/work-order area.
     if (body.mode === "cleanup_sales_lead") {
+      if (!can("work_orders", "production", "dispatch")) {
+        return new Response(JSON.stringify({ error: "You do not have access to Work Orders" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (typeof body.text !== "string" || !body.text.trim() || body.text.length > 12000) {
         return new Response(JSON.stringify({ error: "Sales lead notes are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -172,6 +173,11 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ cleaned }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (!Array.isArray(body.messages) || body.messages.length > 100 || !body.messages.length || body.messages.some(message => !message || !["user", "assistant"].includes(message.role) || typeof message.content !== "string" || message.content.length > 12000)) {
+      return new Response(JSON.stringify({ error: "Invalid messages" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    // Browser-supplied assistant history can contain stale privileged responses.
+    // Rebuild model context from current authorized data and user turns only.
     const recentMessages = body.messages.filter(message => message.role === "user").slice(-10);
     if (!recentMessages.length) return new Response(JSON.stringify({ error: "A user message is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (unsupportedPersonnelQuestion(recentMessages[recentMessages.length - 1].content)) {
