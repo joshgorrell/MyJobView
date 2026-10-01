@@ -316,7 +316,7 @@ export default function LostOpportunityReviews(
     );
   }
   return (
-    <section className="space-y-5">
+    <section className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">
@@ -327,13 +327,13 @@ export default function LostOpportunityReviews(
             visible only to users with submission viewing permission.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-gray-300 text-sm">
+        <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <label className="flex min-w-0 items-center gap-2 text-gray-300 text-sm">
             Filter
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="rounded-lg bg-gray-800 border border-gray-600 p-2 text-sm"
+              className="min-h-11 min-w-0 flex-1 rounded-lg bg-gray-800 border border-gray-600 p-2 text-base sm:text-sm"
             >
               <option value="all">All</option>
               <option value="needs_review">Needs Review</option>
@@ -344,7 +344,7 @@ export default function LostOpportunityReviews(
           <button
             disabled={!canSend}
             onClick={() => setCreating(!creating)}
-            className="bg-cyan-700 text-white rounded-lg px-4 py-2 text-sm whitespace-nowrap"
+            className="min-h-11 bg-cyan-700 text-white rounded-lg px-4 py-2 text-sm"
           >
             {creating ? "Cancel" : "Create Review Request"}
           </button>
@@ -436,35 +436,21 @@ export default function LostOpportunityReviews(
               className={input}
             />
           </label>
-          <div className="bg-gray-900 rounded-lg p-4 text-gray-300 space-y-2 text-sm">
-            <p>
-              Thank you for giving us the opportunity to help with{" "}
-              <strong>{name || title || "your project"}</strong>.
-            </p>
-            <p>
-              Your feedback is privately reviewed by company leadership.
-              Constructive criticism is absolutely welcome. We want to improve
-              and win you over.
-            </p>
-            <p>
-              For a competing proposal with comparable equipment and scope, we
-              will work to meet or beat their price. If we can’t, we’ll buy you
-              dinner.
-            </p>
-            <p className="text-cyan-300">Tell Us Why →</p>
-          </div>
+          <p className="text-sm text-gray-400">
+            Use Preview Email to see the personalized message before sending.
+          </p>
           <button
             type="button"
             disabled={busy || previewing || !canSend || !contact?.email ||
               !title.trim()}
             onClick={previewEmail}
-            className="rounded-lg border border-cyan-600 px-5 py-3 text-cyan-200 disabled:opacity-50"
+            className="w-full sm:w-auto rounded-lg border border-cyan-600 px-5 py-3 text-cyan-200 disabled:opacity-50"
           >
             {previewing ? "Loading Preview…" : "Preview Email"}
           </button>
           <button
             disabled={busy || !canSend || !contact?.email || !title.trim()}
-            className="rounded-lg bg-cyan-700 px-5 py-3 text-white disabled:opacity-50"
+            className="w-full sm:w-auto rounded-lg bg-cyan-700 px-5 py-3 text-white disabled:opacity-50"
           >
             {busy ? "Sending…" : "Send Lost Opportunity Review"}
           </button>
@@ -528,8 +514,8 @@ export default function LostOpportunityReviews(
             key={v.request_id}
             className="rounded-lg border border-gray-700 bg-gray-800 p-3 space-y-2"
           >
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div className="min-w-0 flex-1">
+            <div className="flex flex-col items-start gap-2">
+              <div className="w-full min-w-0">
                 {v.response ? (
                   <button type="button"
                     aria-expanded={expandedReview === v.request_id}
@@ -546,7 +532,7 @@ export default function LostOpportunityReviews(
                   </>
                 )}
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
+              <div className="w-full min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <p className="text-cyan-300">
                   {v.responded_at
                     ? (v.reviewed_at ? "Reviewed" : "Needs Review")
@@ -629,22 +615,24 @@ export default function LostOpportunityReviews(
                       {v.response.attachments.map((a) => (
                         <div key={a.path} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-600 bg-gray-900/40 p-3">
                           <FileText size={20} className="shrink-0 text-cyan-300" aria-hidden="true" />
-                          <span className="min-w-0 flex-1 break-words text-sm">
+                          <span className="min-w-0 flex-1 basis-[calc(100%-32px)] sm:basis-auto break-words text-sm">
                             {a.name}
                             <span className="block text-xs text-gray-400">{a.name.toLowerCase().endsWith(".pdf") ? "PDF document" : "Image attachment"}</span>
                           </span>
+                          <div className="flex w-full sm:w-auto items-center gap-3 pl-8 sm:pl-0">
                           <button type="button" disabled={busy}
                             aria-label={`View ${a.name}`}
                             onClick={() => openAttachment(v, a, false)}
-                            className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
+                            className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
                             <ExternalLink size={14} aria-hidden="true" /> View
                           </button>
                           <button type="button" disabled={busy}
                             aria-label={`Download ${a.name}`}
                             onClick={() => openAttachment(v, a, true)}
-                            className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
+                            className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
                             <Download size={14} aria-hidden="true" /> Download
                           </button>
+                          </div>
                         </div>
                       ))}
                     </section>
@@ -672,7 +660,7 @@ export default function LostOpportunityReviews(
                   </button>
                 )}
                 {v.response && (
-                  <label className="text-gray-300">
+                  <label className="w-full sm:w-auto text-gray-300">
                     Follow-up status<select
                       disabled={busy}
                       value={v.recovery_outcome}
@@ -682,7 +670,7 @@ export default function LostOpportunityReviews(
                           request_id: v.request_id,
                           outcome: e.target.value,
                         })}
-                      className="ml-2 rounded-lg bg-gray-900 border border-gray-600 p-2"
+                      className="block sm:inline-block w-full sm:w-auto mt-2 sm:mt-0 sm:ml-2 min-h-11 rounded-lg bg-gray-900 border border-gray-600 p-2"
                     >
                       <option value="unreviewed" disabled>Not started</option>
                       <option value="following_up">Following Up</option>
