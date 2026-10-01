@@ -1,6 +1,6 @@
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import Flow from '../Flow/Flow';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, AlertCircle, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Tag, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
@@ -184,11 +184,17 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [jobCompletion, setJobCompletion] = useState<JobCompletion | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const validTabs = ['overview','vip','tasks','materials','time','parts','photos','completion','history','flow'] as const;
+  const validTabs = ['overview','vip','notes','tasks','materials','time','parts','photos','completion','history','flow'] as const;
   type WorkOrderTab = typeof validTabs[number];
   const requestedTab = new URLSearchParams(window.location.search).get('subtab') as WorkOrderTab | null;
   const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'overview');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
+  const [notesDraft, setNotesDraft] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesError, setNotesError] = useState('');
+  const notesDraftRef = useRef('');
+  const notesDirtyRef = useRef(false);
+  const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPartRequestForm, setShowPartRequestForm] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [photoContext, setPhotoContext] = useState<'general' | 'work_order_notes' | 'vip_sales_lead'>('general');
@@ -397,6 +403,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         loadLinkedWorkOrders(woResult.data?.work_order_group_id || null);
         loadCustomerHistory(woResult.data.contact_id);
         setEditedWorkOrder(woResult.data);
+        if (!notesDirtyRef.current) {
+          const loadedNotes = woResult.data.notes || '';
+          setNotesDraft(loadedNotes);
+          notesDraftRef.current = loadedNotes;
+        }
       }
 
       setTasks(tasksResult.data || []);
@@ -412,6 +423,34 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       setLoading(false);
     }
   }
+
+
+  async function saveNotesDraft() {
+    if (!notesDirtyRef.current) return;
+    const value = notesDraftRef.current;
+    setNotesSaving(true);
+    setNotesError('');
+    const { error } = await supabase.from('work_orders').update({ notes: value, updated_at: new Date().toISOString() }).eq('id', workOrderId);
+    setNotesSaving(false);
+    if (error) { setNotesError(error.message); return; }
+    notesDirtyRef.current = false;
+    setWorkOrder(current => current ? { ...current, notes: value } : current);
+    setEditedWorkOrder(current => ({ ...current, notes: value }));
+  }
+
+  function changeNotesDraft(value: string) {
+    setNotesDraft(value);
+    notesDraftRef.current = value;
+    notesDirtyRef.current = true;
+    setNotesError('');
+    if (notesTimerRef.current) clearTimeout(notesTimerRef.current);
+    notesTimerRef.current = setTimeout(() => { void saveNotesDraft(); }, 500);
+  }
+
+  useEffect(() => () => {
+    if (notesTimerRef.current) clearTimeout(notesTimerRef.current);
+    if (notesDirtyRef.current) void saveNotesDraft();
+  }, [workOrderId]);
 
   async function handleSave() {
     if (!workOrder) return;
@@ -670,6 +709,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     { id: 'flow', label: 'Flow', icon: History },
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
     { id: 'overview', label: 'Overview', icon: FileText },
+    { id: 'notes', label: 'Notes', icon: FileText },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
     { id: 'photos', label: 'Photos', icon: Camera, count: jobPhotos.length },
@@ -934,6 +974,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                 key={tab.id}
                 onClick={() => {
                   const nextTab = tab.id as WorkOrderTab;
+                  if (activeTab === 'notes' && notesDirtyRef.current) void saveNotesDraft();
                   setActiveTab(nextTab);
                   const url = new URL(window.location.href);
                   if (nextTab === 'overview') url.searchParams.delete('subtab'); else url.searchParams.set('subtab', nextTab);
@@ -970,6 +1011,17 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
         {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} onAddSalesLeadPhoto={() => { setPhotoContext('vip_sales_lead'); setShowPhotoCapture(true); }} />}
+        {activeTab === 'notes' && (
+          <div className="max-w-3xl space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div><h3 className="font-semibold text-gray-900">Work Order Notes</h3><p className="text-sm text-gray-500">Type normally or use your device keyboard's voice-to-text. Notes save automatically.</p></div>
+              {isAssignedTech && <button type="button" onClick={() => { setPhotoContext('work_order_notes'); setShowPhotoCapture(true); }} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-gray-600 hover:bg-gray-50" title="Take or upload photos" aria-label="Take or upload note photos"><Camera className="w-5 h-5" /></button>}
+            </div>
+            <textarea value={notesDraft} onChange={e => changeNotesDraft(e.target.value)} onBlur={() => { if (notesDirtyRef.current) void saveNotesDraft(); }} rows={10} className="w-full min-h-56 rounded-xl border border-gray-300 p-3 text-base sm:text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200" placeholder="Add technician notes, customer comments, visit recap, or anything the next person should know…" />
+            <div className="flex items-center justify-between text-xs"><span className={notesError ? 'text-red-600' : 'text-gray-400'}>{notesError ? `Could not save notes: ${notesError}` : notesSaving ? 'Saving…' : notesDirtyRef.current ? 'Unsaved changes' : 'Saved'}</span><span className="text-gray-500">Camera supports multiple photos.</span></div>
+          </div>
+        )}
+
         {/* Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
