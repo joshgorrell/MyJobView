@@ -14,13 +14,13 @@ const sections = [
 
 const dispositions = [
   ['resolved_today','Resolved Today'],['punchlist','Add to Punchlist'],
-  ['service_follow_up','Service Follow-Up'],['sales','Send to Sales'],['no_action','No Action']
+  ['service_follow_up','Service Follow-Up'],['no_action','No Action']
 ] as const;
 
-type Finding={id?:string;room:string;description:string;notes:string;dispositions:string[];punchlist_task_id?:string|null;service_request_id?:string|null;sales_task_id?:string|null;routed_at?:string|null};
+type Finding={id?:string;room:string;description:string;notes:string;dispositions:string[];punchlist_task_id?:string|null;service_request_id?:string|null;routed_at?:string|null};
 type SalesLeadDraft={notes:string};
 
-export default function VipMaintenanceChecklist({workOrderId,onChange}:{workOrderId:string;onChange?:()=>void}) {
+export default function VipMaintenanceChecklist({workOrderId,onChange,onAddPart}:{workOrderId:string;onChange?:()=>void;onAddPart?:()=>void}) {
  const {profile}=useAuth(); const [visit,setVisit]=useState<any>(null); const [findings,setFindings]=useState<Finding[]>([]); const [saving,setSaving]=useState(false);
  const [cleaningLead,setCleaningLead]=useState(false);
  useEffect(()=>{load();},[workOrderId]);
@@ -35,7 +35,7 @@ export default function VipMaintenanceChecklist({workOrderId,onChange}:{workOrde
   if(!visit.no_issues_found&&!findings.length)m.push('Findings / Issues');
   if(findings.some(f=>!f.dispositions?.length))m.push('Finding Dispositions');
   if(findings.some(f=>(f.dispositions||[]).includes('no_action')&&!f.notes?.trim()))m.push('No Action Reason');
-  if(findings.some(f=>(f.dispositions||[]).some(d=>(d==='punchlist'&&!f.punchlist_task_id)||(d==='service_follow_up'&&!f.service_request_id)||(d==='sales'&&!f.sales_task_id))))m.push('Unrouted Findings');
+  if(findings.some(f=>(f.dispositions||[]).some(d=>(d==='punchlist'&&!f.punchlist_task_id)||(d==='service_follow_up'&&!f.service_request_id))))m.push('Unrouted Findings');
   const lead=visit.responses?.sales_lead; if(!visit.no_opportunities_identified&&!lead?.notes?.trim())m.push('Sales Lead / No Sales Lead Identified');
   if(!visit.customer_not_present&&!visit.customer_acknowledged_at)m.push('Customer Acknowledgment'); return m;
  },[visit,findings]);
@@ -49,7 +49,7 @@ export default function VipMaintenanceChecklist({workOrderId,onChange}:{workOrde
  async function cleanSalesLead(){const notes=visit.responses?.sales_lead?.notes?.trim();if(!notes||cleaningLead)return;setCleaningLead(true);try{const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error('Please sign in again.');const res=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-assistant`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({mode:'cleanup_sales_lead',text:notes,messages:[{role:'user',content:'Clean up these sales lead notes.'}]})});const data=await res.json();if(!res.ok||!data.cleaned)throw new Error(data.error||'Could not clean up notes');await updateSalesLead(data.cleaned);}catch(e){alert(e instanceof Error?e.message:'Could not clean up notes');}finally{setCleaningLead(false);}}
  if(!visit)return <div className="p-6 text-sm text-gray-500">Preparing VIP Maintenance checklist…</div>;
  return <div className="space-y-5">
-  <div className="flex items-start justify-between gap-4"><div><h3 className="text-lg font-bold text-gray-900">VIP Maintenance Visit</h3><p className="text-sm text-gray-600">Complete each applicable section. Batteries, replacement parts and consumables are billed through the normal Work Order parts flow.</p></div><span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${missing.length?'bg-amber-100 text-amber-700':'bg-green-100 text-green-700'}`}>{missing.length?missing.length+' incomplete':'Ready to complete'}</span></div>
+  <div className="flex items-start justify-between gap-4"><div><h3 className="text-lg font-bold text-gray-900">VIP Maintenance Visit</h3><p className="text-sm text-gray-600">Complete each applicable section. Batteries, replacement parts and consumables are billed through the normal Work Order parts flow.</p>{onAddPart&&<button type="button" onClick={onAddPart} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600"><Plus className="w-3.5 h-3.5"/>Add Battery / Consumable</button>}</div><span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${missing.length?'bg-amber-100 text-amber-700':'bg-green-100 text-green-700'}`}>{missing.length?missing.length+' incomplete':'Ready to complete'}</span></div>
   {sections.map(([k,label,checks])=>{const x=visit.responses?.[k]||{};return <section key={k} className={`rounded-xl border p-4 ${x.na?'bg-gray-50 opacity-70':'bg-white'}`}><div className="flex items-center justify-between gap-3"><button onClick={()=>setSection(k,{complete:!x.complete,na:false})} className="flex items-center gap-2 text-left font-semibold text-gray-900">{x.complete?<CheckCircle className="w-5 h-5 text-green-600"/>:<Circle className="w-5 h-5 text-gray-400"/>}{label}</button>{k!=='customer_check_in'&&<label className="flex items-center gap-1.5 text-xs text-gray-500"><input type="checkbox" checked={!!x.na} onChange={e=>setSection(k,{na:e.target.checked,complete:false})}/>N/A</label>}</div>{!x.na&&<><div className="mt-3 grid gap-1.5">{checks.map(check=><div key={check} className="text-xs text-gray-600 flex items-start gap-2"><CheckCircle className="w-3.5 h-3.5 mt-0.5 text-gray-400 shrink-0"/>{check}</div>)}</div><textarea value={x.notes||''} onChange={e=>setSection(k,{notes:e.target.value})} rows={2} placeholder="Notes (optional)" className="mt-3 w-full border border-gray-200 rounded-lg p-2 text-sm"/></>}</section>})}
   <section className="rounded-xl border p-4"><div className="flex items-center justify-between"><button onClick={()=>setSection('customer_training',{complete:!visit.responses?.customer_training?.complete})} className="flex items-center gap-2 font-semibold">{visit.responses?.customer_training?.complete?<CheckCircle className="w-5 h-5 text-green-600"/>:<Circle className="w-5 h-5 text-gray-400"/>}Customer Training</button><label className="text-xs text-gray-600 flex gap-1.5"><input type="checkbox" checked={visit.training_not_needed} onChange={e=>patch({training_not_needed:e.target.checked})}/>No customer present / training not needed</label></div></section>
   <section className="rounded-xl border p-4 space-y-3"><div className="flex justify-between"><h4 className="font-semibold">Findings / Issues</h4><label className="text-xs flex gap-1.5"><input type="checkbox" checked={visit.no_issues_found} onChange={e=>{if(e.target.checked&&findings.length){alert('Remove the documented findings before selecting No Issues Found.');return;}patch({no_issues_found:e.target.checked});}}/>No Issues Found</label></div>
