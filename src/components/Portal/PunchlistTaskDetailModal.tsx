@@ -1,3 +1,4 @@
+import { punchlistDescription } from '../../lib/punchlist';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -72,7 +73,7 @@ interface PunchlistTaskDetailModalProps {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  draft:     { label: 'Draft',     bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300'  },
+  draft:     { label: 'Not Requested',     bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300'  },
   requested: { label: 'Requested', bg: 'bg-amber-100',  text: 'text-amber-700',  border: 'border-amber-300' },
   scheduled: { label: 'Scheduled', bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300'  },
   completed: { label: 'Completed', bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
@@ -192,7 +193,7 @@ export function PunchlistTaskDetailModal({
                   </span>
                 )}
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-gray-900 leading-snug">{task.title}</h2>
+              <h2 className="text-base sm:text-lg font-bold text-gray-900 leading-snug line-clamp-2">{punchlistDescription(task)}</h2>
             </div>
 
             <button
@@ -246,15 +247,19 @@ export function PunchlistTaskDetailModal({
               </div>
             )}
 
-            {/* Original description */}
-            {task.details && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">What needs attention?</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{punchlistDescription(task)}</p>
+            </div>
+            {/* Preserve historical subjects for staff without asking customers for one. */}
+            {isAdmin && task.details && task.title !== task.details && (
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5" />
-                  Description
+                  Original subject
                 </p>
                 <p className="text-sm text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  {task.details}
+                  {task.title}
                 </p>
               </div>
             )}

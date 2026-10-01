@@ -1,3 +1,4 @@
+import { punchlistDescription } from '../../lib/punchlist';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -211,83 +212,15 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         if (error) throw error;
         loadTasks();
       } else if (newStatus === 'completed') {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) throw new Error('Task not found');
-
-        if (task.status === 'scheduled' && (task.service_request_id || task.work_order_id)) {
-          const doComplete = async () => {
-            try {
-              const now = new Date().toISOString();
-              const adminName = profile?.full_name || profile?.email || 'Admin';
-              const auditNote = `Cancelled — punchlist task marked complete by ${adminName} on ${new Date().toLocaleString()}.`;
-
-              await supabase
-                .from('punchlist_tasks')
-                .update({ status: 'completed', completed_at: now })
-                .eq('id', taskId);
-
-              if (task.service_request_id) {
-                const { data: sr } = await supabase
-                  .from('service_requests')
-                  .select('notes')
-                  .eq('id', task.service_request_id)
-                  .maybeSingle();
-
-                const existingNotes = sr?.notes ? sr.notes + '\n\n' : '';
-                await supabase
-                  .from('service_requests')
-                  .update({ status: 'cancelled', notes: existingNotes + auditNote })
-                  .eq('id', task.service_request_id);
-              }
-
-              if (task.work_order_id) {
-                const { data: wo } = await supabase
-                  .from('work_orders')
-                  .select('internal_notes')
-                  .eq('id', task.work_order_id)
-                  .maybeSingle();
-
-                const existingNotes = wo?.internal_notes ? wo.internal_notes + '\n\n' : '';
-                await supabase
-                  .from('work_orders')
-                  .update({ status: 'cancelled', internal_notes: existingNotes + auditNote })
-                  .eq('id', task.work_order_id);
-              }
-
-              toast.success('Task marked complete. The linked service request and work order have been cancelled.', 'Task Completed');
-              loadTasks();
-            } catch (err: any) {
-              toast.error(err.message, 'Failed to complete task');
-            }
-          };
-
-          toast.confirm(
-            'This task has a scheduled work order. Marking it complete will cancel both the service request and the work order. This cannot be undone.',
-            doComplete,
-            'Cancel Work Order & Complete Task?'
-          );
-          return;
-        }
-
-        const updates: any = {
-          status: newStatus,
-          completed_at: new Date().toISOString()
-        };
-
-        const { error } = await supabase
-          .from('punchlist_tasks')
-          .update(updates)
-          .eq('id', taskId);
-
+        const { error } = await supabase.rpc('mark_punchlist_task_completed', {
+          p_task_id: taskId, p_completed_by_customer: false
+        });
         if (error) throw error;
         loadTasks();
       } else if (newStatus === 'draft') {
         toast.confirm('This will mark the task as incomplete and remove the completion date.', async () => {
           try {
-            const { error } = await supabase
-              .from('punchlist_tasks')
-              .update({ status: 'draft', completed_at: null, requested_at: null })
-              .eq('id', taskId);
+            const { error } = await supabase.rpc('update_punchlist_item', { p_task_id: taskId, p_action: 'reopen' });
 
             if (error) throw error;
             toast.success('Task has been reopened and marked as incomplete.');
@@ -304,50 +237,39 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     }
   }
 
-  async function handleAdminRecallTask(task: PunchlistTask) {
+  async function handleAdminRecallTask(task: Pick<PunchlistTask, 'id' | 'service_request' | 'work_order_id'>) {
     const hasWorkOrder = task.service_request?.work_order_id || task.work_order_id;
     if (hasWorkOrder) return;
 
     toast.confirm(
-      'This will cancel the open service request and return the task to draft status.',
+      'Return this item to Not Requested? Other items in the request remain requested.',
       async () => {
         try {
-          if (task.service_request_id) {
-            await supabase
-              .from('service_requests')
-              .update({ status: 'cancelled' })
-              .eq('id', task.service_request_id);
-          }
-          await supabase
-            .from('punchlist_tasks')
-            .update({ status: 'draft', service_request_id: null, requested_at: null })
-            .eq('id', task.id);
-          toast.success('Task recalled to draft.');
+          const { error } = await supabase.rpc('update_punchlist_item', { p_task_id: task.id, p_action: 'cancel' });
+          if (error) throw error;
+
+          toast.success('Item returned to Not Requested.');
           setDetailTask(null);
           loadTasks();
         } catch (error: any) {
           toast.error(error.message, 'Failed to recall task');
         }
       },
-      'Recall to Draft?'
+      'Cancel Request for Item?'
     );
   }
 
-  async function handleAdminDeleteTask(task: PunchlistTask) {
+  async function handleAdminDeleteTask(task: Pick<PunchlistTask, 'id' | 'service_request' | 'work_order_id'>) {
     const hasWorkOrder = task.service_request?.work_order_id || task.work_order_id;
     if (hasWorkOrder) return;
 
     toast.confirm(
-      'This will cancel the open service request and permanently delete the task. This cannot be undone.',
+      'Permanently remove this item? Other items in the request remain requested. This cannot be undone.',
       async () => {
         try {
-          if (task.service_request_id) {
-            await supabase
-              .from('service_requests')
-              .update({ status: 'cancelled' })
-              .eq('id', task.service_request_id);
-          }
-          await supabase.from('punchlist_tasks').delete().eq('id', task.id);
+          const { error } = await supabase.rpc('update_punchlist_item', { p_task_id: task.id, p_action: 'delete' });
+          if (error) throw error;
+
           toast.success('Task deleted.');
           setDetailTask(null);
           loadTasks();
@@ -377,7 +299,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   );
 
   const toggleSelectAll = () => {
-    if (selectedTaskIds.size === selectableTasks.length) {
+    if (selectableTasks.length > 0 && selectableTasks.every(task => selectedTaskIds.has(task.id))) {
       setSelectedTaskIds(new Set());
     } else {
       setSelectedTaskIds(new Set(selectableTasks.map(t => t.id)));
@@ -438,12 +360,12 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   };
 
   return (
-    <div className="space-y-4 px-3 sm:px-0">
+    <div className="space-y-2 sm:space-y-4 px-1 sm:px-0">
       {/* Header - Compact */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+        <h2 className="text-base sm:text-xl font-bold text-primary flex items-center gap-2">
           <ClipboardList className="w-5 h-5" />
-          Punchlist Management
+          <span className="sm:hidden">Punchlist</span><span className="hidden sm:inline">Punchlist Management</span>
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -499,8 +421,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
       {activeTab === 'punchlist' && (
         <>
       {/* Search and Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="flex-1 relative">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex-1 min-w-[140px] relative">
           <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
@@ -515,25 +437,16 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           <select
             value={selectedFilter}
             onChange={e => setSelectedFilter(e.target.value as typeof selectedFilter)}
-            className="appearance-none pl-3 pr-7 py-2 bg-surface border border-subtle rounded-lg text-sm text-gray-200 focus:outline-none focus:border-gray-500 cursor-pointer hover:border-strong transition-colors"
+            className="appearance-none pl-3 pr-7 py-2 bg-surface border border-subtle rounded-lg text-xs sm:text-sm text-primary focus:outline-none focus:border-gray-500 cursor-pointer hover:border-strong transition-colors"
           >
             <option value="all">All ({stats.total})</option>
-            <option value="draft">Draft ({stats.draft})</option>
+            <option value="draft">Not Requested ({stats.draft})</option>
             <option value="requested">Requested ({stats.requested})</option>
             <option value="scheduled">Scheduled ({stats.scheduled})</option>
             <option value="completed">Completed ({stats.completed})</option>
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
         </div>
-        {selectableTasks.length > 0 && (
-          <button
-            onClick={toggleSelectAll}
-            className="px-3 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <CheckCheck className="w-3.5 h-3.5" />
-            {selectedTaskIds.size === selectableTasks.length ? 'Deselect All' : 'Select All'}
-          </button>
-        )}
         {(selectedFilter !== 'all' || searchQuery) && (
           <button
             onClick={() => { setSelectedFilter('all'); setSearchQuery(''); }}
@@ -565,7 +478,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
       {/* Batch Action Toolbar */}
       {selectedTaskIds.size > 0 && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-blue-900/40 border-2 border-blue-500 rounded-lg">
+        <div className="flex items-center justify-between gap-3 px-2 py-2 sm:px-4 sm:py-3 bg-blue-900/40 border-2 border-blue-500 rounded-lg">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
               {selectedTaskIds.size}
@@ -606,6 +519,18 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         </div>
       )}
 
+      <div className="flex justify-end">
+        {selectableTasks.length > 0 && (
+          <button
+            onClick={toggleSelectAll}
+            className="px-1 py-1 text-xs text-brand hover:bg-elevated rounded flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <CheckCheck className="w-3.5 h-3.5" />
+            {selectableTasks.length > 0 && selectableTasks.every(task => selectedTaskIds.has(task.id)) ? 'Deselect All' : 'Select All'}
+          </button>
+        )}
+      </div>
+
       {/* Tasks List - Compact */}
       <div className="space-y-2">
         {filteredTasks.length === 0 ? (
@@ -633,25 +558,25 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                 <div key={task.id}>
                   {/* Section Header */}
                   {showSectionHeader && task.status === 'requested' && (
-                    <div className="text-sm font-semibold text-amber-400 px-2 py-2 mt-2 flex items-center gap-1.5">
+                    <div className="text-sm font-semibold text-amber-400 px-1 py-1 mt-1 flex items-center gap-1.5">
                       <Send className="w-3.5 h-3.5" />
                       Requested Tasks
                     </div>
                   )}
                   {showSectionHeader && task.status === 'scheduled' && (
-                    <div className="text-sm font-semibold text-blue-400 px-2 py-2 mt-2 flex items-center gap-1.5">
+                    <div className="text-sm font-semibold text-info px-1 py-1 mt-1 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" />
                       Scheduled Tasks
                     </div>
                   )}
                   {showSectionHeader && task.status === 'draft' && (
-                    <div className="text-sm font-semibold text-yellow-400 px-2 py-2 mt-2 flex items-center gap-1.5">
+                    <div className="text-sm font-semibold text-warning px-1 py-1 mt-1 flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5" />
-                      Draft Tasks
+                      Not Requested
                     </div>
                   )}
                   {showSectionHeader && task.status === 'completed' && (
-                    <div className="text-sm font-semibold text-green-400 px-2 py-2 mt-2 flex items-center gap-1.5">
+                    <div className="text-sm font-semibold text-success px-1 py-1 mt-1 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Completed Tasks
                     </div>
@@ -663,94 +588,35 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                       ? 'border-blue-500 ring-2 ring-blue-500/50'
                       : 'border-subtle hover:border-strong'
                   }`}>
-              {/* Task Header - Clickable and Compact */}
-              <div className="p-3">
-                <div className="flex items-start gap-3">
-                  {/* Checkbox placeholder - always reserve space for uniform card height */}
-                  <div className="flex-shrink-0 pt-1 w-4">
-                    {task.status === 'draft' && !task.service_request_id && !task.work_order_id && (
-                      <input
-                        type="checkbox"
-                        checked={selectedTaskIds.has(task.id)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          toggleTaskSelection(task.id);
-                        }}
-                        className="w-4 h-4 rounded border-strong text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
-                      />
-                    )}
-                  </div>
-
-                  {/* Main Content - Clickable */}
-                  <div
-                    className="flex-1 min-w-0 cursor-pointer"
-                    onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                  >
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <StatusBadge status={task.status} task={task} />
-                      {task.photos && task.photos.length > 0 && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-elevated rounded text-xs text-secondary">
-                          <ImageIcon className="w-3 h-3" />
-                          {task.photos.length}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                      className="text-left text-base font-semibold text-primary mb-1 hover:text-amber-300 transition-colors leading-snug"
-                    >
-                      {task.title}
+              <div className="px-2.5 py-2 sm:p-3 flex items-start gap-2">
+                <div className="w-4 shrink-0 pt-0.5">
+                  {task.status === 'draft' && !task.service_request_id && !task.work_order_id && (
+                    <input type="checkbox" aria-label={`Select ${punchlistDescription(task)}`}
+                      checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)}
+                      className="w-4 h-4 rounded border-strong text-blue-600 focus:ring-blue-500" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setDetailTask(task)}
+                      className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-primary hover:text-brand">
+                      {punchlistDescription(task)}
                     </button>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted min-w-0">
-                      <div className="flex items-center gap-1">
-                        <User className="w-3.5 h-3.5" />
-                        {task.contact_id ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setQuickViewContactId(task.contact_id); }}
-                            className="customer-link text-left font-medium transition-colors"
-                          >
-                            {task.contact.full_name}
-                          </button>
-                        ) : (
-                          <span>{task.contact.full_name}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Mail className="w-3.5 h-3.5" />
-                        <span className="truncate max-w-[200px]">{task.contact.email}</span>
-                      </div>
-                      {task.contact.phone && (
-                        <div className="flex items-center gap-1">
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>{task.contact.phone}</span>
-                        </div>
-                      )}
-                      {task.requested_at && task.status !== 'draft' ? (
-                        <div className="flex items-center gap-1 text-amber-400/80" title={`Customer requested service: ${new Date(task.requested_at).toLocaleString()}`}>
-                          <Send className="w-3 h-3" />
-                          <span>Requested {new Date(task.requested_at).toLocaleDateString()}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1" title={`Created: ${new Date(task.created_at).toLocaleString()}`}>
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>{new Date(task.created_at).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Quick Preview - Compact */}
-                    {task.details && expandedTask !== task.id && (
-                      <p className="text-xs text-muted mt-1.5 line-clamp-1">{task.details}</p>
-                    )}
+                    <span className="hidden sm:block"><StatusBadge status={task.status} task={task} /></span>
+                    <button aria-label={expandedTask === task.id ? 'Collapse item' : 'Expand item'}
+                      onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                      className="p-1 shrink-0 text-muted">
+                      {expandedTask === task.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
                   </div>
-
-                  {/* Expand/Collapse Icon */}
-                  <div className="flex-shrink-0 pt-1">
-                    {expandedTask === task.id ? (
-                      <ChevronUp className="w-4 h-4 text-muted" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-muted" />
-                    )}
+                  <div className="flex items-center gap-1.5 text-xs text-muted min-w-0">
+                    <button onClick={() => setQuickViewContactId(task.contact_id)}
+                      className="customer-link truncate text-left min-w-0 flex-1 sm:flex-none">{task.contact.full_name}</button>
+                    <span>·</span><span className="shrink-0">{new Date(task.requested_at || task.created_at).toLocaleDateString()}</span>
+                    <span className={`sm:hidden shrink-0 text-[10px] ${task.status === 'draft' ? 'text-warning' : task.status === 'completed' ? 'text-success' : 'text-info'}`}>
+                      · {task.status === 'draft' ? 'Not Requested' : task.status === 'completed' ? 'Completed' : task.status === 'scheduled' ? 'Scheduled' : 'Requested'}
+                    </span>
+                    {task.photos && task.photos.length > 0 && <span className="shrink-0 flex items-center gap-1">· <ImageIcon className="w-3 h-3" />{task.photos.length}</span>}
                   </div>
                 </div>
               </div>
@@ -759,6 +625,10 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
               {expandedTask === task.id && (
                 <div className="border-t border-subtle bg-canvas/50">
                   <div className="p-3 space-y-3">
+                    <div className="flex flex-wrap gap-3 text-xs text-muted">
+                      <a href={`mailto:${task.contact.email}`} className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{task.contact.email}</a>
+                      {task.contact.phone && <a href={`tel:${task.contact.phone}`} className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{task.contact.phone}</a>}
+                    </div>
                     {/* Customer self-completed notice */}
                     {task.status === 'completed' && task.completed_by_customer && (
                       <div className="flex items-start gap-2.5 px-3 py-2.5 bg-teal-900/40 border border-teal-600 rounded-lg">
@@ -852,7 +722,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                                 className="px-2.5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-xs flex items-center gap-1"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
-                                Recall to Draft
+                                Cancel Request for Item
                               </button>
                               <button
                                 onClick={() => updateTaskStatus(task.id, 'completed')}
@@ -1156,7 +1026,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 function StatusBadge({ status, task }: { status: string; task?: PunchlistTask }) {
   const statusConfig: Record<string, { label: string; className: string; icon: any }> = {
     draft: {
-      label: 'Draft',
+      label: 'Not Requested',
       className: 'bg-warningSoft text-warning border border-warningLine',
       icon: FileText,
     },
@@ -1193,7 +1063,7 @@ function StatusBadge({ status, task }: { status: string; task?: PunchlistTask })
   }
 
   return (
-    <span className={`px-1.5 py-0.5 rounded text-xs font-medium flex items-center gap-1 ${config.className}`}>
+    <span className={`px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-medium whitespace-nowrap shrink-0 flex items-center gap-1 ${config.className}`}>
       <Icon className="w-3 h-3" />
       {config.label}{linkedInfo}
       {status === 'completed' && task?.completed_by_customer && (
@@ -1312,10 +1182,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
                     <div key={task.id} className="flex items-start gap-2.5 px-4 py-2.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0 mt-0.5" />
                       <div className="min-w-0">
-                        <div className="text-sm text-white font-medium truncate">{task.title}</div>
-                        {task.details && (
-                          <div className="text-xs text-muted truncate mt-0.5">{task.details}</div>
-                        )}
+                        <div className="text-sm text-primary font-medium truncate">{punchlistDescription(task)}</div>
                       </div>
                     </div>
                   ))}
