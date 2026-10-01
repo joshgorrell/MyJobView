@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { responseReasons, lostReviewAction } from "./lostReview";
+import { printLostReview } from "./printLostReview";
 interface Contact {
   id: string;
   contact_name: string;
@@ -39,7 +40,7 @@ interface Review {
 export default function LostOpportunityReviews(
   { showCreate = false }: { showCreate?: boolean },
 ) {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [filter, setFilter] = useState("all");
   const [creating, setCreating] = useState(showCreate);
@@ -506,6 +507,16 @@ export default function LostOpportunityReviews(
                     : "Awaiting Response"}
                 </p>
                 <HistoryLine v={v} />
+                {canView && v.response && (
+                  <button type="button"
+                    onClick={() => {
+                      try { printLostReview(v, companySettings?.company_name || "Customer Feedback"); }
+                      catch (e) { setError(e instanceof Error ? e.message : "Unable to open printable review."); }
+                    }}
+                    className="text-cyan-300 hover:underline whitespace-nowrap">
+                    Print / Save PDF
+                  </button>
+                )}
                 {canView && (
                   <button
                     type="button"
