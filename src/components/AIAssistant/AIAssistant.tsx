@@ -122,6 +122,7 @@ interface AIAssistantProps {
   contactName?: string;
   contactId?: string;
   salesRepContext?: {
+    repId: string;
     repName: string;
     thisMonthTotal: number;
     ytdTotal: number;
@@ -173,12 +174,18 @@ export function AIAssistant({
   const [checkingEnabled, setCheckingEnabled] = useState(true);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeRequestRef = useRef<AbortController | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    checkEnabled();
-  }, []);
+    activeRequestRef.current?.abort();
+    setLoading(false);
+    setMessages([]);
+    setInput('');
+    setEnabled(false);
+    if (profile?.organization_id) void checkEnabled();
+  }, [profile?.id, profile?.organization_id, profile?.role]);
 
   useEffect(() => {
     if (onRegisterOpen) onRegisterOpen(() => setIsOpen(true));
@@ -202,9 +209,10 @@ export function AIAssistant({
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('ai_assistant_enabled, openai_api_key')
+        .select('ai_assistant_enabled')
+        .eq('organization_id', profile?.organization_id)
         .maybeSingle();
-      setEnabled(!!(data?.ai_assistant_enabled && data?.openai_api_key));
+      setEnabled(!!data?.ai_assistant_enabled);
     } catch {
       setEnabled(false);
     } finally {
@@ -216,6 +224,8 @@ export function AIAssistant({
     const content = (text ?? input).trim();
     if (!content || loading) return;
 
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -235,23 +245,26 @@ export function AIAssistant({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      if (!token) throw new Error('Please sign in again to use the assistant.');
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-assistant`,
         {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             messages: history,
-            context: { activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext },
+            context: { activeTab, proposalId, contactId, salesRepId: ['sales_dashboard', 'sales'].includes(activeTab || '') ? salesRepContext?.repId : undefined },
           }),
         }
       );
 
       const data = await res.json();
+      if (controller.signal.aborted) return;
       if (!res.ok) throw new Error(data.error || 'Request failed');
 
       const assistantMessage: ChatMessage = {
@@ -267,6 +280,7 @@ export function AIAssistant({
 
       if (!isOpen || isMinimized) setHasUnread(true);
     } catch (err) {
+      if (controller.signal.aborted) return;
       setMessages(prev => [
         ...prev,
         {
@@ -277,9 +291,9 @@ export function AIAssistant({
         },
       ]);
     } finally {
-      setLoading(false);
+      if (activeRequestRef.current === controller) { activeRequestRef.current = null; setLoading(false); }
     }
-  }, [input, loading, messages, activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext, isOpen, isMinimized]);
+  }, [input, loading, messages, activeTab, proposalId, proposalNumber, proposalTitle, contactName, contactId, salesRepContext?.repId, isOpen, isMinimized]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {

@@ -114,6 +114,7 @@ interface YearComparison {
 }
 
 export interface SalesRepAIContext {
+  repId: string;
   repName: string;
   thisMonthTotal: number;
   ytdTotal: number;
@@ -373,6 +374,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
     const repName = salesRepsForSelector.find(r => r.id === viewingRepId)?.display_name || 'Rep';
 
     onRepContextChange({
+      repId: viewingRepId,
       repName,
       thisMonthTotal,
       ytdTotal,
