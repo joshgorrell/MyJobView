@@ -14,7 +14,8 @@ BEGIN
  SELECT * INTO f FROM public.vip_maintenance_findings WHERE id=p_finding_id FOR UPDATE;
  IF NOT FOUND OR p.organization_id IS DISTINCT FROM f.organization_id THEN RAISE EXCEPTION 'Finding not found' USING ERRCODE='42501'; END IF;
  IF cardinality(f.dispositions)<>1 THEN RAISE EXCEPTION 'Choose exactly one finding outcome'; END IF;
- IF NOT ('punchlist'=ANY(f.dispositions)) THEN RAISE EXCEPTION 'Only Needs Follow-Up findings create Punchlist items.'; END IF;
+ IF NOT ('punchlist'=ANY(f.dispositions)) THEN RAISE EXCEPTION 'Only Needs Follow-Up findings can be routed.'; END IF;
+ IF f.follow_up_type IS DISTINCT FROM 'punchlist' THEN RAISE EXCEPTION 'Choose Service / Technical Work before creating a Punchlist item.'; END IF;
  IF nullif(btrim(f.description),'') IS NULL THEN RAISE EXCEPTION 'Describe what needs follow-up before creating a Punchlist item'; END IF;
  IF 'no_action'=ANY(f.dispositions) AND coalesce(nullif(btrim(f.notes),''),'')='' THEN RAISE EXCEPTION 'A reason is required when No Action is selected.'; END IF;
  SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=f.visit_id;
@@ -51,8 +52,10 @@ BEGIN
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)<>1) THEN missing:=array_append(missing,'finding_dispositions'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND nullif(btrim(x.description),'') IS NULL) THEN missing:=array_append(missing,'finding_description'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='') THEN missing:=array_append(missing,'no_action_reason'); END IF;
- IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND
-   ('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL))
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'punchlist'=ANY(x.dispositions) AND x.follow_up_type IS NULL)
+ THEN missing:=array_append(missing,'follow_up_type'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'punchlist'=ANY(x.dispositions) AND
+   ((x.follow_up_type='punchlist' AND x.punchlist_task_id IS NULL) OR (x.follow_up_type='task' AND x.follow_up_task_id IS NULL)))
  THEN missing:=array_append(missing,'unrouted_findings'); END IF;
  IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'notes'),'') IS NOT NULL) THEN missing:=array_append(missing,'sales_lead'); END IF;
  IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL) THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
