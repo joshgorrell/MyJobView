@@ -950,7 +950,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
-        {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist workOrderId={workOrderId} onChange={loadWorkOrderData} />}
+        {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} />}
         {/* Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
