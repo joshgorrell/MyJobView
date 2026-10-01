@@ -83,6 +83,8 @@ BEGIN
  THEN missing:=array_append(missing,'customer_training'); END IF;
  IF NOT (v.no_issues_found OR EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id))
  THEN missing:=array_append(missing,'findings'); END IF;
+ IF v.no_issues_found AND EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id)
+ THEN missing:=array_append(missing,'findings_consistency'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)<>1)
  THEN missing:=array_append(missing,'finding_dispositions'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND nullif(btrim(x.description),'') IS NULL)
