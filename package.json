@@ -15,6 +15,7 @@
     "test:reviews": "node tests/reviews/database.mjs && node tests/reviews/edge.mjs",
     "test:punchlist": "node tests/punchlist/database.mjs",
     "test:work-orders": "node tests/work-orders/modal-runtime.mjs",
+    "test:vip-plans": "node tests/vip-plans/flow.mjs",
     "test:program-access": "node tests/program-access/database.mjs"
   },
   "dependencies": {
