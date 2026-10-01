@@ -1,5 +1,6 @@
+let assessment: any = null;
 const review = { request_id: 'request-1', organization_id: 'org-1', opportunity_name: 'Home theater', delivery_status: 'sent', responded_at: '2026-10-01T15:00:00Z', reviewed_at: null, recovery_outcome: 'unreviewed' };
-export const useAuth = () => ({ profile: { id: 'employee-1', organization_id: 'org-1', can_send_lost_opportunity_reviews: false, can_view_lost_opportunity_submissions: true }, companySettings: { company_name: 'Electronic Life' } });
+export const useAuth = () => ({ profile: { role: new URLSearchParams(location.search).has('sales') ? 'sales' : 'admin', id: 'employee-1', organization_id: 'org-1', can_send_lost_opportunity_reviews: false, can_view_lost_opportunity_submissions: true }, companySettings: { company_name: 'Electronic Life' } });
 (window as any).reviewCalls = 0;
 (window as any).failReview = false;
 export const supabase = {
@@ -14,6 +15,12 @@ export const supabase = {
     return query;
   },
   functions: { async invoke(_name: string, { body }: any) {
+    if (body.action === 'assessment_load') return { data: { assessment, reps: [{ id: 'rep-1', first_name: 'Michael', last_name: 'Sales', is_active: true }], default_rep_id: 'rep-1' } };
+    if (body.action === 'assessment_save') {
+      if ((window as any).failAssessment) return { data: { error: 'Simulated assessment save failure' } };
+      assessment = { ...body.assessment, updated_at: new Date().toISOString() };
+      return { data: { assessment } };
+    }
     if (body.action === 'load') return { data: { title: 'Tell us why', opportunity_name: 'Home theater', company_name: 'Electronic Life', completed: false } };
     if (body.action === 'submit') { (window as any).submittedFiles = body.files; return { data: { success: true } }; }
     if (body.action === 'review') {

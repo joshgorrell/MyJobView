@@ -1,3 +1,4 @@
+import AdminSalesReviewModal from "./AdminSalesReviewModal";
 import React, { useEffect, useState } from "react";
 import { Trash2, FileText, Download, ExternalLink, Paperclip } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -45,6 +46,7 @@ export default function LostOpportunityReviews(
   const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [expandedReview, setExpandedReview] = useState<string | null>(null);
+  const [adminReview, setAdminReview] = useState<Review | null>(null);
   const [filter, setFilter] = useState("all");
   const [creating, setCreating] = useState(showCreate);
   const [search, setSearch] = useState("");
@@ -179,11 +181,15 @@ export default function LostOpportunityReviews(
       return;
     }
     setExpandedReview(review.request_id);
+    await markViewed(review);
+  }
+  async function markViewed(review: Review) {
     if (review.reviewed_at) return;
     setBusy(true);
     setError("");
     try {
       const data = await lostReviewAction({ action: "review", request_id: review.request_id });
+      if (!data?.reviewed_at) throw new Error("Unable to mark this response Complete. Reopen it to retry.");
       setReviews(current => current.map(item => item.request_id === review.request_id
         ? { ...item, reviewed_at: data.reviewed_at } : item));
     } catch (e) {
@@ -525,6 +531,7 @@ export default function LostOpportunityReviews(
           </div>
         </div>
       )}
+      {adminReview && <AdminSalesReviewModal requestId={adminReview.request_id} customer={adminReview.recipient || "Customer"} onClose={() => setAdminReview(null)} />}
       {loading
         ? <p className="text-gray-400">Loading…</p>
         : visible.length === 0
@@ -536,6 +543,9 @@ export default function LostOpportunityReviews(
         : visible.map((v) => (
           <article
             key={v.request_id}
+            onClick={e => {
+              if (v.response && !busy && expandedReview !== v.request_id && !(e.target as HTMLElement).closest('button,a,input,select,textarea,label')) openResponse(v);
+            }}
             className="rounded-lg border border-gray-700 bg-gray-800 p-3 space-y-2"
           >
             <div className="flex flex-col items-start gap-2">
@@ -547,13 +557,13 @@ export default function LostOpportunityReviews(
                     disabled={busy}
                     onClick={() => openResponse(v)}
                     className="text-left w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
-                    <span className="block text-white font-semibold">{v.opportunity_name}</span>
-                    <span className="block text-gray-400 text-sm">{v.recipient} <span className="text-cyan-300 ml-2">{expandedReview === v.request_id ? "Hide answers ↑" : "View answers →"}</span></span>
+                    <span className="block text-white text-lg font-semibold">{v.recipient}</span>
+                    <span className="block text-gray-400 text-sm">{v.title || v.opportunity_name} <span className="text-cyan-300 ml-2">{expandedReview === v.request_id ? "Hide answers ↑" : "View answers →"}</span></span>
                   </button>
                 ) : (
                   <>
-                    <h3 className="text-white font-semibold">{v.opportunity_name}</h3>
-                    <p className="text-gray-400 text-sm">{v.recipient}</p>
+                    <h3 className="text-white text-lg font-semibold">{v.recipient}</h3>
+                    <p className="text-gray-400 text-sm">{v.title || v.opportunity_name}</p>
                   </>
                 )}
               </div>
@@ -574,10 +584,16 @@ export default function LostOpportunityReviews(
                     {v.response.attachments.length} {v.response.attachments.length === 1 ? "attachment" : "attachments"}
                   </span>
                 )}
+                {canView && profile?.role === "admin" && v.response && (
+                  <button type="button" disabled={busy} onClick={() => {
+                    setAdminReview(v);
+                    void markViewed(v);
+                  }} className="text-cyan-300 hover:underline whitespace-nowrap">Admin Review</button>
+                )}
                 {canView && v.response && (
                   <button type="button"
                     onClick={() => {
-                      try { printLostReview(v, companySettings?.company_name || "Customer Feedback"); }
+                      try { printLostReview(v, companySettings?.company_name || "Customer Feedback"); void markViewed(v); }
                       catch (e) { setError(e instanceof Error ? e.message : "Unable to open printable review."); }
                     }}
                     className="text-cyan-300 hover:underline whitespace-nowrap">

@@ -1,3 +1,4 @@
+import { validateAssessment } from "./adminReview.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { bidFileFormat, bidFileHelp, validBidFile } from "./bidFileTypes.ts";
 import { bidEmailBatches } from "./bidEmailBatches.ts";
@@ -503,6 +504,45 @@ Deno.serve(async (req) => {
         b.request_id,
       ).eq("organization_id", org).single(),
     );
+    if (["assessment_load", "assessment_save"].includes(b.action)) {
+      if (profile.role !== "admin" || !profile.can_view_lost_opportunity_submissions) {
+        return json({ error: "Admin submission access required." }, 403);
+      }
+      if (!detail.responded_at) return json({ error: "There is no response yet." }, 400);
+      const existing = await checked(await admin.from("lost_review_assessments").select("*")
+        .eq("request_id", detail.request_id).eq("organization_id", org).maybeSingle());
+      if (b.action === "assessment_load") {
+        const reps = await checked(await admin.from("profiles").select("id,first_name,last_name,is_active")
+          .eq("organization_id", org).order("first_name"));
+        const proposal = detail.proposal_id ? await checked(await admin.from("proposals").select("created_by")
+          .eq("id", detail.proposal_id).eq("organization_id", org).maybeSingle()) : null;
+        return json({ assessment: existing, reps, default_rep_id: proposal?.created_by || null });
+      }
+      let values;
+      try { values = validateAssessment(b.assessment || {}); }
+      catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid assessment." }, 400); }
+      if (values.sales_rep_id) {
+        const rep = await checked(await admin.from("profiles").select("id").eq("id", values.sales_rep_id)
+          .eq("organization_id", org).maybeSingle());
+        if (!rep) return json({ error: "Choose a sales rep in this company." }, 400);
+      }
+      const now = new Date().toISOString();
+      const row = { ...values, request_id: detail.request_id, organization_id: org,
+        updated_by: user.id, updated_at: now };
+      // Compare the revision displayed in the modal to avoid overwriting another admin's work.
+      if (existing) {
+        if (b.expected_updated_at !== existing.updated_at) return json({ error: "Another admin updated this review. Close and reopen it to load their changes." }, 409);
+        const saved = await checked(await admin.from("lost_review_assessments").update(row)
+          .eq("request_id", detail.request_id).eq("organization_id", org)
+          .eq("updated_at", b.expected_updated_at).select("*").maybeSingle());
+        if (!saved) return json({ error: "Another admin updated this review. Close and reopen it to load their changes." }, 409);
+        return json({ assessment: saved });
+      }
+      if (b.expected_updated_at) return json({ error: "This review changed. Close and reopen it." }, 409);
+      const result = await admin.from("lost_review_assessments").insert({ ...row, created_by: user.id, created_at: now }).select("*").single();
+      if (result.error?.code === "23505") return json({ error: "Another admin saved this review. Close and reopen it." }, 409);
+      return json({ assessment: await checked(result) });
+    }
     if (["review", "outcome"].includes(b.action)) {
       if (!profile.can_view_lost_opportunity_submissions) {
         return json({
