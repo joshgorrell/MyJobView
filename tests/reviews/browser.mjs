@@ -30,7 +30,7 @@ try {
     await page.getByRole('button', { name: /Home theater/ }).click();
     assert.equal(await page.evaluate(() => window.reviewCalls), 1, 'Reopening preserves first review');
     const card = page.locator('article').first();
-    assert.ok(await card.getByRole('button', { name: /John Valley/ }).evaluate(el => {
+    assert.ok(await card.getByRole('button', { name: /^John Valley Home theater/ }).evaluate(el => {
       const spans = el.querySelectorAll(':scope > span');
       return parseFloat(getComputedStyle(spans[0]).fontSize) > parseFloat(getComputedStyle(spans[1]).fontSize);
     }), 'Customer name is larger than title');
