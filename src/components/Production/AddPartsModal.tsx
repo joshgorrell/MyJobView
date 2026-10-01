@@ -33,15 +33,31 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
   const [showCustomPart, setShowCustomPart] = useState(false);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
 
   const [parts, setParts] = useState<PartEntry[]>([]);
+
+  useEffect(() => {
+    loadCatalog();
+  }, []);
+
+  async function loadCatalog() {
+    setSearching(true);
+    try {
+      const { data, error } = await supabase.from('products').select('id, name, sku, unit_cost, list_price').order('name').limit(100);
+      if (error) throw error;
+      setSearchResults(data || []);
+      setCatalogLoaded(true);
+    } catch (error) { console.error('Error loading product catalog:', error); }
+    finally { setSearching(false); }
+  }
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.length >= 2) {
         searchProducts();
-      } else {
-        setSearchResults([]);
+      } else if (catalogLoaded) {
+        loadCatalog();
       }
     }, 300);
 
@@ -55,7 +71,8 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
         .from('products')
         .select('id, name, sku, unit_cost, list_price')
         .or(`name.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%`)
-        .limit(20);
+        .order('name')
+        .limit(100);
 
       if (error) throw error;
       setSearchResults(data || []);
@@ -79,7 +96,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
 
     setParts(prev => [...prev, newPart]);
     setSearchQuery('');
-    setSearchResults([]);
+    loadCatalog();
   }
 
   function addCustomPart() {
@@ -182,7 +199,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by product name or SKU..."
+                placeholder="Type to search by product name or SKU, or scroll the catalog below..."
                 className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -195,7 +212,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
             )}
 
             {!searching && searchResults.length > 0 && (
-              <div className="border-2 border-blue-200 rounded-lg max-h-64 overflow-y-auto bg-blue-50">
+              <div className="border-2 border-blue-200 rounded-lg max-h-80 overflow-y-auto bg-blue-50"><div className="sticky top-0 z-10 px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs font-medium text-gray-600">{searchQuery.trim() ? `Search results (${searchResults.length})` : `Product Catalog — scroll or type above (${searchResults.length} shown)`}</div>
                 {searchResults.map(product => (
                   <button
                     key={product.id}
