@@ -10,9 +10,10 @@ CREATE INDEX IF NOT EXISTS profiles_org_sales_rep_idx
   WHERE is_sales_rep = true;
 
 -- Bootstrap Electronic Life safely without hard-coding an organization UUID.
+-- Josh Paul's existing profile is stored as "JP", so include that alias as well.
 WITH known_sales_reps(full_name) AS (
   VALUES ('josh gorrell'), ('aaron koker'), ('michael colley'),
-         ('bobbi holthaus'), ('jon nester'), ('josh paul')
+         ('bobbi holthaus'), ('jon nester'), ('josh paul'), ('jp')
 ),
 electronic_life_org AS (
   SELECT p.organization_id
