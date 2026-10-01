@@ -29,7 +29,8 @@ export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId }: Manage
           .from('profiles')
           .select('id, first_name, last_name, full_name')
           .eq('organization_id', orgId)
-          .eq('can_create_proposals', true)
+          .eq('is_sales_rep', true)
+          .eq('is_active', true)
           .order('first_name', { ascending: true });
 
         if (error) throw error;

@@ -513,7 +513,7 @@ Deno.serve(async (req) => {
         .eq("request_id", detail.request_id).eq("organization_id", org).maybeSingle());
       if (b.action === "assessment_load") {
         const reps = await checked(await admin.from("profiles").select("id,first_name,last_name,is_active")
-          .eq("organization_id", org).order("first_name"));
+          .eq("organization_id", org).eq("is_sales_rep", true).order("first_name"));
         const proposal = detail.proposal_id ? await checked(await admin.from("proposals").select("created_by")
           .eq("id", detail.proposal_id).eq("organization_id", org).maybeSingle()) : null;
         return json({ assessment: existing, reps, default_rep_id: proposal?.created_by || null });
@@ -523,7 +523,7 @@ Deno.serve(async (req) => {
       catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid assessment." }, 400); }
       if (values.sales_rep_id) {
         const rep = await checked(await admin.from("profiles").select("id").eq("id", values.sales_rep_id)
-          .eq("organization_id", org).maybeSingle());
+          .eq("organization_id", org).eq("is_sales_rep", true).maybeSingle());
         if (!rep) return json({ error: "Choose a sales rep in this company." }, 400);
       }
       const now = new Date().toISOString();
