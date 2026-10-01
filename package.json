@@ -15,7 +15,8 @@
     "test:reviews": "node tests/reviews/database.mjs",
     "test:punchlist": "node tests/punchlist/database.mjs",
     "test:work-orders": "node tests/work-orders/modal-runtime.mjs",
-    "test:program-access": "node tests/program-access/database.mjs"
+    "test:program-access": "node tests/program-access/database.mjs",
+    "test:handoff": "node tests/work-orders/handoff-database.mjs && node tests/work-orders/modal-runtime.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
