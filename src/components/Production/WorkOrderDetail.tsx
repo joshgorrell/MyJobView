@@ -184,7 +184,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [jobCompletion, setJobCompletion] = useState<JobCompletion | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'vip' | 'tasks' | 'materials' | 'time' | 'parts' | 'photos' | 'completion' | 'history' | 'flow'>('overview');
+  const validTabs = ['overview','vip','tasks','materials','time','parts','photos','completion','history','flow'] as const;
+  type WorkOrderTab = typeof validTabs[number];
+  const requestedTab = new URLSearchParams(window.location.search).get('tab') as WorkOrderTab | null;
+  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'overview');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [showPartRequestForm, setShowPartRequestForm] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
@@ -653,6 +656,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   const isVipMaintenance = workOrder.type === 'vip_program' || workOrderOptions.some(o => o.id === workOrder.work_order_type_id && o.system_key === 'vip_program');
 
+  useEffect(() => {
+    if (activeTab === 'vip' && !isVipMaintenance) setActiveTab('overview');
+  }, [activeTab, isVipMaintenance]);
+
   const tabs = [
     { id: 'flow', label: 'Flow', icon: History },
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
@@ -919,7 +926,13 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  const nextTab = tab.id as WorkOrderTab;
+                  setActiveTab(nextTab);
+                  const url = new URL(window.location.href);
+                  if (nextTab === 'overview') url.searchParams.delete('tab'); else url.searchParams.set('tab', nextTab);
+                  window.history.replaceState({}, '', url.toString());
+                }}
                 className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600'
