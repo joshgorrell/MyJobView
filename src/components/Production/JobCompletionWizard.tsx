@@ -55,6 +55,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
   const [qualityScore, setQualityScore] = useState(5);
   const [flagForReview, setFlagForReview] = useState(false);
   const [sendFeedbackEmail, setSendFeedbackEmail] = useState(false);
+  const [vipCustomerNotPresent, setVipCustomerNotPresent] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -79,6 +80,12 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
       setWorkOrder(woResult.data);
       setJobPhotos(photosResult.data || []);
+
+      const vipByType = woResult.data.type === 'vip_program' || woResult.data.work_order_option?.system_key === 'vip_program';
+      if (vipByType) {
+        const { data: vipVisit } = await supabase.from('vip_maintenance_visits').select('customer_not_present').eq('work_order_id', workOrderId).maybeSingle();
+        setVipCustomerNotPresent(!!vipVisit?.customer_not_present);
+      }
 
       const jobType = woResult.data.type || 'General';
       const { data: templateData, error: templateError } = await supabase
@@ -138,6 +145,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       return !!techNotes.trim();
     }
     if (step === 5 && template?.requires_signature) {
+      if (isVipMaintenance && vipCustomerNotPresent) return true;
       return !!signatureDataUrl && !!customerName.trim();
     }
     return true;
@@ -554,11 +562,16 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
                 <PenTool className="w-6 h-6 text-indigo-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Customer Signature</h3>
-                <p className="text-sm text-gray-600">Customer sign-off required</p>
+                <h3 className="text-lg font-semibold text-gray-900">{isVipMaintenance ? "Customer Acknowledgment" : "Customer Signature"}</h3>
+                <p className="text-sm text-gray-600">{isVipMaintenance && vipCustomerNotPresent ? "Customer was not present for this VIP visit" : "Customer sign-off required"}</p>
               </div>
             </div>
 
+            {isVipMaintenance && vipCustomerNotPresent ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                Customer Not Present was recorded on the VIP visit. Customer name and signature are not required.
+              </div>
+            ) : (<>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Customer Name <span className="text-red-500">*</span>
@@ -652,6 +665,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
                 Customer name and signature are required to complete the job.
               </div>
             )}
+            </>)}
           </div>
         )}
       </div>
