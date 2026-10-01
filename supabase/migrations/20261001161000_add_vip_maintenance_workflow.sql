@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.vip_maintenance_findings (
   description text NOT NULL,
   notes text,
   dispositions text[] NOT NULL DEFAULT '{}'::text[],
+  follow_up_type text CHECK (follow_up_type IS NULL OR follow_up_type IN ('punchlist','task')),
+  follow_up_task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
   created_by uuid REFERENCES public.profiles(id),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
