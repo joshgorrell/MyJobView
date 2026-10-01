@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
+import type { CustomerLocation } from '../Contacts/CustomerLocationSelector';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import {
   X,
@@ -22,12 +23,14 @@ import {
   CheckCircle2,
   Camera,
   Trash2,
-  Briefcase
+  Briefcase,
+  ExternalLink
 } from 'lucide-react';
 
 interface EditingRequest {
   id: string;
   contact_id: string | null;
+  customer_location_id?: string | null;
   customer_name: string;
   customer_phone: string | null;
   customer_email: string | null;
@@ -71,6 +74,7 @@ interface ProjectOption {
   project_number: string;
   status: string;
   job_site_address: any;
+  customer_location_id?: string | null;
 }
 
 interface ServiceRequestFormProps {
@@ -89,6 +93,12 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
+  const [showAddressFields, setShowAddressFields] = useState(false);
+  const [locations, setLocations] = useState<CustomerLocation[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const locationTouched = useRef(false);
   const [searching, setSearching] = useState(false);
   const [salesReps, setSalesReps] = useState<any[]>([]);
   const aiPrefillApplied = useRef(false);
@@ -120,6 +130,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
   const [formData, setFormData] = useState({
     contact_id: editingRequest?.contact_id || prefilledContactId || null,
+    customer_location_id: editingRequest?.customer_location_id || null as string | null,
     customer_name: editingRequest?.customer_name || '',
     customer_phone: editingRequest?.customer_phone || '',
     customer_email: editingRequest?.customer_email || '',
@@ -203,6 +214,49 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       setSelectedProjectId('');
     }
   }, [formData.contact_id, requestType]);
+
+  useEffect(() => {
+    let active = true;
+    setLocations([]);
+    setLocationError('');
+    if (!formData.contact_id || (!originalContact && !isEditMode)) {
+      setLoadingLocations(false);
+      return;
+    }
+    setLoadingLocations(true);
+    supabase.from('customer_locations').select('*')
+      .eq('customer_contact_id', formData.contact_id).eq('is_active', true)
+      .order('is_default', { ascending: false }).order('name')
+      .then(({ data, error }) => {
+        if (!active) return;
+        setLoadingLocations(false);
+        if (error) {
+          setLocationError('Unable to load saved sites. You can still enter the job address.');
+          return;
+        }
+        const next = (data || []) as CustomerLocation[];
+        setLocations(next);
+        const defaultSite = next.find(site => site.is_default);
+        // Existing and AI-supplied request addresses must survive asynchronous loading.
+        if (!isEditMode && !aiPrefill?.jobAddress && !locationTouched.current && requestType === 'service' && defaultSite) {
+          selectLocation(defaultSite);
+        }
+      });
+    return () => { active = false; };
+  }, [formData.contact_id, originalContact]);
+
+  function selectLocation(site: CustomerLocation | null) {
+    locationTouched.current = true;
+    setFormData(prev => ({
+      ...prev,
+      customer_location_id: site?.id || null,
+      job_location_address: site?.street_address || (site ? '' : originalContact?.street_address || ''),
+      job_location_city: site?.city || (site ? '' : originalContact?.city || ''),
+      job_location_state: site?.state || (site ? '' : originalContact?.state || ''),
+      job_location_zip: site?.zip_code || (site ? '' : originalContact?.zip_code || ''),
+    }));
+    setShowAddressFields(false);
+  }
 
   async function loadSalesReps() {
     try {
@@ -308,7 +362,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, name, project_number, status, job_site_address')
+        .select('id, name, project_number, status, job_site_address, customer_location_id')
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
 
@@ -328,6 +382,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
   function selectProject(project: ProjectOption) {
     setSelectedProjectId(project.id);
+    locationTouched.current = true;
+    setFormData(prev => ({ ...prev, customer_location_id: project.customer_location_id || null }));
     const addr = project.job_site_address;
     if (addr && typeof addr === 'object') {
       setFormData(prev => ({
@@ -341,6 +397,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   }
 
   function selectContact(contact: any) {
+    locationTouched.current = false;
+    setShowCustomerDetails(false);
+    setShowAddressFields(false);
+    setShowNewCustomer(false);
     setOriginalContact({
       phone: contact.phone || '',
       email: contact.email || '',
@@ -352,6 +412,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     setFormData(prev => ({
       ...prev,
       contact_id: contact.id,
+      customer_location_id: null,
       customer_name: contact.full_name || contact.company_name || '',
       customer_phone: contact.phone || '',
       customer_email: contact.email || '',
@@ -413,13 +474,13 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       updates.phone = formData.customer_phone.trim();
     if (!originalContact.email && formData.customer_email?.trim())
       updates.email = formData.customer_email.trim();
-    if (!originalContact.street_address && formData.job_location_address?.trim())
+    if (!formData.customer_location_id && !originalContact.street_address && formData.job_location_address?.trim())
       updates.street_address = formData.job_location_address.trim();
-    if (!originalContact.city && formData.job_location_city?.trim())
+    if (!formData.customer_location_id && !originalContact.city && formData.job_location_city?.trim())
       updates.city = formData.job_location_city.trim();
-    if (!originalContact.state && formData.job_location_state?.trim())
+    if (!formData.customer_location_id && !originalContact.state && formData.job_location_state?.trim())
       updates.state = formData.job_location_state.trim();
-    if (!originalContact.zip_code && formData.job_location_zip?.trim())
+    if (!formData.customer_location_id && !originalContact.zip_code && formData.job_location_zip?.trim())
       updates.zip_code = formData.job_location_zip.trim();
 
     return updates;
@@ -501,6 +562,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         const { error } = await supabase
           .from('service_requests')
           .update({
+            customer_location_id: formData.customer_location_id,
             customer_name: formData.customer_name,
             customer_phone: formData.customer_phone || null,
             customer_email: formData.customer_email || null,
@@ -568,6 +630,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         .insert({
           created_by: profile.id,
           contact_id: finalContactId || null,
+          customer_location_id: formData.customer_location_id,
           customer_name: formData.customer_name,
           customer_phone: formData.customer_phone || null,
           customer_email: formData.customer_email || null,
@@ -643,10 +706,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       icon={isEditMode ? <RotateCcw className="w-5 h-5 text-primary" /> : <FileText className="w-5 h-5 text-primary" />}
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
       onClose={onClose}
+      stableHeight
       showSuccess={showSuccess}
       successMessage="Work Order Request Created!"
     >
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 min-w-0">
 
           {/* Kickback reason banner (edit mode only) */}
           {isEditMode && editingRequest?.kickback_reason && (
@@ -712,10 +776,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Type customer name, company, or phone..."
                     className="w-full pl-10 pr-4 py-3 bg-surface border-2 border-blue-500/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg text-primary placeholder-gray-500"
-                    autoFocus
                   />
                 </div>
 
+                <div className="h-48 overflow-y-auto rounded-lg border border-subtle bg-surface">
                 {searching && (
                   <div className="text-center py-4 text-muted">
                     <div className="animate-spin inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
@@ -724,7 +788,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 )}
 
                 {!searching && searchResults.length > 0 && (
-                  <div className="border border-blue-500/40 rounded-lg max-h-48 overflow-y-auto bg-surface">
+                  <div className="bg-surface">
                     <div className="bg-blue-900/40 px-3 py-2 border-b border-blue-500/40">
                       <p className="text-sm text-blue-300 font-medium">Found {searchResults.length} customer{searchResults.length !== 1 ? 's' : ''}</p>
                     </div>
@@ -754,6 +818,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   </div>
                 )}
 
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setShowNewCustomer(true)}
@@ -767,36 +833,28 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
             {(formData.contact_id || showNewCustomer || isEditMode) && (
               <>
-                {formData.contact_id && !isEditMode && (
-                  <div className="bg-emerald-950/40 border border-emerald-700/50 rounded-lg p-3 flex items-center justify-between">
-                    <span className="text-emerald-400 font-medium">
-                      Existing Customer Selected
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          contact_id: '',
-                          customer_name: '',
-                          customer_phone: '',
-                          customer_email: '',
-                          job_location_address: '',
-                          job_location_city: '',
-                          job_location_state: '',
-                          job_location_zip: ''
-                        }));
-                      }}
-                      className="text-sm text-emerald-400 hover:text-emerald-300 underline"
-                    >
-                      Change Customer
+                {formData.contact_id && (
+                  <div className="rounded-lg border border-subtle bg-surface p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-1">
+                        <p className="min-w-0 truncate font-semibold text-primary">{formData.customer_name || 'Loading customer…'}</p>
+                        <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" title="Open master customer record" aria-label="Open master customer record in a new tab" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-blue-500 hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
+                          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                        </a>
+                      </div>
+                      {!isEditMode && <button type="button" className="shrink-0 min-h-10 text-sm text-blue-500" onClick={() => {
+                        locationTouched.current = false;
+                        setOriginalContact(null);
+                        setShowCustomerDetails(false);
+                        setShowAddressFields(false);
+                        setFormData(prev => ({ ...prev, contact_id: null, customer_location_id: null, customer_name: '', customer_phone: '', customer_email: '', job_location_address: '', job_location_city: '', job_location_state: '', job_location_zip: '' }));
+                      }}>Change</button>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4">
+                    <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 text-sm text-blue-500">
+                      {showCustomerDetails ? 'Hide request contact details' : 'Edit request contact details'}
                     </button>
-                  </div>
-                )}
-
-                {formData.contact_id && isEditMode && (
-                  <div className="bg-emerald-950/40 border border-emerald-700/50 rounded-lg p-3">
-                    <span className="text-emerald-400 font-medium text-sm">Linked to existing customer record</span>
+                    </div>
                   </div>
                 )}
 
@@ -827,6 +885,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   </div>
                 )}
 
+                {(!formData.contact_id || showCustomerDetails) && <div className="space-y-3">
                 <input
                   type="text"
                   value={formData.customer_name}
@@ -869,6 +928,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     )}
                   </div>
                 </div>
+                </div>}
               </>
             )}
           </div>
@@ -917,12 +977,36 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               <MapPin className="w-5 h-5" />
               Job Location
             </h3>
+            {formData.contact_id && (
+              <div className="space-y-2">
+                {/* Reserve one row while sites load so the description stays in place. */}
+                <div className="min-h-11">
+                  {loadingLocations ? <p className="text-sm text-muted py-3">Loading sites…</p> : locations.length > 0 ? (
+                    <select aria-label="Job site" value={formData.customer_location_id || ''} disabled={requestType === 'project' && !!selectedProjectId}
+                      onChange={event => selectLocation(locations.find(site => site.id === event.target.value) || null)}
+                      className="w-full min-w-0 px-3 py-2.5 bg-surface border border-strong rounded-lg text-base text-primary">
+                      {formData.customer_location_id && !locations.some(site => site.id === formData.customer_location_id) && <option value={formData.customer_location_id}>Current request site</option>}
+                      <option value="">Customer address{!locations.some(site => site.is_default) ? ' (Default)' : ''}</option>
+                      {locations.map(site => <option key={site.id} value={site.id}>{site.name}{site.is_default ? ' (Default)' : ''}</option>)}
+                    </select>
+                  ) : <p className="text-sm font-medium text-secondary py-3">Customer address</p>}
+                </div>
+                <p className="min-h-10 text-sm text-secondary break-words">{[formData.job_location_address, formData.job_location_city, formData.job_location_state, formData.job_location_zip].filter(Boolean).join(', ') || 'Add a job address to continue.'}</p>
+                {locationError && <p role="alert" className="text-sm text-amber-500">{locationError}</p>}
+                <button type="button" aria-expanded={showAddressFields} className="min-h-10 text-sm text-blue-500" onClick={() => { locationTouched.current = true; setShowAddressFields(value => !value); }}>
+                  {showAddressFields ? 'Hide address fields' : 'Edit job address'}
+                </button>
+              </div>
+            )}
+            {(!formData.contact_id || showAddressFields || !formData.job_location_address) && <div className="space-y-3">
             <div className="relative">
               <AddressAutocomplete
                 value={formData.job_location_address}
                 onChange={(address, components) => {
+                  locationTouched.current = true;
                   setFormData(prev => ({
                     ...prev,
+                    customer_location_id: null,
                     job_location_address: address,
                     job_location_city: components?.city || prev.job_location_city,
                     job_location_state: components?.state || prev.job_location_state,
@@ -941,29 +1025,30 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 <span className="absolute -top-2 right-2 text-xs bg-emerald-900 text-emerald-300 font-medium px-1.5 py-0.5 rounded-full border border-emerald-600">new</span>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2">
               <input
                 type="text"
                 value={formData.job_location_city}
-                onChange={(e) => setFormData(prev => ({ ...prev, job_location_city: e.target.value }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, customer_location_id: null, job_location_city: e.target.value }))}
                 placeholder="City"
                 className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
               <input
                 type="text"
                 value={formData.job_location_state}
-                onChange={(e) => setFormData(prev => ({ ...prev, job_location_state: e.target.value }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, customer_location_id: null, job_location_state: e.target.value }))}
                 placeholder="State"
                 className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
               <input
                 type="text"
                 value={formData.job_location_zip}
-                onChange={(e) => setFormData(prev => ({ ...prev, job_location_zip: e.target.value }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, customer_location_id: null, job_location_zip: e.target.value }))}
                 placeholder="ZIP"
                 className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
             </div>
+            </div>}
           </div>
 
           {/* Job Description */}
@@ -1186,7 +1271,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </button>
             <button
               type="submit"
-              disabled={!isValid || loading || uploadingPhotos}
+              disabled={!isValid || loading || uploadingPhotos || loadingLocations}
               className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
                 isEditMode
                   ? 'bg-gradient-to-r from-amber-600 to-orange-700 text-white hover:opacity-90'

@@ -1,7 +1,8 @@
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { X, CheckCircle2 } from 'lucide-react';
 
 interface QuickActionModalProps {
+  stableHeight?: boolean;
   title: string;
   subtitle?: string;
   icon: ReactNode;
@@ -13,6 +14,7 @@ interface QuickActionModalProps {
 }
 
 export function QuickActionModal({
+  stableHeight = false,
   title,
   subtitle,
   icon,
@@ -23,6 +25,20 @@ export function QuickActionModal({
   successMessage = 'Created!',
 }: QuickActionModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!stableHeight || !window.visualViewport) return;
+    const visibleViewport = window.visualViewport;
+    const update = () => setViewport({ top: visibleViewport.offsetTop, height: visibleViewport.height });
+    update();
+    visibleViewport.addEventListener('resize', update);
+    visibleViewport.addEventListener('scroll', update);
+    return () => {
+      visibleViewport.removeEventListener('resize', update);
+      visibleViewport.removeEventListener('scroll', update);
+    };
+  }, [stableHeight]);
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -109,8 +125,10 @@ export function QuickActionModal({
       <div
         className={`
           fixed bottom-0 left-0 right-0 z-[61]
+          ${stableHeight ? 'flex items-end' : ''}
           sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4
         `}
+        style={stableHeight && viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
       >
         <div
           className={`
@@ -118,9 +136,10 @@ export function QuickActionModal({
             rounded-t-2xl sm:rounded-xl
             shadow-2xl border-t sm:border border-subtle
             flex flex-col
-            max-h-[92svh] sm:max-h-[90svh]
+            ${stableHeight ? 'h-[92svh] sm:h-[90svh]' : 'max-h-[92svh] sm:max-h-[90svh]'}
             relative
           `}
+          style={stableHeight ? { maxHeight: '100%' } : undefined}
           onClick={(e) => e.stopPropagation()}
         >
 
