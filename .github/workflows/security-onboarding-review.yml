@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'supabase/**'
       - 'tests/security-onboarding/**'
+      - 'tests/punchlist/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/security-onboarding-review.yml'
@@ -35,6 +36,8 @@ jobs:
         run: npm ci
       - name: Database, payment access and charge safeguards
         run: npm run test:security-onboarding
+      - name: Punchlist ownership and grouped request safeguards
+        run: npm run test:punchlist
       - name: Production build
         run: npm run build
       - name: Install pinned browser test runtime

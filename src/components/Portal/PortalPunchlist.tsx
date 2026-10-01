@@ -1,5 +1,6 @@
+import { punchlistDescription } from '../../lib/punchlist';
 import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -107,7 +108,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   const [loading, setLoading] = useState(true);
   const [customerFirstName, setCustomerFirstName] = useState<string | null>(null);
   const [contactOrgId, setContactOrgId] = useState<string | null>(null);
-  const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const pendingEdits = useRef(new Map<string, Partial<PunchlistTask>>());
   const [showCamera, setShowCamera] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
   const [showNewTaskCamera, setShowNewTaskCamera] = useState(false);
@@ -120,11 +122,11 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [requestingService, setRequestingService] = useState(false);
   const [detailTask, setDetailTask] = useState<PunchlistTask | null>(null);
   const [appUrl, setAppUrl] = useState<string>('https://myjobview.com');
 
   const [newTask, setNewTask] = useState({
-    title: '',
     details: '',
   });
 
@@ -266,7 +268,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         .order('priority_order', { ascending: true });
 
       if (error) throw error;
-      setTasks(tasksData || []);
+      setTasks((tasksData || []).map(task => ({ ...task, ...pendingEdits.current.get(task.id) })));
+      setSelectedTaskIds(prev => new Set([...prev].filter(id => tasksData?.some(task => task.id === id && task.status === 'draft'))));
     } catch (error) {
       console.error('Error loading tasks:', error);
     }
@@ -275,7 +278,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   async function handleCreateTask() {
     const contactId = getContactId();
 
-    if (!contactId || !newTask.title.trim()) return;
+    if (!contactId || !newTask.details.trim()) return;
 
     const orgId = contactOrgId || user?.user_metadata?.organization_id || null;
     if (!orgId) {
@@ -289,8 +292,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       const { data: createdTask, error } = await supabase.from('punchlist_tasks').insert({
         contact_id: contactId,
         organization_id: orgId,
-        title: newTask.title,
-        details: newTask.details,
+        title: newTask.details.trim(),
+        details: newTask.details.trim(),
         priority_order: maxPriority + 1,
         status: 'draft',
       }).select().maybeSingle();
@@ -303,7 +306,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         }
       }
 
-      setNewTask({ title: '', details: '' });
+      setNewTask({ details: '' });
       setNewTaskPhotos([]);
       setIsCreating(false);
       loadTasks(contactId);
@@ -349,23 +352,31 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       if (contactId) loadTasks(contactId);
     } catch (error) {
       console.error('Error updating task:', error);
+      throw error;
     }
   }
 
-  function handleTaskChange(taskId: string, field: string, value: any) {
-    setTasks(prevTasks =>
-      prevTasks.map(task => (task.id === taskId ? { ...task, [field]: value } : task))
-    );
+  async function savePendingTask(taskId: string) {
+    const timer = saveTimers.current.get(taskId);
+    if (timer) clearTimeout(timer);
+    saveTimers.current.delete(taskId);
+    const updates = pendingEdits.current.get(taskId);
+    if (!updates) return;
+    if (typeof updates.details === 'string' && !updates.details.trim()) throw new Error('Describe what needs attention before saving.');
+    await handleUpdateTask(taskId, updates);
+    // Do not discard newer typing that arrived while this save was in progress.
+    if (pendingEdits.current.get(taskId) === updates) pendingEdits.current.delete(taskId);
+  }
 
-    if (autoSaveTimeout) {
-      clearTimeout(autoSaveTimeout);
-    }
-
-    const timeout = setTimeout(() => {
-      handleUpdateTask(taskId, { [field]: value });
-    }, 1000);
-
-    setAutoSaveTimeout(timeout);
+  function handleTaskChange(taskId: string, field: string, value: string) {
+    const updates = field === 'details' ? { details: value, title: value } : { [field]: value };
+    setTasks(prev => prev.map(task => task.id === taskId ? { ...task, ...updates } : task));
+    pendingEdits.current.set(taskId, { ...pendingEdits.current.get(taskId), ...updates });
+    const timer = saveTimers.current.get(taskId);
+    if (timer) clearTimeout(timer);
+    saveTimers.current.set(taskId, setTimeout(() => {
+      savePendingTask(taskId).catch(() => alert('Your edit could not be saved. Please try again.'));
+    }, 1000));
   }
 
   async function handleDeleteTask(taskId: string) {
@@ -411,7 +422,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         .insert({
           task_id: taskId,
           photo_url: publicUrl,
-          uploaded_by: profile?.id
+          uploaded_by: profile?.id,
+          organization_id: contactOrgId
         });
 
       if (dbError) throw dbError;
@@ -466,6 +478,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   }
 
   async function handleSubmitTasks(taskIds?: string[]) {
+    if (requestingService) return;
     const contactId = getContactId();
 
     const tasksToSubmit = taskIds
@@ -473,19 +486,22 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       : tasks.filter(t => t.status === 'draft');
 
     if (tasksToSubmit.length === 0) {
-      alert('No draft tasks available to submit.');
+      alert('No unrequested items available to submit.');
       return;
     }
 
     const message = taskIds
-      ? `Request service for this task? This will notify our team and they will contact you to schedule.`
+      ? `Request service for ${tasksToSubmit.length} selected item(s)? Our team will contact you to schedule.`
       : `Request service for ${tasksToSubmit.length} task(s)? This will create a service request and our team will contact you to schedule.`;
 
     setConfirmModal({
       title: 'Request Service',
       message,
       onConfirm: async () => {
+        if (requestingService) return;
+        setRequestingService(true);
         try {
+          await Promise.all(tasksToSubmit.map(task => savePendingTask(task.id)));
           const { error } = await supabase.rpc('request_punchlist_service', {
             p_task_ids: tasksToSubmit.map(t => t.id),
             p_contact_id: contactId,
@@ -500,15 +516,17 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         } catch (error: any) {
           console.error('Error requesting service:', error);
           alert(`Failed to request service: ${error.message || 'Unknown error'}`);
+        } finally {
+          setRequestingService(false);
         }
       }
     });
   }
 
-  async function handleMarkComplete(task: PunchlistTask) {
-    const hasWorkOrder = task.service_request?.work_order_id;
+  async function handleMarkComplete(task: Pick<PunchlistTask, 'id' | 'service_request' | 'work_order_id'>) {
+    const hasWorkOrder = task.service_request?.work_order_id || task.work_order_id;
     const message = hasWorkOrder
-      ? 'Mark this task as complete? A work order has been scheduled — our team will be notified that you resolved this yourself.'
+      ? 'Mark this task as complete? A work order has been scheduled — this item will show as resolved by you. Other items and the work order stay active.'
       : 'Mark this task as complete?';
 
     setConfirmModal({
@@ -517,13 +535,6 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       onConfirm: async () => {
         try {
           await markTaskComplete(task.id);
-
-          if (task.service_request_id && !hasWorkOrder) {
-            await supabase
-              .from('service_requests')
-              .update({ status: 'cancelled' })
-              .eq('id', task.service_request_id);
-          }
 
           const contactId = getContactId();
           if (contactId) loadTasks(contactId);
@@ -535,8 +546,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     });
   }
 
-  async function handleCancelServiceRequest(serviceRequestId: string, task: PunchlistTask) {
-    const hasWorkOrder = task.service_request?.work_order_id;
+  async function handleCancelServiceRequest(task: Pick<PunchlistTask, 'id' | 'service_request' | 'work_order_id'>) {
+    const hasWorkOrder = task.service_request?.work_order_id || task.work_order_id;
 
     if (hasWorkOrder) {
       alert('This task already has a work order assigned — it cannot be cancelled at this stage. Please contact us if you need to make changes.');
@@ -545,18 +556,11 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
     setConfirmModal({
       title: 'Cancel Service Request',
-      message: 'Cancel this service request? The task will return to your draft tasks and you can resubmit it later if needed.',
+      message: 'Cancel service for this item? It will return to Not Requested. Other items in the same request remain requested.',
       onConfirm: async () => {
         try {
-          await supabase
-            .from('service_requests')
-            .update({ status: 'cancelled' })
-            .eq('id', serviceRequestId);
-
-          await supabase
-            .from('punchlist_tasks')
-            .update({ status: 'draft', service_request_id: null })
-            .eq('id', task.id);
+          const { error } = await supabase.rpc('update_punchlist_item', { p_task_id: task.id, p_action: 'cancel' });
+          if (error) throw error;
 
           const contactId = getContactId();
           if (contactId) loadTasks(contactId);
@@ -568,22 +572,18 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     });
   }
 
-  async function handleDeleteRequestedTask(task: PunchlistTask) {
+  async function handleDeleteRequestedTask(task: Pick<PunchlistTask, 'id' | 'service_request' | 'work_order_id'>) {
     const hasWorkOrder = task.service_request?.work_order_id || task.work_order_id;
     if (hasWorkOrder) return; // guarded in UI; belt-and-suspenders
 
     setConfirmModal({
       title: 'Delete Task',
-      message: 'This will also cancel your open service request and permanently remove this task. This cannot be undone.',
+      message: 'Remove this item? Other items in the same service request will remain requested. This cannot be undone.',
       onConfirm: async () => {
         try {
-          if (task.service_request_id) {
-            await supabase
-              .from('service_requests')
-              .update({ status: 'cancelled' })
-              .eq('id', task.service_request_id);
-          }
-          await supabase.from('punchlist_tasks').delete().eq('id', task.id);
+          const { error } = await supabase.rpc('update_punchlist_item', { p_task_id: task.id, p_action: 'delete' });
+          if (error) throw error;
+
           setDetailTask(null);
           const contactId = getContactId();
           if (contactId) loadTasks(contactId);
@@ -598,13 +598,11 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   async function handleReopenTask(taskId: string) {
     setConfirmModal({
       title: 'Reopen Task',
-      message: 'Reopen this task? It will be moved back to your draft items.',
+      message: 'Reopen this task? It will be moved back to your unrequested items.',
       onConfirm: async () => {
         try {
-          await supabase
-            .from('punchlist_tasks')
-            .update({ status: 'draft', completed_at: null })
-            .eq('id', taskId);
+          const { error } = await supabase.rpc('update_punchlist_item', { p_task_id: taskId, p_action: 'reopen' });
+          if (error) throw error;
 
           const contactId = getContactId();
           if (contactId) loadTasks(contactId);
@@ -641,7 +639,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   };
 
   const toggleSelectAll = () => {
-    if (selectedTaskIds.size === draftTasks.length && draftTasks.length > 0) {
+    if (draftTasks.length > 0 && draftTasks.every(task => selectedTaskIds.has(task.id))) {
       setSelectedTaskIds(new Set());
     } else {
       setSelectedTaskIds(new Set(draftTasks.map(t => t.id)));
@@ -862,7 +860,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
-              {draftTasks.length} Draft
+              {draftTasks.length} Not Requested
             </button>
             <button
               onClick={() => setFilterStatus('requested')}
@@ -918,12 +916,12 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           <div className="flex flex-col sm:flex-row gap-2">
             {selectedTaskIds.size > 0 && (
               <button
+                disabled={requestingService}
                 onClick={() => handleSubmitTasks(Array.from(selectedTaskIds))}
                 className="w-full sm:w-auto px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-1.5 text-sm font-medium shadow-sm hover:shadow transition-all whitespace-nowrap"
               >
                 <Send className="w-4 h-4" />
-                <span className="hidden sm:inline">Create service request</span>
-                <span className="sm:hidden">Request</span>
+                <span>Request Service</span>
                 ({selectedTaskIds.size})
               </button>
             )}
@@ -932,7 +930,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               className="w-full sm:w-auto px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center gap-1.5 font-semibold shadow-sm transition-colors text-sm whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
-              Add Task
+              Add Item
             </button>
           </div>
         </div>
@@ -942,11 +940,11 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-base font-semibold text-gray-900">Add a Task</h3>
+              <h3 className="text-base font-semibold text-gray-900">Add an Item</h3>
               <button
                 onClick={() => {
                   setIsCreating(false);
-                  setNewTask({ title: '', details: '' });
+                  setNewTask({ details: '' });
                   setNewTaskPhotos([]);
                 }}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -956,25 +954,16 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Title <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={newTask.title}
-                  onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-                  placeholder="e.g. Doorbell camera not responding"
-                  autoFocus
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Details <span className="text-gray-400 font-normal">(optional)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">What needs attention? <span className="text-red-500">*</span></label>
                 <textarea
                   value={newTask.details}
                   onChange={e => setNewTask({ ...newTask, details: e.target.value })}
-                  placeholder="Describe the issue or provide any helpful context"
+                  placeholder="Tell us what’s going on…"
+                  autoFocus
                   rows={3}
                   className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
+                <p className="text-xs text-gray-500 mt-2">Save items as you notice them. Request service for any or all items whenever you’re ready.</p>
               </div>
 
               {newTaskPhotos.length > 0 && (
@@ -1021,7 +1010,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               <button
                 onClick={() => {
                   setIsCreating(false);
-                  setNewTask({ title: '', details: '' });
+                  setNewTask({ details: '' });
                   setNewTaskPhotos([]);
                 }}
                 className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors"
@@ -1030,10 +1019,10 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               </button>
               <button
                 onClick={handleCreateTask}
-                disabled={!newTask.title.trim()}
+                disabled={!newTask.details.trim()}
                 className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors"
               >
-                Create Task
+                Save Item
               </button>
             </div>
           </div>
@@ -1057,12 +1046,12 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               return (
                 <div
                   key={task.id}
-                  className="bg-white border-l-4 border-blue-400 rounded-lg shadow-sm p-3 hover:shadow transition-all cursor-pointer"
+                  className="bg-white border-l-4 border-blue-400 rounded-lg shadow-sm px-2.5 py-2 sm:p-3 hover:shadow transition-all cursor-pointer"
                   onClick={() => toggleTaskExpansion(task.id)}
                 >
                   {/* Row 1: title + badge + chevron */}
                   <div className="flex items-center gap-2">
-                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{task.title}</span>
+                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{punchlistDescription(task)}</span>
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1 flex-shrink-0">
                       <Calendar className="w-3 h-3" />
                       Scheduled
@@ -1075,14 +1064,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                     </button>
                   </div>
 
-                  {/* Row 2: description preview — always visible */}
-                  {task.details
-                    ? <p className="text-xs text-gray-500 mt-1 line-clamp-1">{task.details}</p>
-                    : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
-                  }
-
-                  {/* Row 3: metadata + primary action — always visible */}
-                  <div className="flex items-center justify-between mt-2">
+                  {/* Row 2: metadata; actions appear when expanded */}
+                  <div className="flex items-center justify-between mt-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-400">{new Date(task.created_at).toLocaleDateString()}</span>
                       {task.photos && task.photos.length > 0 && (
@@ -1095,7 +1078,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                         <span className="text-xs text-blue-600">WO #{task.service_request.work_order.work_order_number}</span>
                       )}
                     </div>
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <div className={`${isExpanded ? "flex" : "hidden"} gap-1`} onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleMarkComplete(task)}
                         className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center gap-1"
@@ -1158,12 +1141,12 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               return (
                 <div
                   key={task.id}
-                  className="bg-white border-l-4 border-amber-400 rounded-lg shadow-sm p-3 hover:shadow transition-all cursor-pointer"
+                  className="bg-white border-l-4 border-amber-400 rounded-lg shadow-sm px-2.5 py-2 sm:p-3 hover:shadow transition-all cursor-pointer"
                   onClick={() => toggleTaskExpansion(task.id)}
                 >
                   {/* Row 1: title + badge + chevron */}
                   <div className="flex items-center gap-2">
-                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{task.title}</span>
+                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{punchlistDescription(task)}</span>
                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs flex items-center gap-1 flex-shrink-0">
                       <Send className="w-3 h-3" />
                       Requested
@@ -1176,14 +1159,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                     </button>
                   </div>
 
-                  {/* Row 2: description preview — always visible */}
-                  {task.details
-                    ? <p className="text-xs text-gray-500 mt-1 line-clamp-1">{task.details}</p>
-                    : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
-                  }
-
-                  {/* Row 3: metadata + primary actions — always visible */}
-                  <div className="flex items-center justify-between mt-2">
+                  {/* Row 2: metadata; actions appear when expanded */}
+                  <div className="flex items-center justify-between mt-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-400">
                         {task.requested_at
@@ -1206,11 +1183,11 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <div className={`${isExpanded ? "flex" : "hidden"} gap-1`} onClick={(e) => e.stopPropagation()}>
                       {canAct && (
                         <button
-                          onClick={() => handleCancelServiceRequest(task.service_request_id!, task)}
-                          title="Recall request — return to drafts"
+                          onClick={() => handleCancelServiceRequest(task)}
+                          title="Cancel service for this item"
                           className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs flex items-center gap-1"
                         >
                           <RotateCcw className="w-3 h-3" />
@@ -1278,13 +1255,13 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         </>
       )}
 
-      {/* Draft Tasks */}
+      {/* Not Requested */}
       {draftTasks.length > 0 && (
         <>
           <div className="flex items-center justify-between mt-4 px-2">
             <div>
-              <h3 className="text-base font-semibold text-gray-900">Draft ({draftTasks.length})</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Not yet submitted — only you can see these</p>
+              <h3 className="text-base font-semibold text-gray-900">Not Requested ({draftTasks.length})</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Add items now. Request service whenever you’re ready.</p>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
@@ -1292,11 +1269,11 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
             >
               <input
                 type="checkbox"
-                checked={selectedTaskIds.size === draftTasks.length && draftTasks.length > 0}
+                checked={draftTasks.length > 0 && draftTasks.every(task => selectedTaskIds.has(task.id))}
                 onChange={() => {}}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              {selectedTaskIds.size === draftTasks.length && draftTasks.length > 0 ? 'Deselect All' : 'Select All'}
+              {draftTasks.length > 0 && draftTasks.every(task => selectedTaskIds.has(task.id)) ? 'Deselect All' : 'Select All'}
             </button>
           </div>
           <div className="space-y-2">
@@ -1306,7 +1283,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               return (
                 <div
                   key={task.id}
-                  className="bg-white border-l-4 border-orange-400 rounded-lg shadow-sm p-3 hover:shadow transition-all cursor-pointer"
+                  className="bg-white border-l-4 border-orange-400 rounded-lg shadow-sm px-2.5 py-2 sm:p-3 hover:shadow transition-all cursor-pointer"
                   onClick={() => toggleTaskExpansion(task.id)}
                 >
                   {/* Row 1: checkbox + title + badge + chevron */}
@@ -1318,8 +1295,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                       onClick={(e) => e.stopPropagation()}
                       className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                     />
-                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{task.title}</span>
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs flex-shrink-0">Draft</span>
+                    <span className="flex-1 font-semibold text-sm text-gray-900 truncate">{punchlistDescription(task)}</span>
+                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs flex-shrink-0">Not Requested</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleTaskExpansion(task.id); }}
                       className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
@@ -1328,14 +1305,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                     </button>
                   </div>
 
-                  {/* Row 2: description preview — always visible */}
-                  {task.details
-                    ? <p className="text-xs text-gray-500 mt-1 line-clamp-1">{task.details}</p>
-                    : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
-                  }
-
-                  {/* Row 3: metadata + primary actions — always visible */}
-                  <div className="flex items-center justify-between mt-2">
+                  {/* Row 2: metadata; actions appear when expanded */}
+                  <div className="flex items-center justify-between mt-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-400">{new Date(task.created_at).toLocaleDateString()}</span>
                       {task.photos && task.photos.length > 0 && (
@@ -1345,13 +1316,14 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <div className={`${isExpanded ? "flex" : "hidden"} gap-1`} onClick={(e) => e.stopPropagation()}>
                       <button
+                        disabled={requestingService}
                         onClick={() => handleSubmitTasks([task.id])}
                         className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
                       >
                         <Send className="w-3 h-3" />
-                        Create Service Request
+                        Request Service
                       </button>
                       <button
                         onClick={() => handleMarkComplete(task)}
@@ -1366,22 +1338,14 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                   {/* Expanded content */}
                   {isExpanded && (
                     <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="text"
-                        value={task.title}
-                        onChange={e => handleTaskChange(task.id, 'title', e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        placeholder="Task title"
-                        className="w-full text-sm font-semibold text-gray-900 border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-
+                      <label className="block text-xs font-medium text-gray-700">What needs attention?</label>
                       <textarea
-                        value={task.details || ''}
+                        value={punchlistDescription(task)}
                         onChange={e => handleTaskChange(task.id, 'details', e.target.value)}
                         onClick={(e) => e.stopPropagation()}
-                        placeholder="Add details..."
-                        rows={2}
-                        className="w-full text-sm text-gray-600 border border-gray-200 rounded px-2 py-1 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Tell us what’s going on…"
+                        rows={3}
+                        className="w-full text-sm text-gray-900 border border-gray-200 rounded px-2 py-1 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
 
                       <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -1478,7 +1442,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                   >
                     {/* Row 1: title + badge + chevron */}
                     <div className="flex items-center gap-2">
-                      <span className="flex-1 font-semibold text-sm text-gray-500 truncate line-through">{task.title}</span>
+                      <span className="flex-1 font-semibold text-sm text-gray-500 truncate line-through">{punchlistDescription(task)}</span>
                       <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs flex items-center gap-1 flex-shrink-0">
                         <CheckCircle2 className="w-3 h-3" />
                         Completed
@@ -1492,12 +1456,9 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                     </div>
 
                     {/* Row 2: description preview — always visible */}
-                    {task.details
-                      ? <p className="text-xs text-gray-400 mt-1 line-clamp-1">{task.details}</p>
-                      : <p className="text-xs text-gray-400 mt-1 italic">No description</p>
-                    }
 
-                    {/* Row 3: metadata + primary action — always visible */}
+
+                    {/* Row 3: metadata; actions appear when expanded */}
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="flex items-center gap-1 text-xs text-gray-400">
@@ -1508,7 +1469,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                           <span className="text-xs text-blue-600">WO #{task.service_request.work_order.work_order_number}</span>
                         )}
                       </div>
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div className={`${isExpanded ? "flex" : "hidden"} gap-1`} onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleReopenTask(task.id)}
                           className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs flex items-center gap-1"
@@ -1622,11 +1583,11 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">1</div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">Draft — Create a Task</h4>
+                      <h4 className="font-semibold text-gray-900 mb-1">Not Requested — Add an Item</h4>
                       <p className="text-sm text-gray-700">
-                        Click "Add Task" to document an issue. Add a title, details, and photos.
-                        Tasks are saved automatically and only visible to you until you request service.
-                        You can also mark a draft complete yourself if you resolved it.
+                        Click "Add Item" to document an issue. Describe what needs attention and optionally add photos. Saving an item does not request service.
+                        You can collect items for weeks, then select all or just some to request service.
+                        You can also mark an item complete yourself if you resolved it.
                       </p>
                     </div>
                   </div>
@@ -1725,7 +1686,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to delete this draft task? Any photos attached will also be removed.
+              Are you sure you want to delete this unrequested item? Any photos attached will also be removed.
             </p>
             <div className="flex gap-3">
               <button
@@ -1757,7 +1718,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           }}
           onRecall={(t) => {
             setDetailTask(null);
-            if (t.service_request_id) handleCancelServiceRequest(t.service_request_id, t);
+            if (t.service_request_id) handleCancelServiceRequest(t);
           }}
           onDelete={(t) => {
             setDetailTask(null);
