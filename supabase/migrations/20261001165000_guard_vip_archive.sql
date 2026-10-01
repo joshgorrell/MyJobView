@@ -11,6 +11,9 @@ BEGIN
    IF cardinality(missing)>0 THEN
      RAISE EXCEPTION 'VIP Maintenance cannot be archived until complete: %',array_to_string(missing,', ');
    END IF;
+   IF NOT EXISTS (SELECT 1 FROM vip_maintenance_visits v WHERE v.work_order_id=NEW.id AND v.completed_at IS NOT NULL) THEN
+     RAISE EXCEPTION 'VIP Maintenance must be completed before it can be archived.';
+   END IF;
  END IF;
  RETURN NEW;
 END $$;
@@ -29,7 +32,7 @@ ALTER TABLE public.vip_maintenance_visits ADD COLUMN IF NOT EXISTS sales_lead_id
 
 -- Give VIP its own measurable lead source instead of hiding it under "other".
 ALTER TABLE public.leads DROP CONSTRAINT IF EXISTS leads_lead_source_check;
-ALTER TABLE public.leads ADD CONSTRAINT leads_lead_source_check CHECK (lead_source IN ('manual','kiosk','website','referral','import','other','vip_maintenance'));
+ALTER TABLE public.leads ADD CONSTRAINT leads_lead_source_check CHECK (lead_source IN ('manual','kiosk','website','referral','import','other','email_forward','vip_maintenance'));
 
 CREATE OR REPLACE FUNCTION public.create_vip_sales_lead(p_work_order_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
