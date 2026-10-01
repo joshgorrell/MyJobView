@@ -151,6 +151,9 @@ BEGIN
   IF p_section IS NULL OR btrim(p_section)='' OR p_patch IS NULL OR jsonb_typeof(p_patch) <> 'object' THEN
     RAISE EXCEPTION 'A VIP response section and object patch are required.';
   END IF;
+  IF p_section <> ALL(ARRAY['customer_check_in','network_internet','av_automation','security_surveillance','room_by_room','preventive_maintenance','customer_training','sales_lead','review']) THEN
+    RAISE EXCEPTION 'Invalid VIP response section.';
+  END IF;
   SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=p_visit_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'VIP Maintenance visit not found.'; END IF;
   IF v.completed_at IS NOT NULL THEN RAISE EXCEPTION 'Completed VIP Maintenance visits are read-only.'; END IF;
