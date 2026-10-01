@@ -135,6 +135,16 @@ Deno.serve(async (req) => {
           await admin.from("organizations").select("subdomain")
             .eq("id", detail.organization_id).single(),
         );
+        // Preserve the first successful form load, including concurrent opens.
+        if (!detail.opened_at) {
+          await checked(
+            await admin.from("lost_review_details")
+              .update({ opened_at: new Date().toISOString() })
+              .eq("request_id", detail.request_id)
+              .eq("organization_id", detail.organization_id)
+              .is("opened_at", null),
+          );
+        }
         return json({
           personal_contact_email: organization.subdomain === "elife"
             ? "josh@electroniclife.com"

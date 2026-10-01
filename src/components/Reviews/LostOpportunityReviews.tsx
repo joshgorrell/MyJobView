@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, FileText, Download, ExternalLink, Paperclip } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { responseReasons, lostReviewAction } from "./lostReview";
+import { printLostReview } from "./printLostReview";
 interface Contact {
   id: string;
   contact_name: string;
@@ -27,6 +28,7 @@ interface Review {
   title: string;
   delivery_status: string;
   responded_at: string | null;
+  opened_at: string | null;
   reviewed_at: string | null;
   shared_at: string | null;
   recovery_outcome: string;
@@ -39,8 +41,9 @@ interface Review {
 export default function LostOpportunityReviews(
   { showCreate = false }: { showCreate?: boolean },
 ) {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [expandedReview, setExpandedReview] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [creating, setCreating] = useState(showCreate);
   const [search, setSearch] = useState("");
@@ -184,6 +187,40 @@ export default function LostOpportunityReviews(
       setBusy(false);
     }
   }
+  async function openAttachment(review: Review, attachment: Response["attachments"][number], download: boolean) {
+    const viewer = download ? null : window.open("", "_blank");
+    if (!download && !viewer) {
+      setError("Allow pop-ups to view this attachment.");
+      return;
+    }
+    if (viewer) viewer.opener = null;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await lostReviewAction({
+        action: "download", request_id: review.request_id, path: attachment.path,
+      });
+      if (download) {
+        const result = await fetch(data.url);
+        if (!result.ok) throw new Error("Unable to download attachment.");
+        const url = URL.createObjectURL(await result.blob());
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = attachment.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else if (viewer) {
+        viewer.location.replace(data.url);
+      }
+    } catch (e) {
+      viewer?.close();
+      setError(e instanceof Error ? e.message : "Unable to open attachment.");
+    } finally {
+      setBusy(false);
+    }
+  }
   function opportunity(value: string) {
     setName(value);
     if (!titleEdited) setTitle(value ? `Why didn’t we win your ${value}?` : "");
@@ -257,6 +294,9 @@ export default function LostOpportunityReviews(
     if (v.delivery_status === "sent" && v.sent_at) {
       segments.push("Delivered");
     }
+    if (v.opened_at) {
+      segments.push(`Form opened \u00b7 ${formatDateTime(v.opened_at)}`);
+    }
     if (v.response_created_at || v.responded_at) {
       segments.push(
         `Customer responded \u00b7 ${formatDateTime(v.response_created_at || v.responded_at)}`,
@@ -270,7 +310,7 @@ export default function LostOpportunityReviews(
     }
     if (segments.length === 0) return null;
     return (
-      <p className="text-xs text-gray-500 leading-relaxed">
+      <p className="text-xs text-gray-400 leading-relaxed">
         {segments.join("  \u2022  ")}
       </p>
     );
@@ -486,14 +526,25 @@ export default function LostOpportunityReviews(
         : visible.map((v) => (
           <article
             key={v.request_id}
-            className="rounded-xl border border-gray-700 bg-gray-800 p-5 space-y-3"
+            className="rounded-lg border border-gray-700 bg-gray-800 p-3 space-y-2"
           >
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div>
-                <h3 className="text-white font-semibold">
-                  {v.opportunity_name}
-                </h3>
-                <p className="text-gray-400 text-sm">{v.recipient}</p>
+              <div className="min-w-0 flex-1">
+                {v.response ? (
+                  <button type="button"
+                    aria-expanded={expandedReview === v.request_id}
+                    aria-controls={`lost-response-${v.request_id}`}
+                    onClick={() => setExpandedReview(expandedReview === v.request_id ? null : v.request_id)}
+                    className="text-left w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
+                    <span className="block text-white font-semibold">{v.opportunity_name}</span>
+                    <span className="block text-gray-400 text-sm">{v.recipient} <span className="text-cyan-300 ml-2">{expandedReview === v.request_id ? "Hide answers ↑" : "View answers →"}</span></span>
+                  </button>
+                ) : (
+                  <>
+                    <h3 className="text-white font-semibold">{v.opportunity_name}</h3>
+                    <p className="text-gray-400 text-sm">{v.recipient}</p>
+                  </>
+                )}
               </div>
               <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
                 <p className="text-cyan-300">
@@ -506,6 +557,22 @@ export default function LostOpportunityReviews(
                     : "Awaiting Response"}
                 </p>
                 <HistoryLine v={v} />
+                {canView && !!v.response?.attachments.length && (
+                  <span className="inline-flex items-center gap-1 text-gray-300">
+                    <Paperclip size={14} aria-hidden="true" />
+                    {v.response.attachments.length} {v.response.attachments.length === 1 ? "attachment" : "attachments"}
+                  </span>
+                )}
+                {canView && v.response && (
+                  <button type="button"
+                    onClick={() => {
+                      try { printLostReview(v, companySettings?.company_name || "Customer Feedback"); }
+                      catch (e) { setError(e instanceof Error ? e.message : "Unable to open printable review."); }
+                    }}
+                    className="text-cyan-300 hover:underline whitespace-nowrap">
+                    Print / Save PDF
+                  </button>
+                )}
                 {canView && (
                   <button
                     type="button"
@@ -529,57 +596,62 @@ export default function LostOpportunityReviews(
                 )}
               </div>
             </div>
-            {v.response
+            {v.response && expandedReview === v.request_id
               ? (
-                <div className="space-y-3 text-gray-200">
-                  <p>
-                    {v.response.reasons.map((r) =>
+                <div id={`lost-response-${v.request_id}`} className="border-t border-gray-700 pt-3 space-y-3 text-gray-200">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-400">Reasons</h4>
+                    <p className="mt-1">{v.response.reasons.map((r) =>
                       responseReasons.find(([key]) => key === r)?.[1] || r
-                    ).join(" • ")}
-                  </p>
+                    ).join(" • ") || "Comment only"}</p>
+                  </div>
                   {v.response.message && (
-                    <p className="whitespace-pre-wrap">{v.response.message}</p>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400">Customer comments</h4>
+                      <p className="mt-1 whitespace-pre-wrap break-words">{v.response.message}</p>
+                    </div>
                   )}
-                  <p className="text-sm text-cyan-300">
-                    Another chance: {v.response.recoverable}
-                  </p>
-                  {v.response.recovery_message && (
-                    <p className="whitespace-pre-wrap">
-                      {v.response.recovery_message}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-400">Is there still a chance to earn your business?</h4>
+                    <p className="mt-1 text-cyan-300">
+                      {({ yes: "Yes", maybe: "Maybe", no: "No" } as Record<string, string>)[v.response.recoverable] || v.response.recoverable}
                     </p>
+                  </div>
+                  {v.response.recovery_message && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400">What would it take to earn your business?</h4>
+                      <p className="mt-1 whitespace-pre-wrap break-words">{v.response.recovery_message}</p>
+                    </div>
                   )}
-                  {v.response.attachments.map((a) => (
-                    <button
-                      disabled={busy}
-                      key={a.path}
-                      className="block text-cyan-300 underline"
-                      onClick={async () => {
-                        try {
-                          const data = await lostReviewAction({
-                            action: "download",
-                            request_id: v.request_id,
-                            path: a.path,
-                          });
-                          window.open(
-                            data.url,
-                            "_blank",
-                            "noopener,noreferrer",
-                          );
-                        } catch (e) {
-                          setError(
-                            e instanceof Error
-                              ? e.message
-                              : "Unable to open bid.",
-                          );
-                        }
-                      }}
-                    >
-                      {a.name}
-                    </button>
-                  ))}
+                  {!!v.response.attachments.length && (
+                    <section aria-label="Attachments" className="space-y-2">
+                      <h4 className="text-sm font-semibold text-gray-400">Attachments</h4>
+                      {v.response.attachments.map((a) => (
+                        <div key={a.path} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-600 bg-gray-900/40 p-3">
+                          <FileText size={20} className="shrink-0 text-cyan-300" aria-hidden="true" />
+                          <span className="min-w-0 flex-1 break-words text-sm">
+                            {a.name}
+                            <span className="block text-xs text-gray-400">{a.name.toLowerCase().endsWith(".pdf") ? "PDF document" : "Image attachment"}</span>
+                          </span>
+                          <button type="button" disabled={busy}
+                            aria-label={`View ${a.name}`}
+                            onClick={() => openAttachment(v, a, false)}
+                            className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
+                            <ExternalLink size={14} aria-hidden="true" /> View
+                          </button>
+                          <button type="button" disabled={busy}
+                            aria-label={`Download ${a.name}`}
+                            onClick={() => openAttachment(v, a, true)}
+                            className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:underline disabled:opacity-50">
+                            <Download size={14} aria-hidden="true" /> Download
+                          </button>
+                        </div>
+                      ))}
+                    </section>
+                  )}
                 </div>
               )
-              : v.responded_at
+              : v.responded_at && !v.response
               ? (
                 <p className="text-gray-400 text-sm">
                   Private — viewing this response requires the View Lost
@@ -587,7 +659,7 @@ export default function LostOpportunityReviews(
                 </p>
               )
               : null}
-            {canView && (
+            {canView && v.response && expandedReview === v.request_id && (
               <div className="flex flex-wrap gap-3 items-center">
                 {v.response && !v.reviewed_at && (
                   <button
@@ -601,7 +673,7 @@ export default function LostOpportunityReviews(
                 )}
                 {v.response && (
                   <label className="text-gray-300">
-                    Recovery outcome<select
+                    Follow-up status<select
                       disabled={busy}
                       value={v.recovery_outcome}
                       onChange={(e) =>
@@ -612,7 +684,7 @@ export default function LostOpportunityReviews(
                         })}
                       className="ml-2 rounded-lg bg-gray-900 border border-gray-600 p-2"
                     >
-                      <option value="unreviewed" disabled>Unreviewed</option>
+                      <option value="unreviewed" disabled>Not started</option>
                       <option value="following_up">Following Up</option>
                       <option value="recovered">Recovered</option>
                       <option value="closed">Closed</option>
