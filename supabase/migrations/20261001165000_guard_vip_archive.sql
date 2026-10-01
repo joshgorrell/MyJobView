@@ -39,14 +39,12 @@ BEGIN
  IF NOT FOUND OR v.no_opportunities_identified THEN RETURN NULL; END IF;
  IF v.sales_lead_id IS NOT NULL THEN RETURN v.sales_lead_id; END IF;
  lead:=v.responses->'sales_lead';
- IF nullif(btrim(lead->>'request'),'') IS NULL THEN RETURN NULL; END IF;
+ IF nullif(btrim(lead->>'notes'),'') IS NULL THEN RETURN NULL; END IF;
  SELECT * INTO w FROM public.work_orders WHERE id=p_work_order_id;
  SELECT * INTO c FROM public.contacts WHERE id=w.contact_id;
  rep:=w.customer_sales_rep_id;
  IF rep IS NULL THEN RAISE EXCEPTION 'Customer has no assigned sales rep. Assign one before completing this VIP visit.'; END IF;
- descr:=(lead->>'request') || coalesce(E'\nRoom/Area: '||nullif(btrim(lead->>'room'),''),'') ||
-   E'\nInterest: '||coalesce(lead->>'interest','exploring') || E'\nTiming: '||coalesce(lead->>'timing','future') ||
-   coalesce(E'\nNotes: '||nullif(btrim(lead->>'notes'),''),'') || E'\nSource: VIP Maintenance • '||coalesce(w.work_order_number,w.id::text);
+ descr:=(lead->>'notes') || E'\n\nSource: VIP Maintenance • '||coalesce(w.work_order_number,w.id::text);
  INSERT INTO public.leads(company_name,contact_name,email,phone,opportunity_description,status,assigned_to,created_by,is_fishbowl,claimed_at,lead_source)
  VALUES(c.company_name,coalesce(c.full_name,c.company_name,'Customer'),c.email,c.phone,descr,'claimed',rep,auth.uid(),false,now(),'vip_maintenance') RETURNING id INTO lead_id;
  UPDATE public.vip_maintenance_visits SET sales_lead_id=lead_id,updated_at=now() WHERE id=v.id;
