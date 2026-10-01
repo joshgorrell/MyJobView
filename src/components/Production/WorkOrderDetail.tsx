@@ -186,7 +186,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [editing, setEditing] = useState(false);
   const validTabs = ['overview','vip','tasks','materials','time','parts','photos','completion','history','flow'] as const;
   type WorkOrderTab = typeof validTabs[number];
-  const requestedTab = new URLSearchParams(window.location.search).get('tab') as WorkOrderTab | null;
+  const requestedTab = new URLSearchParams(window.location.search).get('subtab') as WorkOrderTab | null;
   const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'overview');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [showPartRequestForm, setShowPartRequestForm] = useState(false);
@@ -657,7 +657,12 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const isVipMaintenance = workOrder.type === 'vip_program' || workOrderOptions.some(o => o.id === workOrder.work_order_type_id && o.system_key === 'vip_program');
 
   useEffect(() => {
-    if (activeTab === 'vip' && !isVipMaintenance) setActiveTab('overview');
+    if (activeTab === 'vip' && !isVipMaintenance) {
+      setActiveTab('overview');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('subtab');
+      window.history.replaceState({}, '', url.toString());
+    }
   }, [activeTab, isVipMaintenance]);
 
   const tabs = [
@@ -930,7 +935,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                   const nextTab = tab.id as WorkOrderTab;
                   setActiveTab(nextTab);
                   const url = new URL(window.location.href);
-                  if (nextTab === 'overview') url.searchParams.delete('tab'); else url.searchParams.set('tab', nextTab);
+                  if (nextTab === 'overview') url.searchParams.delete('subtab'); else url.searchParams.set('subtab', nextTab);
                   window.history.replaceState({}, '', url.toString());
                 }}
                 className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
