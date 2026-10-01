@@ -1,3 +1,34 @@
+-- Reconcile the final validator here too so environments that applied an earlier draft of
+-- the VIP migrations converge on the final Sales Lead / Punchlist workflow.
+CREATE OR REPLACE FUNCTION public.vip_maintenance_incomplete_sections(p_work_order_id uuid)
+RETURNS text[] LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+DECLARE v vip_maintenance_visits; missing text[] := '{}'; section text;
+BEGIN
+ SELECT vmv.* INTO v FROM vip_maintenance_visits vmv WHERE vmv.work_order_id=p_work_order_id;
+ IF NOT FOUND THEN RETURN ARRAY['VIP Maintenance']; END IF;
+ FOREACH section IN ARRAY ARRAY['customer_check_in','network_internet','av_automation','security_surveillance','room_by_room','preventive_maintenance'] LOOP
+   IF NOT (COALESCE((v.responses->section->>'complete')::boolean,false) OR (section <> 'customer_check_in' AND COALESCE((v.responses->section->>'na')::boolean,false)))
+   THEN missing:=array_append(missing,section); END IF;
+ END LOOP;
+ IF NOT (COALESCE((v.responses->'customer_training'->>'complete')::boolean,false) OR v.training_not_needed OR v.customer_not_present)
+ THEN missing:=array_append(missing,'customer_training'); END IF;
+ IF NOT (v.no_issues_found OR EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id))
+ THEN missing:=array_append(missing,'findings'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)<>1)
+ THEN missing:=array_append(missing,'finding_dispositions'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND nullif(btrim(x.description),'') IS NULL)
+ THEN missing:=array_append(missing,'finding_description'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='')
+ THEN missing:=array_append(missing,'no_action_reason'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL)
+ THEN missing:=array_append(missing,'unrouted_findings'); END IF;
+ IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'notes'),'') IS NOT NULL)
+ THEN missing:=array_append(missing,'sales_lead'); END IF;
+ IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL)
+ THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
+ RETURN missing;
+END $;
+
 -- Final VIP Maintenance completion protections.
 -- Archive uses is_archived rather than status, so guard it separately.
 CREATE OR REPLACE FUNCTION public.guard_vip_work_order_archive()
