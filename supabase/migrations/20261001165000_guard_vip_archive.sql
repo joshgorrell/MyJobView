@@ -4,7 +4,7 @@ ALTER TABLE public.vip_maintenance_findings ADD COLUMN IF NOT EXISTS follow_up_t
 -- Reconcile the final validator here too so environments that applied an earlier draft of
 -- the VIP migrations converge on the final Sales Lead / Punchlist workflow.
 CREATE OR REPLACE FUNCTION public.vip_maintenance_incomplete_sections(p_work_order_id uuid)
-RETURNS text[] LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+RETURNS text[] LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
 DECLARE v vip_maintenance_visits; missing text[] := '{}'; section text;
 BEGIN
  SELECT vmv.* INTO v FROM vip_maintenance_visits vmv WHERE vmv.work_order_id=p_work_order_id;
@@ -33,7 +33,7 @@ BEGIN
  IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL)
  THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
  RETURN missing;
-END $;
+END $$;
 
 -- Final VIP Maintenance completion protections.
 -- Archive uses is_archived rather than status, so guard it separately.
@@ -68,7 +68,7 @@ GRANT EXECUTE ON FUNCTION public.guard_vip_work_order_archive() TO authenticated
 ALTER TABLE public.vip_maintenance_visits ADD COLUMN IF NOT EXISTS sales_lead_id uuid REFERENCES public.leads(id) ON DELETE SET NULL;
 
 -- Give VIP its own measurable lead source instead of hiding it under "other".
-DO $
+DO $$
 DECLARE constraint_name text;
 BEGIN
   SELECT con.conname INTO constraint_name
@@ -81,7 +81,7 @@ BEGIN
   IF constraint_name IS NOT NULL THEN
     EXECUTE format('ALTER TABLE public.leads DROP CONSTRAINT %I',constraint_name);
   END IF;
-END $;
+END $$;
 ALTER TABLE public.leads ADD CONSTRAINT leads_lead_source_check
 CHECK (lead_source IN ('manual','kiosk','website','referral','import','other','email_forward','vip_maintenance'));
 
