@@ -55,6 +55,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     role: 'sales' as 'admin' | 'finance' | 'manager' | 'sales' | 'tech' | 'service_manager',
     role_id: '' as string,
     email_leads: false,
+    is_sales_rep: false,
     can_view_prospects: true,
     can_view_all_tasks: true,
     can_view_all_messages: false,
@@ -275,6 +276,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
             role: formData.role,
             role_id: formData.role_id,
             email_leads: formData.email_leads,
+            is_sales_rep: formData.is_sales_rep,
             can_view_prospects: formData.can_view_prospects,
             can_view_all_tasks: formData.can_view_all_tasks,
             can_view_all_messages: formData.can_view_all_messages,
@@ -580,6 +582,24 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           )}
 
           <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.is_sales_rep}
+                onChange={(e) => setFormData({ ...formData, is_sales_rep: e.target.checked })}
+                className="mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-cyan-400" />
+                  <span className="text-sm font-medium text-white">Sales Rep</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  This person is a salesperson and will appear anywhere MJV asks for a Sales Rep. This is separate from role and permissions.
+                </p>
+              </div>
+            </label>
+
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
