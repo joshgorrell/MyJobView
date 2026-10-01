@@ -28,6 +28,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
   const [uploading, setUploading] = useState(false);
   const [photoPoints, setPhotoPoints] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     loadSettings();
@@ -85,9 +86,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
 
     setPhotos([...photos, ...newPhotos]);
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   }
 
   function removePhoto(index: number) {
@@ -190,26 +190,15 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
 
   return (
     <div className="space-y-4">
-      {/* Photo Input */}
-      <div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handlePhotoCapture}
-          className="hidden"
-          id="job-photo-input"
-        />
-        <label
-          htmlFor="job-photo-input"
-          className="flex items-center justify-center gap-2 w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
-        >
-          <Camera className="w-8 h-8 text-gray-400" />
-          <div className="text-center">
-            <div className="text-gray-600 font-medium">Tap to capture photos</div>
-            <div className="text-sm text-gray-500 mt-1">Multiple photos supported</div>
-          </div>
+      {/* Separate camera and library inputs behave reliably on iPhone/iPad. */}
+      <div className="grid grid-cols-2 gap-3">
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} className="hidden" id="job-photo-camera-input" />
+        <label htmlFor="job-photo-camera-input" className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-3 text-center hover:border-blue-500 hover:bg-blue-50">
+          <Camera className="w-7 h-7 text-gray-400" /><span className="text-sm font-medium text-gray-700">Take Photo</span>
+        </label>
+        <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoCapture} className="hidden" id="job-photo-library-input" />
+        <label htmlFor="job-photo-library-input" className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-3 text-center hover:border-blue-500 hover:bg-blue-50">
+          <ImageIcon className="w-7 h-7 text-gray-400" /><span className="text-sm font-medium text-gray-700">Choose Photos</span><span className="text-xs text-gray-500">Select several</span>
         </label>
       </div>
 
