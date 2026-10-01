@@ -17,16 +17,22 @@ WITH known_sales_reps(full_name) AS (
 electronic_life_org AS (
   SELECT p.organization_id
   FROM public.profiles p
-  JOIN known_sales_reps k ON lower(trim(p.full_name)) = k.full_name
+  JOIN known_sales_reps k ON (
+    lower(trim(p.full_name)) = k.full_name
+    OR lower(trim(concat_ws(' ', p.first_name, p.last_name))) = k.full_name
+  )
   WHERE p.organization_id IS NOT NULL
   GROUP BY p.organization_id
-  HAVING count(DISTINCT lower(trim(p.full_name))) >= 4
+  HAVING count(DISTINCT k.full_name) >= 4
 ),
 target_reps AS (
   SELECT p.id
   FROM public.profiles p
   JOIN electronic_life_org o ON o.organization_id = p.organization_id
-  JOIN known_sales_reps k ON lower(trim(p.full_name)) = k.full_name
+  JOIN known_sales_reps k ON (
+    lower(trim(p.full_name)) = k.full_name
+    OR lower(trim(concat_ws(' ', p.first_name, p.last_name))) = k.full_name
+  )
 )
 UPDATE public.profiles p
 SET is_sales_rep = true
