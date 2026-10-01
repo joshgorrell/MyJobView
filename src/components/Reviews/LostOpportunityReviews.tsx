@@ -41,6 +41,7 @@ export default function LostOpportunityReviews(
 ) {
   const { profile } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [expandedReview, setExpandedReview] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [creating, setCreating] = useState(showCreate);
   const [search, setSearch] = useState("");
@@ -486,14 +487,25 @@ export default function LostOpportunityReviews(
         : visible.map((v) => (
           <article
             key={v.request_id}
-            className="rounded-xl border border-gray-700 bg-gray-800 p-5 space-y-3"
+            className="rounded-lg border border-gray-700 bg-gray-800 p-3 space-y-2"
           >
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div>
-                <h3 className="text-white font-semibold">
-                  {v.opportunity_name}
-                </h3>
-                <p className="text-gray-400 text-sm">{v.recipient}</p>
+              <div className="min-w-0 flex-1">
+                {v.response ? (
+                  <button type="button"
+                    aria-expanded={expandedReview === v.request_id}
+                    aria-controls={`lost-response-${v.request_id}`}
+                    onClick={() => setExpandedReview(expandedReview === v.request_id ? null : v.request_id)}
+                    className="text-left w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
+                    <span className="block text-white font-semibold">{v.opportunity_name}</span>
+                    <span className="block text-gray-400 text-sm">{v.recipient} <span className="text-cyan-300 ml-2">{expandedReview === v.request_id ? "Hide answers ↑" : "View answers →"}</span></span>
+                  </button>
+                ) : (
+                  <>
+                    <h3 className="text-white font-semibold">{v.opportunity_name}</h3>
+                    <p className="text-gray-400 text-sm">{v.recipient}</p>
+                  </>
+                )}
               </div>
               <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
                 <p className="text-cyan-300">
@@ -529,9 +541,9 @@ export default function LostOpportunityReviews(
                 )}
               </div>
             </div>
-            {v.response
+            {v.response && expandedReview === v.request_id
               ? (
-                <div className="space-y-3 text-gray-200">
+                <div id={`lost-response-${v.request_id}`} className="border-t border-gray-700 pt-3 space-y-3 text-gray-200">
                   <p>
                     {v.response.reasons.map((r) =>
                       responseReasons.find(([key]) => key === r)?.[1] || r
@@ -579,7 +591,7 @@ export default function LostOpportunityReviews(
                   ))}
                 </div>
               )
-              : v.responded_at
+              : v.responded_at && !v.response
               ? (
                 <p className="text-gray-400 text-sm">
                   Private — viewing this response requires the View Lost
@@ -587,7 +599,7 @@ export default function LostOpportunityReviews(
                 </p>
               )
               : null}
-            {canView && (
+            {canView && v.response && expandedReview === v.request_id && (
               <div className="flex flex-wrap gap-3 items-center">
                 {v.response && !v.reviewed_at && (
                   <button
