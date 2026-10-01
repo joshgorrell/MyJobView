@@ -51,7 +51,7 @@ export function printLostReview(review: PrintableReview, companyName: string) {
 <dl><dt>Customer</dt><dd>${escapeHtml(review.recipient || "Customer")}</dd><dt>Submitted</dt><dd>${escapeHtml(dateLabel(review.responded_at))}</dd><dt>Requested by</dt><dd>${escapeHtml(review.sent_by_name || "—")}</dd><dt>Reviewed</dt><dd>${escapeHtml(dateLabel(review.reviewed_at))}</dd><dt>Recovery outcome</dt><dd>${escapeHtml(outcomes[review.recovery_outcome] || review.recovery_outcome)}</dd></dl>
 ${answer("Why did we lose your business?", reasons.length ? reasons.join("\n") : "Comment only")}
 ${answer("Customer comments", response.message)}
-${answer("Is there still a chance to earn their business?", {yes:"Yes",maybe:"Maybe",no:"No"}[response.recoverable] || response.recoverable)}
+${answer("Is there still a chance to earn their business?", ({yes:"Yes",maybe:"Maybe",no:"No"} as Record<string, string>)[response.recoverable] || response.recoverable)}
 ${answer("What would it take to earn their business?", response.recovery_message)}
 ${answer("Competing bid attachments", response.attachments.length ? response.attachments.map(file => file.name).join("\n") : "None uploaded")}
 <div class="private">Attachments are listed here. Download the original files separately from MJV.</div>
