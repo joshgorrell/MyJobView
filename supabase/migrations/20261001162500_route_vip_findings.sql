@@ -79,7 +79,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND
    (('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL) OR ('service_follow_up'=ANY(x.dispositions) AND x.service_request_id IS NULL) OR ('sales'=ANY(x.dispositions) AND x.sales_task_id IS NULL)))
  THEN missing:=array_append(missing,'unrouted_findings'); END IF;
- IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'request'),'') IS NOT NULL) THEN missing:=array_append(missing,'sales_lead'); END IF;
+ IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'notes'),'') IS NOT NULL) THEN missing:=array_append(missing,'sales_lead'); END IF;
  IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL) THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
  RETURN missing;
 END $$;
