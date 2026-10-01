@@ -39,9 +39,9 @@ BEGIN
      job_location_address,job_location_city,job_location_state,job_location_zip,job_description,billable_type,billable_by,
      priority,notes,status,source_type,request_type,project_id,created_by)
    VALUES(f.organization_id,w.contact_id,coalesce(c.full_name,c.company_name,'Customer'),c.phone,c.email,
-     coalesce(c.street_address,'Address on file'),c.city,
-     c.state,c.zip_code,description,'billable','admin',
-     'normal','Created from VIP Maintenance finding','open','vip_maintenance','service',w.project_id,auth.uid())
+     coalesce(w.service_location_address,c.street_address,'Address on file'),coalesce(w.service_location_city,c.city),
+     coalesce(w.service_location_state,c.state),coalesce(w.service_location_zip,c.zip_code),description,'billable','admin',
+     'normal','Created from VIP Maintenance finding','open','other','service',w.project_id,auth.uid())
    RETURNING id INTO f.service_request_id;
  END IF;
 
