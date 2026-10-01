@@ -16,6 +16,7 @@ interface WorkOrder {
   title: string;
   type: string;
   work_order_number: string;
+  work_order_type_id?: string | null;
 }
 
 interface ChecklistTemplate {
@@ -63,7 +64,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       const [woResult, photosResult] = await Promise.all([
         supabase
           .from('work_orders')
-          .select('id, title, type, work_order_number')
+          .select('id, title, type, work_order_number, work_order_type_id')
           .eq('id', workOrderId)
           .maybeSingle(),
         supabase
@@ -138,6 +139,12 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
   async function handleSubmit() {
     if (!profile || !workOrder || !template) return;
+
+    if (workOrder.type === 'vip_program') {
+      const { data: incomplete, error: validationError } = await supabase.rpc('vip_maintenance_incomplete_sections', { p_work_order_id: workOrderId });
+      if (validationError) { alert('Unable to validate VIP Maintenance checklist.'); return; }
+      if (incomplete?.length) { alert(`VIP Maintenance is incomplete: ${incomplete.join(', ')}`); return; }
+    }
 
     setSubmitting(true);
 
