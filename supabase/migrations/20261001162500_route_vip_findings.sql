@@ -16,6 +16,7 @@ BEGIN
  SELECT * INTO f FROM public.vip_maintenance_findings WHERE id=p_finding_id FOR UPDATE;
  IF NOT FOUND OR p.organization_id IS DISTINCT FROM f.organization_id THEN RAISE EXCEPTION 'Finding not found' USING ERRCODE='42501'; END IF;
  IF cardinality(f.dispositions)=0 THEN RAISE EXCEPTION 'Choose a finding disposition first'; END IF;
+ IF 'no_action'=ANY(f.dispositions) AND coalesce(nullif(btrim(f.notes),''),'')='' THEN RAISE EXCEPTION 'A reason is required when No Action is selected.'; END IF;
  SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=f.visit_id;
  SELECT wo.* INTO w FROM public.work_orders wo
  JOIN public.contacts wc ON wc.id=wo.contact_id AND wc.organization_id=f.organization_id
@@ -74,6 +75,7 @@ BEGIN
  IF NOT (COALESCE((v.responses->'customer_training'->>'complete')::boolean,false) OR v.training_not_needed OR v.customer_not_present) THEN missing:=array_append(missing,'customer_training'); END IF;
  IF NOT (v.no_issues_found OR EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id)) THEN missing:=array_append(missing,'findings'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)=0) THEN missing:=array_append(missing,'finding_dispositions'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='') THEN missing:=array_append(missing,'no_action_reason'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND
    (('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL) OR ('service_follow_up'=ANY(x.dispositions) AND x.service_request_id IS NULL) OR ('sales'=ANY(x.dispositions) AND x.sales_task_id IS NULL)))
  THEN missing:=array_append(missing,'unrouted_findings'); END IF;
