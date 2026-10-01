@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS public.vip_maintenance_findings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
   visit_id uuid NOT NULL REFERENCES public.vip_maintenance_visits(id) ON DELETE CASCADE,
-  room text,
   description text NOT NULL,
   notes text,
   dispositions text[] NOT NULL DEFAULT '{}'::text[],
