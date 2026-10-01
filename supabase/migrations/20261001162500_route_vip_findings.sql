@@ -8,7 +8,7 @@ RETURNS public.vip_maintenance_findings
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
  f public.vip_maintenance_findings%ROWTYPE; v public.vip_maintenance_visits%ROWTYPE; w public.work_orders%ROWTYPE;
- p public.profiles%ROWTYPE; description text;
+ p public.profiles%ROWTYPE;
 BEGIN
  SELECT * INTO p FROM public.profiles WHERE id=auth.uid() AND is_active AND contact_id IS NULL;
  SELECT * INTO f FROM public.vip_maintenance_findings WHERE id=p_finding_id FOR UPDATE;
@@ -20,11 +20,9 @@ BEGIN
  JOIN public.contacts wc ON wc.id=wo.contact_id AND wc.organization_id=f.organization_id
  WHERE wo.id=v.work_order_id;
  IF NOT FOUND THEN RAISE EXCEPTION 'VIP Work Order not found in this organization' USING ERRCODE='42501'; END IF;
- description := coalesce(nullif(btrim(f.description),''),'VIP Maintenance finding');
-
  IF 'punchlist'=ANY(f.dispositions) AND f.punchlist_task_id IS NULL THEN
    INSERT INTO public.punchlist_tasks(organization_id,contact_id,title,details,status,priority_order)
-   VALUES(f.organization_id,w.contact_id,left(f.description,120),description,'draft',
+   VALUES(f.organization_id,w.contact_id,left(f.description,120),f.description,'draft',
      coalesce((SELECT max(priority_order)+1 FROM public.punchlist_tasks WHERE contact_id=w.contact_id),0))
    RETURNING id INTO f.punchlist_task_id;
  END IF;
