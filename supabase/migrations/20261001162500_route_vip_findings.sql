@@ -13,16 +13,14 @@ BEGIN
  SELECT * INTO p FROM public.profiles WHERE id=auth.uid() AND is_active AND contact_id IS NULL;
  SELECT * INTO f FROM public.vip_maintenance_findings WHERE id=p_finding_id FOR UPDATE;
  IF NOT FOUND OR p.organization_id IS DISTINCT FROM f.organization_id THEN RAISE EXCEPTION 'Finding not found' USING ERRCODE='42501'; END IF;
- IF cardinality(f.dispositions)=0 THEN RAISE EXCEPTION 'Choose a finding disposition first'; END IF;
+ IF cardinality(f.dispositions)<>1 THEN RAISE EXCEPTION 'Choose exactly one finding outcome'; END IF;
  IF 'no_action'=ANY(f.dispositions) AND coalesce(nullif(btrim(f.notes),''),'')='' THEN RAISE EXCEPTION 'A reason is required when No Action is selected.'; END IF;
  SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=f.visit_id;
  SELECT wo.* INTO w FROM public.work_orders wo
  JOIN public.contacts wc ON wc.id=wo.contact_id AND wc.organization_id=f.organization_id
  WHERE wo.id=v.work_order_id;
  IF NOT FOUND THEN RAISE EXCEPTION 'VIP Work Order not found in this organization' USING ERRCODE='42501'; END IF;
- description := coalesce(nullif(btrim(f.description),''),'VIP Maintenance finding') ||
-   CASE WHEN 'no_action'=ANY(f.dispositions) AND nullif(btrim(f.notes),'') IS NOT NULL THEN E'\nNo Action Reason: '||f.notes ELSE '' END ||
-   E'\nSource: VIP Maintenance • '||coalesce(w.work_order_number,w.id::text)||' • '||current_date::text;
+ description := coalesce(nullif(btrim(f.description),''),'VIP Maintenance finding');
 
  IF 'punchlist'=ANY(f.dispositions) AND f.punchlist_task_id IS NULL THEN
    INSERT INTO public.punchlist_tasks(organization_id,contact_id,title,details,status,priority_order)
@@ -50,7 +48,7 @@ BEGIN
  END LOOP;
  IF NOT (COALESCE((v.responses->'customer_training'->>'complete')::boolean,false) OR v.training_not_needed OR v.customer_not_present) THEN missing:=array_append(missing,'customer_training'); END IF;
  IF NOT (v.no_issues_found OR EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id)) THEN missing:=array_append(missing,'findings'); END IF;
- IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)=0) THEN missing:=array_append(missing,'finding_dispositions'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)<>1) THEN missing:=array_append(missing,'finding_dispositions'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='') THEN missing:=array_append(missing,'no_action_reason'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND
    ('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL))
