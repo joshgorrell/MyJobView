@@ -17,7 +17,7 @@ const dispositions = [
   ['service_follow_up','Service Follow-Up'],['sales','Send to Sales'],['no_action','No Action']
 ] as const;
 
-type Finding={id?:string;room:string;description:string;notes:string;dispositions:string[]};
+type Finding={id?:string;room:string;description:string;notes:string;dispositions:string[];punchlist_task_id?:string|null;service_request_id?:string|null;sales_task_id?:string|null;routed_at?:string|null};
 
 export default function VipMaintenanceChecklist({workOrderId,onChange}:{workOrderId:string;onChange?:()=>void}) {
  const {profile}=useAuth(); const [visit,setVisit]=useState<any>(null); const [findings,setFindings]=useState<Finding[]>([]); const [saving,setSaving]=useState(false);
@@ -40,6 +40,7 @@ export default function VipMaintenanceChecklist({workOrderId,onChange}:{workOrde
  async function addFinding(){if(!visit||!profile)return;const {data}=await supabase.from('vip_maintenance_findings').insert({visit_id:visit.id,organization_id:profile.organization_id,created_by:profile.id,description:'New finding'}).select().single();if(data)setFindings([...findings,data]);}
  async function updateFinding(f:Finding,p:any){const next={...f,...p};setFindings(findings.map(x=>x.id===f.id?next:x));if(f.id)await supabase.from('vip_maintenance_findings').update(p).eq('id',f.id);}
  async function removeFinding(f:Finding){if(f.id)await supabase.from('vip_maintenance_findings').delete().eq('id',f.id);setFindings(findings.filter(x=>x.id!==f.id));}
+ async function routeFinding(f:Finding){if(!f.id)return;setSaving(true);const {data,error}=await supabase.rpc('route_vip_maintenance_finding',{p_finding_id:f.id});setSaving(false);if(error){alert(error.message);return;}setFindings(findings.map(x=>x.id===f.id?data:x));onChange?.();}
  if(!visit)return <div className="p-6 text-sm text-gray-500">Preparing VIP Maintenance checklist…</div>;
  return <div className="space-y-5">
   <div className="flex items-start justify-between gap-4"><div><h3 className="text-lg font-bold text-gray-900">VIP Maintenance Visit</h3><p className="text-sm text-gray-600">Complete each applicable section. Batteries, replacement parts and consumables are billed through the normal Work Order parts flow.</p></div><span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${missing.length?'bg-amber-100 text-amber-700':'bg-green-100 text-green-700'}`}>{missing.length?missing.length+' incomplete':'Ready to complete'}</span></div>
