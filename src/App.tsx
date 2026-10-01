@@ -1402,6 +1402,17 @@ function AppContent() {
           salesRepContext={activeTab === 'sales_dashboard' ? salesRepAIContext : null}
           onRegisterOpen={(fn) => { openAIAssistantRef.current = fn; }}
           onAction={(action) => {
+            const actionModule: Record<string, string> = {
+              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks',
+              CREATE_SERVICE_REQUEST: 'service_requests', CREATE_MESSAGE: 'messages',
+              CREATE_PROPOSAL: 'proposals', CREATE_SECURITY_CONTRACT: 'security_onboarding',
+              OPEN_PROPOSAL: 'proposals',
+            };
+            const requiredModule = action.type === 'NAVIGATE_TO' ? action.tab : actionModule[action.type];
+            if (!requiredModule || !checkModuleAccess(requiredModule)) {
+              window.alert('That action is not available with your current permissions.');
+              return;
+            }
             if (action.type === 'CREATE_CONTACT') {
               setShowContactForm(true);
             } else if (action.type === 'CREATE_LEAD') {
