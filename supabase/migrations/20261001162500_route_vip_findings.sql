@@ -8,7 +8,7 @@ RETURNS public.vip_maintenance_findings
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
  f public.vip_maintenance_findings%ROWTYPE; v public.vip_maintenance_visits%ROWTYPE; w public.work_orders%ROWTYPE;
- c public.contacts%ROWTYPE; p public.profiles%ROWTYPE; description text; sales_rep uuid;
+ p public.profiles%ROWTYPE; description text;
 BEGIN
  SELECT * INTO p FROM public.profiles WHERE id=auth.uid() AND is_active AND contact_id IS NULL;
  SELECT * INTO f FROM public.vip_maintenance_findings WHERE id=p_finding_id FOR UPDATE;
@@ -20,10 +20,9 @@ BEGIN
  JOIN public.contacts wc ON wc.id=wo.contact_id AND wc.organization_id=f.organization_id
  WHERE wo.id=v.work_order_id;
  IF NOT FOUND THEN RAISE EXCEPTION 'VIP Work Order not found in this organization' USING ERRCODE='42501'; END IF;
- SELECT * INTO c FROM public.contacts WHERE id=w.contact_id AND organization_id=f.organization_id;
  description := coalesce(nullif(btrim(f.description),''),'VIP Maintenance finding') ||
    CASE WHEN f.room IS NOT NULL THEN E'\nRoom/Area: '||f.room ELSE '' END ||
-   CASE WHEN f.notes IS NOT NULL THEN E'\nNotes: '||f.notes ELSE '' END ||
+   CASE WHEN 'no_action'=ANY(f.dispositions) AND nullif(btrim(f.notes),'') IS NOT NULL THEN E'\nNo Action Reason: '||f.notes ELSE '' END ||
    E'\nSource: VIP Maintenance • '||coalesce(w.work_order_number,w.id::text)||' • '||current_date::text;
 
  IF 'punchlist'=ANY(f.dispositions) AND f.punchlist_task_id IS NULL THEN
