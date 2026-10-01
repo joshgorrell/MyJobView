@@ -10,15 +10,14 @@ import { MessageTicker } from './components/Layout/MessageTicker';
 import { DepartmentSidebar } from './components/Layout/DepartmentSidebar';
 import { PlatformFooter } from './components/Layout/PlatformFooter';
 import { OfflineIndicator } from './components/Offline/OfflineIndicator';
-import BugReportModal from './components/Shared/BugReportModal';
+import TellUsModal from './components/Shared/TellUsModal';
 import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
-import { getIcon } from './lib/iconMap';
-import { X, LogOut, FileText, Bug, TrendingUp } from 'lucide-react';
+import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
@@ -181,7 +180,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
-  const { footerDepartments, getUserModules, starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
+  const { starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -193,7 +192,7 @@ function AppContent() {
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
-  const [showBugReportModal, setShowBugReportModal] = useState(false);
+  const [showTellUsModal, setShowTellUsModal] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
@@ -310,10 +309,6 @@ function AppContent() {
     if (urlSalesOrderId) setOpenSalesOrderId(urlSalesOrderId);
   }, []);
 
-  const renderIcon = (iconName: string, className: string = "w-4 h-4") => {
-    const IconComponent = getIcon(iconName);
-    return IconComponent ? <IconComponent className={className} /> : null;
-  };
 
   useEffect(() => {
     offlineStorage.init();
@@ -1209,27 +1204,6 @@ function AppContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4">
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
-              {footerDepartments.map((dept) => {
-                const modules = getUserModules(dept.id);
-                // Only show sort_order = 1 in footer (Feature Suggestions)
-                return modules.filter(m => m.sort_order === 1).map((module) => (
-                  <button
-                    key={module.module_key}
-                    onClick={() => setActiveTab(module.module_key)}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors justify-center"
-                  >
-                    {renderIcon(module.icon, "w-4 h-4 flex-shrink-0")}
-                    <span className="text-sm whitespace-nowrap">{module.display_name}</span>
-                  </button>
-                ));
-              })}
-              <button
-                onClick={() => setShowBugReportModal(true)}
-                className="p-2 text-green-500 hover:text-green-400 hover:bg-gray-800 rounded-lg transition-colors"
-                title="Report a bug"
-              >
-                <Bug className="w-5 h-5" />
-              </button>
               <button
                 onClick={signOut}
                 className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors justify-center"
@@ -1245,7 +1219,7 @@ function AppContent() {
       )}
 
       {!isStandalone && (
-        <PlatformFooter />
+        <PlatformFooter onTellUs={() => setShowTellUsModal(true)} />
       )}
 
       {showJobMediaUpload && (
@@ -1328,9 +1302,9 @@ function AppContent() {
         </Suspense>
       )}
 
-      <BugReportModal
-        isOpen={showBugReportModal}
-        onClose={() => setShowBugReportModal(false)}
+      <TellUsModal
+        isOpen={showTellUsModal}
+        onClose={() => setShowTellUsModal(false)}
       />
 
       {showDesignBriefModal && (
