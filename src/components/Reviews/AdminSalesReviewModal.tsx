@@ -70,7 +70,7 @@ export default function AdminSalesReviewModal({ requestId, customer, onClose }: 
         </fieldset>
         <fieldset className="space-y-3"><legend className="font-semibold">Sales performance</legend>
           <p className="text-sm text-gray-400">1 = Poor · 2 = Needs improvement · 3 = Meets expectations · 4 = Good · 5 = Excellent</p>
-          {adminRatingFields.map(([key, label]) => <label key={key} className="block">{label}<select value={form[key] ?? ''} onChange={e => change({ [key]: e.target.value ? Number(e.target.value) : null })} className={field}>
+          {adminRatingFields.map(([key, label]) => <label key={key} className="block">{label}<select aria-label={label} value={form[key] ?? ''} onChange={e => change({ [key]: e.target.value ? Number(e.target.value) : null })} className={field}>
             <option value="">N/A / not enough information</option>{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
           </select></label>)}
         </fieldset>
