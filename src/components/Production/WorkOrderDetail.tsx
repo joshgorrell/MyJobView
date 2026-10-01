@@ -1817,9 +1817,13 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           initialDescription={vipFollowUpFinding ? `VIP Maintenance follow-up\n\n${vipFollowUpFinding.description}\n\nWork Order #${workOrder.work_order_number} - ${workOrder.title}\nCustomer: ${workOrder.contact.full_name || workOrder.contact.company_name}` : undefined}
           onClose={() => { setShowCreateTaskModal(false); setVipFollowUpFinding(null); }}
           onSuccess={async (taskId) => {
-            if (vipFollowUpFinding?.id && taskId) {
-              const { error } = await supabase.from('vip_maintenance_findings').update({ follow_up_task_id: taskId, routed_at: new Date().toISOString() }).eq('id', vipFollowUpFinding.id);
-              if (error) alert(`Task was created, but the VIP Finding could not be linked: ${error.message}`);
+            const findingId = vipFollowUpFinding?.id;
+            if (findingId && taskId) {
+              const { error } = await supabase.from('vip_maintenance_findings').update({ follow_up_task_id: taskId, routed_at: new Date().toISOString() }).eq('id', findingId);
+              if (error) {
+                alert(`Task was created, but the VIP Finding could not be linked: ${error.message}`);
+                return;
+              }
             }
             setShowCreateTaskModal(false);
             setVipFollowUpFinding(null);
