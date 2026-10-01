@@ -17,7 +17,10 @@ BEGIN
  IF NOT FOUND OR p.organization_id IS DISTINCT FROM f.organization_id THEN RAISE EXCEPTION 'Finding not found' USING ERRCODE='42501'; END IF;
  IF cardinality(f.dispositions)=0 THEN RAISE EXCEPTION 'Choose a finding disposition first'; END IF;
  SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=f.visit_id;
- SELECT * INTO w FROM public.work_orders WHERE id=v.work_order_id AND company_id=f.organization_id;
+ SELECT wo.* INTO w FROM public.work_orders wo
+ JOIN public.contacts wc ON wc.id=wo.contact_id AND wc.organization_id=f.organization_id
+ WHERE wo.id=v.work_order_id;
+ IF NOT FOUND THEN RAISE EXCEPTION 'VIP Work Order not found in this organization' USING ERRCODE='42501'; END IF;
  SELECT * INTO c FROM public.contacts WHERE id=w.contact_id AND organization_id=f.organization_id;
  description := coalesce(nullif(btrim(f.description),''),'VIP Maintenance finding') ||
    CASE WHEN f.room IS NOT NULL THEN E'\nRoom/Area: '||f.room ELSE '' END ||
@@ -36,19 +39,19 @@ BEGIN
      job_location_address,job_location_city,job_location_state,job_location_zip,job_description,billable_type,billable_by,
      priority,notes,status,source_type,request_type,project_id,created_by)
    VALUES(f.organization_id,w.contact_id,coalesce(c.full_name,c.company_name,'Customer'),c.phone,c.email,
-     coalesce(w.service_location_address,c.street_address,'Address on file'),coalesce(w.service_location_city,c.city),
-     coalesce(w.service_location_state,c.state),coalesce(w.service_location_zip,c.zip_code),description,'billable','admin',
+     coalesce(c.street_address,'Address on file'),c.city,
+     c.state,c.zip_code,description,'billable','admin',
      'normal','Created from VIP Maintenance finding','open','vip_maintenance','service',w.project_id,auth.uid())
    RETURNING id INTO f.service_request_id;
  END IF;
 
  IF 'sales'=ANY(f.dispositions) AND f.sales_task_id IS NULL THEN
-   sales_rep:=coalesce(w.sales_rep_id,c.sales_rep_id);
+   sales_rep:=w.customer_sales_rep_id;
    IF sales_rep IS NULL THEN RAISE EXCEPTION 'Customer has no assigned sales rep. Assign one before routing this finding to Sales.'; END IF;
-   INSERT INTO public.tasks(title,description,assigned_to,contact_id,priority,status,created_by)
-   VALUES('VIP opportunity: '||left(f.description,90),description,sales_rep,w.contact_id,'normal','pending',auth.uid())
+   INSERT INTO public.tasks(title,description,assigned_to,contact_id,priority,status,user_id)
+   VALUES('VIP opportunity: '||left(f.description,90),description,sales_rep,w.contact_id,'medium','pending',auth.uid())
    RETURNING id INTO f.sales_task_id;
-   INSERT INTO public.task_comments(task_id,user_id,comment) VALUES(f.sales_task_id,auth.uid(),'Created automatically from VIP Maintenance '||coalesce(w.work_order_number,w.id::text));
+   INSERT INTO public.task_comments(task_id,user_id,content) VALUES(f.sales_task_id,auth.uid(),'Created automatically from VIP Maintenance '||coalesce(w.work_order_number,w.id::text));
  END IF;
 
  UPDATE public.vip_maintenance_findings SET punchlist_task_id=f.punchlist_task_id,service_request_id=f.service_request_id,
