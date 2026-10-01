@@ -1,7 +1,6 @@
 -- Route VIP findings into existing MJV systems without duplicate entry.
 ALTER TABLE public.vip_maintenance_findings
   ADD COLUMN IF NOT EXISTS punchlist_task_id uuid REFERENCES public.punchlist_tasks(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS service_request_id uuid REFERENCES public.service_requests(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS routed_at timestamptz;
 
 CREATE OR REPLACE FUNCTION public.route_vip_maintenance_finding(p_finding_id uuid)
@@ -34,20 +33,8 @@ BEGIN
    RETURNING id INTO f.punchlist_task_id;
  END IF;
 
- IF 'service_follow_up'=ANY(f.dispositions) AND f.service_request_id IS NULL THEN
-   INSERT INTO public.service_requests(organization_id,contact_id,customer_name,customer_phone,customer_email,
-     job_location_address,job_location_city,job_location_state,job_location_zip,job_description,billable_type,billable_by,
-     priority,notes,status,source_type,request_type,project_id,created_by)
-   VALUES(f.organization_id,w.contact_id,coalesce(c.full_name,c.company_name,'Customer'),c.phone,c.email,
-     coalesce(w.service_location_address,c.street_address,'Address on file'),coalesce(w.service_location_city,c.city),
-     coalesce(w.service_location_state,c.state),coalesce(w.service_location_zip,c.zip_code),description,'billable','admin',
-     'normal','Created from VIP Maintenance finding','open','other','service',w.project_id,auth.uid())
-   RETURNING id INTO f.service_request_id;
- END IF;
 
-
-
- UPDATE public.vip_maintenance_findings SET punchlist_task_id=f.punchlist_task_id,service_request_id=f.service_request_id,routed_at=now(),updated_at=now() WHERE id=f.id RETURNING * INTO f;
+ UPDATE public.vip_maintenance_findings SET punchlist_task_id=f.punchlist_task_id,routed_at=now(),updated_at=now() WHERE id=f.id RETURNING * INTO f;
  RETURN f;
 END $$;
 REVOKE ALL ON FUNCTION public.route_vip_maintenance_finding(uuid) FROM PUBLIC,anon;
@@ -68,7 +55,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)=0) THEN missing:=array_append(missing,'finding_dispositions'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='') THEN missing:=array_append(missing,'no_action_reason'); END IF;
  IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND
-   (('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL) OR ('service_follow_up'=ANY(x.dispositions) AND x.service_request_id IS NULL) OR ('sales'=ANY(x.dispositions) AND x.sales_task_id IS NULL)))
+   ('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL))
  THEN missing:=array_append(missing,'unrouted_findings'); END IF;
  IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'notes'),'') IS NOT NULL) THEN missing:=array_append(missing,'sales_lead'); END IF;
  IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL) THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
