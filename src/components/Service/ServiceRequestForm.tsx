@@ -836,7 +836,12 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 {formData.contact_id && (
                   <div className="rounded-lg border border-subtle bg-surface p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="min-w-0 truncate font-semibold text-primary">{formData.customer_name || 'Loading customer…'}</p>
+                      <div className="flex min-w-0 items-center gap-1">
+                        <p className="min-w-0 truncate font-semibold text-primary">{formData.customer_name || 'Loading customer…'}</p>
+                        <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" title="Open master customer record" aria-label="Open master customer record in a new tab" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-blue-500 hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
+                          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                        </a>
+                      </div>
                       {!isEditMode && <button type="button" className="shrink-0 min-h-10 text-sm text-blue-500" onClick={() => {
                         locationTouched.current = false;
                         setOriginalContact(null);
@@ -846,9 +851,6 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                       }}>Change</button>}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4">
-                    <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-blue-500">
-                      Open customer record <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                    </a>
                     <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 text-sm text-blue-500">
                       {showCustomerDetails ? 'Hide request contact details' : 'Edit request contact details'}
                     </button>
