@@ -27,6 +27,7 @@ export default function VipMaintenanceChecklist({workOrderId,onChange,onAddPart}
  const [leadDraftDirty,setLeadDraftDirty]=useState(false);
  const [sectionDrafts,setSectionDrafts]=useState<Record<string,string>>({});
  const sectionTimers=useRef<Record<string,ReturnType<typeof setTimeout>>>({});
+ const sectionDraftsRef=useRef<Record<string,string>>({});
  const leadDraftRef=useRef('');
  const leadDirtyRef=useRef(false);
  const visitRef=useRef<any>(null);
@@ -35,7 +36,7 @@ export default function VipMaintenanceChecklist({workOrderId,onChange,onAddPart}
  async function load(){
   let {data:v}=await supabase.from('vip_maintenance_visits').select('*').eq('work_order_id',workOrderId).maybeSingle();
   if(!v&&profile?.organization_id){const r=await supabase.from('vip_maintenance_visits').insert({work_order_id:workOrderId,organization_id:profile.organization_id,created_by:profile.id}).select().single();v=r.data;}
-  setVisit(v); visitRef.current=v; if(v){const notes=v.responses?.sales_lead?.notes||'';setLeadDraft(notes);leadDraftRef.current=notes;setLeadDraftDirty(false);leadDirtyRef.current=false;const drafts:Record<string,string>={};sections.forEach(([k])=>{drafts[k]=v.responses?.[k]?.notes||''});setSectionDrafts(drafts);const {data}=await supabase.from('vip_maintenance_findings').select('*').eq('visit_id',v.id).order('created_at');setFindings(data||[]);}
+  setVisit(v); visitRef.current=v; if(v){const notes=v.responses?.sales_lead?.notes||'';setLeadDraft(notes);leadDraftRef.current=notes;setLeadDraftDirty(false);leadDirtyRef.current=false;const drafts:Record<string,string>={};sections.forEach(([k])=>{drafts[k]=v.responses?.[k]?.notes||''});setSectionDrafts(drafts);sectionDraftsRef.current=drafts;const {data}=await supabase.from('vip_maintenance_findings').select('*').eq('visit_id',v.id).order('created_at');setFindings(data||[]);}
  }
  const missing=useMemo(()=>{if(!visit)return ['VIP Maintenance']; const m:string[]=[];
   sections.forEach(([k,l])=>{const x=visit.responses?.[k];if(!x?.complete&&!(k!=='customer_check_in'&&x?.na))m.push(l);});
@@ -49,9 +50,9 @@ export default function VipMaintenanceChecklist({workOrderId,onChange,onAddPart}
  },[visit,findings,leadDraft]);
  async function patch(p:any){if(!visit||readOnly)return;setSaving(true);const previous=visit;const next={...visit,...p,updated_at:new Date().toISOString()};setVisit(next);visitRef.current=next;const {error}=await supabase.from('vip_maintenance_visits').update(p).eq('id',visit.id);setSaving(false);if(error){setVisit(previous);visitRef.current=previous;alert(`Could not save VIP visit: ${error.message}`);return;}onChange?.();}
  async function setSection(k:string,p:any){if(readOnly)return;await patch({responses:{...(visit.responses||{}),[k]:{...(visit.responses?.[k]||{}),...p}}});}
- function queueSectionNotes(k:string,notes:string){setSectionDrafts(d=>({...d,[k]:notes}));if(sectionTimers.current[k])clearTimeout(sectionTimers.current[k]);sectionTimers.current[k]=setTimeout(()=>{void setSection(k,{notes});delete sectionTimers.current[k];},500);}
- async function flushSectionNotes(k:string){if(sectionTimers.current[k]){clearTimeout(sectionTimers.current[k]);delete sectionTimers.current[k];await setSection(k,{notes:sectionDrafts[k]||''});}}
- useEffect(()=>()=>{Object.entries(sectionTimers.current).forEach(([k,timer])=>{clearTimeout(timer);const current=visitRef.current;if(current&&!current.completed_at){const notes=sectionDrafts[k]||'';void supabase.from('vip_maintenance_visits').update({responses:{...(current.responses||{}),[k]:{...(current.responses?.[k]||{}),notes}},updated_at:new Date().toISOString()}).eq('id',current.id);}});},[workOrderId,sectionDrafts]);
+ function queueSectionNotes(k:string,notes:string){sectionDraftsRef.current={...sectionDraftsRef.current,[k]:notes};setSectionDrafts(sectionDraftsRef.current);if(sectionTimers.current[k])clearTimeout(sectionTimers.current[k]);sectionTimers.current[k]=setTimeout(()=>{void setSection(k,{notes:sectionDraftsRef.current[k]||''});delete sectionTimers.current[k];},500);}
+ async function flushSectionNotes(k:string){if(sectionTimers.current[k]){clearTimeout(sectionTimers.current[k]);delete sectionTimers.current[k];await setSection(k,{notes:sectionDraftsRef.current[k]||''});}}
+ useEffect(()=>()=>{Object.entries(sectionTimers.current).forEach(([k,timer])=>{clearTimeout(timer);const current=visitRef.current;if(current&&!current.completed_at){const notes=sectionDraftsRef.current[k]||'';void supabase.from('vip_maintenance_visits').update({responses:{...(current.responses||{}),[k]:{...(current.responses?.[k]||{}),notes}},updated_at:new Date().toISOString()}).eq('id',current.id);}});},[workOrderId]);
  async function addFinding(){if(!visit||!profile||readOnly)return;if(visit.no_issues_found)await patch({no_issues_found:false});const {data,error}=await supabase.from('vip_maintenance_findings').insert({visit_id:visit.id,organization_id:profile.organization_id,created_by:profile.id,description:'New finding'}).select().single();if(error){alert(`Could not add finding: ${error.message}`);return;}if(data)setFindings([...findings,data]);}
  async function updateFinding(f:Finding,p:any){if(readOnly)return;const next={...f,...p};setFindings(findings.map(x=>x.id===f.id?next:x));if(f.id){const {error}=await supabase.from('vip_maintenance_findings').update(p).eq('id',f.id);if(error){setFindings(current=>current.map(x=>x.id===f.id?f:x));alert(`Could not save finding: ${error.message}`);}}}
  async function removeFinding(f:Finding){if(readOnly)return;if(f.id){const {error}=await supabase.from('vip_maintenance_findings').delete().eq('id',f.id);if(error){alert(`Could not remove finding: ${error.message}`);return;}}setFindings(findings.filter(x=>x.id!==f.id));}
