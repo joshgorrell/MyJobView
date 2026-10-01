@@ -5,6 +5,8 @@ interface PrintableReview {
   title: string;
   recipient?: string;
   responded_at: string | null;
+  opened_at: string | null;
+  sent_at: string | null;
   reviewed_at: string | null;
   sent_by_name: string | null;
   recovery_outcome: string;
@@ -48,7 +50,7 @@ export function printLostReview(review: PrintableReview, companyName: string) {
   @page{size:letter;margin:18mm}@media print{body{background:white}main{margin:0;padding:0;max-width:none}.toolbar{display:none}h2{break-after:avoid}header,dl{break-inside:avoid}}
 </style></head><body><div class="toolbar"><button id="print-review">Print / Save PDF</button><div class="hint">Choose Save as PDF in your print dialog to download a copy.</div></div><main>
 <header><div class="company">${escapeHtml(companyName)}</div><h1>Lost Opportunity Review</h1><p>${escapeHtml(review.opportunity_name)}</p><div class="private">Private customer feedback · For authorized internal review</div></header>
-<dl><dt>Customer</dt><dd>${escapeHtml(review.recipient || "Customer")}</dd><dt>Submitted</dt><dd>${escapeHtml(dateLabel(review.responded_at))}</dd><dt>Requested by</dt><dd>${escapeHtml(review.sent_by_name || "—")}</dd><dt>Reviewed</dt><dd>${escapeHtml(dateLabel(review.reviewed_at))}</dd><dt>Follow-up status</dt><dd>${escapeHtml(outcomes[review.recovery_outcome] || review.recovery_outcome)}</dd></dl>
+<dl><dt>Customer</dt><dd>${escapeHtml(review.recipient || "Customer")}</dd><dt>Sent</dt><dd>${escapeHtml(dateLabel(review.sent_at))}</dd><dt>Form opened</dt><dd>${escapeHtml(dateLabel(review.opened_at))}</dd><dt>Submitted</dt><dd>${escapeHtml(dateLabel(review.responded_at))}</dd><dt>Requested by</dt><dd>${escapeHtml(review.sent_by_name || "—")}</dd><dt>Reviewed</dt><dd>${escapeHtml(dateLabel(review.reviewed_at))}</dd><dt>Follow-up status</dt><dd>${escapeHtml(outcomes[review.recovery_outcome] || review.recovery_outcome)}</dd></dl>
 ${answer("Why did we lose your business?", reasons.length ? reasons.join("\n") : "Comment only")}
 ${answer("Customer comments", response.message)}
 ${answer("Is there still a chance to earn their business?", ({yes:"Yes",maybe:"Maybe",no:"No"} as Record<string, string>)[response.recoverable] || response.recoverable)}

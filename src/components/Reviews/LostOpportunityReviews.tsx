@@ -28,6 +28,7 @@ interface Review {
   title: string;
   delivery_status: string;
   responded_at: string | null;
+  opened_at: string | null;
   reviewed_at: string | null;
   shared_at: string | null;
   recovery_outcome: string;
@@ -292,6 +293,9 @@ export default function LostOpportunityReviews(
     }
     if (v.delivery_status === "sent" && v.sent_at) {
       segments.push("Delivered");
+    }
+    if (v.opened_at) {
+      segments.push(`Form opened \u00b7 ${formatDateTime(v.opened_at)}`);
     }
     if (v.response_created_at || v.responded_at) {
       segments.push(
