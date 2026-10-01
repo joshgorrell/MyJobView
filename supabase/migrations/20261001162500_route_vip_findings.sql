@@ -1,0 +1,80 @@
+-- Route VIP findings into existing MJV systems without duplicate entry.
+ALTER TABLE public.vip_maintenance_findings
+  ADD COLUMN IF NOT EXISTS punchlist_task_id uuid REFERENCES public.punchlist_tasks(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS service_request_id uuid REFERENCES public.service_requests(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS sales_task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS routed_at timestamptz;
+
+CREATE OR REPLACE FUNCTION public.route_vip_maintenance_finding(p_finding_id uuid)
+RETURNS public.vip_maintenance_findings
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE
+ f public.vip_maintenance_findings%ROWTYPE; v public.vip_maintenance_visits%ROWTYPE; w public.work_orders%ROWTYPE;
+ c public.contacts%ROWTYPE; p public.profiles%ROWTYPE; description text; sales_rep uuid;
+BEGIN
+ SELECT * INTO p FROM public.profiles WHERE id=auth.uid() AND is_active AND contact_id IS NULL;
+ SELECT * INTO f FROM public.vip_maintenance_findings WHERE id=p_finding_id FOR UPDATE;
+ IF NOT FOUND OR p.organization_id IS DISTINCT FROM f.organization_id THEN RAISE EXCEPTION 'Finding not found' USING ERRCODE='42501'; END IF;
+ IF cardinality(f.dispositions)=0 THEN RAISE EXCEPTION 'Choose a finding disposition first'; END IF;
+ SELECT * INTO v FROM public.vip_maintenance_visits WHERE id=f.visit_id;
+ SELECT * INTO w FROM public.work_orders WHERE id=v.work_order_id AND company_id=f.organization_id;
+ SELECT * INTO c FROM public.contacts WHERE id=w.contact_id AND organization_id=f.organization_id;
+ description := coalesce(nullif(btrim(f.description),''),'VIP Maintenance finding') ||
+   CASE WHEN f.room IS NOT NULL THEN E'\nRoom/Area: '||f.room ELSE '' END ||
+   CASE WHEN f.notes IS NOT NULL THEN E'\nNotes: '||f.notes ELSE '' END ||
+   E'\nSource: VIP Maintenance • '||coalesce(w.work_order_number,w.id::text)||' • '||current_date::text;
+
+ IF 'punchlist'=ANY(f.dispositions) AND f.punchlist_task_id IS NULL THEN
+   INSERT INTO public.punchlist_tasks(organization_id,contact_id,title,details,status,priority_order)
+   VALUES(f.organization_id,w.contact_id,left(f.description,120),description,'draft',
+     coalesce((SELECT max(priority_order)+1 FROM public.punchlist_tasks WHERE contact_id=w.contact_id),0))
+   RETURNING id INTO f.punchlist_task_id;
+ END IF;
+
+ IF 'service_follow_up'=ANY(f.dispositions) AND f.service_request_id IS NULL THEN
+   INSERT INTO public.service_requests(organization_id,contact_id,customer_name,customer_phone,customer_email,
+     job_location_address,job_location_city,job_location_state,job_location_zip,job_description,billable_type,billable_by,
+     priority,notes,status,source_type,request_type,project_id,created_by)
+   VALUES(f.organization_id,w.contact_id,coalesce(c.full_name,c.company_name,'Customer'),c.phone,c.email,
+     coalesce(w.service_location_address,c.street_address,'Address on file'),coalesce(w.service_location_city,c.city),
+     coalesce(w.service_location_state,c.state),coalesce(w.service_location_zip,c.zip_code),description,'billable','admin',
+     'normal','Created from VIP Maintenance finding','open','vip_maintenance','service',w.project_id,auth.uid())
+   RETURNING id INTO f.service_request_id;
+ END IF;
+
+ IF 'sales'=ANY(f.dispositions) AND f.sales_task_id IS NULL THEN
+   sales_rep:=coalesce(w.sales_rep_id,c.sales_rep_id);
+   IF sales_rep IS NULL THEN RAISE EXCEPTION 'Customer has no assigned sales rep. Assign one before routing this finding to Sales.'; END IF;
+   INSERT INTO public.tasks(title,description,assigned_to,contact_id,priority,status,created_by)
+   VALUES('VIP opportunity: '||left(f.description,90),description,sales_rep,w.contact_id,'normal','pending',auth.uid())
+   RETURNING id INTO f.sales_task_id;
+   INSERT INTO public.task_comments(task_id,user_id,comment) VALUES(f.sales_task_id,auth.uid(),'Created automatically from VIP Maintenance '||coalesce(w.work_order_number,w.id::text));
+ END IF;
+
+ UPDATE public.vip_maintenance_findings SET punchlist_task_id=f.punchlist_task_id,service_request_id=f.service_request_id,
+   sales_task_id=f.sales_task_id,routed_at=now(),updated_at=now() WHERE id=f.id RETURNING * INTO f;
+ RETURN f;
+END $$;
+REVOKE ALL ON FUNCTION public.route_vip_maintenance_finding(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.route_vip_maintenance_finding(uuid) TO authenticated;
+
+-- Completion requires downstream routing for dispositions that create MJV objects.
+CREATE OR REPLACE FUNCTION public.vip_maintenance_incomplete_sections(p_work_order_id uuid)
+RETURNS text[] LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+DECLARE v vip_maintenance_visits; missing text[] := '{}'; section text;
+BEGIN
+ SELECT vmv.* INTO v FROM vip_maintenance_visits vmv WHERE vmv.work_order_id=p_work_order_id;
+ IF NOT FOUND THEN RETURN ARRAY['VIP Maintenance']; END IF;
+ FOREACH section IN ARRAY ARRAY['customer_check_in','network_internet','av_automation','security_surveillance','room_by_room','preventive_maintenance'] LOOP
+   IF NOT (COALESCE((v.responses->section->>'complete')::boolean,false) OR COALESCE((v.responses->section->>'na')::boolean,false)) THEN missing:=array_append(missing,section); END IF;
+ END LOOP;
+ IF NOT (COALESCE((v.responses->'customer_training'->>'complete')::boolean,false) OR v.training_not_needed OR v.customer_not_present) THEN missing:=array_append(missing,'customer_training'); END IF;
+ IF NOT (v.no_issues_found OR EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id)) THEN missing:=array_append(missing,'findings'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)=0) THEN missing:=array_append(missing,'finding_dispositions'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND
+   (('punchlist'=ANY(x.dispositions) AND x.punchlist_task_id IS NULL) OR ('service_follow_up'=ANY(x.dispositions) AND x.service_request_id IS NULL) OR ('sales'=ANY(x.dispositions) AND x.sales_task_id IS NULL)))
+ THEN missing:=array_append(missing,'unrouted_findings'); END IF;
+ IF NOT (v.no_opportunities_identified OR COALESCE(jsonb_array_length(COALESCE(v.responses->'opportunities','[]'::jsonb)),0)>0) THEN missing:=array_append(missing,'opportunities'); END IF;
+ IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL) THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
+ RETURN missing;
+END $$;
