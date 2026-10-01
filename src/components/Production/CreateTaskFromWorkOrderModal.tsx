@@ -11,7 +11,9 @@ interface CreateTaskFromWorkOrderModalProps {
   contactName: string;
   customerSalesRepId?: string | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (taskId?: string) => void;
+  initialTitle?: string;
+  initialDescription?: string;
 }
 
 interface Profile {
@@ -28,7 +30,9 @@ export function CreateTaskFromWorkOrderModal({
   contactName,
   customerSalesRepId,
   onClose,
-  onSuccess
+  onSuccess,
+  initialTitle,
+  initialDescription
 }: CreateTaskFromWorkOrderModalProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -36,8 +40,8 @@ export function CreateTaskFromWorkOrderModal({
   const [salesReps, setSalesReps] = useState<Profile[]>([]);
 
   const [formData, setFormData] = useState({
-    title: '',
-    description: `Related to Work Order #${workOrderNumber} - ${workOrderTitle}\n\nCustomer: ${contactName}\n\n`,
+    title: initialTitle || '',
+    description: initialDescription || `Related to Work Order #${workOrderNumber} - ${workOrderTitle}\n\nCustomer: ${contactName}\n\n`,
     assigned_to: customerSalesRepId || '',
     due_date: '',
     priority: 'normal',
@@ -193,7 +197,7 @@ export function CreateTaskFromWorkOrderModal({
 
       if (commentError) console.error('Error adding comment:', commentError);
 
-      onSuccess();
+      onSuccess(task.id);
       onClose();
     } catch (error: any) {
       console.error('Error creating task:', error);
