@@ -150,6 +150,28 @@ END $$;
 REVOKE ALL ON FUNCTION public.guard_vip_work_order_archive() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.guard_vip_work_order_archive() TO authenticated;
 
+DROP TRIGGER IF EXISTS guard_vip_work_order_archive ON public.work_orders;
+CREATE TRIGGER guard_vip_work_order_archive
+BEFORE UPDATE OF is_archived ON public.work_orders
+FOR EACH ROW EXECUTE FUNCTION public.guard_vip_work_order_archive();
+
+DO $
+DECLARE constraint_name text;
+BEGIN
+  SELECT con.conname INTO constraint_name
+  FROM pg_constraint con
+  JOIN pg_class rel ON rel.oid=con.conrelid
+  JOIN pg_namespace nsp ON nsp.oid=rel.relnamespace
+  WHERE nsp.nspname='public' AND rel.relname='leads' AND con.contype='c'
+    AND pg_get_constraintdef(con.oid) ILIKE '%lead_source%'
+  LIMIT 1;
+  IF constraint_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.leads DROP CONSTRAINT %I',constraint_name);
+  END IF;
+END $;
+ALTER TABLE public.leads ADD CONSTRAINT leads_lead_source_check
+CHECK (lead_source IN ('manual','kiosk','website','referral','import','other','email_forward','vip_maintenance'));
+
 CREATE OR REPLACE FUNCTION public.create_vip_sales_lead(p_work_order_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v public.vip_maintenance_visits%ROWTYPE; w public.work_orders%ROWTYPE; c public.contacts%ROWTYPE; lead jsonb; lead_id uuid; rep uuid; descr text;
@@ -193,7 +215,40 @@ BEGIN
    UPDATE vip_maintenance_visits SET completed_at=COALESCE(completed_at,now()),completed_by=COALESCE(completed_by,auth.uid()),updated_at=now() WHERE work_order_id=NEW.id;
  END IF;
  RETURN NEW;
-END $$;
+END $;
+
+DROP TRIGGER IF EXISTS guard_vip_work_order_completion ON public.work_orders;
+CREATE TRIGGER guard_vip_work_order_completion
+BEFORE UPDATE OF status ON public.work_orders
+FOR EACH ROW EXECUTE FUNCTION public.guard_vip_work_order_completion();
+
+CREATE OR REPLACE FUNCTION public.lock_completed_vip_visit()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+BEGIN
+  IF OLD.completed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Completed VIP Maintenance visits are read-only.';
+  END IF;
+  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $;
+DROP TRIGGER IF EXISTS lock_completed_vip_visit ON public.vip_maintenance_visits;
+CREATE TRIGGER lock_completed_vip_visit BEFORE UPDATE OR DELETE ON public.vip_maintenance_visits
+FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_visit();
+
+CREATE OR REPLACE FUNCTION public.lock_completed_vip_finding()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $
+DECLARE completed timestamptz;
+BEGIN
+  SELECT completed_at INTO completed FROM public.vip_maintenance_visits
+  WHERE id=CASE WHEN TG_OP='DELETE' THEN OLD.visit_id ELSE NEW.visit_id END;
+  IF completed IS NOT NULL THEN RAISE EXCEPTION 'Findings on a completed VIP Maintenance visit are read-only.'; END IF;
+  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $;
+DROP TRIGGER IF EXISTS lock_completed_vip_finding ON public.vip_maintenance_findings;
+CREATE TRIGGER lock_completed_vip_finding BEFORE INSERT OR UPDATE OR DELETE ON public.vip_maintenance_findings
+FOR EACH ROW EXECUTE FUNCTION public.lock_completed_vip_finding();
+
+REVOKE ALL ON FUNCTION public.lock_completed_vip_visit(),public.lock_completed_vip_finding() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.lock_completed_vip_visit(),public.lock_completed_vip_finding() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.patch_vip_maintenance_response(
   p_visit_id uuid,
