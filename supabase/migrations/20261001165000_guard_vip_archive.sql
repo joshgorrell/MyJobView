@@ -31,8 +31,22 @@ GRANT EXECUTE ON FUNCTION public.guard_vip_work_order_archive() TO authenticated
 ALTER TABLE public.vip_maintenance_visits ADD COLUMN IF NOT EXISTS sales_lead_id uuid REFERENCES public.leads(id) ON DELETE SET NULL;
 
 -- Give VIP its own measurable lead source instead of hiding it under "other".
-ALTER TABLE public.leads DROP CONSTRAINT IF EXISTS leads_lead_source_check;
-ALTER TABLE public.leads ADD CONSTRAINT leads_lead_source_check CHECK (lead_source IN ('manual','kiosk','website','referral','import','other','email_forward','vip_maintenance'));
+DO $
+DECLARE constraint_name text;
+BEGIN
+  SELECT con.conname INTO constraint_name
+  FROM pg_constraint con
+  JOIN pg_class rel ON rel.oid=con.conrelid
+  JOIN pg_namespace nsp ON nsp.oid=rel.relnamespace
+  WHERE nsp.nspname='public' AND rel.relname='leads' AND con.contype='c'
+    AND pg_get_constraintdef(con.oid) ILIKE '%lead_source%'
+  LIMIT 1;
+  IF constraint_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.leads DROP CONSTRAINT %I',constraint_name);
+  END IF;
+END $;
+ALTER TABLE public.leads ADD CONSTRAINT leads_lead_source_check
+CHECK (lead_source IN ('manual','kiosk','website','referral','import','other','email_forward','vip_maintenance'));
 
 CREATE OR REPLACE FUNCTION public.create_vip_sales_lead(p_work_order_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
