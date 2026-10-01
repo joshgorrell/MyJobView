@@ -122,6 +122,8 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
     setChecklist({ ...checklist, [itemId]: !checklist[itemId] });
   }
 
+  const isVipMaintenance = workOrder?.type === 'vip_program' || workOrder?.work_order_option?.system_key === 'vip_program';
+
   function canProceedToNextStep(): boolean {
     if (step === 2 && template) {
       const requiredItems = template.checklist_items.filter(item => item.required);
@@ -132,6 +134,9 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         jobPhotos.some(photo => photo.category === category)
       );
     }
+    if (step === 4 && isVipMaintenance) {
+      return !!techNotes.trim();
+    }
     if (step === 5 && template?.requires_signature) {
       return !!signatureDataUrl && !!customerName.trim();
     }
@@ -141,7 +146,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
   async function handleSubmit() {
     if (!profile || !workOrder || !template) return;
 
-    if (workOrder.type === 'vip_program' || workOrder.work_order_option?.system_key === 'vip_program') {
+    if (isVipMaintenance) {
       const { data: incomplete, error: validationError } = await supabase.rpc('vip_maintenance_incomplete_sections', { p_work_order_id: workOrderId });
       if (validationError) { alert('Unable to validate VIP Maintenance checklist.'); return; }
       if (incomplete?.length) { alert(`VIP Maintenance is incomplete: ${incomplete.join(', ')}`); return; }
@@ -496,16 +501,18 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes (Optional)
+                {isVipMaintenance ? 'Technician Summary' : 'Notes (Optional)'}
               </label>
               <textarea
                 value={techNotes}
                 onChange={(e) => setTechNotes(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={8}
-                placeholder="Enter any notes about the job, parts used, customer concerns, recommendations, etc..."
+                placeholder={isVipMaintenance ? "Summarize the VIP visit, what was checked, and anything the next person should know..." : "Enter any notes about the job, parts used, customer concerns, recommendations, etc..."}
               />
             </div>
+
+            {isVipMaintenance && !techNotes.trim() && <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">Technician summary is required for a VIP Maintenance visit.</div>}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
