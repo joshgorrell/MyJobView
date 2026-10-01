@@ -54,7 +54,7 @@ BEGIN
  IF NOT FOUND THEN RETURN ARRAY['VIP Maintenance']; END IF;
 
  FOREACH section IN ARRAY ARRAY['customer_check_in','network_internet','av_automation','security_surveillance','room_by_room','preventive_maintenance'] LOOP
-   IF NOT (COALESCE((v.responses->section->>'complete')::boolean,false) OR COALESCE((v.responses->section->>'na')::boolean,false))
+   IF NOT (COALESCE((v.responses->section->>'complete')::boolean,false) OR (section <> 'customer_check_in' AND COALESCE((v.responses->section->>'na')::boolean,false)))
    THEN missing:=array_append(missing,section); END IF;
  END LOOP;
 
