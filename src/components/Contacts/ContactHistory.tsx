@@ -123,7 +123,7 @@ export function ContactHistory({ contactId, onNavigateToProposal }: ContactHisto
             iconColor: 'text-orange-600',
             bgColor: 'bg-orange-50',
             status: wo.status,
-            link: `/dispatch?workorder=${wo.id}`
+            link: `/?tab=work_orders&workOrderId=${wo.id}`
           });
         });
       }
@@ -142,7 +142,7 @@ export function ContactHistory({ contactId, onNavigateToProposal }: ContactHisto
           title: `VIP Maintenance Visit • ${visit.work_orders?.work_order_number || 'Completed'}`,
           description: visit.sales_lead_id ? 'Completed VIP form • Sales lead created' : 'Completed VIP form',
           date: visit.completed_at, icon: ClipboardList, iconColor: 'text-blue-600', bgColor: 'bg-blue-50',
-          status: 'completed', link: `/dispatch?workorder=${visit.work_orders?.id}&tab=vip`
+          status: 'completed', link: `/?tab=work_orders&workOrderId=${visit.work_orders?.id}&tab=vip`
         }));
       }
 
