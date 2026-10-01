@@ -47,7 +47,7 @@ WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id=auth.uid() AND p.
 
 CREATE OR REPLACE FUNCTION public.vip_maintenance_incomplete_sections(p_work_order_id uuid)
 RETURNS text[] LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
-DECLARE v vip_maintenance_visits; f record; missing text[] := '{}'; section text;
+DECLARE v vip_maintenance_visits; missing text[] := '{}'; section text;
 BEGIN
  SELECT vmv.* INTO v FROM vip_maintenance_visits vmv WHERE vmv.work_order_id=p_work_order_id;
  IF NOT FOUND THEN RETURN ARRAY['VIP Maintenance']; END IF;
@@ -61,10 +61,12 @@ BEGIN
  THEN missing:=array_append(missing,'customer_training'); END IF;
  IF NOT (v.no_issues_found OR EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id))
  THEN missing:=array_append(missing,'findings'); END IF;
- IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)=0)
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND cardinality(x.dispositions)<>1)
  THEN missing:=array_append(missing,'finding_dispositions'); END IF;
- IF NOT (v.no_opportunities_identified OR COALESCE(jsonb_array_length(COALESCE(v.responses->'opportunities','[]'::jsonb)),0)>0)
- THEN missing:=array_append(missing,'opportunities'); END IF;
+ IF EXISTS(SELECT 1 FROM vip_maintenance_findings x WHERE x.visit_id=v.id AND 'no_action'=ANY(x.dispositions) AND coalesce(nullif(btrim(x.notes),''),'')='')
+ THEN missing:=array_append(missing,'no_action_reason'); END IF;
+ IF NOT (v.no_opportunities_identified OR nullif(btrim(v.responses->'sales_lead'->>'notes'),'') IS NOT NULL)
+ THEN missing:=array_append(missing,'sales_lead'); END IF;
  IF NOT (v.customer_not_present OR v.customer_acknowledged_at IS NOT NULL)
  THEN missing:=array_append(missing,'customer_acknowledgment'); END IF;
  RETURN missing;
