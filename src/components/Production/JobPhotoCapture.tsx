@@ -103,13 +103,6 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
   async function handleUpload() {
     if (!profile || photos.length === 0) return;
 
-    // Check that all photos have captions
-    const missingCaptions = photos.some(photo => !photo.caption.trim());
-    if (missingCaptions) {
-      alert('Please add a caption to all photos before uploading');
-      return;
-    }
-
     setUploading(true);
 
     try {
@@ -178,6 +171,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          capture="environment"
           multiple
           onChange={handlePhotoCapture}
           className="hidden"
@@ -249,7 +243,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
               {/* Caption */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Caption *
+                  Caption <span className="font-normal text-gray-400">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -257,7 +251,6 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
                   onChange={(e) => updatePhoto(index, { caption: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Describe what's in this photo..."
-                  required
                 />
               </div>
             </div>
@@ -266,7 +259,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
           {/* Upload Button */}
           <button
             onClick={handleUpload}
-            disabled={uploading || photos.some(p => !p.caption.trim())}
+            disabled={uploading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
           >
             {uploading ? (
