@@ -102,7 +102,7 @@ export function ProspectsPage() {
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name, role')
-      .in('role', ['sales', 'admin', 'manager', 'sales_v2'])
+      .eq('is_sales_rep', true)
       .eq('is_active', true)
       .order('full_name');
     if (data) setSalesReps(data);
