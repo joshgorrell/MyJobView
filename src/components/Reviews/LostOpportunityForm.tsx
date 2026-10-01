@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { lossReasons, lostReviewAction } from "./lostReview";
 interface Invitation {
   title: string;
+  customer_first_name?: string;
   opportunity_name: string;
   company_name: string;
   company_logo_url?: string;
@@ -89,7 +90,11 @@ export default function LostOpportunityForm() {
             A private note to our leadership
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
-            {invitation?.title || (error ? "Review unavailable" : "Loading your invitation…")}
+            {invitation
+              ? invitation.customer_first_name?.trim()
+                ? `Thank you, ${invitation.customer_first_name.trim()}!`
+                : "Thank you!"
+              : error ? "Review unavailable" : "Loading your invitation…"}
           </h1>
         </header>
         <div className="p-5 sm:p-9">
