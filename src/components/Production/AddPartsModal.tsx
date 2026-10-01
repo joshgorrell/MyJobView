@@ -34,6 +34,9 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
   const [searching, setSearching] = useState(false);
   const [showCustomPart, setShowCustomPart] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [catalogOffset, setCatalogOffset] = useState(0);
+  const [hasMoreCatalog, setHasMoreCatalog] = useState(false);
+  const CATALOG_PAGE_SIZE = 100;
 
   const [parts, setParts] = useState<PartEntry[]>([]);
 
@@ -41,12 +44,16 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
     loadCatalog();
   }, []);
 
-  async function loadCatalog() {
+  async function loadCatalog(append = false) {
     setSearching(true);
     try {
-      const { data, error } = await supabase.from('products').select('id, name, sku, unit_cost, list_price').order('name').limit(100);
+      const offset = append ? catalogOffset : 0;
+      const { data, error } = await supabase.from('products').select('id, name, sku, unit_cost, list_price').order('name').range(offset, offset + CATALOG_PAGE_SIZE - 1);
       if (error) throw error;
-      setSearchResults(data || []);
+      const rows = data || [];
+      setSearchResults(prev => append ? [...prev, ...rows] : rows);
+      setCatalogOffset(offset + rows.length);
+      setHasMoreCatalog(rows.length === CATALOG_PAGE_SIZE);
       setCatalogLoaded(true);
     } catch (error) { console.error('Error loading product catalog:', error); }
     finally { setSearching(false); }
@@ -76,6 +83,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
 
       if (error) throw error;
       setSearchResults(data || []);
+      setHasMoreCatalog(false);
     } catch (error) {
       console.error('Error searching products:', error);
     } finally {
@@ -234,6 +242,9 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
                     </div>
                   </button>
                 ))}
+                {!searchQuery.trim() && hasMoreCatalog && (
+                  <button type="button" onClick={() => loadCatalog(true)} disabled={searching} className="w-full min-h-12 px-4 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50 touch-manipulation disabled:opacity-50">Load more products</button>
+                )}
               </div>
             )}
 
