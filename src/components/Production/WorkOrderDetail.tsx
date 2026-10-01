@@ -183,7 +183,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [jobCompletion, setJobCompletion] = useState<JobCompletion | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'materials' | 'time' | 'parts' | 'photos' | 'completion' | 'history' | 'flow'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'materials' | 'time' | 'parts' | 'photos' | 'completion' | 'history' | 'flow'>('tasks');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [showPartRequestForm, setShowPartRequestForm] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
@@ -653,7 +653,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const tabs = [
     { id: 'flow', label: 'Flow', icon: History },
     { id: 'overview', label: 'Overview', icon: FileText },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
+    { id: 'tasks', label: "Today's Work", icon: CheckSquare, count: tasks.length },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
     { id: 'photos', label: 'Photos', icon: Camera, count: jobPhotos.length },
     { id: 'materials', label: 'Materials', icon: Package, count: materials.length + partsUsed.length },
@@ -995,7 +995,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                   </div>
                 )}
 
-                {canEdit && (workOrder.internal_notes || editing) && (
+                {(canEdit || isAssignedTech) && (workOrder.internal_notes || editing) && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Internal Notes</label>
                     {editing ? (

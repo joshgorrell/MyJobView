@@ -230,7 +230,7 @@ export function ChangeOrderApprovalModal({ isOpen, onClose, changeOrderId, onSuc
       }
     } catch (error) {
       console.error('Error approving change order:', error);
-      alert('Failed to approve change order');
+      alert('Approval could not be fully applied. Review the change order before retrying.');
     } finally {
       setLoading(false);
     }
@@ -274,13 +274,13 @@ export function ChangeOrderApprovalModal({ isOpen, onClose, changeOrderId, onSuc
       const { error: applyError } = await supabase.rpc('apply_change_order', {
         p_change_order_id: changeOrderId,
       });
-      if (applyError) console.error('apply_change_order error:', applyError);
+      if (applyError) throw applyError;
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error finalizing change order approval:', error);
-      alert('Failed to approve change order');
+      alert('Approval could not be fully applied. Review the change order before retrying.');
     } finally {
       setLoading(false);
     }

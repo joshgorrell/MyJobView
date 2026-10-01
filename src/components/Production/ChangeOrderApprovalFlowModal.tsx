@@ -173,7 +173,7 @@ export function ChangeOrderApprovalFlowModal({
       const { error: applyError } = await supabase.rpc('apply_change_order', {
         p_change_order_id: changeOrder.id,
       });
-      if (applyError) console.error('apply_change_order error:', applyError);
+      if (applyError) throw applyError;
 
       // Trigger the parent refresh immediately so the list shows locked state
       onSuccess();
@@ -182,7 +182,7 @@ export function ChangeOrderApprovalFlowModal({
       setPath('manual_done');
     } catch (err) {
       console.error(err);
-      alert('Failed to approve change order');
+      alert('Approval could not be fully applied. Review the change order before retrying.');
     } finally {
       setLoading(false);
     }
