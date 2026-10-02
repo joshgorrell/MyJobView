@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { WorkOrderDetail } from './WorkOrderDetail';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 
 import { Calendar, CheckCircle, Wrench, Camera, Award, Play, AlertCircle, Package, User, Send, Plus, Clock, Coffee, CreditCard as Edit2, Briefcase, BookOpen } from 'lucide-react';
 import { TimeAdjustmentRequestModal } from '../Technician/TimeAdjustmentRequestModal';
@@ -104,8 +103,6 @@ export function TechnicianWorkCenter() {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [sendingNotification, setSendingNotification] = useState<string | null>(null);
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
-  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
-  const [checkingPermission, setCheckingPermission] = useState(true);
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [timeEvents, setTimeEvents] = useState<TimeEvent[]>([]);
   const [requestingAdjustmentEntry, setRequestingAdjustmentEntry] = useState<ClockEntry | null>(null);
@@ -113,18 +110,7 @@ export function TechnicianWorkCenter() {
   useEffect(() => {
     if (profile) {
       loadData();
-      checkLocationPermission();
-
-      // Start GPS pre-warming when component mounts
-      if (navigator.geolocation) {
-        gpsTrackingService.startPreWarming();
-      }
     }
-
-    return () => {
-      // Stop GPS pre-warming when component unmounts
-      gpsTrackingService.stopPreWarming();
-    };
   }, [profile]);
 
   async function loadClockEntries() {
@@ -312,32 +298,6 @@ export function TechnicianWorkCenter() {
     }
   }
 
-  async function checkLocationPermission() {
-    setCheckingPermission(true);
-
-    console.log('=== Location Permission Check (Job Clock) ===');
-    console.log('User Agent:', navigator.userAgent);
-    console.log('Protocol:', window.location.protocol);
-    console.log('Has Geolocation:', !!navigator.geolocation);
-
-    const declined = localStorage.getItem('gps_permission_declined');
-    if (declined === 'true') {
-      console.log('Permission was previously declined');
-      setLocationPermission('denied');
-      setCheckingPermission(false);
-      return;
-    }
-
-    const state = await gpsTrackingService.getPermissionState();
-    console.log('Permission state:', state);
-    setLocationPermission(state);
-    setCheckingPermission(false);
-
-    if (state === 'prompt') {
-      console.log('Permission is in prompt state - waiting for user to click Start button');
-    }
-  }
-
   function getStatusColor(status: string) {
     switch (status) {
       case 'completed':
@@ -425,16 +385,6 @@ export function TechnicianWorkCenter() {
           </button>
         )}
       </div>
-
-      {(locationPermission === 'prompt' || locationPermission === 'unknown') && !checkingPermission && myJobs.length > 0 && (
-        <div className="bg-blue-500 text-white rounded-xl p-4 text-center">
-          <AlertCircle className="w-6 h-6 mx-auto mb-2" />
-          <p className="font-semibold mb-1">Location Permission Required</p>
-          <p className="text-sm opacity-90">
-            When you tap "Start" on a job, your device will ask for location permission. You must tap "Allow" to start the job.
-          </p>
-        </div>
-      )}
 
       {/* Today's Stats */}
       <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
