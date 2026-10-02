@@ -1,10 +1,11 @@
+import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { WorkOrderDetail } from './WorkOrderDetail';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
 import { gpsTrackingService } from '../../lib/gpsTracking';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
+
 import { Calendar, CheckCircle, Wrench, Camera, Award, Play, AlertCircle, Package, User, Send, Plus, Clock, Coffee, CreditCard as Edit2, Briefcase, BookOpen } from 'lucide-react';
 import { TimeAdjustmentRequestModal } from '../Technician/TimeAdjustmentRequestModal';
 import { AssignedSessionsWidget } from './AssignedSessionsWidget';
@@ -130,7 +131,7 @@ export function TechnicianWorkCenter() {
     if (!profile) return;
 
     try {
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const weekAgo = formatDateInTimezone(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), await getOrganizationTimezone());
 
       const [{ data: dailyData, error: dailyError }, { data: internalData }] = await Promise.all([
         supabase
@@ -208,8 +209,8 @@ export function TechnicianWorkCenter() {
     if (!profile) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
+      const weekAgo = formatDateInTimezone(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), await getOrganizationTimezone());
 
       const [
         assignedJobsResult,
@@ -334,92 +335,6 @@ export function TechnicianWorkCenter() {
 
     if (state === 'prompt') {
       console.log('Permission is in prompt state - waiting for user to click Start button');
-    }
-  }
-
-  async function startJob(jobId: string) {
-    if (!profile) return;
-    await performJobStart(jobId);
-  }
-
-  async function performJobStart(jobId: string) {
-    if (!profile) return;
-
-    try {
-      // Update work order status to in_progress
-      const { error: woError } = await supabase
-        .from('work_orders')
-        .update({ status: 'in_progress' })
-        .eq('id', jobId);
-
-      if (woError) throw woError;
-
-      // Create time_entry immediately without GPS data
-      const now = new Date();
-      const entryData: any = {
-        technician_id: profile.id,
-        work_order_id: jobId,
-        entry_date: now.toISOString().split('T')[0],
-        clock_in: now.toISOString(),
-        clock_out: null,
-        total_hours: 0,
-        break_minutes: 0,
-        status: 'draft',
-      };
-
-      const { data: insertedEntry, error: timeError } = await supabase
-        .from('time_entries')
-        .insert(entryData)
-        .select()
-        .single();
-
-      if (timeError) throw timeError;
-
-      // Start GPS breadcrumb tracking
-      await gpsTrackingService.startTracking(profile.id, undefined, jobId);
-
-      if (insertedEntry && navigator.geolocation) {
-        gpsTrackingService.captureLocationForClockEvent(false).then(async (gpsResult) => {
-          try {
-            const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-              p_accuracy: gpsResult.accuracy,
-              p_method: gpsResult.method,
-              p_duration_ms: gpsResult.duration_ms,
-              p_refined: false,
-              p_original_accuracy: null
-            });
-
-            await supabase
-              .from('time_entries')
-              .update({
-                clock_in_latitude: gpsResult.latitude,
-                clock_in_longitude: gpsResult.longitude,
-                clock_in_gps_accuracy: gpsResult.accuracy,
-                clock_in_gps_capture_method: gpsResult.method,
-                clock_in_gps_duration_ms: gpsResult.duration_ms,
-                clock_in_gps_attempted_at: gpsResult.attempted_at,
-                clock_in_gps_captured_at: gpsResult.captured_at,
-                clock_in_gps_quality_score: scoreData || 0,
-              })
-              .eq('id', insertedEntry.id);
-
-            if (gpsResult.latitude && gpsResult.longitude) {
-              updateClockEntryAddress(insertedEntry.id, gpsResult.latitude, gpsResult.longitude, false, 'time_entries').catch(() => {});
-            }
-
-            if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-              gpsTrackingService.startPostCaptureRefinement(insertedEntry.id, false, 'time_entries');
-            }
-          } catch (error) {
-            console.error('GPS metadata update failed:', error);
-          }
-        }).catch(() => {});
-      }
-
-      loadData();
-    } catch (error) {
-      console.error('Error starting job:', error);
-      alert('Failed to start job');
     }
   }
 
@@ -645,19 +560,10 @@ export function TechnicianWorkCenter() {
                 {/* Action buttons — full width row on mobile */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => startJob(job.id)}
-                    disabled={checkingPermission || locationPermission === 'denied'}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                    title={locationPermission === 'denied' ? 'Location permission required' : ''}
-                  >
-                    <Play className="w-3.5 h-3.5 flex-shrink-0" />
-                    {locationPermission === 'denied' ? 'GPS Required' : 'Start'}
-                  </button>
-                  <button
                     onClick={() => setSelectedWorkOrderId(job.id)}
                     className="flex-1 flex items-center justify-center px-3 py-2.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 active:bg-gray-300 transition-colors"
                   >
-                    View
+                    Open Work Order
                   </button>
                   {!job.on_my_way_sent_at && (
                     <button
