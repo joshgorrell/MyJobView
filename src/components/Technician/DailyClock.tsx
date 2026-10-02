@@ -1,3 +1,4 @@
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, Calendar, X, AlertTriangle } from 'lucide-react';
@@ -37,6 +38,7 @@ interface RewardEvent {
 
 export function DailyClock() {
   const { profile } = useAuth();
+  const timePolicy=useEmployeeTimePolicy();
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
   const [activeBreak, setActiveBreak] = useState<Break | null>(null);
   const [breaks, setBreaks] = useState<Break[]>([]);
@@ -58,7 +60,7 @@ export function DailyClock() {
   useEffect(() => {
     getOrganizationTimezone().then(tz => setOrgTimezone(tz));
 
-    if (profile?.requires_daily_clock) {
+    if (timePolicy.ready && timePolicy.dailyClock) {
       loadTodaysClock();
     }
 
@@ -93,7 +95,7 @@ export function DailyClock() {
       window.removeEventListener('offline', handleOffline);
       gpsTrackingService.stopPreWarming();
     };
-  }, [profile, todayEntry]);
+  }, [profile, todayEntry, timePolicy.ready, timePolicy.dailyClock]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -262,7 +264,7 @@ export function DailyClock() {
       return;
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatDateInTimezone(new Date().toISOString(),orgTimezone);
     const isSameDay = true;
 
     if (isSameDay && !['bereavement', 'jury_duty', 'unpaid'].includes(policy.policy.pto_type)) {
@@ -540,14 +542,13 @@ export function DailyClock() {
     return '';
   }
 
-  if (!profile?.requires_daily_clock) {
+  if (!timePolicy.ready || !timePolicy.dailyClock) {
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
         <Clock className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Daily Clock Not Required</h3>
-        <p className="text-gray-300">
-          Your employment type ({profile?.employment_type}) does not require daily clock-in/out.
-          {profile?.employment_type === 'job_time' && ' You only need to clock into specific jobs.'}
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{!timePolicy.ready?'Loading time configuration…':'Daily Clock Not Required'}</h3>
+        <p className="text-gray-600">
+          {timePolicy.ready?'Your payroll configuration does not require daily clock-in/out. Open the assigned Work Order to record job time.':'If this persists, refresh to load your payroll configuration.'}
         </p>
       </div>
     );
@@ -623,7 +624,7 @@ export function DailyClock() {
 
         <div className="text-center mb-6">
           <div className="text-6xl font-bold mb-2">
-            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone:orgTimezone })}
           </div>
           <div className="text-xl opacity-90">
             {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
