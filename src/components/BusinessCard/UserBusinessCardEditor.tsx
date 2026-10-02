@@ -77,7 +77,7 @@ export function UserBusinessCardEditor() {
       const fileName = `${user.id}/photo-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('business_card_photos')
+        .from('business-card-photos')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -86,7 +86,7 @@ export function UserBusinessCardEditor() {
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('business_card_photos')
+        .from('business-card-photos')
         .getPublicUrl(fileName);
 
       setPhotoUrl(publicUrl);
@@ -113,9 +113,9 @@ export function UserBusinessCardEditor() {
       if (error) throw error;
       setProfileAvatar(null);
       setPhotoUrl('');
-      const oldPath = photoUrl.split('/business_card_photos/')[1];
+      const oldPath = photoUrl.split('/business-card-photos/')[1];
       if (oldPath?.startsWith(`${user.id}/`)) {
-        await supabase.storage.from('business_card_photos').remove([decodeURIComponent(oldPath)]);
+        await supabase.storage.from('business-card-photos').remove([decodeURIComponent(oldPath)]);
       }
     } catch (error) {
       console.error('Error removing photo:', error);
