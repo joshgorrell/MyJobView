@@ -62,3 +62,11 @@ The audit covers staff creation/editing, invitation/return access, personal/prop
 - `git diff --check`: passed.
 - Repository TypeScript check completes with existing project errors. Compared against current main using the same compiler/dependencies; it is not reported as a passing repository-wide check.
 - No production writes or merchant transactions performed. Keep PR #78 in draft until remaining release gates are resolved.
+
+## Final conditional-merge audit
+
+Reviewed PR head `4583baccf96166abca88335e213171c57f510c73` after Josh authorized merging only if the final audit passes. All three GitHub Actions checks passed on that head: onboarding build/database/payment/print/browser checks, AI permissions, and work-order scope. White fields/black text and light checkboxes are verified in dark mode. Blank printing creates no records; returned paper enters through staff web onboarding. The source review found no additional code defect.
+
+The full deployment audit is **not passed**. A fresh read-only query confirmed that the connected MJV database lacks `staff_security_onboarding`, `portal_security_onboarding`, and `security_correct_onboarding`. The GitHub `Supabase Preview` check on that same head was **skipped**, explicitly because the Git branch is not associated with a Supabase branch. The default branch already reports migration failure, so automatic migration delivery on merge is not established. Local fixtures and green Actions checks do not replace a hosted migration/authorization check.
+
+Keep the PR unmerged while arranging an isolated hosted test, validating the migration sequence against the actual schema, and confirming coordinated migration/function/frontend delivery. The user's conditional merge approval remains valid once that audit passes. No production write was performed to bypass the blocker.
