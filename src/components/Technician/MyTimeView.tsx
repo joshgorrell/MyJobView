@@ -32,6 +32,8 @@ interface TimeRequest {
 export function MyTimeView() {
   const { profile } = useAuth();
   const policy = useEmployeeTimePolicy();
+  const [timezone,setTimezone]=useState('America/Chicago');
+  useEffect(()=>{void getOrganizationTimezone().then(setTimezone);},[]);
   const [entries, setEntries] = useState<ClockEntry[]>([]);
   const [requests, setRequests] = useState<Record<string, TimeRequest>>({});
   const [loading, setLoading] = useState(true);
@@ -258,7 +260,7 @@ export function MyTimeView() {
                             {new Date(entry.clock_in).toLocaleTimeString('en-US', {
                               hour: 'numeric',
                               minute: '2-digit',
-                              hour12: true
+                              hour12: true, timeZone:timezone
                             })}
                           </span>
                         </div>
@@ -272,7 +274,7 @@ export function MyTimeView() {
                               new Date(entry.clock_out).toLocaleTimeString('en-US', {
                                 hour: 'numeric',
                                 minute: '2-digit',
-                                hour12: true
+                                hour12: true, timeZone:timezone
                               })
                             ) : (
                               <span className="text-blue-600">Still Clocked In</span>
