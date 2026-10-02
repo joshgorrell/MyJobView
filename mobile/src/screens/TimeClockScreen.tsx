@@ -175,12 +175,16 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       // Capture high-accuracy location
       const location = await locationTrackingService.captureHighAccuracyLocation();
 
+      Object.assign(clockInData, {clock_in_gps_attempted_at:now.toISOString(),clock_in_gps_capture_method:'failed'});
       if (location) {
         Object.assign(clockInData, {
           clock_in_latitude: location.coords.latitude,
           clock_in_longitude: location.coords.longitude,
           clock_in_gps_accuracy: location.coords.accuracy,
-          clock_in_gps_capture_method: 'native_mobile',
+          clock_in_gps_capture_method: (location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy',
+          clock_in_gps_attempted_at: now.toISOString(),
+          clock_in_gps_captured_at: new Date(location.timestamp).toISOString(),
+          clock_in_gps_duration_ms: (location.coords as any).duration_ms || 0,
         });
       }
 
@@ -191,7 +195,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       if (error) throw error;
 
       // Start background GPS tracking
-      await locationTrackingService.startTracking(profile.id, entryId);
+      await locationTrackingService.startTracking(profile.id, entryId).catch(error => console.warn('Clock-in saved; background GPS unavailable:', error));
 
       await loadTodaysClock();
       Alert.alert('Success', 'Clocked in successfully!');
@@ -223,12 +227,17 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
             clock_out: now.toISOString(),
             status: 'clocked_out',
             notes: notes || null,
+            clock_out_gps_attempted_at: now.toISOString(),
+            clock_out_gps_capture_method: 'failed',
           };
 
           if (location) {
             updates.clock_out_latitude = location.coords.latitude;
             updates.clock_out_longitude = location.coords.longitude;
             updates.clock_out_gps_accuracy = location.coords.accuracy;
+            updates.clock_out_gps_capture_method = (location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy';
+            updates.clock_out_gps_captured_at = new Date(location.timestamp).toISOString();
+            updates.clock_out_gps_duration_ms = (location.coords as any).duration_ms || 0;
           }
 
           const { error } = await supabase
@@ -239,7 +248,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           if (error) throw error;
 
           // Stop GPS tracking
-          await locationTrackingService.stopTracking();
+          await locationTrackingService.stopTracking().catch(error => console.warn('Clock-out saved; background GPS stop failed:', error));
 
           await loadTodaysClock();
           Alert.alert('Success', 'Clocked out successfully!');
