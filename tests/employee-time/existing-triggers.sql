@@ -1,6 +1,318 @@
 -- Read-only snapshot of relevant existing production triggers, 2026-10-02.
 -- Executed only against isolated test databases; no application data is included.
 
+CREATE OR REPLACE FUNCTION public.check_home_clock_and_notify()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+v_settings record;
+v_profile record;
+v_org_id uuid;
+v_distance_in integer;
+v_distance_out integer;
+v_is_home_clock_in boolean := false;
+v_is_home_clock_out boolean := false;
+v_recipient record;
+BEGIN
+-- Get technician profile with home coordinates and org id
+SELECT
+id,
+full_name,
+home_latitude,
+home_longitude,
+home_address,
+organization_id
+INTO v_profile
+FROM profiles
+WHERE id = NEW.technician_id;
+
+v_org_id := v_profile.organization_id;
+
+-- Get company settings for this org
+SELECT
+home_clock_notification_enabled,
+home_location_radius_meters,
+home_clock_notification_roles
+INTO v_settings
+FROM company_settings
+WHERE organization_id = v_org_id
+LIMIT 1;
+
+-- If no org-specific settings, fall back to any row
+IF v_settings IS NULL THEN
+SELECT
+home_clock_notification_enabled,
+home_location_radius_meters,
+home_clock_notification_roles
+INTO v_settings
+FROM company_settings
+LIMIT 1;
+END IF;
+
+-- Exit early if notifications are disabled
+IF NOT COALESCE(v_settings.home_clock_notification_enabled, false) THEN
+RETURN NEW;
+END IF;
+
+-- Check clock IN from home (only on INSERT or when clock_in changes)
+IF (TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND OLD.clock_in IS DISTINCT FROM NEW.clock_in))
+AND NEW.clock_in IS NOT NULL
+AND NEW.clock_in_latitude IS NOT NULL
+AND NEW.clock_in_longitude IS NOT NULL
+AND v_profile.home_latitude IS NOT NULL
+AND v_profile.home_longitude IS NOT NULL THEN
+
+v_distance_in := calculate_distance_meters(
+NEW.clock_in_latitude,
+NEW.clock_in_longitude,
+v_profile.home_latitude,
+v_profile.home_longitude
+);
+
+IF v_distance_in IS NOT NULL AND v_distance_in <= COALESCE(v_settings.home_location_radius_meters, 150) THEN
+v_is_home_clock_in := true;
+NEW.clocked_in_from_home := true;
+END IF;
+END IF;
+
+-- Check clock OUT from home (only when clock_out changes)
+IF TG_OP = 'UPDATE'
+AND OLD.clock_out IS DISTINCT FROM NEW.clock_out
+AND NEW.clock_out IS NOT NULL
+AND NEW.clock_out_latitude IS NOT NULL
+AND NEW.clock_out_longitude IS NOT NULL
+AND v_profile.home_latitude IS NOT NULL
+AND v_profile.home_longitude IS NOT NULL THEN
+
+v_distance_out := calculate_distance_meters(
+NEW.clock_out_latitude,
+NEW.clock_out_longitude,
+v_profile.home_latitude,
+v_profile.home_longitude
+);
+
+IF v_distance_out IS NOT NULL AND v_distance_out <= COALESCE(v_settings.home_location_radius_meters, 150) THEN
+v_is_home_clock_out := true;
+NEW.clocked_out_from_home := true;
+END IF;
+END IF;
+
+-- Send notifications for clock-in from home
+IF v_is_home_clock_in THEN
+FOR v_recipient IN
+SELECT id
+FROM profiles
+WHERE organization_id = v_org_id
+AND role = ANY(COALESCE(
+v_settings.home_clock_notification_roles,
+ARRAY['admin', 'office_manager', 'production_manager', 'service_manager']
+))
+LOOP
+INSERT INTO notifications (
+user_id,
+type,
+title,
+body,
+related_id,
+organization_id
+) VALUES (
+v_recipient.id,
+'home_clock',
+'Clock In From Home',
+v_profile.full_name || ' clocked in from home at ' ||
+TO_CHAR(NEW.clock_in AT TIME ZONE 'America/Chicago', 'HH12:MI AM') ||
+CASE
+WHEN v_distance_in IS NOT NULL THEN ' (' || v_distance_in || 'm from home)'
+ELSE ''
+END,
+NEW.id,
+v_org_id
+);
+END LOOP;
+END IF;
+
+-- Send notifications for clock-out from home
+IF v_is_home_clock_out THEN
+FOR v_recipient IN
+SELECT id
+FROM profiles
+WHERE organization_id = v_org_id
+AND role = ANY(COALESCE(
+v_settings.home_clock_notification_roles,
+ARRAY['admin', 'office_manager', 'production_manager', 'service_manager']
+))
+LOOP
+INSERT INTO notifications (
+user_id,
+type,
+title,
+body,
+related_id,
+organization_id
+) VALUES (
+v_recipient.id,
+'home_clock',
+'Clock Out From Home',
+v_profile.full_name || ' clocked out from home at ' ||
+TO_CHAR(NEW.clock_out AT TIME ZONE 'America/Chicago', 'HH12:MI AM') ||
+CASE
+WHEN v_distance_out IS NOT NULL THEN ' (' || v_distance_out || 'm from home)'
+ELSE ''
+END,
+NEW.id,
+v_org_id
+);
+END LOOP;
+END IF;
+
+RETURN NEW;
+END;
+$function$;
+CREATE TRIGGER check_home_clock_trigger BEFORE INSERT OR UPDATE ON public.daily_clock_entries FOR EACH ROW EXECUTE FUNCTION check_home_clock_and_notify();
+CREATE TRIGGER trigger_check_home_clock BEFORE INSERT OR UPDATE ON public.daily_clock_entries FOR EACH ROW EXECUTE FUNCTION check_home_clock_and_notify();
+
+CREATE OR REPLACE FUNCTION public.notify_approvers_of_time_request()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+v_approver_ids uuid[];
+v_approver_id  uuid;
+v_tech_name    text;
+v_session_type text;
+v_hours        numeric;
+v_title        text;
+v_body         text;
+BEGIN
+-- Only fire on new pending_approval inserts
+IF NEW.status <> 'pending_approval' THEN
+RETURN NEW;
+END IF;
+
+-- Get approver list from company_settings
+SELECT time_request_approver_ids
+INTO v_approver_ids
+FROM company_settings
+LIMIT 1;
+
+IF v_approver_ids IS NULL OR array_length(v_approver_ids, 1) IS NULL THEN
+RETURN NEW;
+END IF;
+
+-- Resolve tech's display name
+SELECT COALESCE(full_name, email, 'A technician')
+INTO v_tech_name
+FROM profiles
+WHERE id = NEW.assigned_to;
+
+v_session_type := CASE NEW.session_type
+WHEN 'shop_time'  THEN 'Shop Time'
+WHEN 'training'   THEN 'Training Time'
+ELSE initcap(replace(NEW.session_type, '_', ' '))
+END;
+
+v_hours := COALESCE(NEW.predetermined_hours, 0);
+
+v_title := v_tech_name || ' requested ' || v_session_type;
+v_body  := v_session_type || ' request for ' ||
+v_hours::text || ' hour(s)' ||
+CASE WHEN NEW.request_reason IS NOT NULL AND NEW.request_reason <> ''
+THEN ': ' || NEW.request_reason
+ELSE ''
+END;
+
+-- Insert one notification per approver
+FOREACH v_approver_id IN ARRAY v_approver_ids
+LOOP
+INSERT INTO notifications (user_id, type, title, body, related_id, is_read)
+VALUES (
+v_approver_id,
+'internal_time_request_submitted',
+v_title,
+v_body,
+NEW.id,
+false
+);
+END LOOP;
+
+RETURN NEW;
+END;
+$function$;
+CREATE TRIGGER trigger_notify_approvers_time_request AFTER INSERT ON public.internal_time_sessions FOR EACH ROW EXECUTE FUNCTION notify_approvers_of_time_request();
+
+CREATE OR REPLACE FUNCTION public.notify_tech_of_time_request_outcome()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+v_approver_name text;
+v_session_type  text;
+v_hours         numeric;
+v_title         text;
+v_body          text;
+v_notif_type    text;
+BEGIN
+-- Fire when status transitions from pending_approval to completed (approved) or denied
+IF OLD.status <> 'pending_approval' THEN
+RETURN NEW;
+END IF;
+IF NEW.status NOT IN ('completed', 'denied') THEN
+RETURN NEW;
+END IF;
+
+-- Resolve approver name
+SELECT COALESCE(full_name, email, 'A manager')
+INTO v_approver_name
+FROM profiles
+WHERE id = NEW.approved_by;
+
+v_session_type := CASE NEW.session_type
+WHEN 'shop_time'  THEN 'Shop Time'
+WHEN 'training'   THEN 'Training Time'
+ELSE initcap(replace(NEW.session_type, '_', ' '))
+END;
+
+v_hours := COALESCE(NEW.predetermined_hours, 0);
+
+IF NEW.status = 'completed' THEN
+v_notif_type := 'internal_time_request_approved';
+v_title      := v_session_type || ' request approved';
+v_body       := v_approver_name || ' approved your ' || v_session_type || ' request. ' ||
+v_hours::text || 'h have been added to your payroll for ' ||
+to_char(NEW.session_date::date, 'Mon DD') || '.';
+ELSE
+v_notif_type := 'internal_time_request_denied';
+v_title      := v_session_type || ' request declined';
+v_body       := v_approver_name || ' declined your ' || v_session_type || ' request.' ||
+CASE WHEN NEW.denial_reason IS NOT NULL AND NEW.denial_reason <> ''
+THEN ' Reason: ' || NEW.denial_reason
+ELSE ''
+END;
+END IF;
+
+INSERT INTO notifications (user_id, type, title, body, related_id, is_read)
+VALUES (
+NEW.assigned_to,
+v_notif_type,
+v_title,
+v_body,
+NEW.id,
+false
+);
+
+RETURN NEW;
+END;
+$function$;
+CREATE TRIGGER trigger_notify_tech_time_request_outcome AFTER UPDATE ON public.internal_time_sessions FOR EACH ROW EXECUTE FUNCTION notify_tech_of_time_request_outcome();
+
+
 CREATE OR REPLACE FUNCTION public.calculate_daily_clock_hours()
  RETURNS trigger
  LANGUAGE plpgsql
