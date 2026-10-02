@@ -184,3 +184,8 @@ export function getTimezoneLabel(timezone: string): string {
   const option = TIMEZONE_OPTIONS.find(opt => opt.value === timezone);
   return option?.label || timezone;
 }
+
+/** A calendar selection is a civil day, not a UTC timestamp. */
+export function calendarDateKey(date:Date):string {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
