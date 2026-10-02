@@ -1,4 +1,4 @@
-import { ManualJobTimeRequests } from './Payroll/ManualJobTimeRequests';
+import { TimeReviewPanel } from './Payroll/TimeReviewPanel';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink, DollarSign } from 'lucide-react';
@@ -128,7 +128,7 @@ export function TimeClockManagement() {
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
   const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [confirmRunAutoClockOut, setConfirmRunAutoClockOut] = useState(false);
-  const [activeTab, setActiveTab] = useState<'settings' | 'payroll'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'review' | 'payroll'>('settings');
   const [selectedPayPeriodId, setSelectedPayPeriodId] = useState<string | null>(null);
   const [payrollRefreshKey, setPayrollRefreshKey] = useState(0);
 
@@ -271,10 +271,7 @@ export function TimeClockManagement() {
   async function approveTimeRequest(id: string) {
     setApprovingRequestId(id);
     try {
-      const { error } = await supabase
-        .from('internal_time_sessions')
-        .update({ status: 'scheduled', approved_by: user?.id, approved_at: new Date().toISOString() })
-        .eq('id', id);
+      const {error}=await supabase.rpc('review_internal_time',{p_session_id:id,p_action:'approve'});
       if (error) throw error;
       supabase.functions.invoke('send-time-request-notification', {
         body: { sessionId: id, direction: 'to_tech' },
@@ -291,10 +288,7 @@ export function TimeClockManagement() {
     const reason = denyReasonInput[id]?.trim();
     setDenyingRequestId(id);
     try {
-      const { error } = await supabase
-        .from('internal_time_sessions')
-        .update({ status: 'denied', denial_reason: reason || null })
-        .eq('id', id);
+      const {error}=await supabase.rpc('review_internal_time',{p_session_id:id,p_action:'deny',p_notes:reason||null});
       if (error) throw error;
       supabase.functions.invoke('send-time-request-notification', {
         body: { sessionId: id, direction: 'to_tech' },
@@ -531,7 +525,7 @@ export function TimeClockManagement() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex flex-wrap gap-1 border-b border-gray-200">
         <button
           onClick={() => setActiveTab('settings')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -541,8 +535,9 @@ export function TimeClockManagement() {
           }`}
         >
           <Clock className="w-4 h-4 inline mr-1.5" />
-          Settings & Review
+          Settings & Alerts
         </button>
+        <button onClick={()=>setActiveTab('review')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='review'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}>Requests & Travel</button>
         <button
           onClick={() => setActiveTab('payroll')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -556,6 +551,7 @@ export function TimeClockManagement() {
         </button>
       </div>
 
+      {activeTab==='review' && <TimeReviewPanel onPayroll={()=>setActiveTab('payroll')}/>}
       {activeTab === 'settings' && (
       <>
       <div className="flex items-center gap-2 justify-end">
@@ -575,7 +571,7 @@ export function TimeClockManagement() {
         </button>
       </div>
 
-      <ManualJobTimeRequests />
+
 
       {/* Auto Clock-Out Settings */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 space-y-6">
