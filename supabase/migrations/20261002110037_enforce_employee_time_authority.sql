@@ -731,3 +731,23 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.check_home_clock_and_notify() FROM PUBLIC,anon,authenticated;
 DROP TRIGGER IF EXISTS trigger_check_home_clock ON public.daily_clock_entries;
+
+-- Existing production policies permit inserts but omit recipient reads/acknowledgment.
+-- Restore tenant-bound recipient access and limit client updates to read state.
+GRANT SELECT,DELETE ON public.notifications TO authenticated;
+REVOKE UPDATE ON public.notifications FROM authenticated;
+GRANT UPDATE(is_read) ON public.notifications TO authenticated;
+DROP POLICY IF EXISTS notifications_recipient_read ON public.notifications;
+CREATE POLICY notifications_recipient_read ON public.notifications FOR SELECT TO authenticated
+USING (user_id=(SELECT auth.uid()) AND organization_id=get_user_org_id()
+ AND EXISTS(SELECT 1 FROM public.profiles p WHERE p.id=(SELECT auth.uid()) AND p.organization_id=notifications.organization_id AND p.is_active IS DISTINCT FROM false));
+DROP POLICY IF EXISTS notifications_recipient_ack ON public.notifications;
+CREATE POLICY notifications_recipient_ack ON public.notifications FOR UPDATE TO authenticated
+USING (user_id=(SELECT auth.uid()) AND organization_id=get_user_org_id()
+ AND EXISTS(SELECT 1 FROM public.profiles p WHERE p.id=(SELECT auth.uid()) AND p.organization_id=notifications.organization_id AND p.is_active IS DISTINCT FROM false))
+WITH CHECK (user_id=(SELECT auth.uid()) AND organization_id=get_user_org_id()
+ AND EXISTS(SELECT 1 FROM public.profiles p WHERE p.id=(SELECT auth.uid()) AND p.organization_id=notifications.organization_id AND p.is_active IS DISTINCT FROM false));
+DROP POLICY IF EXISTS notifications_recipient_delete ON public.notifications;
+CREATE POLICY notifications_recipient_delete ON public.notifications FOR DELETE TO authenticated
+USING (user_id=(SELECT auth.uid()) AND organization_id=get_user_org_id()
+ AND EXISTS(SELECT 1 FROM public.profiles p WHERE p.id=(SELECT auth.uid()) AND p.organization_id=notifications.organization_id AND p.is_active IS DISTINCT FROM false));
