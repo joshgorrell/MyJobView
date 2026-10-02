@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { createTimestampInTimezone, formatDateInTimezone, formatTimeInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, Clock, Calendar, Send, AlertCircle } from 'lucide-react';
@@ -22,24 +23,22 @@ export function TimeAdjustmentRequestModal({ entry, onClose, onSubmit }: Props) 
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  // Convert times to HH:MM format for time inputs (browsers use 24-hour format for input type="time")
-  const formatTimeForInput = (dateString: string) => {
-    const date = new Date(dateString);
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  };
-
-  const [requestedClockIn, setRequestedClockIn] = useState(formatTimeForInput(entry.clock_in));
-  const [requestedClockOut, setRequestedClockOut] = useState(
-    entry.clock_out ? formatTimeForInput(entry.clock_out) : ''
-  );
+  const [timezone,setTimezone]=useState('');
+  const [requestedClockIn,setRequestedClockIn]=useState('');
+  const [requestedClockOut,setRequestedClockOut]=useState('');
+  const [requestedEndDate,setRequestedEndDate]=useState(entry.entry_date);
+  useEffect(()=>{void getOrganizationTimezone().then(tz=>{
+    setTimezone(tz);setRequestedClockIn(formatTimeInTimezone(entry.clock_in,tz));
+    setRequestedClockOut(entry.clock_out?formatTimeInTimezone(entry.clock_out,tz):'');
+    setRequestedEndDate(entry.clock_out?formatDateInTimezone(entry.clock_out,tz):entry.entry_date);
+  });},[entry.id]);
   const [reasonCategory, setReasonCategory] = useState('wrong_time');
   const [explanation, setExplanation] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    if (!timezone) return;
     if (!explanation.trim()) {
       alert('Please provide an explanation for this request');
       return;
@@ -49,13 +48,14 @@ export function TimeAdjustmentRequestModal({ entry, onClose, onSubmit }: Props) 
     try {
       // Build full timestamps for requested times
       const entryDate = entry.entry_date;
-      const requestedClockInTimestamp = new Date(`${entryDate}T${requestedClockIn}`).toISOString();
+      const requestedClockInTimestamp = createTimestampInTimezone(entryDate,requestedClockIn,timezone);
       let requestedClockOutTimestamp = null;
 
       if (requestedClockOut) {
-        requestedClockOutTimestamp = new Date(`${entryDate}T${requestedClockOut}`).toISOString();
+        requestedClockOutTimestamp = createTimestampInTimezone(requestedEndDate,requestedClockOut,timezone);
       }
 
+      if(requestedClockOutTimestamp && new Date(requestedClockOutTimestamp)<=new Date(requestedClockInTimestamp)) throw new Error('Clock out must be after clock in. Select the next date for overnight work.');
       const { error } = await supabase
         .from('time_adjustment_requests')
         .insert({
@@ -135,7 +135,7 @@ export function TimeAdjustmentRequestModal({ entry, onClose, onSubmit }: Props) 
                     {new Date(entry.clock_in).toLocaleTimeString('en-US', {
                       hour: 'numeric',
                       minute: '2-digit',
-                      hour12: true
+                      hour12: true, timeZone:timezone||'America/Chicago'
                     })}
                   </div>
                 </div>
@@ -146,7 +146,7 @@ export function TimeAdjustmentRequestModal({ entry, onClose, onSubmit }: Props) 
                       new Date(entry.clock_out).toLocaleTimeString('en-US', {
                         hour: 'numeric',
                         minute: '2-digit',
-                        hour12: true
+                        hour12: true, timeZone:timezone||'America/Chicago'
                       })
                     ) : (
                       <span className="text-blue-600">Not clocked out</span>
@@ -187,6 +187,7 @@ export function TimeAdjustmentRequestModal({ entry, onClose, onSubmit }: Props) 
                     onChange={(e) => setRequestedClockOut(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  <label className="block text-xs text-gray-700 mt-2">Clock out date<input type="date" required={!!requestedClockOut} min={entry.entry_date} value={requestedEndDate} onChange={e=>setRequestedEndDate(e.target.value)} className="block w-full border rounded-lg p-2" /></label>
                   <p className="text-xs text-gray-500 mt-1">
                     Leave blank if still clocked in
                   </p>
