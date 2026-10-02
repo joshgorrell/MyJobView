@@ -1,3 +1,4 @@
+import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -60,6 +61,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 export function InternalSessionsManagement() {
   const { profile } = useAuth();
+  const [organizationTimezone,setOrganizationTimezone] = useState('America/Chicago');
+  useEffect(() => { void getOrganizationTimezone().then(setOrganizationTimezone); }, []);
   const [sessions, setSessions] = useState<InternalSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -106,11 +109,11 @@ export function InternalSessionsManagement() {
   }
 
   const filtered = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateInTimezone(new Date().toISOString(), organizationTimezone);
     const weekEnd = (() => {
       const d = new Date();
       d.setDate(d.getDate() + 7);
-      return d.toISOString().split('T')[0];
+      return formatDateInTimezone(d.toISOString(),organizationTimezone);
     })();
 
     return sessions.filter(s => {
@@ -121,7 +124,7 @@ export function InternalSessionsManagement() {
       if (dateFilter === 'upcoming' && s.session_date < today && s.status === 'scheduled') return false;
       return true;
     });
-  }, [sessions, typeFilter, statusFilter, dateFilter]);
+  }, [sessions, typeFilter, statusFilter, dateFilter, organizationTimezone]);
 
   async function completeWithPredetermined(session: InternalSession) {
     if (!session.predetermined_hours) return;
@@ -201,7 +204,7 @@ export function InternalSessionsManagement() {
   async function approveRequest(session: InternalSession) {
     setApprovingId(session.id);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
       const isToday = session.session_date === today;
 
       const newStatus = (isToday && !session.predetermined_hours) ? 'scheduled' : 'scheduled';
