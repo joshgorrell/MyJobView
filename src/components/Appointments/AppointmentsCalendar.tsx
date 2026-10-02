@@ -1,3 +1,4 @@
+import { calendarDateKey, createTimestampInTimezone, formatTimeInTimezone, formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect, useRef, ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, AlertTriangle, Users, Clock, CheckCircle2, AlertCircle, Wrench, LayoutList, LayoutGrid, Settings, Maximize2, User, Lock, Star, Repeat } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -20,7 +21,7 @@ interface Appointment {
   technician_id?: string;
   isWorkOrder?: boolean;
   isReminder?: boolean;
-  reminderType?: 'task' | 'lead' | 'discussion' | 'scheduled_connection';
+  reminderType?: 'task' | 'lead' | 'discussion' | 'scheduled_connection' | 'internal_time' | 'time_off';
   appointment_type?: 'customer_meeting' | 'personal' | 'work_order' | 'other';
   is_private?: boolean;
   all_day?: boolean;
@@ -54,12 +55,13 @@ type TechnicianViewMode = 'timeline' | 'list';
 type AgendaGrouping = 'all' | 'week' | 'month';
 type DateRangeFilter = '30' | '90' | '180' | 'all';
 
-export function AppointmentsCalendar() {
+export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }: { personalOnly?: boolean; onWorkOrderSelect?: (id: string) => void } = {}) {
   const { profile } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
+  const [loadError,setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -68,7 +70,8 @@ export function AppointmentsCalendar() {
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
-  const [calendarView, setCalendarView] = useState<'my' | 'technicians' | 'shared'>('my');
+  const [storedCalendarView, setCalendarView] = useState<'my' | 'technicians' | 'shared'>('my');
+  const calendarView = personalOnly ? 'my' : storedCalendarView;
   const [sharedCalendarMemberIds, setSharedCalendarMemberIds] = useState<string[]>([]);
   const [technicianViewMode, setTechnicianViewMode] = useState<TechnicianViewMode>('timeline');
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -103,6 +106,10 @@ export function AppointmentsCalendar() {
     loadCalendars();
 
     // Check for URL parameters to restore state (for pop-out window)
+    if (personalOnly) {
+      void getOrganizationTimezone().then(tz => setCurrentDate(new Date(formatDateInTimezone(new Date().toISOString(),tz)+'T12:00:00')));
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     if (params.get('popup') === 'true') {
       const view = params.get('view') as 'my' | 'technicians' | 'shared' | null;
@@ -112,7 +119,7 @@ export function AppointmentsCalendar() {
 
       if (view) setCalendarView(view);
       if (mode) setViewMode(mode);
-      if (date) setCurrentDate(new Date(date));
+      if (date) setCurrentDate(new Date(date.length===10?date+'T12:00:00':date));
       if (calId) setSelectedCalendarId(calId);
     } else if (profile) {
       // Restore saved default calendar preference
@@ -577,16 +584,20 @@ export function AppointmentsCalendar() {
       }
 
       // Get current user ID
+      const timezone=await getOrganizationTimezone();
+      const rangeStart=createTimestampInTimezone(calendarDateKey(startDate),'00:00',timezone);
+      const nextDay=new Date(endDate);nextDay.setDate(nextDay.getDate()+1);
+      const rangeEnd=new Date(Date.parse(createTimestampInTimezone(calendarDateKey(nextDay),'00:00',timezone))-1).toISOString();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Load appointments using privacy-aware function, work orders, reminders, and scheduled connections
-      const [appointmentsRes, workOrdersRes, tasksRes, leadsRes, discussionsRes, scheduledConnectionsRes] = await Promise.all([
+      const [appointmentsRes, workOrdersRes, tasksRes, leadsRes, discussionsRes, scheduledConnectionsRes, internalRes, ptoRes] = await Promise.all([
         supabase.rpc('get_appointments_with_privacy', {
           p_user_id: user.id,
-          p_company_id: user.id,
-          p_start_date: startDate.toISOString().split('T')[0],
-          p_end_date: endDate.toISOString().split('T')[0]
+          p_company_id: profile?.organization_id || user.id,
+          p_start_date: calendarDateKey(startDate),
+          p_end_date: calendarDateKey(endDate)
         }),
         supabase
           .from('work_orders')
@@ -611,8 +622,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('scheduled_date', 'is', null)
-          .gte('scheduled_date', startDate.toISOString().split('T')[0])
-          .lte('scheduled_date', endDate.toISOString().split('T')[0])
+          .gte('scheduled_date', calendarDateKey(startDate))
+          .lte('scheduled_date', calendarDateKey(endDate))
           .order('scheduled_date')
           .order('scheduled_start_time'),
         // Load task reminders
@@ -629,8 +640,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('reminder_date', 'is', null)
-          .gte('reminder_date', startDate.toISOString())
-          .lte('reminder_date', endDate.toISOString()),
+          .gte('reminder_date', rangeStart)
+          .lte('reminder_date', rangeEnd),
         // Load lead reminders
         supabase
           .from('leads')
@@ -646,8 +657,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('reminder_date', 'is', null)
-          .gte('reminder_date', startDate.toISOString())
-          .lte('reminder_date', endDate.toISOString()),
+          .gte('reminder_date', rangeStart)
+          .lte('reminder_date', rangeEnd),
         // Load discussion post reminders
         supabase
           .from('discussion_posts')
@@ -661,8 +672,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('reminder_date', 'is', null)
-          .gte('reminder_date', startDate.toISOString())
-          .lte('reminder_date', endDate.toISOString()),
+          .gte('reminder_date', rangeStart)
+          .lte('reminder_date', rangeEnd),
         // Load scheduled connection occurrences
         supabase
           .from('scheduled_connection_occurrences')
@@ -686,8 +697,14 @@ export function AppointmentsCalendar() {
             )
           `)
           .eq('status', 'pending')
-          .gte('occurrence_date', startDate.toISOString().split('T')[0])
-          .lte('occurrence_date', endDate.toISOString().split('T')[0])
+          .gte('occurrence_date', calendarDateKey(startDate))
+          .lte('occurrence_date', calendarDateKey(endDate))
+        ,supabase.from('internal_time_sessions').select('id,title,session_date,start_time,end_time,predetermined_hours,status,assigned_to')
+          .eq('assigned_to',user.id).in('status',['scheduled','in_progress','completed'])
+          .gte('session_date',calendarDateKey(startDate)).lte('session_date',calendarDateKey(endDate)),
+        supabase.from('pto_requests').select('id,employee_id,start_date,end_date,request_type')
+          .eq('employee_id',user.id).eq('status','approved')
+          .lte('start_date',calendarDateKey(endDate)).gte('end_date',calendarDateKey(startDate)),
       ]);
 
       if (appointmentsRes.error) throw appointmentsRes.error;
@@ -739,9 +756,9 @@ export function AppointmentsCalendar() {
         return {
           id: task.id,
           title: `Task: ${task.title}`,
-          appointment_date: reminderDate.toISOString().split('T')[0],
-          start_time: reminderDate.toTimeString().slice(0, 5),
-          end_time: reminderDate.toTimeString().slice(0, 5),
+          appointment_date: formatDateInTimezone(reminderDate.toISOString(),timezone),
+          start_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
+          end_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
           status: task.status,
           technician_id: task.assigned_to,
           customer_name: 'Reminder',
@@ -758,9 +775,9 @@ export function AppointmentsCalendar() {
         return {
           id: lead.id,
           title: `Lead: ${leadTitle}`,
-          appointment_date: reminderDate.toISOString().split('T')[0],
-          start_time: reminderDate.toTimeString().slice(0, 5),
-          end_time: reminderDate.toTimeString().slice(0, 5),
+          appointment_date: formatDateInTimezone(reminderDate.toISOString(),timezone),
+          start_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
+          end_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
           status: lead.status,
           technician_id: lead.assigned_to,
           customer_name: 'Reminder',
@@ -777,9 +794,9 @@ export function AppointmentsCalendar() {
         return {
           id: post.id,
           title: `Note: ${previewText}`,
-          appointment_date: reminderDate.toISOString().split('T')[0],
-          start_time: reminderDate.toTimeString().slice(0, 5),
-          end_time: reminderDate.toTimeString().slice(0, 5),
+          appointment_date: formatDateInTimezone(reminderDate.toISOString(),timezone),
+          start_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
+          end_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
           status: 'pending',
           technician_id: post.user_id,
           customer_name: 'Reminder',
@@ -812,6 +829,26 @@ export function AppointmentsCalendar() {
         };
       });
 
+      if(internalRes.error) throw internalRes.error;
+      if(ptoRes.error) throw ptoRes.error;
+      const internalEvents = (internalRes.data || []).map(session => ({
+        id:session.id, title:session.title + (!session.start_time ? ' (time not scheduled)' : ''), appointment_date:session.session_date,
+        start_time:session.start_time || '00:00', end_time:session.end_time || '23:59',
+        all_day:!session.start_time, status:session.status, technician_id:session.assigned_to,
+        technician_name:'',customer_name:'Approved internal session',isReminder:true,reminderType:'internal_time' as const,
+      }));
+      const ptoEvents: Appointment[] = [];
+      for(const pto of ptoRes.data || []) {
+        const from = pto.start_date > calendarDateKey(startDate) ? pto.start_date : calendarDateKey(startDate);
+        const to = pto.end_date < calendarDateKey(endDate) ? pto.end_date : calendarDateKey(endDate);
+        for(let day=new Date(from+'T12:00Z'); day.toISOString().slice(0,10)<=to; day.setUTCDate(day.getUTCDate()+1)) {
+          const date=day.toISOString().slice(0,10);
+          ptoEvents.push({id:pto.id+'-'+date,title:pto.request_type==='full_day'?'Approved Time Off':'Approved Partial Time Off (see request for hours)',
+            appointment_date:date,start_time:'00:00',end_time:'23:59',all_day:true,status:'approved',technician_id:pto.employee_id,
+            technician_name:'',customer_name:'Time Off',isReminder:true,reminderType:'time_off'});
+        }
+      }
+
       // Combine and sort by date and time
       const combined = [
         ...formattedAppointments,
@@ -819,7 +856,9 @@ export function AppointmentsCalendar() {
         ...formattedTasks,
         ...formattedLeads,
         ...formattedDiscussions,
-        ...formattedConnections
+        ...formattedConnections,
+        ...internalEvents,
+        ...ptoEvents
       ].sort((a, b) => {
         const dateCompare = a.appointment_date.localeCompare(b.appointment_date);
         if (dateCompare !== 0) return dateCompare;
@@ -827,8 +866,10 @@ export function AppointmentsCalendar() {
       });
 
       setAllAppointments(combined);
+      setLoadError('');
     } catch (error) {
       console.error('Error loading calendar items:', error);
+      setLoadError('Unable to load all calendar items. Refresh this view to try again.');
     } finally {
       setLoading(false);
     }
@@ -852,6 +893,10 @@ export function AppointmentsCalendar() {
         endDate.setFullYear(endDate.getFullYear() + 1);
       }
 
+      const timezone=await getOrganizationTimezone();
+      const rangeStart=createTimestampInTimezone(calendarDateKey(startDate),'00:00',timezone);
+      const nextDay=new Date(endDate);nextDay.setDate(nextDay.getDate()+1);
+      const rangeEnd=new Date(Date.parse(createTimestampInTimezone(calendarDateKey(nextDay),'00:00',timezone))-1).toISOString();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -859,9 +904,9 @@ export function AppointmentsCalendar() {
       const [appointmentsRes, workOrdersRes, tasksRes, leadsRes, discussionsRes, scheduledConnectionsRes] = await Promise.all([
         supabase.rpc('get_appointments_with_privacy', {
           p_user_id: user.id,
-          p_company_id: user.id,
-          p_start_date: startDate.toISOString().split('T')[0],
-          p_end_date: endDate.toISOString().split('T')[0]
+          p_company_id: profile?.organization_id || user.id,
+          p_start_date: calendarDateKey(startDate),
+          p_end_date: calendarDateKey(endDate)
         }),
         supabase
           .from('work_orders')
@@ -886,8 +931,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('scheduled_date', 'is', null)
-          .gte('scheduled_date', startDate.toISOString().split('T')[0])
-          .lte('scheduled_date', endDate.toISOString().split('T')[0])
+          .gte('scheduled_date', calendarDateKey(startDate))
+          .lte('scheduled_date', calendarDateKey(endDate))
           .order('scheduled_date')
           .order('scheduled_start_time'),
         supabase
@@ -903,8 +948,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('reminder_date', 'is', null)
-          .gte('reminder_date', startDate.toISOString())
-          .lte('reminder_date', endDate.toISOString()),
+          .gte('reminder_date', rangeStart)
+          .lte('reminder_date', rangeEnd),
         supabase
           .from('leads')
           .select(`
@@ -919,8 +964,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('reminder_date', 'is', null)
-          .gte('reminder_date', startDate.toISOString())
-          .lte('reminder_date', endDate.toISOString()),
+          .gte('reminder_date', rangeStart)
+          .lte('reminder_date', rangeEnd),
         supabase
           .from('discussion_posts')
           .select(`
@@ -933,8 +978,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .not('reminder_date', 'is', null)
-          .gte('reminder_date', startDate.toISOString())
-          .lte('reminder_date', endDate.toISOString()),
+          .gte('reminder_date', rangeStart)
+          .lte('reminder_date', rangeEnd),
         supabase
           .from('scheduled_connection_occurrences')
           .select(`
@@ -957,8 +1002,8 @@ export function AppointmentsCalendar() {
             )
           `)
           .eq('status', 'pending')
-          .gte('occurrence_date', startDate.toISOString().split('T')[0])
-          .lte('occurrence_date', endDate.toISOString().split('T')[0])
+          .gte('occurrence_date', calendarDateKey(startDate))
+          .lte('occurrence_date', calendarDateKey(endDate))
       ]);
 
       if (appointmentsRes.error) throw appointmentsRes.error;
@@ -1008,9 +1053,9 @@ export function AppointmentsCalendar() {
         return {
           id: task.id,
           title: `Task: ${task.title}`,
-          appointment_date: reminderDate.toISOString().split('T')[0],
-          start_time: reminderDate.toTimeString().slice(0, 5),
-          end_time: reminderDate.toTimeString().slice(0, 5),
+          appointment_date: formatDateInTimezone(reminderDate.toISOString(),timezone),
+          start_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
+          end_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
           status: task.status,
           technician_id: task.assigned_to,
           customer_name: 'Reminder',
@@ -1026,9 +1071,9 @@ export function AppointmentsCalendar() {
         return {
           id: lead.id,
           title: `Lead: ${leadTitle}`,
-          appointment_date: reminderDate.toISOString().split('T')[0],
-          start_time: reminderDate.toTimeString().slice(0, 5),
-          end_time: reminderDate.toTimeString().slice(0, 5),
+          appointment_date: formatDateInTimezone(reminderDate.toISOString(),timezone),
+          start_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
+          end_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
           status: lead.status,
           technician_id: lead.assigned_to,
           customer_name: 'Reminder',
@@ -1044,9 +1089,9 @@ export function AppointmentsCalendar() {
         return {
           id: post.id,
           title: `Note: ${previewText}`,
-          appointment_date: reminderDate.toISOString().split('T')[0],
-          start_time: reminderDate.toTimeString().slice(0, 5),
-          end_time: reminderDate.toTimeString().slice(0, 5),
+          appointment_date: formatDateInTimezone(reminderDate.toISOString(),timezone),
+          start_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
+          end_time: formatTimeInTimezone(reminderDate.toISOString(),timezone),
           status: 'pending',
           technician_id: post.user_id,
           customer_name: 'Reminder',
@@ -1173,13 +1218,13 @@ export function AppointmentsCalendar() {
   }
 
   function getAppointmentsForDate(date: Date): Appointment[] {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = calendarDateKey(date);
     return appointments.filter(apt => apt.appointment_date === dateStr);
   }
 
   function openCreateModal(date?: Date, time?: string) {
     if (date) {
-      setSelectedDate(date.toISOString().split('T')[0]);
+      setSelectedDate(calendarDateKey(date));
     } else {
       setSelectedDate(null);
     }
@@ -1217,7 +1262,7 @@ export function AppointmentsCalendar() {
     setIsDragSelecting(false);
     setDragSelectStart(null);
     setDragSelectEnd(null);
-    setSelectedDate(currentDate.toISOString().split('T')[0]);
+    setSelectedDate(calendarDateKey(currentDate));
     setSelectedTime(startTime);
     setShowCreateModal(true);
     // Pass end time via selectedEndTime
@@ -1227,7 +1272,7 @@ export function AppointmentsCalendar() {
   async function handleDrop(targetDate: Date) {
     if (!draggedAppointment) return;
 
-    const newDateStr = targetDate.toISOString().split('T')[0];
+    const newDateStr = calendarDateKey(targetDate);
     if (newDateStr === draggedAppointment.appointment_date) {
       setDraggedAppointment(null);
       setDragOverDate(null);
@@ -1313,7 +1358,7 @@ export function AppointmentsCalendar() {
     const params = new URLSearchParams({
       view: calendarView,
       viewMode,
-      date: currentDate.toISOString(),
+      date: calendarDateKey(currentDate),
       calendarId: selectedCalendarId || '',
       popup: 'true'
     });
@@ -1422,7 +1467,7 @@ export function AppointmentsCalendar() {
       } else if (scope === 'this_and_future') {
         const apt = allAppointments.find(a => a.id === aptId);
         const parentId = apt?.recurrence_parent_id || aptId;
-        const cutoffDate = apt?.appointment_date || new Date().toISOString().split('T')[0];
+        const cutoffDate = apt?.appointment_date || formatDateInTimezone(new Date().toISOString(),await getOrganizationTimezone());
         await supabase
           .from('appointments')
           .delete()
@@ -1513,8 +1558,9 @@ export function AppointmentsCalendar() {
 
   return (
     <div className="space-y-6">
+      {loadError && <p role="alert" className="text-red-600 text-sm">{loadError}</p>}
       {/* Header: two rows */}
-      <div className="space-y-3">
+      <div className="space-y-3 bg-slate-800 rounded-xl p-3">
         {/* Row 1: title, date nav, and action controls */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -1541,7 +1587,7 @@ export function AppointmentsCalendar() {
                     <ChevronLeft className="w-4 h-4 text-white" />
                   </button>
                   <button
-                    onClick={() => setCurrentDate(new Date())}
+                    onClick={() => {void getOrganizationTimezone().then(tz=>setCurrentDate(new Date(formatDateInTimezone(new Date().toISOString(),tz)+'T12:00:00')));}}
                     className="px-3 py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-white/10 rounded-lg transition-colors"
                   >
                     Today
@@ -1653,7 +1699,7 @@ export function AppointmentsCalendar() {
         </div>
 
         {/* Row 2: Calendar Tab Rail */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+        {!personalOnly && <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           <CalendarTab
             label="My Calendar"
             icon={<User className="w-3.5 h-3.5" />}
@@ -1687,7 +1733,7 @@ export function AppointmentsCalendar() {
               savingDefault={savingDefault}
             />
           ))}
-        </div>
+        </div>}
       </div>
 
       {/* Technician Calendar Views */}
@@ -1917,7 +1963,7 @@ export function AppointmentsCalendar() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold text-gray-900">{apt.title}</h4>
+                                  <h4 className="font-semibold text-gray-900">{apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}</h4>
                                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                                     apt.status === 'completed'
                                       ? 'bg-green-100 text-green-700'
@@ -1974,11 +2020,11 @@ export function AppointmentsCalendar() {
                   className={`min-h-28 p-2 border-b border-r border-gray-200 transition-colors ${
                     !isCurrentMonth ? 'bg-gray-50' : ''
                   } ${isToday ? 'bg-blue-50' : ''} ${
-                    dragOverDate === date.toISOString().split('T')[0] ? 'bg-green-100 ring-2 ring-green-400' : ''
+                    dragOverDate === calendarDateKey(date) ? 'bg-green-100 ring-2 ring-green-400' : ''
                   }`}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    setDragOverDate(date.toISOString().split('T')[0]);
+                    setDragOverDate(calendarDateKey(date));
                   }}
                   onDragLeave={() => setDragOverDate(null)}
                   onDrop={(e) => {
@@ -2031,7 +2077,7 @@ export function AppointmentsCalendar() {
                       >
                         <span className="flex items-center gap-0.5 truncate">
                           {isRecurring(apt) && <Repeat className="w-2.5 h-2.5 flex-shrink-0 opacity-70" />}
-                          {apt.start_time.slice(0, 5)} {apt.title}
+                          {apt.start_time.slice(0, 5)} {apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}
                         </span>
                       </div>
                     ))}
@@ -2076,10 +2122,10 @@ export function AppointmentsCalendar() {
                   key={index}
                   className={`min-h-96 p-3 border-r border-gray-200 last:border-r-0 cursor-pointer hover:bg-gray-50 ${
                     isToday ? 'bg-blue-50/30' : ''
-                  } ${dragOverDate === date.toISOString().split('T')[0] ? 'bg-green-100 ring-2 ring-green-400' : ''}`}
+                  } ${dragOverDate === calendarDateKey(date) ? 'bg-green-100 ring-2 ring-green-400' : ''}`}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    setDragOverDate(date.toISOString().split('T')[0]);
+                    setDragOverDate(calendarDateKey(date));
                   }}
                   onDragLeave={() => setDragOverDate(null)}
                   onDrop={(e) => {
@@ -2144,7 +2190,7 @@ export function AppointmentsCalendar() {
                           )}
                           <span>{apt.start_time.slice(0, 5)}</span>
                         </div>
-                        <div className="truncate">{apt.title}</div>
+                        <div className="truncate">{apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}</div>
                         {apt.customer_name && (
                           <div className="text-gray-600 truncate">{apt.customer_name}</div>
                         )}
@@ -2313,7 +2359,7 @@ export function AppointmentsCalendar() {
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                                       <h3 className="font-semibold text-gray-900 text-sm md:text-base">
-                                        {apt.title}
+                                        {apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}
                                       </h3>
                                       {apt.appointment_type === 'personal' && !apt.is_blocked && (
                                         <User className="w-4 h-4 text-indigo-600 flex-shrink-0" />
@@ -2626,7 +2672,7 @@ export function AppointmentsCalendar() {
                                 </span>
                                 <span className="text-xs text-gray-400">•</span>
                                 <h4 className="text-sm font-medium text-gray-900 truncate">
-                                  {apt.title}
+                                  {apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}
                                 </h4>
                               </div>
 
@@ -2664,7 +2710,7 @@ export function AppointmentsCalendar() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setCurrentDate(new Date(apt.appointment_date));
+                                        setCurrentDate(new Date(apt.appointment_date+'T12:00:00'));
                                         setViewMode('day');
                                       }}
                                       className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"

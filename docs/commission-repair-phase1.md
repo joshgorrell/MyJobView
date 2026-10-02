@@ -31,7 +31,8 @@ The report displays earnings and approval state; it is not a payroll payout inst
 - `npm run test:commissions`: executable PGlite SQL migration/regression tests use the audited schema's real financial table definitions and check invoice/payment triggers, assigned rep attribution, proposal deposits, standalone/project-linked service, department pool, fees and refunds, moved/deleted payments, overpayment/zero-total handling, rate locking, invoice updates, installment rounding, paid-balance preservation, missing eligibility, profit holds, source/tenant isolation, RLS and RPC permissions.
 - The same test command checks payroll-period boundaries and report runtime behavior, including server-rounded earnings, receipt deduplication, visible errors and historical/adjustment warnings.
 - Production frontend build passes. Focused lint on rewritten/new components passes.
-- Repository-wide typecheck was compared with `origin/main` (`f362e14`): main has 1,568 diagnostics; the checked branch had 1,539, with no new diagnostic messages. The repository still needs unrelated type cleanup.
+- Before integrating the concurrent employee-time merge, repository-wide typecheck was compared with the audited base (`f362e14`): the base has 1,568 diagnostics; the commission branch had 1,539, with no new diagnostic messages. The repository still needs unrelated type cleanup.
+- The concurrent employee-time change from `main` was integrated, preserving both test scripts; commission regression tests and the production build were rerun on the combined source.
 - No production migration or production payment mutation was performed.
 
 ## Before merge/deployment

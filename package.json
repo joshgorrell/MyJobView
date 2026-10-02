@@ -19,7 +19,9 @@
     "test:program-access": "node tests/program-access/database.mjs",
     "test:user-setup": "node tests/user-setup/database.mjs && node tests/user-setup/runtime.mjs && node tests/user-setup/payroll.mjs",
     "test:user-setup:browser": "npm run build && node tests/user-setup/browser.mjs",
-    "test:commissions": "node tests/commissions/database.mjs && node tests/commissions/periods.mjs && node tests/commissions/report-runtime.mjs"
+    "test:commissions": "node tests/commissions/database.mjs && node tests/commissions/periods.mjs && node tests/commissions/report-runtime.mjs",
+    "test:employee-time:browser": "node tests/employee-time/browser.mjs",
+    "test:employee-time": "node tests/employee-time/database.mjs && node tests/employee-time/integration.mjs && node tests/employee-time/runtime.mjs && node tests/employee-time/sync.mjs && node tests/employee-time/gps.mjs && node tests/employee-time/notifications.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

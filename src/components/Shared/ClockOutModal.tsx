@@ -1,20 +1,21 @@
+import { saveClockEventGps } from '../../lib/clockEventGps';
+import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
 import { X, Upload, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 import { offlineSupabaseUpdate } from '../../lib/offlineSupport';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 
 interface ClockOutModalProps {
   type: 'daily' | 'job';
   entryId: string;
   technicianId: string;
   workOrderId?: string;
+  allowCompletion?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClose, onSuccess }: ClockOutModalProps) {
+export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowCompletion=true, onClose, onSuccess }: ClockOutModalProps) {
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
@@ -91,6 +92,8 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
         clock_out: new Date().toISOString(),
       };
 
+      if (type === 'job') updateData.status = 'submitted';
+
       if (notes.trim()) {
         updateData.notes = notes.trim();
       }
@@ -101,7 +104,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       }
 
       // Mark job as complete if selected
-      if (type === 'job' && jobStatus === 'complete') {
+      if (type === 'job' && allowCompletion && jobStatus === 'complete') {
         updateData.marked_complete = true;
       }
 
@@ -112,14 +115,16 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       );
 
       if (updateError) throw updateError;
+      void saveClockEventGps(entryId, type === 'daily' ? 'daily_clock_entries' : 'time_entries', true)
+        .catch(error => console.error('Clock-out GPS could not be saved:', error));
 
       // 1.5. Update work order status to completed if marked complete
-      if (type === 'job' && workOrderId && jobStatus === 'complete') {
+      if (type === 'job' && workOrderId && allowCompletion && jobStatus === 'complete') {
         const { error: woError } = await supabase
           .from('work_orders')
           .update({
             status: 'completed',
-            actual_completion_date: new Date().toISOString().split('T')[0],
+            actual_completion_date: formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone()),
           })
           .eq('id', workOrderId);
 
@@ -169,7 +174,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       }
 
       // 3. Send feedback email if requested (only if online and job is marked complete)
-      if (type === 'job' && workOrderId && jobStatus === 'complete' && sendFeedbackEmail && navigator.onLine) {
+      if (type === 'job' && workOrderId && allowCompletion && jobStatus === 'complete' && sendFeedbackEmail && navigator.onLine) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
@@ -204,57 +209,6 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           // Don't throw - clock out should still succeed even if email fails
         }
       }
-
-      // Stop GPS tracking when clocking out
-      // This stops tracking for both daily clock and job clock outs
-      gpsTrackingService.stopTracking();
-
-      // Capture GPS location silently in background (non-blocking) for all clock-outs
-      gpsTrackingService.captureLocationForClockEvent(true).then(async (gpsResult) => {
-        try {
-          // Calculate GPS quality score
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy,
-            p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms,
-            p_refined: false,
-            p_original_accuracy: null
-          });
-
-          const qualityScore = scoreData || 0;
-
-          const gpsData = {
-            clock_out_latitude: gpsResult.latitude,
-            clock_out_longitude: gpsResult.longitude,
-            clock_out_gps_accuracy: gpsResult.accuracy,
-            clock_out_gps_capture_method: gpsResult.method,
-            clock_out_gps_duration_ms: gpsResult.duration_ms,
-            clock_out_gps_attempted_at: gpsResult.attempted_at,
-            clock_out_gps_captured_at: gpsResult.captured_at,
-            clock_out_gps_quality_score: qualityScore,
-          };
-
-          const clockTable = type === 'daily' ? 'daily_clock_entries' as const : 'time_entries' as const;
-
-          await supabase
-            .from(clockTable)
-            .update(gpsData)
-            .eq('id', entryId);
-
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, true, clockTable).catch(() => {});
-          }
-
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, true, clockTable);
-          }
-        } catch (error) {
-          // Silently fail - GPS metadata is not critical
-          console.error('GPS metadata update failed:', error);
-        }
-      }).catch(() => {
-        // Silently fail - GPS capture is best-effort only
-      });
 
       // Show offline notification if applicable
       if (!navigator.onLine) {
@@ -298,7 +252,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              Clock Out {type === 'daily' ? '- End of Day' : '- Complete Job'}
+              {type==='daily'?'Clock Out - End of Day':allowCompletion?'Clock Out - Complete Job':'Stop Job Time'}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               {type === 'daily' ? 'Add notes to earn points!' : 'Add notes and photos to earn points!'}
@@ -344,7 +298,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           </div>
 
           {/* Job Status Selection - Only for job clock out */}
-          {type === 'job' && workOrderId && (
+          {type === 'job' && workOrderId && allowCompletion && (
             <div className="border-2 border-gray-200 rounded-lg p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-3">
@@ -466,7 +420,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           </div>
 
           {/* Photos Section - Only for job clock out */}
-          {type === 'job' && workOrderId && (
+          {type === 'job' && workOrderId && allowCompletion && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Job Photos (Optional - 1 point per photo with description)

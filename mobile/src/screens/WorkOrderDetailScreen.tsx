@@ -1,50 +1,20 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import React,{useState} from 'react';
+import {View,Text,TouchableOpacity,Alert} from 'react-native';
+import {useAuth} from '../contexts/AuthContext';
+import {openMJV} from '../services/OpenMJV';
 
-export default function WorkOrderDetailScreen({ route }: any) {
-  const { workOrderId } = route.params;
-
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Work Order Details</Text>
-        <Text style={styles.text}>Work Order ID: {workOrderId}</Text>
-        <Text style={styles.infoText}>
-          Detailed view coming soon. This will include full work order information,
-          customer details, tasks, parts needed, and completion status.
-        </Text>
-      </View>
-    </ScrollView>
-  );
+export default function WorkOrderDetailScreen({route}:any) {
+  const {profile}=useAuth();const [opening,setOpening]=useState(false);
+  async function open() {
+    if(!profile || opening) return;
+    setOpening(true);
+    try {await openMJV(profile.id,{tab:'work_orders',workOrderId:route.params.workOrderId});}
+    catch(error:any){Alert.alert('Unable to open Work Order',error.message);}
+    finally{setOpening(false);}
+  }
+  return <View style={{flex:1,padding:20,backgroundColor:'#f3f4f6'}}>
+    <Text style={{fontSize:22,fontWeight:'bold',color:'#111827'}}>Work Order</Text>
+    <Text style={{marginVertical:16,color:'#374151'}}>Open the MJV Work Order for job time, parts, notes, photos and completion. Sign in to MJV in your browser if prompted.</Text>
+    <TouchableOpacity disabled={opening} onPress={open} style={{padding:14,backgroundColor:'#2563eb',borderRadius:10}}><Text style={{color:'white',textAlign:'center'}}>{opening?'Opening…':'Open Work Order'}</Text></TouchableOpacity>
+  </View>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-  },
-  content: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  text: {
-    fontSize: 16,
-    color: '#374151',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-  },
-});
