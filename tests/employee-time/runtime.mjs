@@ -118,7 +118,7 @@ const timerNav={onLine:true};
 const timer=harness('src/components/Production/WorkOrderTimeControl.tsx',{
  '../../lib/offlineStorage':{offlineStorage:timerStorage},'../../lib/syncManager':{syncManager:{addListener:fn=>{timerRefresh=fn;return()=>{};}}},
  '../../lib/supabase':{supabase:{from:()=>timerQuery,channel:()=>({on(){return this;},subscribe(){return {unsubscribe:async()=>{}};}})}},
- '../../contexts/AuthContext':auth,'../Shared/ClockOutModal':{ClockOutModal:'ClockOutModal'},'../../lib/gpsTracking':{gpsTrackingService:{}},'../../lib/reverseGeocode':{},
+ '../../contexts/AuthContext':auth,'../Shared/ClockOutModal':{ClockOutModal:'ClockOutModal'},'../../lib/gpsTracking':{gpsTrackingService:{}},'../../lib/reverseGeocode':{},'../../lib/clockEventGps':{saveClockEventGps:async()=>{}},
 },{navigator:timerNav,window:timerWindow,setInterval:()=>1,clearInterval(){}});
 const timerProps={workOrderId:'wo-1',assignedTo:'tech',onChanged(){}};
 timer.render('WorkOrderTimeControl',timerProps);timer.effects.splice(0).forEach(fn=>fn());for(let i=0;i<40;i++)await Promise.resolve();
