@@ -70,47 +70,8 @@ class LocationTrackingService {
     });
   }
 
-  async startTracking(technicianId: string, clockEntryId: string) {
-    if (this.isTracking) {
-      console.log('Already tracking');
-      return;
-    }
-
-    this.currentTechnicianId = technicianId;
-    this.currentClockEntryId = clockEntryId;
-    this.isTracking = true;
-
-    const config = this.getTrackingConfig();
-
-    try {
-      // Start background location updates
-      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-        accuracy: config.accuracy,
-        timeInterval: config.timeInterval,
-        distanceInterval: config.distanceInterval,
-        foregroundService: Platform.OS === 'android' ? {
-          notificationTitle: 'Field Ops Pro - Tracking Active',
-          notificationBody: 'Recording your location for work hours tracking',
-          notificationColor: '#2563eb',
-        } : undefined,
-        pausesUpdatesAutomatically: false,
-        showsBackgroundLocationIndicator: true,
-        deferredUpdatesInterval: 30000, // Batch updates every 30 seconds
-        deferredUpdatesDistance: 50, // Or every 50 meters
-      });
-
-      // Capture initial location with high accuracy
-      const initialLocation = await this.captureHighAccuracyLocation();
-      if (initialLocation) {
-        await this.saveLocationBreadcrumb(initialLocation, 'initial_clock_in');
-      }
-
-      console.log('Location tracking started successfully');
-    } catch (error) {
-      console.error('Failed to start location tracking:', error);
-      this.isTracking = false;
-      throw error;
-    }
+  async startTracking(_technicianId: string, _clockEntryId: string) {
+    // Retired: capture locations only for explicit clock actions.
   }
 
   async stopTracking() {
@@ -146,6 +107,11 @@ class LocationTrackingService {
   async captureHighAccuracyLocation(): Promise<Location.LocationObject | null> {
     const startTime = Date.now();
     try {
+      let permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== 'granted' && permission.canAskAgain) {
+        permission = await Location.requestForegroundPermissionsAsync();
+      }
+      if (permission.status !== 'granted') return null;
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.BestForNavigation,
         maximumAge: 1000,
