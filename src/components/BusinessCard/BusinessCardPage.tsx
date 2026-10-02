@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Mail, Phone, Linkedin, Globe, Send, User, Building2, Check, MapPin, Edit3, Download, QrCode, X } from 'lucide-react';
+import { Mail, Phone, Linkedin, Globe, Send, User, Building2, Check, MapPin, Edit3, Download, QrCode, X, Copy, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { BusinessCard, CompanySettings, CompanyOffice } from '../../lib/types';
 import { UserBusinessCardEditor } from './UserBusinessCardEditor';
+import { getBusinessCardUrl } from '../../lib/businessCardLinks';
 
 interface BusinessCardPageProps {
   slug: string;
@@ -25,6 +26,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loadingQR, setLoadingQR] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (slug === 'temp' && isOwnCard) {
@@ -59,6 +61,8 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   }
 
   async function loadCompanyInfo() {
+    if (!profile?.organization_id) return;
+
     try {
       const [settingsResult, officesResult] = await Promise.all([
         supabase.from('company_settings').select('*').eq('organization_id', profile?.organization_id).maybeSingle(),
@@ -118,6 +122,8 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   async function generateQRCode() {
     if (!card) return;
 
+    const cardUrl = getBusinessCardUrl(card.slug, getSubdomainFromCurrentHost());
+
     setLoadingQR(true);
 
     try {
@@ -130,6 +136,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            url: cardUrl,
             fullName: card.full_name,
             title: card.title,
             email: card.email,
@@ -206,6 +213,31 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
     } finally {
       setSending(false);
     }
+  }
+
+  function getSubdomainFromCurrentHost(): string | null {
+    const host = window.location.hostname.toLowerCase();
+    const match = host.match(/^([a-z0-9-]+)\.myjobview\.com$/);
+    return match ? match[1] : null;
+  }
+
+  function getCardUrl(): string {
+    return getBusinessCardUrl(card?.slug || slug, getSubdomainFromCurrentHost());
+  }
+
+  async function copyCardLink() {
+    await navigator.clipboard.writeText(getCardUrl());
+    setShareMessage('Link copied');
+    window.setTimeout(() => setShareMessage(null), 2500);
+  }
+
+  async function shareCardLink() {
+    const url = getCardUrl();
+    if (navigator.share) {
+      await navigator.share({ title: card?.full_name || 'Digital business card', url });
+      return;
+    }
+    await copyCardLink();
   }
 
   if (loading) {
@@ -435,10 +467,22 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
                 </button>
               </div>
             )}
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <button onClick={copyCardLink} className="flex items-center justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg hover:bg-white/15 transition-all font-medium">
+                <Copy className="w-4 h-4" />
+                {shareMessage || 'Copy Link'}
+              </button>
+              <button onClick={shareCardLink} className="flex items-center justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg hover:bg-white/15 transition-all font-medium">
+                <Share2 className="w-4 h-4" />
+                Share
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-8">
+        {profile && (
+          <div className="mt-8 bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-8">
           <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Share This Card</h2>
           <p className="text-gray-400 mb-6">
             Send this digital business card directly to a contact's phone via SMS
@@ -502,7 +546,8 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
               </button>
             </form>
           )}
-        </div>
+          </div>
+        )}
 
         {isOwnCard && (
           <div className="mt-4 text-center">
@@ -521,7 +566,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-6 sm:p-8 max-w-md w-full">
             <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h3 className="text-lg sm:text-xl font-bold text-white">Scan to Save Contact</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white">Scan to Open Card</h3>
               <button
                 onClick={() => setShowQRModal(false)}
                 className="text-gray-400 hover:text-white transition-colors"
@@ -533,7 +578,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
               <img src={qrCode} alt="QR Code" className="w-full h-auto" />
             </div>
             <p className="text-gray-400 text-xs sm:text-sm text-center mb-4">
-              Scan this QR code with your phone camera to save the contact information
+              Scan this QR code with your phone camera to open this business card
             </p>
             <button
               onClick={() => {
@@ -544,7 +589,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
                 link.click();
                 document.body.removeChild(link);
               }}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <Download className="w-4 h-4" />
               Download QR Code

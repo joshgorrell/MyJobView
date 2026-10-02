@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, Upload, X, Save, Eye, ExternalLink } from 'lucide-react';
+import { CreditCard, Upload, X, Save, Eye, ExternalLink, Copy, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BusinessCard } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
+import { getBusinessCardUrl } from '../../lib/businessCardLinks';
 
 export function UserBusinessCardEditor() {
   const { user, profile, setProfileAvatar } = useAuth();
@@ -13,6 +14,8 @@ export function UserBusinessCardEditor() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [subdomain, setSubdomain] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState('');
   const [title, setTitle] = useState('');
@@ -24,7 +27,39 @@ export function UserBusinessCardEditor() {
 
   useEffect(() => {
     loadCard();
+    loadOrganizationSubdomain();
   }, [user]);
+
+  async function loadOrganizationSubdomain() {
+    if (!profile?.organization_id) return;
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('subdomain')
+      .eq('id', profile.organization_id)
+      .maybeSingle();
+
+    if (!error) setSubdomain(data?.subdomain || null);
+  }
+
+  function getCardUrl(): string {
+    return getBusinessCardUrl(card?.slug || '', subdomain);
+  }
+
+  async function copyCardLink() {
+    await navigator.clipboard.writeText(getCardUrl());
+    setShareMessage('Link copied');
+    window.setTimeout(() => setShareMessage(null), 2500);
+  }
+
+  async function shareCardLink() {
+    const url = getCardUrl();
+    if (navigator.share) {
+      await navigator.share({ title: card?.full_name || 'Digital business card', url });
+      return;
+    }
+    await copyCardLink();
+  }
 
   async function loadCard() {
     if (!user) return;
@@ -152,7 +187,7 @@ export function UserBusinessCardEditor() {
           .from('business_cards')
           .insert({
             ...cardData,
-            slug: `${fullName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+            slug: `${(profile?.username || fullName.split(/\s+/).map(name => name[0]).join('')).toLowerCase().replace(/[^a-z0-9-]/g, '') || 'card'}`, 
             is_active: true
           });
 
@@ -187,11 +222,11 @@ export function UserBusinessCardEditor() {
           <div className="flex-1">
             <p className="text-sm font-medium text-cyan-400 mb-1">Your card is live!</p>
             <p className="text-xs sm:text-sm text-muted break-all">
-              Share: {window.location.origin}/card/{card.slug}
+              Share: {getCardUrl()}
             </p>
           </div>
           <a
-            href={`/card/${card.slug}`}
+            href={getCardUrl()}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm whitespace-nowrap"
@@ -200,6 +235,22 @@ export function UserBusinessCardEditor() {
             Preview
             <ExternalLink className="w-3 h-3" />
           </a>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              onClick={copyCardLink}
+              className="flex items-center justify-center gap-1 px-3 py-1.5 border border-cyan-500/40 text-cyan-300 rounded-lg hover:bg-cyan-500/10 text-sm whitespace-nowrap"
+            >
+              <Copy className="w-4 h-4" />
+              {shareMessage || 'Copy Link'}
+            </button>
+            <button
+              onClick={shareCardLink}
+              className="flex items-center justify-center gap-1 px-3 py-1.5 border border-cyan-500/40 text-cyan-300 rounded-lg hover:bg-cyan-500/10 text-sm whitespace-nowrap"
+            >
+              <Share2 className="w-4 h-4" />
+              Share
+            </button>
+          </div>
         </div>
       )}
 

@@ -24,6 +24,7 @@ import { useNotificationCount } from './hooks/useNotificationCount';
 import { supabase } from './lib/supabase';
 import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
+import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
@@ -628,17 +629,16 @@ function AppContent() {
     return null;
   }
 
-  // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
-
-  const cardMatch = currentPath.match(/^\/card\/(.+)$/);
-  if (cardMatch) {
-    if (!user || !profile) return <LoginForm />;
+  const publicCardSlug = getBusinessCardSlugFromLocation(currentPath, window.location.hostname);
+  if (publicCardSlug) {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <BusinessCardPage slug={cardMatch[1]} isOwnCard={false} />
+        <BusinessCardPage slug={publicCardSlug} isOwnCard={false} />
       </Suspense>
     );
   }
+
+  // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
 
   if (currentPath === '/calendar') {
     if (!user || !profile) return <LoginForm />;
