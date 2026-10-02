@@ -18,7 +18,9 @@
     "test:vip-plans": "node tests/vip-plans/flow.mjs",
     "test:program-access": "node tests/program-access/database.mjs",
     "test:user-setup": "node tests/user-setup/database.mjs && node tests/user-setup/runtime.mjs && node tests/user-setup/payroll.mjs",
-    "test:user-setup:browser": "npm run build && node tests/user-setup/browser.mjs"
+    "test:user-setup:browser": "npm run build && node tests/user-setup/browser.mjs",
+    "test:employee-time:browser": "node tests/employee-time/browser.mjs",
+    "test:employee-time": "node tests/employee-time/database.mjs && node tests/employee-time/runtime.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
