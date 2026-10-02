@@ -6,7 +6,6 @@ import { Clock, Play, Square } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { ClockOutModal } from '../Shared/ClockOutModal';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 
 /** The normal technician timer is part of the existing Work Order, never a second WO layout. */
 export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrderId:string;assignedTo:string|null;onChanged:()=>void}) {
@@ -56,7 +55,6 @@ export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrd
       const {data,error}=await supabase.rpc('start_work_order_time',{p_work_order_id:workOrderId});
       if(error) throw error;
       void saveClockEventGps(data, 'time_entries').catch(error => console.error('Job clock-in GPS could not be saved:', error));
-      await gpsTrackingService.startTracking(profile.id,undefined,workOrderId).catch(()=>{});
       // Payroll time is saved first. GPS evidence can refine in the background.
       await load();onChanged();
     } catch(error:any){setError(error.message||'Unable to start job time.');}
