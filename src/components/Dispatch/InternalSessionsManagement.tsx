@@ -126,175 +126,25 @@ export function InternalSessionsManagement() {
     });
   }, [sessions, typeFilter, statusFilter, dateFilter, organizationTimezone]);
 
-  async function completeWithPredetermined(session: InternalSession) {
-    if (!session.predetermined_hours) return;
+  async function reviewSession(session: InternalSession,action: 'approve'|'deny'|'complete'|'approve_time',notes?:string) {
     setApprovingId(session.id);
     try {
-      const clockIn = new Date(`${session.session_date}T${session.start_time || '08:00'}:00`).toISOString();
-      const clockOutDate = new Date(clockIn);
-      clockOutDate.setTime(clockOutDate.getTime() + session.predetermined_hours * 3600 * 1000);
-
-      const { data: companyData } = await supabase
-        .from('company_settings')
-        .select('id')
-        .maybeSingle();
-
-      const { error: entryError } = await supabase.from('time_entries').insert({
-        company_id: companyData?.id,
-        technician_id: session.assigned_to,
-        entry_date: session.session_date,
-        clock_in: clockIn,
-        clock_out: clockOutDate.toISOString(),
-        total_hours: session.predetermined_hours,
-        break_minutes: 0,
-        status: 'submitted',
-        entry_type: session.session_type,
-        internal_session_id: session.id,
-        notes: session.description || null,
-      });
-
-      if (entryError) throw entryError;
-
-      const { error: sessionError } = await supabase
-        .from('internal_time_sessions')
-        .update({ status: 'completed' })
-        .eq('id', session.id);
-
-      if (sessionError) throw sessionError;
-
-      loadSessions();
-    } catch (err: any) {
-      console.error('Error completing session:', err);
-      alert(err.message || 'Failed to complete session');
-    } finally {
-      setApprovingId(null);
-    }
-  }
-
-  async function approveTimeEntry(session: InternalSession) {
-    const entry = session.time_entries?.[0];
-    if (!entry) return;
-    setApprovingId(session.id);
-    try {
-      const { error } = await supabase
-        .from('time_entries')
-        .update({
-          status: 'approved',
-          approved_by: profile?.id,
-          approved_at: new Date().toISOString(),
-        })
-        .eq('id', entry.id);
-
-      if (error) throw error;
-
-      await supabase
-        .from('internal_time_sessions')
-        .update({ approved_by: profile?.id, approved_at: new Date().toISOString() })
-        .eq('id', session.id);
-
-      loadSessions();
-    } catch (err: any) {
-      console.error('Error approving entry:', err);
-      alert(err.message || 'Failed to approve');
-    } finally {
-      setApprovingId(null);
-    }
-  }
-
-  async function approveRequest(session: InternalSession) {
-    setApprovingId(session.id);
-    try {
-      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
-      const isToday = session.session_date === today;
-
-      const newStatus = (isToday && !session.predetermined_hours) ? 'scheduled' : 'scheduled';
-
-      const { error } = await supabase
-        .from('internal_time_sessions')
-        .update({
-          status: newStatus,
-          approved_by: profile?.id,
-          approved_at: new Date().toISOString(),
-        })
-        .eq('id', session.id);
-
-      if (error) throw error;
-
-      // Fire-and-forget: email the tech about the approval
-      supabase.functions.invoke('send-time-request-notification', {
-        body: { sessionId: session.id, direction: 'to_tech' },
-      }).catch(() => {/* non-critical */});
-
-      if (session.predetermined_hours && isToday) {
-        const clockIn = new Date();
-        const clockOut = new Date(clockIn.getTime() + session.predetermined_hours * 3600 * 1000);
-
-        const { data: companyData } = await supabase
-          .from('company_settings')
-          .select('id')
-          .maybeSingle();
-
-        await supabase.from('time_entries').insert({
-          company_id: companyData?.id,
-          technician_id: session.assigned_to,
-          entry_date: today,
-          clock_in: clockIn.toISOString(),
-          clock_out: clockOut.toISOString(),
-          total_hours: session.predetermined_hours,
-          break_minutes: 0,
-          status: 'submitted',
-          entry_type: session.session_type,
-          internal_session_id: session.id,
-          notes: session.request_reason || null,
-        });
-
-        await supabase
-          .from('internal_time_sessions')
-          .update({ status: 'completed' })
-          .eq('id', session.id);
+      const {error}=await supabase.rpc('review_internal_time',{p_session_id:session.id,p_action:action,p_notes:notes||null});
+      if(error) throw error;
+      if(action==='approve'||action==='deny') {
+        void supabase.functions.invoke('send-time-request-notification',{body:{sessionId:session.id,direction:'to_tech'}}).catch(()=>{});
       }
-
-      loadSessions();
-    } catch (err: any) {
-      console.error('Error approving request:', err);
-      alert(err.message || 'Failed to approve request');
-    } finally {
-      setApprovingId(null);
-    }
+      await loadSessions();return true;
+    } catch(error:any) {alert(error.message||'Unable to review session');return false;}
+    finally {setApprovingId(null);}
   }
-
+  async function completeWithPredetermined(session: InternalSession) {await reviewSession(session,'complete');}
+  async function approveTimeEntry(session: InternalSession) {await reviewSession(session,'approve_time');}
+  async function approveRequest(session: InternalSession) {await reviewSession(session,'approve');}
   async function denyRequest(session: InternalSession) {
-    const reason = denyReasonInput[session.id]?.trim();
     setDenyingId(session.id);
-    try {
-      const { error } = await supabase
-        .from('internal_time_sessions')
-        .update({
-          status: 'denied',
-          denial_reason: reason || null,
-        })
-        .eq('id', session.id);
-
-      if (error) throw error;
-
-      // Fire-and-forget: email the tech about the denial
-      supabase.functions.invoke('send-time-request-notification', {
-        body: { sessionId: session.id, direction: 'to_tech' },
-      }).catch(() => {/* non-critical */});
-
-      setShowDenyFormFor(null);
-      setDenyReasonInput(prev => {
-        const next = { ...prev };
-        delete next[session.id];
-        return next;
-      });
-      loadSessions();
-    } catch (err: any) {
-      console.error('Error denying request:', err);
-      alert(err.message || 'Failed to deny request');
-    } finally {
-      setDenyingId(null);
-    }
+    const reviewed=await reviewSession(session,'deny',denyReasonInput[session.id]?.trim());
+    setDenyingId(null);if(reviewed) setShowDenyFormFor(null);
   }
 
   async function cancelSession(session: InternalSession) {
@@ -811,10 +661,10 @@ export function InternalSessionsManagement() {
                             {entry.status}
                           </span>
                           {entry.clock_in && (
-                            <span>In: {new Date(entry.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                            <span>In: {new Date(entry.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone:organizationTimezone })}</span>
                           )}
                           {entry.clock_out && (
-                            <span>Out: {new Date(entry.clock_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                            <span>Out: {new Date(entry.clock_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone:organizationTimezone })}</span>
                           )}
                         </div>
                         {entry.status === 'approved' && session.approver_profile && (
