@@ -458,21 +458,21 @@ WHERE profiles.id = p_user_id;
 v_is_admin := v_user_role IN ('admin', 'owner');
 
 RETURN QUERY
-SELECT 
+SELECT
 a.id,
 a.company_id,
 a.project_id,
-CASE 
+CASE
 WHEN a.is_private AND NOT (a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin)
 THEN NULL
 ELSE a.contact_id
 END as contact_id,
-CASE 
+CASE
 WHEN a.is_private AND NOT (a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin)
 THEN 'Busy'
 ELSE a.title
 END as title,
-CASE 
+CASE
 WHEN a.is_private AND NOT (a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin)
 THEN NULL
 ELSE a.description
@@ -481,17 +481,17 @@ a.appointment_date,
 a.start_time,
 a.end_time,
 a.status,
-CASE 
+CASE
 WHEN a.is_private AND NOT (a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin)
 THEN NULL
 ELSE a.assigned_technician
 END as assigned_technician,
-CASE 
+CASE
 WHEN a.is_private AND NOT (a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin)
 THEN NULL
 ELSE a.location
 END as location,
-CASE 
+CASE
 WHEN a.is_private AND NOT (a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin)
 THEN NULL
 ELSE a.notes
@@ -499,7 +499,7 @@ END as notes,
 a.created_by,
 a.created_at,
 a.updated_at,
-CASE 
+CASE
 WHEN a.is_private AND NOT (a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin)
 THEN 'personal'::text
 ELSE a.appointment_type
@@ -511,7 +511,7 @@ a.all_day,
 -- can_view_details: true if user can see full details
 (NOT a.is_private OR a.created_by = p_user_id OR a.assigned_technician = p_user_id OR v_is_admin) as can_view_details
 FROM appointments a
-WHERE 
+WHERE
 a.organization_id = get_user_org_id()
 AND (p_start_date IS NULL OR a.appointment_date >= p_start_date)
 AND (p_end_date IS NULL OR a.appointment_date <= p_end_date)
@@ -521,3 +521,213 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.get_appointments_with_privacy(uuid,uuid,date,date) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_appointments_with_privacy(uuid,uuid,date,date) TO authenticated;
+
+-- Notifications follow request authorization, not payroll approval, and never
+-- select another tenant's settings or recipients.
+CREATE OR REPLACE FUNCTION public.notify_approvers_of_time_request()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_ids uuid[];v_name text;v_label text;v_recipient uuid;
+BEGIN
+  IF NEW.status<>'pending_approval' THEN RETURN NEW; END IF;
+  SELECT time_request_approver_ids INTO v_ids FROM company_settings WHERE organization_id=NEW.organization_id LIMIT 1;
+  SELECT COALESCE(full_name,email,'A technician') INTO v_name FROM profiles WHERE id=NEW.assigned_to AND organization_id=NEW.organization_id;
+  v_label:=CASE NEW.session_type WHEN 'shop_time' THEN 'Shop Time' WHEN 'training' THEN 'Training Time' ELSE initcap(replace(NEW.session_type,'_',' ')) END;
+  FOR v_recipient IN SELECT id FROM profiles WHERE id=ANY(COALESCE(v_ids,ARRAY[]::uuid[]))
+    AND organization_id=NEW.organization_id AND is_active IS DISTINCT FROM false
+    AND role IN ('admin','manager','service_manager','office_manager','production_manager','sales_manager') LOOP
+    INSERT INTO notifications(user_id,organization_id,type,title,body,related_id,is_read)
+    VALUES(v_recipient,NEW.organization_id,'internal_time_request_submitted',v_name||' requested '||v_label,
+      v_label||' request for '||COALESCE(NEW.predetermined_hours,0)||' hour(s)'||CASE WHEN COALESCE(NEW.request_reason,'')<>'' THEN ': '||NEW.request_reason ELSE '' END,NEW.id,false);
+  END LOOP;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.notify_approvers_of_time_request() FROM PUBLIC,anon,authenticated;
+
+CREATE OR REPLACE FUNCTION public.notify_tech_of_time_request_outcome()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_name text;v_label text;v_approved boolean;
+BEGIN
+  IF OLD.status<>'pending_approval' OR NEW.status NOT IN ('scheduled','denied') THEN RETURN NEW; END IF;
+  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=NEW.assigned_to AND organization_id=NEW.organization_id) THEN RETURN NEW; END IF;
+  SELECT COALESCE(full_name,email,'A manager') INTO v_name FROM profiles WHERE id=COALESCE(NEW.approved_by,auth.uid()) AND organization_id=NEW.organization_id;
+  v_name:=COALESCE(v_name,'A manager');v_approved:=NEW.status='scheduled';
+  v_label:=CASE NEW.session_type WHEN 'shop_time' THEN 'Shop Time' WHEN 'training' THEN 'Training Time' ELSE initcap(replace(NEW.session_type,'_',' ')) END;
+  INSERT INTO notifications(user_id,organization_id,type,title,body,related_id,is_read)
+  VALUES(NEW.assigned_to,NEW.organization_id,CASE WHEN v_approved THEN 'internal_time_request_approved' ELSE 'internal_time_request_denied' END,
+    v_label||CASE WHEN v_approved THEN ' request approved' ELSE ' request declined' END,
+    v_name||CASE WHEN v_approved THEN ' approved your '||v_label||' request. The session is scheduled; record completed work before payroll review.'
+      ELSE ' declined your '||v_label||' request.'||CASE WHEN COALESCE(NEW.denial_reason,'')<>'' THEN ' Reason: '||NEW.denial_reason ELSE '' END END,NEW.id,false);
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.notify_tech_of_time_request_outcome() FROM PUBLIC,anon,authenticated;
+
+-- GPS may arrive after the clock timestamp. Evaluate the first coordinate update.
+CREATE OR REPLACE FUNCTION public.check_home_clock_and_notify()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+v_settings record;
+v_profile record;
+v_org_id uuid;
+v_timezone text;
+v_distance_in integer;
+v_distance_out integer;
+v_is_home_clock_in boolean := false;
+v_is_home_clock_out boolean := false;
+v_recipient record;
+BEGIN
+-- Get technician profile with home coordinates and org id
+SELECT
+id,
+full_name,
+home_latitude,
+home_longitude,
+home_address,
+organization_id
+INTO v_profile
+FROM profiles
+WHERE id = NEW.technician_id;
+
+v_org_id := v_profile.organization_id;
+SELECT COALESCE(timezone,'America/Chicago') INTO v_timezone FROM organizations WHERE id=v_org_id;
+
+-- Get company settings for this org
+SELECT
+home_clock_notification_enabled,
+home_location_radius_meters,
+home_clock_notification_roles
+INTO v_settings
+FROM company_settings
+WHERE organization_id = v_org_id
+LIMIT 1;
+
+-- Exit early if notifications are disabled
+IF NOT COALESCE(v_settings.home_clock_notification_enabled, false) THEN
+RETURN NEW;
+END IF;
+
+-- Check clock IN from home (only on INSERT or when clock_in changes)
+IF (TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND (OLD.clock_in IS DISTINCT FROM NEW.clock_in
+ OR OLD.clock_in_latitude IS DISTINCT FROM NEW.clock_in_latitude OR OLD.clock_in_longitude IS DISTINCT FROM NEW.clock_in_longitude)))
+AND NOT COALESCE(NEW.clocked_in_from_home,false)
+AND NEW.clock_in IS NOT NULL
+AND NEW.clock_in_latitude IS NOT NULL
+AND NEW.clock_in_longitude IS NOT NULL
+AND v_profile.home_latitude IS NOT NULL
+AND v_profile.home_longitude IS NOT NULL THEN
+
+v_distance_in := calculate_distance_meters(
+NEW.clock_in_latitude,
+NEW.clock_in_longitude,
+v_profile.home_latitude,
+v_profile.home_longitude
+);
+
+IF v_distance_in IS NOT NULL AND v_distance_in <= COALESCE(v_settings.home_location_radius_meters, 150) THEN
+v_is_home_clock_in := true;
+NEW.clocked_in_from_home := true;
+END IF;
+END IF;
+
+-- Check clock OUT from home (only when clock_out changes)
+IF TG_OP = 'UPDATE'
+AND (OLD.clock_out IS DISTINCT FROM NEW.clock_out OR OLD.clock_out_latitude IS DISTINCT FROM NEW.clock_out_latitude
+ OR OLD.clock_out_longitude IS DISTINCT FROM NEW.clock_out_longitude)
+AND NOT COALESCE(NEW.clocked_out_from_home,false)
+AND NEW.clock_out IS NOT NULL
+AND NEW.clock_out_latitude IS NOT NULL
+AND NEW.clock_out_longitude IS NOT NULL
+AND v_profile.home_latitude IS NOT NULL
+AND v_profile.home_longitude IS NOT NULL THEN
+
+v_distance_out := calculate_distance_meters(
+NEW.clock_out_latitude,
+NEW.clock_out_longitude,
+v_profile.home_latitude,
+v_profile.home_longitude
+);
+
+IF v_distance_out IS NOT NULL AND v_distance_out <= COALESCE(v_settings.home_location_radius_meters, 150) THEN
+v_is_home_clock_out := true;
+NEW.clocked_out_from_home := true;
+END IF;
+END IF;
+
+-- Send notifications for clock-in from home
+IF v_is_home_clock_in THEN
+FOR v_recipient IN
+SELECT id
+FROM profiles
+WHERE organization_id = v_org_id
+AND is_active IS DISTINCT FROM false
+AND role = ANY(COALESCE(
+v_settings.home_clock_notification_roles,
+ARRAY['admin', 'office_manager', 'production_manager', 'service_manager']
+))
+LOOP
+INSERT INTO notifications (
+user_id,
+type,
+title,
+body,
+related_id,
+organization_id
+) VALUES (
+v_recipient.id,
+'home_clock',
+'Clock In From Home',
+v_profile.full_name || ' clocked in from home at ' ||
+TO_CHAR(NEW.clock_in AT TIME ZONE COALESCE(v_timezone,'America/Chicago'), 'HH12:MI AM') ||
+CASE
+WHEN v_distance_in IS NOT NULL THEN ' (' || v_distance_in || 'm from home)'
+ELSE ''
+END,
+NEW.id,
+v_org_id
+);
+END LOOP;
+END IF;
+
+-- Send notifications for clock-out from home
+IF v_is_home_clock_out THEN
+FOR v_recipient IN
+SELECT id
+FROM profiles
+WHERE organization_id = v_org_id
+AND is_active IS DISTINCT FROM false
+AND role = ANY(COALESCE(
+v_settings.home_clock_notification_roles,
+ARRAY['admin', 'office_manager', 'production_manager', 'service_manager']
+))
+LOOP
+INSERT INTO notifications (
+user_id,
+type,
+title,
+body,
+related_id,
+organization_id
+) VALUES (
+v_recipient.id,
+'home_clock',
+'Clock Out From Home',
+v_profile.full_name || ' clocked out from home at ' ||
+TO_CHAR(NEW.clock_out AT TIME ZONE COALESCE(v_timezone,'America/Chicago'), 'HH12:MI AM') ||
+CASE
+WHEN v_distance_out IS NOT NULL THEN ' (' || v_distance_out || 'm from home)'
+ELSE ''
+END,
+NEW.id,
+v_org_id
+);
+END LOOP;
+END IF;
+
+RETURN NEW;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.check_home_clock_and_notify() FROM PUBLIC,anon,authenticated;
+DROP TRIGGER IF EXISTS trigger_check_home_clock ON public.daily_clock_entries;
