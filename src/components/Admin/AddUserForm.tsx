@@ -1492,13 +1492,24 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
               </button>
             )}
             {activeTab !== 'review' ? (
-              <button type="button" onClick={reviewAndContinue} className="px-4 py-2 bg-cyan-600 text-white rounded-lg">
+              <button
+                key="continue-setup"
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  reviewAndContinue();
+                }}
+                className="px-4 py-2 bg-cyan-600 text-white rounded-lg"
+              >
                 Review & Continue
               </button>
             ) : (
               <button
+                key="create-user"
                 type="submit"
-                disabled={loading || dataLoading || dataLoadFailed || reviewed.length !== setupSections.length || !!createdId}
+                disabled={
+                  loading || dataLoading || dataLoadFailed || reviewed.length !== setupSections.length || !!createdId
+                }
                 className="px-4 py-2 bg-cyan-600 text-white rounded-lg disabled:opacity-50"
               >
                 {loading ? 'Creating…' : 'Create User'}

@@ -26,15 +26,20 @@ Review metadata is stored separately in `user_setup_reviews`, accessible only to
 
 ## Deployment and checks
 
-Apply `20261001201849_user_setup_reviews.sql` before deploying the frontend. No edge-function deployment is required. Notification and additional create permission values are saved on the created profile before classification and final review completion. This PR does not modify payroll calculation rules or permission evaluation.
+Apply `20261001201849_user_setup_reviews.sql` and `20261002013350_fix_employee_config_nullable_record_checks.sql` before deploying the frontend. No edge-function deployment is required. Notification and additional create permission values are saved on the created profile before classification and final review completion.
 
-Automated coverage: review RLS/tenant isolation, inactive admin denial, allowed section keys, field validation, notification defaults, card content/password exclusion. DOM runtime checks exercised guided navigation, review-gated creation, single creation, all edit tabs and shared notification controls against stubbed services. Production build passes. Repository-wide TypeScript checking still reports existing errors elsewhere; the changed user-management components have no reported TypeScript errors.
+Verification found two defects and this PR fixes them:
 
-A full browser was unavailable in the execution environment (Chromium download failed), so the following visual and live integration checks remain:
+- React could reuse the last Continue button as the Create submit button during the same click, submitting before a deliberate creation action. Continue now prevents the default click action, and the two buttons have separate keys. The browser regression verifies zero create requests on reaching Review.
+- The existing payroll RPC checked a nullable composite record with `IS NOT NULL`. Because payroll configuration rows contain NULL fields, that check failed to close the previous configuration and the replacement insert violated the unique open-configuration constraint. The new migration checks the record ID explicitly. The regression reproduces the old unique-constraint failure, then verifies the fix, retained historical hours and future effective dates.
 
-- Review desktop and narrow/mobile tab navigation, spacing, readable colors and scrolling.
-- Print representative employees with many module overrides to Letter paper; confirm one page, readable text and no clipping. Test Save as PDF in Chrome/Edge.
-- Create employee and non-employee users in a test dealer. Confirm saved profile notification values, role/office assignments, department overrides and creation confirmation.
-- Edit an employee payroll configuration with a future effective date and verify historical/current payroll behavior. The existing effective-date RPC is retained.
-- Reopen saved users, verify setup health, invalidate a review by changing settings, and verify failures display an error rather than saving unloaded defaults.
-- Confirm administrator-scoped session drafts restore preferences/office assignments and require password re-entry.
+Automated checks pass:
+
+- `npm run test:user-setup`: review RLS and tenant isolation, inactive administrator denial, section validation, setup fields, notification defaults, password exclusion, real classification/payroll RPCs in an isolated PostgreSQL runtime, idempotent classification and future-dated configuration/history.
+- `npm run test:user-setup:browser`: Chromium runtime checks against fixture services: all tabs, required review, no premature creation, employee creation and notification payloads, future-dated employee edit payloads, printing, and iPhone-width navigation without horizontal overflow.
+- Production build passes. Repository-wide TypeScript checking still reports existing errors elsewhere; changed user-management components report no errors.
+- Desktop, mobile and print screenshots were inspected. The generated PDF is one Letter page; the print fixture includes five departments and forty modules, with bounds checks verifying all printed text stays on the page.
+
+The browser suite needs Playwright's Chromium (`npx playwright install chromium`), or an existing binary supplied with `CHROMIUM_EXECUTABLE_PATH`. `USER_SETUP_SCREENSHOT_DIR` optionally saves QA screenshots/PDFs. `USER_SETUP_PLAYWRIGHT_MODULE` is an optional module-location override for managed environments. Fixtures use fictional employee data and no live credentials, accounts or payroll records.
+
+After deployment, check employee/non-employee creation and print/PDF output with actual company configuration. Automated regression coverage exercises the existing database functions and frontend payloads separately without mutating live employee data.

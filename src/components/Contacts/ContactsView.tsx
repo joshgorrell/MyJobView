@@ -634,10 +634,10 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <th className="px-3 py-2 w-8"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-subtle">
                   {personContacts.length > 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-1 bg-surface border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-surface/70 border-b border-subtle">
                         <div className="flex items-center gap-1.5">
                           <Users className="w-3 h-3 text-muted" />
                           <span className="text-xs font-semibold text-muted uppercase tracking-wider">People</span>
@@ -650,43 +650,18 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <tr
                       key={contact.id}
                       onClick={() => selectContact(contact)}
-                      className="hover:bg-surface cursor-pointer transition-colors"
+                      className="hover:bg-elevated/60 cursor-pointer transition-colors"
                     >
                       {visibleColumns.name && (
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact)}>
                                 {getDisplayName(contact)}
                               </span>
                               {contact.company_name && (
                                 <span className="text-xs text-muted truncate hidden xl:inline max-w-[120px]" title={contact.company_name}>{contact.company_name}</span>
                               )}
-                              {(() => {
-                                const contactType = getContactType(contact);
-                                if (contactType === 'lead') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Sparkles className="w-2.5 h-2.5" />
-                                      Lead
-                                    </span>
-                                  );
-                                } else if (contactType === 'prospect') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Target className="w-2.5 h-2.5" />
-                                      Prospect
-                                    </span>
-                                  );
-                                } else {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full whitespace-nowrap">
-                                      <UserCheck className="w-2.5 h-2.5" />
-                                      Customer
-                                    </span>
-                                  );
-                                }
-                              })()}
                               {(() => {
                                 const contactType = getContactType(contact);
                                 const temperature = contact.temperature;
@@ -718,7 +693,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       {visibleColumns.phone && (
                         <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {contact.phone ? (
-                            <a href={`tel:${contact.phone}`} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">{contact.phone}</a>
+                            <a href={`tel:${contact.phone}`} className="text-xs text-secondary hover:text-primary hover:underline transition-colors">{contact.phone}</a>
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>
                           )}
@@ -727,7 +702,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       {visibleColumns.email && (
                         <td className="px-3 py-1.5 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
                           {contact.email ? (
-                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[160px] block">{contact.email}</a>
+                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-secondary hover:text-primary hover:underline truncate max-w-[180px] block transition-colors">{contact.email}</a>
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>
                           )}
@@ -782,7 +757,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                   ))}
                   {businessContacts.length > 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-1 bg-surface border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-surface/70 border-b border-subtle">
                         <div className="flex items-center gap-1.5">
                           <Building2 className="w-3 h-3 text-muted" />
                           <span className="text-xs font-semibold text-muted uppercase tracking-wider">Businesses</span>
@@ -795,40 +770,15 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <tr
                       key={contact.id}
                       onClick={() => selectContact(contact)}
-                      className="hover:bg-surface cursor-pointer transition-colors"
+                      className="hover:bg-elevated/60 cursor-pointer transition-colors"
                     >
                       {visibleColumns.name && (
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact)}>
                                 {getDisplayName(contact)}
                               </span>
-                              {(() => {
-                                const contactType = getContactType(contact);
-                                if (contactType === 'lead') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Sparkles className="w-2.5 h-2.5" />
-                                      Lead
-                                    </span>
-                                  );
-                                } else if (contactType === 'prospect') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Target className="w-2.5 h-2.5" />
-                                      Prospect
-                                    </span>
-                                  );
-                                } else {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full whitespace-nowrap">
-                                      <UserCheck className="w-2.5 h-2.5" />
-                                      Customer
-                                    </span>
-                                  );
-                                }
-                              })()}
                               {contact.portal_access_enabled && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 rounded-full whitespace-nowrap">
                                   <Shield className="w-2.5 h-2.5" />
@@ -845,7 +795,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       {visibleColumns.phone && (
                         <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {contact.phone ? (
-                            <a href={`tel:${contact.phone}`} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">{contact.phone}</a>
+                            <a href={`tel:${contact.phone}`} className="text-xs text-secondary hover:text-primary hover:underline transition-colors">{contact.phone}</a>
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>
                           )}
@@ -854,7 +804,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       {visibleColumns.email && (
                         <td className="px-3 py-1.5 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
                           {contact.email ? (
-                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[160px] block">{contact.email}</a>
+                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-secondary hover:text-primary hover:underline truncate max-w-[180px] block transition-colors">{contact.email}</a>
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>
                           )}

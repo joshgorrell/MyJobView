@@ -227,7 +227,7 @@ export function UserDataCard({
     }
     doc.open();
     doc.write(
-      '<!doctype html><html><head><title>User Data Card</title><style>@page{size:letter portrait;margin:0.35in}body{font-family:Arial,sans-serif;color:#111;font-size:10px;margin:0}h2{font-size:20px;margin:0 0 8px}h3{font-size:12px;border-bottom:1px solid #ccc;margin:10px 0 4px}dl{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin:0}dl div{display:flex;justify-content:space-between;gap:8px}dt{font-weight:600}dd{margin:0;text-align:right}section{break-inside:avoid}p{margin:4px 0}.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sub{font-size:9px}</style></head><body></body></html>',
+      '<!doctype html><html><head><title>User Data Card</title><style>@page{size:letter portrait;margin:0.35in}body{font-family:Arial,sans-serif;color:#111;font-size:10px;margin:0}h2{font-size:20px;margin:0 0 8px}h3{font-size:12px;border-bottom:1px solid #ccc;margin:10px 0 4px}dl{display:grid;grid-template-columns:1fr;gap:3px;margin:0}dl div{display:flex;justify-content:space-between;gap:8px}dt{font-weight:600;flex:1;min-width:0}dd{margin:0;text-align:right;flex-shrink:0;max-width:55%;overflow-wrap:anywhere}section{break-inside:avoid}p{margin:4px 0}.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sub{font-size:9px;display:inline}.sub::after{content:" · "}</style></head><body></body></html>',
     );
     doc.close();
     doc.body.appendChild(card.current.cloneNode(true));
@@ -237,8 +237,10 @@ export function UserDataCard({
       const scale = Math.min(1, maxHeight / el.scrollHeight);
       doc.body.style.height = maxHeight + 'px';
       doc.body.style.overflow = 'hidden';
-      el.style.transformOrigin = 'top left';
-      el.style.transform = `scale(${scale})`;
+      el.style.position = 'absolute';
+      el.style.left = '0';
+      el.style.top = '0';
+      el.style.zoom = String(scale);
       el.style.width = `${100 / scale}%`;
       frame.contentWindow?.focus();
       frame.contentWindow?.print();
@@ -258,11 +260,11 @@ export function UserDataCard({
           ? '—'
           : String(v);
   const rows = (entries: [string, unknown][]) => (
-    <dl>
+    <dl className="space-y-1 text-xs">
       {entries.map(([k, v]) => (
-        <div key={k}>
-          <dt>{k}</dt>
-          <dd>{value(v)}</dd>
+        <div key={k} className="flex justify-between gap-3">
+          <dt className="font-medium">{k}</dt>
+          <dd className="text-right max-w-[55%] break-words">{value(v)}</dd>
         </div>
       ))}
     </dl>
