@@ -1,3 +1,4 @@
+import { ManualJobTimeRequests } from './Payroll/ManualJobTimeRequests';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink, DollarSign } from 'lucide-react';
@@ -573,6 +574,8 @@ export function TimeClockManagement() {
           Import CSV
         </button>
       </div>
+
+      <ManualJobTimeRequests />
 
       {/* Auto Clock-Out Settings */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 space-y-6">
