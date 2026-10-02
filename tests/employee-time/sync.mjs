@@ -36,3 +36,12 @@ assert.equal(savedAction.ownerId,'tech');assert.equal(savedAction.id,'queued-id'
 abortWrite=true;await assert.rejects(()=>durableStorage.addToSyncQueue({type:'update',table:'time_entries',data:{id:'entry'}}),/transaction aborted/);
 await assert.rejects(()=>durableStorage.removeFromSyncQueue('queued-id'),/transaction aborted/);
 console.log('Offline queue saves/removals wait for durable transaction completion and reject aborted writes.');
+// A display-cache failure must not turn an already durable stop into a failed save.
+const supportModule={exports:{}};let queuedStops=0,queueFails=false;
+const supportStorage={addToSyncQueue:async()=>{if(queueFails)throw Error('Queue unavailable');queuedStops++;},getCachedData:async()=>{throw Error('Cache unavailable');}};
+vm.runInNewContext(ts.transpileModule(readFileSync('src/lib/offlineSupport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module:supportModule,exports:supportModule.exports,navigator:{onLine:false},console:{warn(){}},require(name){if(name==='./supabase')return {supabase};if(name==='./offlineStorage')return {offlineStorage:supportStorage};if(name==='./syncManager')return {syncManager:sync};throw Error(name);}});
+const acknowledged=await supportModule.exports.offlineSupabaseUpdate('time_entries',{clock_out:'2026-10-02T12:00Z'},'entry');
+assert.equal(acknowledged.error,null);assert.equal(acknowledged.data.id,'entry');assert.equal(queuedStops,1);
+queueFails=true;const rejected=await supportModule.exports.offlineSupabaseUpdate('time_entries',{clock_out:'2026-10-02T12:00Z'},'entry');
+assert.match(rejected.error.message,/Queue unavailable/);assert.equal(rejected.data,null);assert.equal(queuedStops,1);
+console.log('Offline stops acknowledge durable queues despite cache failure and reject unsuccessful queue writes.');
