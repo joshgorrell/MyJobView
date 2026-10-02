@@ -1,3 +1,4 @@
+import { saveClockEventGps } from '../../lib/clockEventGps';
 import {offlineStorage} from '../../lib/offlineStorage';
 import {syncManager} from '../../lib/syncManager';
 import { useEffect, useState } from 'react';
@@ -6,7 +7,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { gpsTrackingService } from '../../lib/gpsTracking';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 
 /** The normal technician timer is part of the existing Work Order, never a second WO layout. */
 export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrderId:string;assignedTo:string|null;onChanged:()=>void}) {
@@ -55,14 +55,9 @@ export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrd
     try {
       const {data,error}=await supabase.rpc('start_work_order_time',{p_work_order_id:workOrderId});
       if(error) throw error;
+      void saveClockEventGps(data, 'time_entries').catch(error => console.error('Job clock-in GPS could not be saved:', error));
       await gpsTrackingService.startTracking(profile.id,undefined,workOrderId).catch(()=>{});
       // Payroll time is saved first. GPS evidence can refine in the background.
-      void gpsTrackingService.captureLocationForClockEvent(false).then(async gps=>{
-        const {error}=await supabase.from('time_entries').update({clock_in_latitude:gps.latitude,clock_in_longitude:gps.longitude,
-          clock_in_gps_accuracy:gps.accuracy,clock_in_gps_capture_method:gps.method,clock_in_gps_captured_at:gps.captured_at,
-          clock_in_gps_attempted_at:gps.attempted_at,clock_in_gps_duration_ms:gps.duration_ms}).eq('id',data);
-        if(!error && gps.latitude && gps.longitude) await updateClockEntryAddress(data,gps.latitude,gps.longitude,false,'time_entries');
-      }).catch(()=>{});
       await load();onChanged();
     } catch(error:any){setError(error.message||'Unable to start job time.');}
     finally{setBusy(false);}
