@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, Calendar, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
 import { getOrganizationTimezone, formatDateInTimezone, formatTimeInTimezone } from '../../lib/timezoneUtils';
@@ -80,11 +79,6 @@ export function DailyClock() {
       console.error('Geolocation requires HTTPS on iOS. Current protocol:', window.location.protocol);
     }
 
-    // Start GPS pre-warming when component mounts (only if not clocked in)
-    if (!todayEntry && navigator.geolocation) {
-      gpsTrackingService.startPreWarming();
-    }
-
     if (profile?.id) {
       loadLeaveBalances();
     }
@@ -93,7 +87,6 @@ export function DailyClock() {
       clearInterval(timer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      gpsTrackingService.stopPreWarming();
     };
   }, [profile, todayEntry, timePolicy.ready, timePolicy.dailyClock]);
 
@@ -175,11 +168,7 @@ export function DailyClock() {
         await loadBreaks(entry.id);
         await loadRewardEvent(entry.id);
 
-        if (entry.status === 'clocked_in' && !entry.clock_out && navigator.onLine) {
-          if (!gpsTrackingService.isCurrentlyTracking()) {
-            await gpsTrackingService.startTracking(profile.id, entry.id);
-          }
-        }
+
       }
     } catch (error) {
       console.error('Error loading daily clock:', error);
@@ -349,20 +338,14 @@ export function DailyClock() {
       };
 
       // Use offline-capable insert
-      const { data, error } = await offlineSupabaseInsert<any>(
+      const { error } = await offlineSupabaseInsert<any>(
         'daily_clock_entries',
         clockInData
       );
 
       if (error) throw error;
 
-      const insertedEntry = Array.isArray(data) ? data[0] : data;
       void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
-
-      // Start GPS tracking silently in the background
-      if (navigator.geolocation) {
-        gpsTrackingService.startTracking(profile.id, insertedEntry.id);
-      }
 
       await loadTodaysClock();
 
@@ -395,7 +378,6 @@ export function DailyClock() {
   }
 
   async function handleClockOutSuccess() {
-    gpsTrackingService.stopTracking('daily');
     await loadTodaysClock();
   }
 
