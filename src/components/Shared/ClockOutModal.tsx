@@ -1,10 +1,10 @@
+import { saveClockEventGps } from '../../lib/clockEventGps';
 import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
 import { X, Upload, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { gpsTrackingService } from '../../lib/gpsTracking';
 import { offlineSupabaseUpdate } from '../../lib/offlineSupport';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 
 interface ClockOutModalProps {
   type: 'daily' | 'job';
@@ -116,6 +116,9 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
       );
 
       if (updateError) throw updateError;
+      gpsTrackingService.stopTracking(type === 'daily' ? 'daily' : 'job');
+      void saveClockEventGps(entryId, type === 'daily' ? 'daily_clock_entries' : 'time_entries', true)
+        .catch(error => console.error('Clock-out GPS could not be saved:', error));
 
       // 1.5. Update work order status to completed if marked complete
       if (type === 'job' && workOrderId && allowCompletion && jobStatus === 'complete') {
@@ -208,57 +211,6 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
           // Don't throw - clock out should still succeed even if email fails
         }
       }
-
-      // Stop GPS tracking when clocking out
-      // This stops tracking for both daily clock and job clock outs
-      gpsTrackingService.stopTracking();
-
-      // Capture GPS location silently in background (non-blocking) for all clock-outs
-      gpsTrackingService.captureLocationForClockEvent(true).then(async (gpsResult) => {
-        try {
-          // Calculate GPS quality score
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy,
-            p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms,
-            p_refined: false,
-            p_original_accuracy: null
-          });
-
-          const qualityScore = scoreData || 0;
-
-          const gpsData = {
-            clock_out_latitude: gpsResult.latitude,
-            clock_out_longitude: gpsResult.longitude,
-            clock_out_gps_accuracy: gpsResult.accuracy,
-            clock_out_gps_capture_method: gpsResult.method,
-            clock_out_gps_duration_ms: gpsResult.duration_ms,
-            clock_out_gps_attempted_at: gpsResult.attempted_at,
-            clock_out_gps_captured_at: gpsResult.captured_at,
-            clock_out_gps_quality_score: qualityScore,
-          };
-
-          const clockTable = type === 'daily' ? 'daily_clock_entries' as const : 'time_entries' as const;
-
-          await supabase
-            .from(clockTable)
-            .update(gpsData)
-            .eq('id', entryId);
-
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, true, clockTable).catch(() => {});
-          }
-
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, true, clockTable);
-          }
-        } catch (error) {
-          // Silently fail - GPS metadata is not critical
-          console.error('GPS metadata update failed:', error);
-        }
-      }).catch(() => {
-        // Silently fail - GPS capture is best-effort only
-      });
 
       // Show offline notification if applicable
       if (!navigator.onLine) {
