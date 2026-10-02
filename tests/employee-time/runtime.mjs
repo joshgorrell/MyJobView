@@ -13,8 +13,8 @@ function harness(path,imports={},globals={}) {
     lazy:()=> 'Calendar',Suspense:'Suspense',
   };
   const jsx=(type,props)=>({type,props});const module={exports:{}};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{
-    console,module,exports:module.exports,Date,URLSearchParams,...globals,
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText.replaceAll('import.meta.env','__testEnv'),{
+    __testEnv:{},console,module,exports:module.exports,Date,URLSearchParams,...globals,
     require(name){if(name==='react')return {...React,default:React};if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};if(name==='lucide-react')return new Proxy({},{get:(_,key)=>key});if(name in imports)return imports[name];throw Error(name);},
   });
   return {exports:module.exports,render(name,props={}){cursor=0;return module.exports[name](props);},effects};
@@ -109,3 +109,36 @@ function assertPlainTemplates(node,inTemplate=false){
  ts.forEachChild(node,child=>assertPlainTemplates(child,inTemplate||ts.isTemplateExpression(node)));
 }
 assertPlainTemplates(calendarSource);
+let timerEntry={id:'running',work_order_id:'wo-1',technician_id:'tech',clock_in:'2026-10-02T11:00Z',clock_out:null,status:'draft'};
+let timerQueue=[],timerCache=[],timerRefresh;
+const timerStorage={getSyncQueue:async()=>timerQueue,getCachedData:async()=>timerCache,cacheData:async(_,rows)=>{timerCache=rows;}};
+const timerQuery=new Proxy({}, {get(_,key){if(key==='then')return resolve=>resolve({error:null,data:timerEntry});return()=>timerQuery;}});
+const timerWindow={addEventListener(){},removeEventListener(){}};
+const timerNav={onLine:true};
+const timer=harness('src/components/Production/WorkOrderTimeControl.tsx',{
+ '../../lib/offlineStorage':{offlineStorage:timerStorage},'../../lib/syncManager':{syncManager:{addListener:fn=>{timerRefresh=fn;return()=>{};}}},
+ '../../lib/supabase':{supabase:{from:()=>timerQuery,channel:()=>({on(){return this;},subscribe(){return {unsubscribe:async()=>{}};}})}},
+ '../../contexts/AuthContext':auth,'../Shared/ClockOutModal':{ClockOutModal:'ClockOutModal'},'../../lib/gpsTracking':{gpsTrackingService:{}},'../../lib/reverseGeocode':{},
+},{navigator:timerNav,window:timerWindow,setInterval:()=>1,clearInterval(){}});
+const timerProps={workOrderId:'wo-1',assignedTo:'tech',onChanged(){}};
+timer.render('WorkOrderTimeControl',timerProps);timer.effects.splice(0).forEach(fn=>fn());for(let i=0;i<40;i++)await Promise.resolve();
+tree=timer.render('WorkOrderTimeControl',timerProps);nodes(tree).find(n=>n.type==='button'&&text(n)==='Stop Time').props.onClick();
+tree=timer.render('WorkOrderTimeControl',timerProps);const stop=nodes(tree).find(n=>n.type==='ClockOutModal');assert.equal(stop.props.allowCompletion,false,'Timer stops cannot bypass canonical Work Order completion');
+timerQueue=[{ownerId:'tech',table:'time_entries',type:'update',data:{id:'running',clock_out:'2026-10-02T12:00Z',status:'submitted'}}];stop.props.onSuccess();for(let i=0;i<40;i++)await Promise.resolve();
+tree=timer.render('WorkOrderTimeControl',timerProps);assert.ok(text(tree).includes('waiting to sync'));assert.equal(nodes(tree).some(n=>n.type==='button'&&text(n)==='Stop Time'),false);
+assert.equal(nodes(tree).find(n=>n.type==='button'&&text(n)==='Start Job Time').props.disabled,true,'Pending stop prevents a second start');
+timerNav.onLine=false;timerRefresh();for(let i=0;i<40;i++)await Promise.resolve();tree=timer.render('WorkOrderTimeControl',timerProps);assert.ok(text(tree).includes('waiting to sync'));
+timerNav.onLine=true;timerQueue=[];timerEntry=null;timerRefresh();for(let i=0;i<40;i++)await Promise.resolve();tree=timer.render('WorkOrderTimeControl',timerProps);assert.equal(text(tree).includes('waiting to sync'),false);
+console.log('Work Order timer separates completion and retains pending offline stops without restarting locally.');
+const completionWrites=[],completionAlerts=[];
+const completion=harness('src/components/Production/JobCompletionWizard.tsx',{
+ '../../lib/timezoneUtils':tz,'../../contexts/AuthContext':auth,'./SignaturePad':{SignaturePad:'SignaturePad'},
+ '../../lib/supabase':{supabase:{from(table){const q=new Proxy({}, {get(_,key){if(key==='then')return resolve=>resolve({error:null,data:table==='work_orders'?{id:'wo',title:'Visit',type:'General',work_order_number:'WO-1'}:table==='job_completion_templates'?{id:'template',template_name:'General',checklist_items:[],required_photos:[],requires_signature:false}:table==='time_entries'?{id:'running'}:[]});return(...args)=>{if(['insert','update','delete'].includes(key))completionWrites.push([table,key,args]);return q;};}});return q;}}},
+},{alert:value=>completionAlerts.push(value),console:{error(){}}});
+const completionProps={workOrderId:'wo',onComplete(){throw Error('Completion must not proceed with running time');},onCancel(){}};
+completion.render('JobCompletionWizard',completionProps);completion.effects.splice(0).forEach(fn=>fn());for(let i=0;i<40;i++)await Promise.resolve();
+for(let i=0;i<8;i++){tree=completion.render('JobCompletionWizard',completionProps);const next=nodes(tree).find(n=>n.type==='button'&&text(n).trim()==='Next');if(!next)break;next.props.onClick();}
+tree=completion.render('JobCompletionWizard',completionProps);
+const completeButton=nodes(tree).find(n=>n.type==='button'&&text(n).trim()==='Complete Job');assert.ok(completeButton);
+await completeButton.props.onClick();assert.equal(completionWrites.length,0);assert.ok(completionAlerts.some(a=>a.includes('Stop Job Time')));
+console.log('Canonical completion rejects running time before any completion writes and shows the recovery instruction.');
