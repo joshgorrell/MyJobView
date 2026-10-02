@@ -1,3 +1,4 @@
+import { WorkOrderTimeControl } from './WorkOrderTimeControl';
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import Flow from '../Flow/Flow';
 import React, { useState, useEffect, useRef } from 'react';
@@ -1007,6 +1008,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           })}
         </nav>
       </div>
+
+      <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />
 
       {/* Tab Content */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
