@@ -322,6 +322,48 @@ CREATE POLICY its_time_manager_update ON public.internal_time_sessions FOR UPDAT
 -- Preflight duplicates before release; never delete or collapse historical payable records automatically.
 CREATE UNIQUE INDEX one_entry_per_internal_session ON public.time_entries(internal_session_id) WHERE internal_session_id IS NOT NULL;
 
+-- Existing SECURITY DEFINER employee setup RPCs bypass RLS. Check the actor
+-- again at the row boundary, including disabled managers with valid tokens.
+CREATE OR REPLACE FUNCTION time_private.guard_employee_config_authority()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_org uuid;
+BEGIN
+  IF auth.uid() IS NULL AND (current_setting('request.jwt.claim.role',true)='service_role'
+    OR (session_user='postgres' AND current_setting('role',true)='none'
+      AND COALESCE(current_setting('request.jwt.claim.role',true),'')='')) THEN
+    IF TG_OP='DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+  END IF;
+  IF TG_OP='INSERT' THEN v_org:=NEW.organization_id; ELSE v_org:=OLD.organization_id; END IF;
+  IF NOT time_private.can_manage_time(v_org) THEN
+    RAISE EXCEPTION 'Employee configuration requires an authorized manager';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  IF NEW.organization_id IS DISTINCT FROM v_org THEN
+    RAISE EXCEPTION 'Employee configuration cannot change organizations';
+  END IF;
+  IF TG_TABLE_NAME='employees' THEN
+    IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=NEW.user_id AND organization_id=v_org) THEN
+      RAISE EXCEPTION 'Employee profile belongs to a different organization';
+    END IF;
+    IF TG_OP='UPDATE' AND NEW.user_id IS DISTINCT FROM OLD.user_id THEN
+      RAISE EXCEPTION 'Employee profile identity cannot be reassigned';
+    END IF;
+  ELSE
+    IF NOT EXISTS(SELECT 1 FROM employees WHERE id=NEW.employee_id AND organization_id=v_org) THEN
+      RAISE EXCEPTION 'Payroll configuration employee belongs to a different organization';
+    END IF;
+    IF TG_OP='UPDATE' AND NEW.employee_id IS DISTINCT FROM OLD.employee_id THEN
+      RAISE EXCEPTION 'Payroll configuration identity cannot be reassigned';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION time_private.guard_employee_config_authority() FROM PUBLIC;
+CREATE TRIGGER guard_employee_config_authority BEFORE INSERT OR UPDATE OR DELETE ON public.employees
+  FOR EACH ROW EXECUTE FUNCTION time_private.guard_employee_config_authority();
+CREATE TRIGGER guard_employee_config_authority BEFORE INSERT OR UPDATE OR DELETE ON public.employee_payroll_configs
+  FOR EACH ROW EXECUTE FUNCTION time_private.guard_employee_config_authority();
+
 -- Employees cannot reclassify themselves to evade the non-WO approval rule.
 DROP POLICY IF EXISTS insert_employee_payroll_configs ON public.employee_payroll_configs;
 DROP POLICY IF EXISTS update_employee_payroll_configs ON public.employee_payroll_configs;
