@@ -29,6 +29,23 @@ CREATE FUNCTION calculate_distance_meters(numeric,numeric,numeric,numeric) RETUR
 INSERT INTO company_settings VALUES('${id(2)}',ARRAY['${id(13)}']::uuid[],true,150,ARRAY['admin']),('${id(1)}',ARRAY['${id(12)}','${id(13)}']::uuid[],true,150,ARRAY['admin']);
 UPDATE profiles SET full_name='Technician',home_latitude=39,home_longitude=-95 WHERE id='${id(14)}';
 GRANT SELECT ON notifications TO authenticated;`);
+// Existing travel requests use office/Work Order coordinates, independent of watches.
+const travelSchema=await readFile('supabase/migrations/20251117163803_create_gps_breadcrumbs_and_travel_bonus.sql','utf8');
+await db.exec(`ALTER TABLE profiles ADD travel_bonus_enabled boolean DEFAULT false,ADD travel_bonus_rate numeric,ADD travel_bonus_method text,ADD primary_office_id uuid;
+ALTER TABLE work_orders ADD latitude numeric,ADD longitude numeric,ADD address text,ADD office_id uuid;
+CREATE TABLE company_offices(id uuid PRIMARY KEY,latitude numeric,longitude numeric,office_name text,city text,state text);`);
+for(const name of ['office_travel_settings','travel_bonus_requests']) {
+  await db.exec(travelSchema.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${name} \\([\\s\\S]*?\\n\\);`))[0]);
+}
+await db.exec(`ALTER TABLE office_travel_settings ADD same_day_job_window_hours numeric DEFAULT 4;
+ALTER TABLE travel_bonus_requests ADD from_type text,ADD from_address text,ADD from_latitude numeric,ADD from_longitude numeric;
+CREATE UNIQUE INDEX integration_one_travel_request ON travel_bonus_requests(technician_id,work_order_id);
+INSERT INTO company_offices VALUES('${id(110)}',39,-95,'Main Office','Topeka','KS');
+INSERT INTO office_travel_settings(office_id,radius_miles,calculation_method) VALUES('${id(110)}',15,'round_trip');
+UPDATE profiles SET primary_office_id='${id(110)}',travel_bonus_enabled=true WHERE id='${id(10)}';
+UPDATE work_orders SET office_id='${id(110)}',latitude=40,longitude=-95,address='Job Site' WHERE id='${id(50)}';
+GRANT SELECT ON travel_bonus_requests TO authenticated;`);
+await db.exec(await readFile('tests/employee-time/existing-travel.sql','utf8'));
 await db.exec(await readFile('tests/employee-time/existing-triggers.sql','utf8'));
 await db.exec(await readFile('tests/employee-time/existing-setup-rpcs.sql','utf8'));
 // Existing user-setup migration is also pending on production and is a dependency.
@@ -79,8 +96,15 @@ assert.equal((await db.query(`SELECT count(*)::int n FROM notifications WHERE re
 await as(14);await db.exec(`INSERT INTO internal_time_sessions(id,assigned_to,requested_by,created_by,session_type,title,session_date,predetermined_hours,status) VALUES('${id(89)}','${id(14)}','${id(14)}','${id(14)}','training','Training','2026-09-08',2,'pending_approval')`);
 await as(12);await db.exec(`SELECT review_internal_time('${id(89)}','deny','Schedule conflict');SELECT review_internal_time('${id(89)}','deny','Schedule conflict');`);
 const denial=(await db.query(`SELECT body FROM notifications WHERE related_id='${id(89)}' AND type='internal_time_request_denied'`)).rows;assert.equal(denial.length,1);assert.match(denial[0].body,/Schedule conflict/);
+await as(10);const travelEntry=(await db.query(`SELECT start_work_order_time('${id(50)}') id`)).rows[0].id;
+assert.equal((await db.query(`SELECT start_work_order_time('${id(50)}') id`)).rows[0].id,travelEntry);
+const bonuses=(await db.query(`SELECT * FROM travel_bonus_requests WHERE technician_id='${id(10)}' AND work_order_id='${id(50)}'`)).rows;
+assert.equal(bonuses.length,1);assert.equal(bonuses[0].status,'pending');assert.equal(bonuses[0].daily_clock_entry_id,null,'Job Time travel does not require a Daily Clock');assert.equal(bonuses[0].from_type,'office');assert.ok(Number(bonuses[0].eligible_miles)>0);
+await db.exec(`UPDATE time_entries SET clock_out=clock_in+interval '30 minutes',status='submitted' WHERE id='${travelEntry}'`);
+assert.equal((await db.query(`SELECT count(*)::int n FROM travel_bonus_requests WHERE work_order_id='${id(50)}'`)).rows[0].n,1,'Stopping time does not duplicate its travel request');
+await as(12);
 // SECURITY DEFINER setup RPCs must not bypass inactive-actor config authority.
 await db.exec(`UPDATE profiles SET is_active=false WHERE id='${id(12)}'`);
 await assert.rejects(()=>db.query(`SELECT update_employee_and_config(p_user_id=>'${id(14)}',p_hire_date=>'2026-01-01',p_expected_weekly_hours=>41,p_reviewed_by=>'${id(12)}')`),/authorized manager/);
 assert.equal((await db.query(`SELECT count(*)::int n FROM employee_payroll_configs c JOIN employees e ON e.id=c.employee_id WHERE e.user_id='${id(14)}'`)).rows[0].n,2,'Rejected inactive-actor update preserves both historical configs');
-await db.close();console.log('Existing trigger/RPC integration: classification, effective-dated successor config, direct-write guards, WO scheduling/project inheritance, Daily Clock calculations payroll status locks, tenant-scoped request outcomes, and delayed GPS home alerts passed.');
+await db.close();console.log('Existing trigger/RPC integration: classification, effective-dated successor config, direct-write guards, WO scheduling/project inheritance, Daily Clock calculations, payroll status locks, tenant-scoped request outcomes, delayed GPS home alerts, and idempotent travel requests without Daily Clock passed.');
