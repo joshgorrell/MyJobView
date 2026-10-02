@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   X, Wrench, BookOpen, Clock, CheckCircle, AlertCircle, Send
@@ -41,10 +42,6 @@ export function RequestInternalTimeModal({
   const [submitting, setSubmitting] = useState(false);
   const [requiresApproval, setRequiresApproval] = useState(true);
 
-  const bothEnabled = companySettings.shop_time_request_enabled && companySettings.training_time_request_enabled;
-  const onlyShop = companySettings.shop_time_request_enabled && !companySettings.training_time_request_enabled;
-  const onlyTraining = !companySettings.shop_time_request_enabled && companySettings.training_time_request_enabled;
-
   function getDuration(): number {
     return selectedDuration;
   }
@@ -65,17 +62,12 @@ export function RequestInternalTimeModal({
 
     setSubmitting(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const needsApproval = companySettings.time_request_requires_approval;
+      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
+      const needsApproval = true;
       setRequiresApproval(needsApproval);
 
       const status = needsApproval ? 'pending_approval' : 'scheduled';
       const defaultTitle = sessionType === 'shop_time' ? 'Shop Time Request' : 'Training Request';
-
-      const { data: companyData } = await supabase
-        .from('company_settings')
-        .select('id')
-        .maybeSingle();
 
       const { error } = await supabase
         .from('internal_time_sessions')
@@ -94,24 +86,6 @@ export function RequestInternalTimeModal({
         });
 
       if (error) throw error;
-
-      if (!needsApproval) {
-        const clockIn = new Date();
-        const clockOut = new Date(clockIn.getTime() + duration * 3600 * 1000);
-
-        await supabase.from('time_entries').insert({
-          company_id: companyData?.id,
-          technician_id: profile.id,
-          entry_date: today,
-          clock_in: clockIn.toISOString(),
-          clock_out: clockOut.toISOString(),
-          total_hours: duration,
-          break_minutes: 0,
-          status: 'submitted',
-          entry_type: sessionType,
-          notes: reason.trim() || null,
-        });
-      }
 
       setStep('success');
       onSubmitted();
@@ -212,7 +186,7 @@ export function RequestInternalTimeModal({
               )}
             </div>
 
-            {companySettings.time_request_requires_approval && (
+            {(
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-700">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                 A manager will need to approve this request before it counts toward your pay.
