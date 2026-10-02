@@ -47,8 +47,8 @@ export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrd
     } catch(error:any){setError(error.message||'Unable to start job time.');}
     finally{setBusy(false);}
   }
-  if(profile?.id!==assignedTo) return null;
   const runningHere=active?.work_order_id===workOrderId;
+  if(profile?.id!==assignedTo && !runningHere) return null;
   const elapsed=active?Math.max(0,Math.floor((now-Date.parse(active.clock_in))/60000)):0;
   return <div className="rounded-xl border border-subtle bg-elevated p-3 space-y-2">
     <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-primary flex items-center gap-2"><Clock className="w-4 h-4" />{runningHere ? `Job time running · ${Math.floor(elapsed/60)}h ${elapsed%60}m`:'Work Order Job Time'}</p>
@@ -56,6 +56,6 @@ export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrd
     </div>
     {active && !runningHere && <p className="text-sm text-secondary">You have time running on another activity. Stop that activity before starting this Work Order.</p>}
     {error && <p role="alert" className="text-red-600 text-sm">{error}</p>}
-    {showStop && active && profile && <ClockOutModal type="job" entryId={active.id} technicianId={profile.id} workOrderId={workOrderId} onClose={()=>setShowStop(false)} onSuccess={()=>{setShowStop(false);void load();onChanged();}} />}
+    {showStop && active && profile && <ClockOutModal type="job" entryId={active.id} technicianId={profile.id} workOrderId={workOrderId} allowCompletion={profile.id===assignedTo} onClose={()=>setShowStop(false)} onSuccess={()=>{setShowStop(false);void load();onChanged();}} />}
   </div>;
 }
