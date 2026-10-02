@@ -389,7 +389,7 @@ export function UserPreferences() {
     <div className="space-y-6">
       <section className="rounded-lg border border-subtle bg-canvas p-4 text-primary">
         <h2 className="font-semibold">Appearance</h2>
-        <p className="mt-1 text-sm text-muted">Choose how MyJobView appears. Your choice is saved to your account after the theme update is released.</p>
+        <p className="mt-1 text-sm text-muted">Choose how MyJobView appears. Your appearance preference is saved to your account.</p>
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Color theme">
           {(['classic', 'light', 'dark', 'system'] as ThemePreference[]).map(option => (
             <button key={option} type="button" aria-pressed={preference === option}
