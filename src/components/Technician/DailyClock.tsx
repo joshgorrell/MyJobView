@@ -1,10 +1,10 @@
+import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, Calendar, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { gpsTrackingService } from '../../lib/gpsTracking';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
 import { getOrganizationTimezone, formatDateInTimezone, formatTimeInTimezone } from '../../lib/timezoneUtils';
@@ -308,52 +308,7 @@ export function DailyClock() {
     if (!profile) return;
 
     // Clock in immediately without waiting for GPS
-    const entryId = await performClockIn();
-
-    // Capture GPS location in background (non-blocking)
-    if (entryId && navigator.geolocation) {
-      gpsTrackingService.captureLocationForClockEvent(false).then(async (gpsResult) => {
-        try {
-          // Calculate GPS quality score
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy,
-            p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms,
-            p_refined: false,
-            p_original_accuracy: null
-          });
-
-          // Update the clock entry with GPS metadata
-          await supabase
-            .from('daily_clock_entries')
-            .update({
-              clock_in_latitude: gpsResult.latitude,
-              clock_in_longitude: gpsResult.longitude,
-              clock_in_gps_accuracy: gpsResult.accuracy,
-              clock_in_gps_capture_method: gpsResult.method,
-              clock_in_gps_duration_ms: gpsResult.duration_ms,
-              clock_in_gps_attempted_at: gpsResult.attempted_at,
-              clock_in_gps_captured_at: gpsResult.captured_at,
-              clock_in_gps_quality_score: scoreData || 0,
-            })
-            .eq('id', entryId);
-
-          // Reverse geocode address if GPS was captured
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, false, 'daily_clock_entries').catch(() => {});
-          }
-
-          // Start refinement if accuracy is poor (>50m)
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, false, 'daily_clock_entries');
-          }
-        } catch (error) {
-          // Silently fail - GPS metadata is not critical
-        }
-      }).catch(() => {
-        // Silently fail - GPS capture is best-effort only
-      });
-    }
+    await performClockIn();
   }
 
   async function performClockIn(): Promise<string | null> {
@@ -402,6 +357,7 @@ export function DailyClock() {
       if (error) throw error;
 
       const insertedEntry = Array.isArray(data) ? data[0] : data;
+      void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       // Start GPS tracking silently in the background
       if (navigator.geolocation) {
@@ -439,7 +395,7 @@ export function DailyClock() {
   }
 
   async function handleClockOutSuccess() {
-    gpsTrackingService.stopTracking();
+    gpsTrackingService.stopTracking('daily');
     await loadTodaysClock();
   }
 
