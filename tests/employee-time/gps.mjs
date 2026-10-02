@@ -11,13 +11,13 @@ const geo={getCurrentPosition(ok,fail,options){requests++;assert.equal(options.m
 const gps=load('src/lib/gpsTracking.ts',{'./supabase':{supabase:{}},'./reverseGeocode':{}},{navigator:{geolocation:geo},window:{addEventListener(){}},localStorage:{getItem:()=>null,setItem(){},removeItem(){}},setTimeout:()=>1,clearTimeout(){},setInterval:()=>2,clearInterval(){}}).gpsTrackingService;
 let reading=await gps.captureLocationForClockEvent();assert.equal(reading.latitude,0);assert.equal(reading.longitude,0);assert.equal(reading.captured_at,new Date(position.timestamp).toISOString());
 behavior='denied';requests=0;reading=await gps.captureLocationForClockEvent(true);assert.equal(reading.method,'failed');assert.equal(reading.latitude,null);assert.equal(requests,1,'Denied permission stops retries and cannot reuse cached location');
-gps.syncOfflineQueue=async()=>{};await gps.startTracking('tech','daily');await gps.startTracking('tech',undefined,'wo');assert.equal(gps.dailyClockEntryId,'daily');gps.stopTracking('job');assert.equal(gps.isTracking,true);assert.equal(gps.workOrderId,null);gps.stopTracking('daily');assert.equal(gps.isTracking,false);assert.equal(cleared.length,1);
-await gps.startTracking('tech','daily');await gps.startTracking('other',undefined,'other-wo');assert.equal(gps.technicianId,'other');assert.equal(gps.dailyClockEntryId,null,'Switching employee cannot retain another employee tracking context');
+// Retired automatic APIs cannot start watches or periodic collection.
+const beforeRequests=requests;await gps.startTracking('tech','daily');gps.startPreWarming();await gps.startPostCaptureRefinement('entry');assert.equal(requests,beforeRequests);assert.equal(gps.isTracking,false);assert.equal(gps.watchId,null);assert.equal(gps.preWarmInterval,null);
 let saved=[],addresses=[],failWrite=false,networkFailure=false;const helperNavigator={onLine:false};let networkQueue=[];
 const helper=load('src/lib/clockEventGps.ts',{'./supabase':{supabase:{rpc:async()=>({data:75,error:null})}},'./offlineStorage':{offlineStorage:{addToSyncQueue:async action=>networkQueue.push(action)}},'./gpsTracking':{gpsTrackingService:{captureLocationForClockEvent:async()=>({latitude:0,longitude:0,accuracy:12,method:'high_accuracy',captured_at:new Date(position.timestamp).toISOString(),attempted_at:new Date().toISOString(),duration_ms:5})}},'./offlineSupport':{offlineSupabaseUpdate:async(table,data,id)=>{saved.push({table,data,id});return {error:networkFailure?Error('Failed to fetch'):failWrite?Error('Save rejected'):null};}},'./reverseGeocode':{updateClockEntryAddress:async(...args)=>addresses.push(args)}},{navigator:helperNavigator});
 for(const table of ['daily_clock_entries','time_entries'])for(const out of [false,true]){await helper.saveClockEventGps('entry',table,out);const p=out?'clock_out':'clock_in';assert.equal(saved.at(-1).data[`${p}_latitude`],0);assert.equal(saved.at(-1).data[`${p}_gps_captured_at`],new Date(position.timestamp).toISOString());assert.equal(saved.at(-1).table,table);}
 assert.equal(addresses.length,0,'Offline coordinates do not depend on a network geocoder');failWrite=true;await assert.rejects(()=>helper.saveClockEventGps('entry','time_entries',true),/Save rejected/);
-console.log('GPS records actual reading timestamps, denial without stale fallback, independent tracking contexts, and durable evidence for all four clock events.');
+console.log('GPS records actual reading timestamps, denial without stale fallback, action-only capture, and durable evidence for all four clock events.');
 
 failWrite=false;helperNavigator.onLine=true;await helper.saveClockEventGps('entry','time_entries',true);assert.equal(addresses.at(-1)[1],0);assert.equal(addresses.at(-1)[2],0);assert.equal(saved.at(-1).data.clock_out_gps_quality_score,75);
 networkFailure=true;await helper.saveClockEventGps('entry','time_entries',true);assert.equal(networkQueue.length,1);assert.equal(networkQueue[0].data.id,'entry');
@@ -27,3 +27,9 @@ native.lastKnownLocation={...position,timestamp:Date.now()-120000};assert.equal(
 native.lastKnownLocation={...position,timestamp:Date.now()-1000};const fallback=await native.captureHighAccuracyLocation();assert.equal(fallback.coords.method,'cached');assert.equal(fallback.timestamp,native.lastKnownLocation.timestamp);
 nativePermission='denied';assert.equal(await native.captureHighAccuracyLocation(),null,'Native permission denial cannot reuse a previous location');
 console.log('GPS handles zero coordinates, network-loss queueing, and native stale-location/permission fallbacks.');
+
+for (const path of ['src/components/Technician/DailyClock.tsx','src/components/Layout/TimeClockModal.tsx','src/components/Production/WorkOrderTimeControl.tsx','src/components/Production/TechnicianWorkCenter.tsx','src/components/Shared/ClockOutModal.tsx','mobile/src/screens/TimeClockScreen.tsx']) {
+ const source=fs.readFileSync(path,'utf8');assert.equal(/\.(startTracking|startPreWarming|startPostCaptureRefinement)\(/.test(source),false,`${path} must not start ongoing GPS collection`);
+}
+assert.equal(fs.readFileSync('mobile/App.tsx','utf8').includes('initializeLocationTracking'),false,'Opening the native app must not request background location');
+console.log('Clock flows never start GPS watches, pre-warming, refinement or background tracking.');
