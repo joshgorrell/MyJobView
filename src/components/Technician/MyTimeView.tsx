@@ -1,3 +1,6 @@
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
+import { MyJobTimeView } from './MyJobTimeView';
+import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +31,7 @@ interface TimeRequest {
 
 export function MyTimeView() {
   const { profile } = useAuth();
+  const policy = useEmployeeTimePolicy();
   const [entries, setEntries] = useState<ClockEntry[]>([]);
   const [requests, setRequests] = useState<Record<string, TimeRequest>>({});
   const [loading, setLoading] = useState(true);
@@ -36,7 +40,7 @@ export function MyTimeView() {
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
-    if (profile?.id) {
+    if (profile?.id && policy.ready && policy.basis === 'daily_clock') {
       loadEntries();
       loadRequests();
 
@@ -65,7 +69,7 @@ export function MyTimeView() {
         channel.unsubscribe();
       };
     }
-  }, [profile?.id]);
+  }, [profile?.id, policy.ready, policy.basis]);
 
   async function loadEntries() {
     try {
@@ -76,7 +80,7 @@ export function MyTimeView() {
         .from('daily_clock_entries')
         .select('*')
         .eq('technician_id', profile?.id)
-        .gte('entry_date', sevenDaysAgo.toISOString().split('T')[0])
+        .gte('entry_date', formatDateInTimezone(sevenDaysAgo.toISOString(),await getOrganizationTimezone()))
         .order('entry_date', { ascending: false });
 
       if (error) throw error;
@@ -171,6 +175,9 @@ export function MyTimeView() {
         return null;
     }
   }
+
+  if (policy.loading || !policy.ready) return <p className="text-secondary">Loading time configuration…</p>;
+  if (policy.basis !== 'daily_clock') return <MyJobTimeView salary={policy.basis === 'salary'} />;
 
   if (loading) {
     return (
