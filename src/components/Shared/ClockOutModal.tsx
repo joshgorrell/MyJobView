@@ -3,7 +3,6 @@ import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezon
 import { useState, useEffect } from 'react';
 import { X, Upload, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 import { offlineSupabaseUpdate } from '../../lib/offlineSupport';
 
 interface ClockOutModalProps {
@@ -116,7 +115,6 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
       );
 
       if (updateError) throw updateError;
-      gpsTrackingService.stopTracking(type === 'daily' ? 'daily' : 'job');
       void saveClockEventGps(entryId, type === 'daily' ? 'daily_clock_entries' : 'time_entries', true)
         .catch(error => console.error('Clock-out GPS could not be saved:', error));
 
