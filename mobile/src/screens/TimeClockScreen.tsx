@@ -194,8 +194,6 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
       if (error) throw error;
 
-      // Start background GPS tracking
-      await locationTrackingService.startTracking(profile.id, entryId).catch(error => console.warn('Clock-in saved; background GPS unavailable:', error));
 
       await loadTodaysClock();
       Alert.alert('Success', 'Clocked in successfully!');
@@ -247,8 +245,6 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
           if (error) throw error;
 
-          // Stop GPS tracking
-          await locationTrackingService.stopTracking().catch(error => console.warn('Clock-out saved; background GPS stop failed:', error));
 
           await loadTodaysClock();
           Alert.alert('Success', 'Clocked out successfully!');
