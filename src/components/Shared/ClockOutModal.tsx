@@ -302,7 +302,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              Clock Out {type === 'daily' ? '- End of Day' : '- Complete Job'}
+              {type==='daily'?'Clock Out - End of Day':allowCompletion?'Clock Out - Complete Job':'Stop Job Time'}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               {type === 'daily' ? 'Add notes to earn points!' : 'Add notes and photos to earn points!'}
