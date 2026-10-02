@@ -1,12 +1,12 @@
 # Security onboarding pre-merge review
 
-Status checked September 30, 2026. Applies to draft PR #33. This is an implementation and acceptance record, not legal approval.
+Original review September 30, 2026; updated October 2 for draft PR #78. This is an implementation and acceptance record, not legal approval.
 
 ## Business decisions
 
 | Item | Selected behavior | Status |
 |---|---|---|
-| Initial monitoring term | 36 months from separately confirmed monitoring activation | Drafted for future Electronic Life agreements |
+| Initial monitoring term | 12, 24, 36, 48, or 60 months (default 36) from separately confirmed monitoring activation | Selector/save regression tested; inactive review draft parameterized |
 | Renewal | Automatic month-to-month; ordinary cancellation on 30 days' notice, subject to mandatory rights | Drafted; confirm notice mechanics |
 | Initial-term early cancellation | 100% of unpaid remaining base monitoring fees, one charge; no additional 80% charge | Selected by Josh September 30; drafted, legal approval outstanding |
 | Calculation | Effective cancellation date to initial-term end; partial-month daily proration; credit prepaid amounts for the same unserved period | Proposed implementation detail for review |
@@ -124,3 +124,14 @@ Proposed clause for legal review:
 The signed agreement or incorporated equipment discount document must identify the actual credit and its repayment terms; this general clause does not create a repayment obligation for an undisclosed credit or supply a missing proration formula. If prorated repayment is intended, disclose that basis when the discount is granted. Staff must itemize and substantiate the remaining amount before collection. Ordinary recurring-payment consent does not independently authorize a cancellation or equipment-credit recovery debit. Do not modify existing signed agreements.
 
 Status: draft wording recorded; legal approval outstanding. No automated calculation, credit tracking or portal balance display is included in this request.
+
+
+## October 2 staff correction update
+
+Draft PR #78 addresses the source audit and Josh's requested deliberate editing of completed contracts before activation. Each field is locked until the edit icon is selected; Save requires a reason, and Cancel changes nothing. Admins and managers with Contract Management access can correct onboarding and account fields. Original submission/signature evidence is retained, each correction has an actor/timestamp/revision/before-and-after record, stale concurrent saves fail, and corrected agreements return to approval. Current copies identify staff corrections; original copies remain available. Changes to signed commercial terms still require the applicable customer agreement/amendment process; the original signature is not represented as proof of acceptance of later changes.
+
+Printing has no creation/completion side effects, and no new paper upload is required. Staff entry validates the same form and real verified payment prerequisites and saves atomically to pending approval. See `docs/audits/security-onboarding-2026-10-02.md` for current deployment evidence and remaining gates. Historical September 30 environment statements above are superseded where the October 2 audit reports deployed functions but missing schema/configuration.
+
+## October 2 authorized deployment update
+
+Josh authorized direct fixes in the unused MJV onboarding system without a test branch and testing after merge. All five onboarding migrations and eight matching functions were deployed; actual-schema read-only print and denied-access checks passed. Newly applied migration history entries now match repository versions. The prior missing-RPC deployment blocker is resolved. Merchant capability/OAuth setup, dedicated recurring-billing schedule, and customer/business/template acceptance remain post-merge launch tasks. No enrollment, invitation, invoice generation or debit was performed. See the audit for exact checks and limitations.

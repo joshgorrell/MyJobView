@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState, useEffect, useRef } from 'react';
+import { SECURITY_INITIAL_TERMS, staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { supabase } from '../../lib/supabase';
 import { X, Search, Plus, Wrench } from 'lucide-react';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
@@ -57,8 +57,7 @@ interface CreateSecurityContractModalProps {
 }
 
 export default function CreateSecurityContractModal({ onClose, onSuccess, onPaperCreated, prefill }: CreateSecurityContractModalProps) {
-  const { profile } = useAuth();
-  const standardMonitoringTerm = profile?.organization_id === 'b324e4e3-cd2e-4c68-8df8-3e27c7e08f15';
+  const creationRequest = useRef(crypto.randomUUID());
   const [templates, setTemplates] = useState<Template[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [monitoringServices, setMonitoringServices] = useState<MonitoringService[]>([]);
@@ -201,7 +200,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
         if (prefill.serviceIds && prefill.serviceIds.length > 0) {
           setSelectedServices(prefill.serviceIds);
         }
-        if (prefill.termMonths) {
+        if (prefill.termMonths && SECURITY_INITIAL_TERMS.includes(prefill.termMonths)) {
           setTermMonths(prefill.termMonths);
         }
         if (prefill.notes) {
@@ -252,116 +251,21 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
     setSaving(true);
 
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Not authenticated');
+      const hasContactChanges = selectedContactData && Object.entries(contactEdits).some(([key, value]) => value !== ((selectedContactData as unknown as Record<string, unknown>)[key] || ''));
+      const contractData = await staffSecurityOnboarding<{ id: string }>('create', undefined, {
+        request_id: creationRequest.current,
+        template_id: selectedTemplate, contact_id: selectedContact || null,
+        new_contact: showNewContactForm && !selectedContact ? newContact : null,
+        contact_edits: hasContactChanges ? contactEdits : null,
+        sales_order_id: selectedSalesOrder || null, service_ids: selectedServices,
+        price_override: priceOverride || null, term_months: termMonths,
+        account_type: accountType || null, account_services: accountServices,
+        is_monitoring: isMonitoring, account_number: isMonitoring ? monitoringAccountNumber.trim() || null : null,
+        installation_date: installationDate || null, service_account_numbers: serviceAccountNumbers,
+        notes, email_override: emailOverride.trim() || null,
+      });
 
-      console.log('Creating contract with user ID:', user.user.id);
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.user.id)
-        .single();
-
-      console.log('User profile role:', profile?.role);
-
-      let contactId = selectedContact;
-
-      if (showNewContactForm && !selectedContact) {
-        const { data: contactData, error: contactError } = await supabase
-          .from('contacts')
-          .insert({
-            first_name: newContact.first_name,
-            last_name: newContact.last_name,
-            email: newContact.email,
-            phone: newContact.phone,
-            street_address: newContact.street_address,
-            city: newContact.city,
-            state: newContact.state,
-            zip_code: newContact.zip_code,
-            company_name: newContact.company_name
-          })
-          .select()
-          .single();
-
-        if (contactError) throw contactError;
-        contactId = contactData.id;
-      } else if (selectedContactData) {
-        const hasChanges =
-          contactEdits.first_name !== (selectedContactData.first_name || '') ||
-          contactEdits.last_name !== (selectedContactData.last_name || '') ||
-          contactEdits.email !== selectedContactData.email ||
-          contactEdits.phone !== selectedContactData.phone ||
-          contactEdits.street_address !== selectedContactData.street_address ||
-          contactEdits.city !== selectedContactData.city ||
-          contactEdits.state !== selectedContactData.state ||
-          contactEdits.zip_code !== selectedContactData.zip_code ||
-          contactEdits.company_name !== (selectedContactData.company_name || '');
-
-        if (hasChanges) {
-          const { error: updateError } = await supabase
-            .from('contacts')
-            .update({
-              first_name: contactEdits.first_name,
-              last_name: contactEdits.last_name,
-              email: contactEdits.email,
-              phone: contactEdits.phone,
-              street_address: contactEdits.street_address,
-              city: contactEdits.city,
-              state: contactEdits.state,
-              zip_code: contactEdits.zip_code,
-              company_name: contactEdits.company_name
-            })
-            .eq('id', selectedContact);
-
-          if (updateError) throw updateError;
-        }
-      }
-
-      const { data: contractData, error } = await supabase
-        .from('security_contracts')
-        .insert({
-          template_id: selectedTemplate,
-          contact_id: contactId,
-          sales_order_id: selectedSalesOrder || null,
-          created_by_user_id: user.user.id,
-          status: 'draft',
-          monthly_price: finalMonthlyPrice,
-          price_override: priceOverride ? parseFloat(priceOverride) : null,
-          term_months: standardMonitoringTerm ? 36 : termMonths,
-          renewal_term_months: 1,
-          cancellation_notice_days: 30,
-          account_type: accountType || null,
-          account_services: accountServices,
-          is_monitoring: isMonitoring,
-          account_number: isMonitoring ? (monitoringAccountNumber.trim() || null) : null,
-          installation_date: installationDate || null,
-          service_account_numbers: Object.keys(serviceAccountNumbers).length > 0 ? serviceAccountNumbers : null,
-          notes,
-          email_override: emailOverride || null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (selectedServices.length > 0) {
-        const serviceInserts = selectedServices.map(serviceId => {
-          const service = monitoringServices.find(s => s.id === serviceId);
-          return {
-            contract_id: contractData.id,
-            service_id: serviceId,
-            monthly_price: service?.monthly_price || 0
-          };
-        });
-
-        const { error: servicesError } = await supabase
-          .from('security_contract_services')
-          .insert(serviceInserts);
-
-        if (servicesError) throw servicesError;
-      }
-
+      creationRequest.current = crypto.randomUUID();
       if (onPaperCreated) onPaperCreated(contractData);
       else onSuccess();
     } catch (error: any) {
@@ -391,10 +295,10 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+    <div className="security-onboarding-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Start Paper Onboarding' : 'Create Security Agreement'}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
@@ -824,13 +728,14 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                 Agreement Term <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {(standardMonitoringTerm ? [36] : [12, 24, 36, 48, 60]).map((months) => (
+                {SECURITY_INITIAL_TERMS.map((months) => (
                   <button
                     key={months}
                     type="button"
                     onClick={() => setTermMonths(months)}
+                    aria-pressed={termMonths === months}
                     className={`px-2 sm:px-4 py-3 text-center rounded-lg border-2 transition-all ${
-                      (standardMonitoringTerm ? 36 : termMonths) === months
+                      termMonths === months
                         ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
                         : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                     }`}

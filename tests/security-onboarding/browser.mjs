@@ -54,6 +54,9 @@ const page=await context.newPage();
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const url='http://127.0.0.1:5173/tests/security-onboarding/browser.html?token=00000000-0000-0000-0000-000000000007';
 await page.goto(url);
+await page.evaluate(() => { document.documentElement.style.colorScheme = 'dark'; });
+await page.getByPlaceholder('Enter your full legal name').waitFor();
+assert.deepEqual(await page.getByPlaceholder('Enter your full legal name').evaluate(el => { const s = getComputedStyle(el); return [s.colorScheme, s.backgroundColor, s.color]; }), ['light', 'rgb(255, 255, 255)', 'rgb(0, 0, 0)'], 'White controls with black text inside a dark workspace');
 await page.getByText('All changes saved',{exact:true}).waitFor();
 await page.getByPlaceholder('Enter your full legal name').fill('Josh Test');
 await page.getByText('All changes saved',{exact:true}).waitFor();
@@ -112,6 +115,7 @@ await page.mouse.move(box.x+30,box.y+30);await page.mouse.down();await page.mous
 await page.getByRole('button',{name:'Save Signature'}).click();
 const complete=page.getByRole('button',{name:'Submit Agreement',exact:true});
 assert.ok(await complete.isDisabled(),'Agreement and AutoPay consent required');
+assert.equal(await page.getByRole('checkbox').nth(0).evaluate(el => getComputedStyle(el).colorScheme), 'light', 'Native checkboxes stay light');
 await page.getByRole('checkbox').nth(0).check();await page.getByRole('checkbox').nth(1).check();
 await complete.click();
 await page.getByRole('heading',{name:'Agreement submitted',exact:true}).waitFor();
@@ -131,6 +135,98 @@ await page.pdf({path:'/tmp/mjv-security-agreement.pdf',format:'Letter'});
 assert.ok(await page.getByText('FINAL CLAUSE INCLUDED',{exact:false}).count());
 assert.ok(saves.every(s=>s.form_data.paymentDetails===undefined && s.form_data.signature===undefined && !JSON.stringify(s).includes('110000006789')),'All browser draft requests omit payment data and signatures');
 assert.deepEqual(errors,[],'No runtime errors');
+const staffContext=await browser.newContext({viewport:{width:390,height:844}});
+let insertedContract;
+await staffContext.route('https://security-test.supabase.co/**', async route => {
+  const u = new URL(route.request().url());
+  if (u.pathname.endsWith('/auth/v1/user')) return route.fulfill({json:{id:'staff-user'}});
+  if (u.pathname.endsWith('/security_contract_templates')) return route.fulfill({json:[{id:'template-1',name:'Monitoring',description:'Initial term [term]'}]});
+  if (u.pathname.endsWith('/monitoring_services')) return route.fulfill({json:[{id:'service-1',name:'Monitoring',monthly_price:35,category:'Monitoring'}]});
+  if (u.pathname.endsWith('/contacts')) return route.fulfill({json:{id:'00000000-0000-0000-0000-000000000004',first_name:'Test',last_name:'Customer',full_name:'Test Customer',email:'customer@example.com',phone:'5551231234',street_address:'1 Main Street',city:'Topeka',state:'KS',zip_code:'66604',company_name:''}});
+  if (u.pathname.endsWith('/profiles')) return route.fulfill({json:{role:'admin',organization_id:'org-1'}});
+  if (u.pathname.endsWith('/rpc/staff_security_onboarding') && route.request().method()==='POST') {
+    insertedContract={...route.request().postDataJSON().p_payload,renewal_term_months:1};
+    return route.fulfill({json:{id:'new-contract',...insertedContract}});
+  }
+  return route.fulfill({json:[]});
+});
+const staffPage=await staffContext.newPage();
+// Supply a synthetic authenticated session. No real credentials are used.
+await staffPage.addInitScript(() => {
+  localStorage.setItem('sb-security-test-auth-token',JSON.stringify({access_token:'fixture-token',refresh_token:'fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'staff-user'}}));
+  document.documentElement.style.colorScheme='dark';
+});
+await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?staff');
+await staffPage.getByRole('button',{name:'36 months',exact:true}).waitFor();
+assert.equal(await staffPage.getByRole('button',{name:'36 months',exact:true}).getAttribute('aria-pressed'),'true','36 is the default');
+for (const months of [12,24,36,48,60]) {
+  const term=staffPage.getByRole('button',{name:`${months} months`,exact:true});
+  await term.click();
+  assert.equal(await term.getAttribute('aria-pressed'),'true');
+  insertedContract=undefined;
+  await staffPage.getByRole('button',{name:'Create Agreement',exact:true}).click();
+  for (let attempt=0;attempt<50 && !insertedContract;attempt++) await new Promise(resolve=>setTimeout(resolve,100));
+  await staffPage.getByRole('button',{name:'Create Agreement',exact:true}).waitFor();
+  assert.equal(insertedContract?.term_months,months,'Selected initial term is saved');
+  assert.equal(insertedContract?.renewal_term_months,1,'Renewal remains month-to-month');
+}
+for (const selector of ['input[type="text"]','select','textarea','input[type="checkbox"]']) {
+  assert.deepEqual(await staffPage.locator(selector).first().evaluate(el=>{const s=getComputedStyle(el);return [s.colorScheme,s.backgroundColor,s.color];}),['light','rgb(255, 255, 255)','rgb(0, 0, 0)']);
+}
+assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Staff creation fits mobile');
+let printPayload;
+await staffContext.route('https://security-test.supabase.co/functions/v1/generate-blank-contract-form',async route=>{printPayload=route.request().postDataJSON();await route.fulfill({contentType:'text/html',body:'<h1>Handwritten onboarding form</h1>'});});
+await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?print');
+await staffPage.getByRole('combobox',{name:'Agreement template'}).selectOption('template-1');
+await staffPage.getByRole('combobox',{name:'Initial term'}).selectOption('24');
+await staffPage.getByRole('checkbox').check();
+insertedContract=undefined;
+const [paperPopup]=await Promise.all([staffPage.waitForEvent('popup'),staffPage.getByRole('button',{name:'Print Blank Form',exact:true}).click()]);
+await paperPopup.getByRole('heading',{name:'Handwritten onboarding form'}).waitFor();
+assert.equal(printPayload.term_months,24);assert.deepEqual(printPayload.service_ids,['service-1']);assert.equal(insertedContract,undefined,'Blank printing never calls contract creation');
+assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Blank print options fit mobile');
+await paperPopup.close();
+await staffPage.goto('file:///tmp/mjv-security-blank-form.html');await staffPage.emulateMedia({media:'print'});
+await staffPage.pdf({path:'/tmp/mjv-security-blank-form.pdf',format:'Letter'});
+assert.ok(await staffPage.getByText('FINAL CLAUSE INCLUDED',{exact:false}).count());
+await staffContext.close();
+const reviewContext=await browser.newContext({viewport:{width:390,height:844}});
+const reviewRecord={id:'review-contract',organization_id:'org-1',status:'pending_approval',customer_completed_at:'2026-10-01T12:00:00Z',onboarding_revision:0,
+  contract_number:'SC-REVIEW',monthly_price:35,term_months:36,renewal_term_months:1,cancellation_notice_days:30,account_type:'residential',security_billing_mode:'autopay',service_account_numbers:{alarm_com:'Original account'},
+  contact,emergency_contacts:[{contact_name:'First',phone_number:'5551111111',password_codeword:'one',can_authorize_entry:true},{contact_name:'Second',phone_number:'5552222222',password_codeword:'two',can_authorize_entry:false}],onboarding_agreement_snapshot:{...document,personalInfo:contact,propertyInfo:{address_line1:'1 Main',city:'Topeka',state:'KS',zip_code:'66604'}},services:[]};
+let correctionCount=0;
+await reviewContext.addInitScript(record=>{window.__reviewRecord=record;document.documentElement.style.colorScheme='dark';},reviewRecord);
+await reviewContext.route('https://security-test.supabase.co/**',async route=>{
+ if(route.request().url().includes('/rpc/security_correct_onboarding')) {
+  const body=route.request().postDataJSON();assert.equal(body.p_revision,correctionCount);assert.ok(body.p_reason);
+  correctionCount++;
+  await reviewPage.evaluate(patch=>{window.__reviewRecord={...window.__reviewRecord,...patch,onboarding_revision:window.__reviewRecord.onboarding_revision+1};},body.p_patch);
+  return route.fulfill({json:{revision:correctionCount}});
+ }
+ return route.fulfill({json:[]});
+});
+const reviewPage=await reviewContext.newPage();
+await reviewPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?review');
+await reviewPage.getByRole('heading',{name:'Review completed contract'}).waitFor();
+assert.equal(await reviewPage.locator('input,textarea,select').count(),0,'All review fields are locked by default');
+await reviewPage.getByRole('button',{name:'Edit Alarm.com account number',exact:true}).click();
+await reviewPage.getByRole('textbox',{name:'Alarm.com account number',exact:true}).fill('Accidental edit');
+await reviewPage.getByRole('button',{name:'Cancel',exact:true}).click();
+assert.equal(correctionCount,0,'Cancel does not persist changes');
+await reviewPage.getByText('Original account',{exact:true}).waitFor();
+await reviewPage.getByRole('button',{name:'Edit Alarm.com account number',exact:true}).click();
+await reviewPage.getByRole('textbox',{name:'Alarm.com account number',exact:true}).fill('1234567');
+await reviewPage.getByRole('textbox',{name:'Reason for correction'}).fill('Manager entered account number');
+await reviewPage.getByRole('button',{name:'Save correction',exact:true}).click();
+await reviewPage.getByText('1234567',{exact:true}).waitFor();
+assert.equal(correctionCount,1);assert.equal(await reviewPage.locator('input,textarea,select').count(),0,'Fields relock after saving');
+await reviewPage.getByRole('button',{name:'Edit Phone',exact:true}).click();
+assert.deepEqual(await reviewPage.getByRole('textbox',{name:'Phone',exact:true}).evaluate(el=>{const s=getComputedStyle(el);return [s.backgroundColor,s.color];}),['rgb(255, 255, 255)','rgb(0, 0, 0)']);
+await reviewPage.getByRole('button',{name:'Cancel',exact:true}).click();
+assert.ok(await reviewPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Review fits mobile');
+await reviewPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?review&readonly');
+await reviewPage.getByRole('heading',{name:'Review completed contract'}).waitFor();assert.equal(await reviewPage.getByRole('button',{name:/^Edit /}).count(),0,'Read-only staff do not receive edit controls');
+await reviewContext.close();
 await context.close();await browser.close();
 server.kill();
-console.log('Browser tests passed: mobile resume, failure/retry, save for later, signature reset, existing/new payment selection, AutoPay consent, signed download and print layout.');
+console.log('Browser tests passed: all five initial terms saved with monthly renewal, light controls in dark theme, mobile resume, failure/retry, save for later, signature reset, existing/new payment selection, AutoPay consent, signed download and print layout.');

@@ -191,5 +191,7 @@ assert.ok(revised.contract_terms.includes('initial monitoring term is 36 months'
 assert.ok(!revised.contract_terms.includes('Old multi-year renewal surcharge'));
 assert.ok((await db.query("select contract_terms from security_contract_templates where id='1546a013-6a30-4aed-b58a-70dd74a6ec25'")).rows[0].contract_terms.includes('Old multi-year renewal surcharge'),'Original template remains intact');
 await assert.rejects(db.query('update security_contract_templates set is_active=true where id=$1',[revised.id]),'Unfinished legal draft cannot be activated');
+const { testStaff } = await import('./staff.mjs');
+await testStaff(db,{id,org,contact,otherContact,template,form,role,rpc});
 await db.close();
 console.log('Security onboarding database tests passed: ownership, expiry, safe drafts, revisions, atomic signing, immutable copy, required verified AutoPay, Admin-only mail billing/$7 fee, portal visibility/summary, recurring billing idempotency, advance notices, pending/settled payments, webhook deduplication, tax blocking, and revocation.');

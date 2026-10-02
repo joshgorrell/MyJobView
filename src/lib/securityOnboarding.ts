@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+// Initial commitment is independent of the month-to-month renewal interval.
+export const SECURITY_INITIAL_TERMS: readonly number[] = [12, 24, 36, 48, 60];
+
 export interface SecurityDraftForm {
   personalInfo: { full_name: string; email: string; phone: string };
   propertyInfo: { address_line1: string; city: string; state: string; zip_code: string };
@@ -28,6 +31,7 @@ export interface SecurityAgreementDocument {
   paymentMethod?: string;
   billingPreference?: 'monthly' | 'annual';
   accepted_at?: string;
+  staff_corrected_at?: string;
   billing_mode: 'autopay' | 'mail';
   mail_invoice_fee: number;
   payment_display?: string;
@@ -83,4 +87,24 @@ export async function securityOnboardingRequest<T>(
   });
   if (error) throw new Error(error.message);
   return data as T;
+}
+
+export async function staffSecurityOnboarding<T>(action: 'print_form' | 'create' | 'edit' | 'get' | 'paper' | 'review' | 'approve' | 'activate' | 'reject', contractId?: string, payload: unknown = {}): Promise<T> {
+  const { data, error } = await supabase.rpc('staff_security_onboarding', { p_action: action, p_id: contractId || null, p_payload: payload });
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
+const invitationRequests = new Map<string, string>();
+
+export async function sendSecurityInvitation(contractId: string): Promise<void> {
+  const requestId = invitationRequests.get(contractId) || crypto.randomUUID();
+  invitationRequests.set(contractId, requestId);
+  const { data, error } = await supabase.functions.invoke('send-contract-invitation', { body: { contractId, requestId, appOrigin: window.location.origin } });
+  if (error) {
+    const detail = await error.context?.json?.().catch(() => null);
+    throw new Error(detail?.error || error.message);
+  }
+  if (!data?.success) throw new Error(data?.error || 'Invitation could not be sent.');
+  invitationRequests.delete(contractId);
 }

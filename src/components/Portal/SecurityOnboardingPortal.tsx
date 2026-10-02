@@ -52,7 +52,7 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
 
   const completed = agreement && (!!agreement.customer_completed_at || ['pending_approval', 'approved', 'active', 'cancelled'].includes(agreement.status));
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="security-onboarding-controls min-h-screen bg-slate-50">
       <header className="bg-[#0f2347] text-white px-4 sm:px-6 py-4">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

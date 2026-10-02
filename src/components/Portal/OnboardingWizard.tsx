@@ -18,7 +18,7 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-const inputClass = 'w-full px-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400 text-sm';
+const inputClass = 'w-full px-4 py-3.5 border border-gray-200 rounded-xl bg-white focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400 text-sm';
 const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5';
 
 export default function OnboardingWizard({ contract, token, onComplete }: OnboardingWizardProps) {
@@ -124,20 +124,20 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
       case 1:
         return !!(
           formData.personalInfo.full_name?.trim() &&
-          formData.personalInfo.email?.trim() &&
-          formData.personalInfo.phone?.trim()
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.personalInfo.email || '') &&
+          /^[0-9]{10,15}$/.test((formData.personalInfo.phone || '').replace(/\D/g, ''))
         );
       case 2:
         return !!(
           formData.propertyInfo.address_line1?.trim() &&
           formData.propertyInfo.city?.trim() &&
-          formData.propertyInfo.state?.trim() &&
-          formData.propertyInfo.zip_code?.trim()
+          /^[A-Za-z]{2}$/.test(formData.propertyInfo.state || '') &&
+          /^[0-9]{5}(-[0-9]{4})?$/.test(formData.propertyInfo.zip_code || '')
         );
       case 3:
-        if (formData.emergencyContacts.length < 2) return false;
+        if (formData.emergencyContacts.length < 2 || formData.emergencyContacts.length > 10) return false;
         return formData.emergencyContacts.every(
-          c => c.name?.trim() && c.phone?.trim() && c.password?.trim()
+          c => c.name?.trim() && /^[0-9]{10,15}$/.test((c.phone || '').replace(/\D/g, '')) && c.password?.trim()
         );
       case 4:
         return contract.billing_mode === 'mail' || !!formData.paymentMethodId;
@@ -153,11 +153,11 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   async function handleNext() {
     if (!isStepComplete()) {
       const messages: Record<number, string> = {
-        1: 'Please complete all required fields: Full Name, Email, and Phone Number.',
-        2: 'Please complete all required fields: Service Address, City, State, and ZIP Code.',
+        1: 'Enter your full name, a valid email, and a phone number with 10–15 digits.',
+        2: 'Enter the service address, city, two-letter state, and a valid ZIP code.',
         3: formData.emergencyContacts.length < 2
           ? 'Please add at least 2 emergency contacts.'
-          : 'Please complete all fields for each emergency contact.',
+          : 'Enter a name, phone with 10–15 digits, and codeword for each of 2–10 emergency contacts.',
         4: 'Please add or select a saved payment method for AutoPay.',
         5: 'Please select a billing preference.',
         6: 'Please review the terms, acknowledge your agreement, and provide your signature.'
@@ -217,7 +217,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   }
 
   return (
-    <div className="relative">
+    <div className="security-onboarding-controls relative">
       <div className="px-4 sm:px-8 py-5 bg-blue-50 border-b border-blue-100 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="font-semibold text-gray-900">Agreement {contract.contract_number}</p>

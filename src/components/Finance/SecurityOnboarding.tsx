@@ -1,3 +1,4 @@
+import { sendSecurityInvitation } from '../../lib/securityOnboarding';
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Shield, Plus, Clock, FileText, Send, Calendar, User, RotateCcw, Search, Trash2, AlertCircle, Eye, CreditCard as Edit2, ArrowRight, UserCheck, CheckCircle, XCircle, Loader2, Mail, X, Printer } from 'lucide-react';
@@ -5,6 +6,7 @@ import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 const CreateSecurityContractModal = lazy(() => import('./CreateSecurityContractModal'));
 const SecurityContractDetail = lazy(() => import('./SecurityContractDetail'));
 const EditSecurityContractModal = lazy(() => import('./EditSecurityContractModal'));
+const PrintSecurityOnboardingForm = lazy(() => import('./PrintSecurityOnboardingForm'));
 const ManualContractEntry = lazy(() => import('./ManualContractEntry'));
 
 interface Contract {
@@ -19,6 +21,8 @@ interface Contract {
   magic_link_expires_at: string;
   monthly_price: number;
   notes: string;
+  email_override?: string;
+  contact_id?: string;
   pipelineStatus?: string;
   invitation_sent_by?: {
     id: string;
@@ -184,7 +188,7 @@ function SendAgreementDialog({
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
                       <p className="text-xs text-gray-500 truncate">
-                        {state.contract.contact?.email || 'No email'}
+                        {state.contract.email_override || state.contract.contact?.email || 'No email'}
                       </p>
                     </div>
                   </div>
@@ -313,6 +317,7 @@ function SendAgreementDialog({
 
 export default function SecurityOnboarding({ onNavigateToContracts, canAccessContractManagement }: SecurityOnboardingProps = {}) {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPrintForm, setShowPrintForm] = useState(false);
   const [createPaperOnboarding, setCreatePaperOnboarding] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -361,7 +366,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
         .from('security_contracts')
         .select(`
           id, contract_number, status, created_at, invitation_sent_at,
-          customer_completed_at, magic_link_expires_at, monthly_price, notes,
+          customer_completed_at, magic_link_expires_at, monthly_price, notes, email_override,
           contact:contacts(id, full_name, first_name, last_name, email, phone, company_name),
           template:security_contract_templates(id, name, description),
           invitation_sent_by:profiles!invitation_sent_by_user_id(id, full_name, first_name, last_name)
@@ -380,7 +385,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           pipelineStatus = 'in_progress';
         }
 
-        return { ...contract, pipelineStatus };
+        return { ...contract, pipelineStatus, contact: Array.isArray(contract.contact) ? contract.contact[0] : contract.contact, template: Array.isArray(contract.template) ? contract.template[0] : contract.template, invitation_sent_by: Array.isArray(contract.invitation_sent_by) ? contract.invitation_sent_by[0] : contract.invitation_sent_by };
       });
 
       if (mountedRef.current) setContracts(processedContracts);
@@ -392,7 +397,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
   }
 
   function promptSendInvitation(contract: Contract, isResend = false) {
-    if (!contract.contact || !contract.contact.email) {
+    if (!(contract.email_override || contract.contact?.email)) {
       setDialog({
         type: 'error',
         message: 'Customer contact information is missing. Please ensure the agreement has a valid customer assigned.'
@@ -405,55 +410,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
   async function executeSendInvitation(contract: Contract, isResend: boolean) {
     setDialog({ type: 'sending', action: 'send' });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setDialog({ type: 'error', message: 'You must be logged in to send invitations.' });
-        return;
-      }
-
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
-      const magicToken = crypto.randomUUID();
-
-      const updateData: any = {
-        status: 'pending_customer',
-        invitation_sent_at: new Date().toISOString(),
-        invitation_sent_by_user_id: user.id,
-        magic_link_token: magicToken,
-        magic_link_expires_at: expiresAt.toISOString()
-      };
-
-      const { error: updateError } = await supabase
-        .from('security_contracts')
-        .update(updateData)
-        .eq('id', contract.id);
-
-      if (updateError) throw updateError;
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-contract-invitation`;
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const fetchResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contractId: contract.id,
-          customerEmail: contract.contact.email,
-          customerName: contract.contact.full_name || 'Customer',
-          token: magicToken,
-          appOrigin: window.location.origin
-        })
-      });
-
-      const responseData = await fetchResponse.json();
-
-      if (!fetchResponse.ok || !responseData.success) {
-        const errorMsg = responseData.error || 'Unknown error occurred';
-        throw new Error(errorMsg);
-      }
+      await sendSecurityInvitation(contract.id);
 
       setDialog({
         type: 'success',
@@ -591,7 +548,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
   }
 
   return (
-    <div className="p-3 sm:p-4 lg:p-6 max-w-full overflow-x-hidden">
+    <div className="security-onboarding-controls p-3 sm:p-4 lg:p-6 max-w-full overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
@@ -616,14 +573,15 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           )}
           <button
             type="button"
-            onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }}
-            aria-label="Paper onboarding"
-            title="Paper onboarding"
+            onClick={() => setShowPrintForm(true)}
+            aria-label="Print blank onboarding form"
+            title="Print blank onboarding form"
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Paper Form</span>
+            <span className="hidden sm:inline">Print Paper Form</span>
           </button>
+          <button type="button" onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }} aria-label="Enter completed paper form" title="Enter completed paper form" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 hover:bg-blue-50"><FileText className="h-4 w-4" /><span className="hidden sm:inline">Enter Completed Paper Form</span></button>
           <button
             type="button"
             onClick={() => { setCreatePaperOnboarding(false); setShowCreateModal(true); }}
@@ -858,6 +816,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
 
       {/* Modals */}
       <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-white" role="status">Loading form...</div>}>
+      {showPrintForm && <PrintSecurityOnboardingForm onClose={() => setShowPrintForm(false)} />}
       {showCreateModal && (
         <CreateSecurityContractModal
           onClose={() => setShowCreateModal(false)}

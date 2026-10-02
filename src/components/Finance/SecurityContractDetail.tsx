@@ -1,14 +1,16 @@
+import SecurityContractReviewFields from './SecurityContractReviewFields';
+import { sendSecurityInvitation, staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { SecurityBillingPanel } from './SecurityBillingPanel';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { readableAgreementTerms, securityAgreementHtml, printSecurityAgreement } from '../../lib/securityAgreementDocument';
 import { formatCurrency } from '../../lib/utils';
-import { ArrowLeft, Send, CheckCircle, XCircle, Eye, Mail, Clock, AlertCircle, User, Shield, Phone, CreditCard, Ligature as FileSignature, MapPin, CreditCard as Edit, Printer, Trash2, Ban, Wrench, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Mail, AlertCircle, User, Shield, Phone, CreditCard, Ligature as FileSignature, MapPin, CreditCard as Edit, Printer, Trash2, Ban, Wrench, ShieldCheck } from 'lucide-react';
 import ManualContractEntry from './ManualContractEntry';
 import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 import ConfirmModal from '../ui/ConfirmModal';
-import { AGREEMENT_TYPE_LABELS, AGREEMENT_TYPE_COLORS, SYSTEM_TYPE_LABELS, SERVICE_SCHEDULE_LABELS, type AgreementType, type SystemType } from '../../lib/types';
+import { AGREEMENT_TYPE_LABELS, SYSTEM_TYPE_LABELS, SERVICE_SCHEDULE_LABELS, type AgreementType, type SystemType } from '../../lib/types';
 
 interface SecurityContractDetailProps {
   contract?: any;
@@ -21,6 +23,8 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   const { profile } = useAuth();
   const resolvedContractId = contract?.id || contractId;
   const [contractData, setContractData] = useState<any>(null);
+  const [canManage, setCanManage] = useState(false);
+  const [editingReview, setEditingReview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [approving, setApproving] = useState(false);
@@ -60,6 +64,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
           *,
           contact:contacts(*),
           template:security_contract_templates(*),
+          services:security_contract_services(*, service:monitoring_services(*)),
           responses:security_contract_responses(
             *,
             field:security_contract_fields(*)
@@ -72,7 +77,16 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
         .single();
 
       if (error) throw error;
-      setContractData(data);
+      const { data: access } = await supabase.rpc('security_staff_access', { p_org: data.organization_id, p_manage: true });
+      setCanManage(access === true);
+      const accepted = data.onboarding_agreement_snapshot;
+      setContractData(accepted ? { ...data,
+        contact: { ...data.contact, ...(accepted.personalInfo || {}) },
+        property_address: accepted.propertyInfo?.address_line1 ?? data.property_address,
+        property_city: accepted.propertyInfo?.city ?? data.property_city,
+        property_state: accepted.propertyInfo?.state ?? data.property_state,
+        property_zip: accepted.propertyInfo?.zip_code ?? data.property_zip,
+      } : data);
     } catch (error) {
       console.error('Error loading contract details:', error);
       alert('Failed to load contract details');
@@ -84,48 +98,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   async function handleSendInvitation() {
     setSending(true);
     try {
-      const token = crypto.randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
-
-      const { error } = await supabase
-        .from('security_contracts')
-        .update({
-          magic_link_token: token,
-          magic_link_expires_at: expiresAt.toISOString(),
-          invitation_sent_at: new Date().toISOString(),
-          status: 'pending_customer'
-        })
-        .eq('id', resolvedContractId);
-
-      if (error) throw error;
-
-      // Use fetch directly to get better error handling
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-contract-invitation`;
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const fetchResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contractId: resolvedContractId,
-          token,
-          customerEmail: contractData.contact.email,
-          customerName: contractData.contact.full_name
-        })
-      });
-
-      const responseData = await fetchResponse.json();
-      console.log('Edge function response:', responseData);
-
-      if (!fetchResponse.ok || !responseData.success) {
-        const errorMsg = responseData.error || 'Unknown error occurred';
-        console.error('Edge function error:', errorMsg);
-        throw new Error(errorMsg);
-      }
+      await sendSecurityInvitation(resolvedContractId);
 
       alert('Invitation sent successfully!');
       onUpdate?.();
@@ -140,28 +113,17 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   }
 
   async function handleApprove() {
+    if (editingReview) { alert('Save or cancel the field edit before approval.'); return; }
     setApproving(true);
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('security_contracts')
-        .update({
-          status: 'approved',
-          approved_at: new Date().toISOString(),
-          approved_by_user_id: user.user.id
-        })
-        .eq('id', resolvedContractId);
-
-      if (error) throw error;
+      await staffSecurityOnboarding('approve', resolvedContractId, { revision: contractData.onboarding_revision || 0 });
 
       alert('Contract approved!');
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error approving contract:', error);
-      alert('Failed to approve contract');
+      alert(error instanceof Error ? error.message : 'Failed to approve contract');
     } finally {
       setApproving(false);
     }
@@ -175,45 +137,30 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
     setRejecting(true);
     try {
-      const { error } = await supabase
-        .from('security_contracts')
-        .update({
-          status: 'rejected',
-          rejection_reason: rejectionReason
-        })
-        .eq('id', resolvedContractId);
-
-      if (error) throw error;
+      await staffSecurityOnboarding('reject', resolvedContractId, { revision: contractData.onboarding_revision || 0, reason: rejectionReason });
 
       alert('Contract rejected');
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error rejecting contract:', error);
-      alert('Failed to reject contract');
+      alert(error instanceof Error ? error.message : 'Failed to reject contract');
     } finally {
       setRejecting(false);
     }
   }
 
   async function handleActivate() {
+    if (editingReview) { alert('Save or cancel the field edit before activation.'); return; }
     try {
-      const { error } = await supabase
-        .from('security_contracts')
-        .update({
-          status: 'active',
-          activated_at: new Date().toISOString()
-        })
-        .eq('id', resolvedContractId);
-
-      if (error) throw error;
+      await staffSecurityOnboarding('activate', resolvedContractId, { revision: contractData.onboarding_revision || 0 });
 
       alert('Contract activated!');
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error activating contract:', error);
-      alert('Failed to activate contract');
+      alert(error instanceof Error ? error.message : 'Failed to activate contract');
     }
   }
 
@@ -281,408 +228,17 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
       catch (error) { alert(error instanceof Error ? error.message : 'Could not print the agreement.'); }
       return;
     }
-    const contact = d?.contact || {};
-    const template = d?.template || {};
-    const emergencyContacts = d?.emergency_contacts || [];
-    const signedDate = d?.customer_signature_date
-      ? new Date(d.customer_signature_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-      : null;
-
-    const contractTermsHtml = (template.contract_terms || '')
-      .replace(/\[term\]/g, `${d.term_months || '__'} months`);
-
-    const emergencyContactsHtml = emergencyContacts.length > 0
-      ? emergencyContacts.map((ec: any, i: number) => `
-          <tr>
-            <td style="padding:8pt 10pt;border-bottom:1pt solid #e5e7eb;font-weight:600;">${i + 1}. ${ec.contact_name || ''}</td>
-            <td style="padding:8pt 10pt;border-bottom:1pt solid #e5e7eb;">${ec.phone_number || '—'}</td>
-            <td style="padding:8pt 10pt;border-bottom:1pt solid #e5e7eb;font-family:monospace;">${ec.password_codeword || '—'}</td>
-            <td style="padding:8pt 10pt;border-bottom:1pt solid #e5e7eb;text-align:center;">${ec.can_authorize_entry ? 'Yes' : 'No'}</td>
-          </tr>`).join('')
-      : `<tr><td colspan="4" style="padding:8pt 10pt;color:#6b7280;font-style:italic;">No emergency contacts on file</td></tr>`;
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Security Monitoring Contract — ${d.contract_number}</title>
-  <style>
-    @page {
-      size: 8.5in 11in;
-      margin: 0.75in 0.85in;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      font-size: 10pt;
-      line-height: 1.5;
-      color: #111827;
-      background: #fff;
-    }
-
-    /* ── Header ── */
-    .doc-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding-bottom: 14pt;
-      border-bottom: 2pt solid #1e3a5f;
-      margin-bottom: 18pt;
-    }
-    .doc-header h1 {
-      font-size: 18pt;
-      font-weight: 700;
-      color: #1e3a5f;
-      letter-spacing: -0.3pt;
-    }
-    .doc-header .meta {
-      text-align: right;
-      font-size: 8.5pt;
-      color: #6b7280;
-      line-height: 1.6;
-    }
-    .doc-header .meta strong {
-      color: #111827;
-      font-size: 9.5pt;
-    }
-
-    /* ── Section ── */
-    .section {
-      margin-bottom: 18pt;
-      page-break-inside: avoid;
-    }
-    .section-title {
-      font-size: 9.5pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.6pt;
-      color: #1e3a5f;
-      border-bottom: 1pt solid #1e3a5f;
-      padding-bottom: 3pt;
-      margin-bottom: 10pt;
-    }
-
-    /* ── Two-column info grid ── */
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6pt 20pt;
-    }
-    .info-grid.three-col {
-      grid-template-columns: 2fr 1fr 1fr;
-    }
-    .field-label {
-      font-size: 7.5pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.4pt;
-      color: #6b7280;
-      margin-bottom: 2pt;
-    }
-    .field-value {
-      font-size: 10pt;
-      color: #111827;
-      border-bottom: 0.5pt solid #d1d5db;
-      padding-bottom: 2pt;
-      min-height: 14pt;
-    }
-    .field-value.empty {
-      color: #9ca3af;
-      font-style: italic;
-    }
-
-    /* ── Emergency contacts table ── */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 9.5pt;
-    }
-    thead tr {
-      background: #f3f4f6;
-    }
-    th {
-      padding: 6pt 10pt;
-      text-align: left;
-      font-size: 8pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.4pt;
-      color: #374151;
-      border-bottom: 1.5pt solid #d1d5db;
-    }
-
-    /* ── Contract terms box ── */
-    .terms-box {
-      border: 1pt solid #d1d5db;
-      border-radius: 4pt;
-      padding: 12pt 14pt;
-      font-size: 8.5pt;
-      line-height: 1.6;
-      color: #374151;
-      max-height: none;
-    }
-    .terms-box p, .terms-box li { margin-bottom: 4pt; }
-    .terms-box h2, .terms-box h3 { font-size: 10pt; margin: 8pt 0 4pt; color: #111827; }
-
-    /* ── Signature block ── */
-    .signature-block {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20pt;
-      margin-top: 14pt;
-    }
-    .sig-box {
-      border-top: 1pt solid #374151;
-      padding-top: 6pt;
-    }
-    .sig-label {
-      font-size: 8pt;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.4pt;
-    }
-    .sig-image {
-      max-height: 48pt;
-      max-width: 100%;
-      display: block;
-      margin-bottom: 4pt;
-    }
-    .sig-name {
-      font-size: 10pt;
-      font-weight: 600;
-      color: #111827;
-      margin-bottom: 2pt;
-    }
-    .sig-date {
-      font-size: 8.5pt;
-      color: #6b7280;
-    }
-    .sig-ip {
-      font-size: 7.5pt;
-      color: #9ca3af;
-      font-family: monospace;
-      margin-top: 2pt;
-    }
-
-    /* ── Payment block ── */
-    .payment-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 6pt 20pt;
-    }
-
-    /* ── Footer ── */
-    .doc-footer {
-      margin-top: 24pt;
-      padding-top: 10pt;
-      border-top: 1pt solid #d1d5db;
-      font-size: 7.5pt;
-      color: #9ca3af;
-      text-align: center;
-    }
-
-    /* ── Confidential banner ── */
-    .confidential-banner {
-      background: #fef2f2;
-      border: 1pt solid #fca5a5;
-      border-radius: 3pt;
-      padding: 5pt 10pt;
-      font-size: 7.5pt;
-      font-weight: 700;
-      color: #991b1b;
-      text-align: center;
-      letter-spacing: 0.8pt;
-      text-transform: uppercase;
-      margin-bottom: 16pt;
-    }
-
-    /* ── Status badge ── */
-    .status-badge {
-      display: inline-block;
-      padding: 2pt 8pt;
-      border-radius: 3pt;
-      font-size: 8pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5pt;
-      border: 1pt solid #d1d5db;
-      color: #374151;
-    }
-  </style>
-</head>
-<body>
-
-  <div class="confidential-banner">Confidential — Security Monitoring Contract</div>
-
-  <!-- Header -->
-  <div class="doc-header">
-    <div>
-      <h1>Security Monitoring Agreement</h1>
-      <div style="font-size:9.5pt;color:#6b7280;margin-top:4pt;">${template.name || 'Standard Contract'}</div>
-    </div>
-    <div class="meta">
-      <div><strong>Contract #: ${d.contract_number}</strong></div>
-      <div>Status: <span class="status-badge">${(d.status || '').replace(/_/g, ' ')}</span></div>
-      <div style="margin-top:4pt;">Printed: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-      ${d.created_at ? `<div>Created: ${new Date(d.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>` : ''}
-    </div>
-  </div>
-
-  <!-- Section 1: Customer Information -->
-  <div class="section">
-    <div class="section-title">1. Customer Information</div>
-    <div class="info-grid">
-      <div>
-        <div class="field-label">Full Name</div>
-        <div class="field-value">${contact.full_name || '&nbsp;'}</div>
-      </div>
-      <div>
-        <div class="field-label">Email Address</div>
-        <div class="field-value">${contact.email || '&nbsp;'}</div>
-      </div>
-      <div>
-        <div class="field-label">Phone Number</div>
-        <div class="field-value ${!contact.phone ? 'empty' : ''}">${contact.phone || 'Not provided'}</div>
-      </div>
-      <div>
-        <div class="field-label">Contract Date</div>
-        <div class="field-value">${signedDate || (d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '&nbsp;')}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Section 2: Service Address -->
-  <div class="section">
-    <div class="section-title">2. Service Address</div>
-    <div class="info-grid three-col">
-      <div style="grid-column:1/-1">
-        <div class="field-label">Street Address</div>
-        <div class="field-value ${!contact.address_line1 ? 'empty' : ''}">${contact.address_line1 || 'Not provided'}</div>
-      </div>
-      <div>
-        <div class="field-label">City</div>
-        <div class="field-value ${!contact.city ? 'empty' : ''}">${contact.city || '&nbsp;'}</div>
-      </div>
-      <div>
-        <div class="field-label">State</div>
-        <div class="field-value ${!contact.state ? 'empty' : ''}">${contact.state || '&nbsp;'}</div>
-      </div>
-      <div>
-        <div class="field-label">ZIP Code</div>
-        <div class="field-value ${!contact.zip_code ? 'empty' : ''}">${contact.zip_code || '&nbsp;'}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Section 3: Monitoring Details & Payment -->
-  <div class="section">
-    <div class="section-title">3. Monitoring &amp; Billing Details</div>
-    <div class="payment-grid">
-      <div>
-        <div class="field-label">Monthly Monitoring Fee</div>
-        <div class="field-value" style="font-weight:700;font-size:11pt;">${formatCurrency(parseFloat(d.monthly_price || 0))}/month</div>
-      </div>
-      <div>
-        <div class="field-label">Payment Method</div>
-        <div class="field-value">${d.payment_method ? (d.payment_method === 'credit_card' ? 'Credit Card' : 'ACH / Bank Account') : 'Not set'}</div>
-      </div>
-      <div>
-        <div class="field-label">Account / Card Ending</div>
-        <div class="field-value">${d.last_four ? `****${d.last_four}` : '—'}</div>
-      </div>
-      <div>
-        <div class="field-label">Billing Cycle</div>
-        <div class="field-value">Monthly (auto-billing)</div>
-      </div>
-      <div>
-        <div class="field-label">Term Length</div>
-        <div class="field-value">${d.term_months ? `${d.term_months} months` : '—'}</div>
-      </div>
-      <div>
-        <div class="field-label">Start Date</div>
-        <div class="field-value">${d.activated_at ? new Date(d.activated_at).toLocaleDateString() : (signedDate || '—')}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Section 4: Emergency / Monitoring Call List -->
-  <div class="section">
-    <div class="section-title">4. Monitoring Station Call List</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Phone Number</th>
-          <th>Codeword</th>
-          <th>Can Authorize Entry</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${emergencyContactsHtml}
-      </tbody>
-    </table>
-    <div style="margin-top:6pt;font-size:7.5pt;color:#6b7280;">
-      Monitoring station will contact these individuals in the order listed when an alarm is triggered. Codeword is required to verify caller identity.
-    </div>
-  </div>
-
-  <!-- Section 5: Terms & Conditions -->
-  ${contractTermsHtml ? `
-  <div class="section" style="page-break-before:always;">
-    <div class="section-title">5. Terms &amp; Conditions</div>
-    <div class="terms-box">
-      ${contractTermsHtml}
-    </div>
-  </div>` : ''}
-
-  <!-- Section 6: Signature -->
-  <div class="section">
-    <div class="section-title">${contractTermsHtml ? '6' : '5'}. Signatures</div>
-    <div style="font-size:8.5pt;color:#374151;margin-bottom:12pt;line-height:1.6;">
-      By signing below, the customer acknowledges that they have read, understood, and agree to all terms and conditions of this Security Monitoring Agreement, including automatic monthly billing to the payment method provided above.
-    </div>
-    <div class="signature-block">
-      <div>
-        <div class="sig-label">Customer Signature</div>
-        ${d.customer_signature
-          ? `<img class="sig-image" src="${d.customer_signature}" alt="Customer signature" />`
-          : `<div style="height:40pt;"></div>`
-        }
-        <div class="sig-box" style="margin-top:${d.customer_signature ? '0' : '40pt'};">
-          <div class="sig-name">${contact.full_name || '____________________________'}</div>
-          <div class="sig-date">Date: ${signedDate || '____________________________'}</div>
-          ${d.customer_ip_address ? `<div class="sig-ip">IP: ${d.customer_ip_address}</div>` : ''}
-        </div>
-      </div>
-      <div>
-        <div class="sig-label">Company Representative</div>
-        <div style="height:40pt;"></div>
-        <div class="sig-box" style="margin-top:0;">
-          <div class="sig-name">____________________________</div>
-          <div class="sig-date">Date: ____________________________</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="doc-footer">
-    Contract #${d.contract_number} &nbsp;|&nbsp; ${template.name || 'Security Monitoring Agreement'} &nbsp;|&nbsp;
-    Generated ${new Date().toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-    <br/>This document is confidential. Unauthorized distribution is prohibited.
-  </div>
-
-</body>
-</html>`;
-
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) return;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 400);
+    const doc = {
+      contract_number: d.contract_number, monthly_price: d.monthly_price, term_months: d.term_months,
+      renewal_term_months: d.renewal_term_months, cancellation_notice_days: d.cancellation_notice_days,
+      billing_mode: d.security_billing_mode, mail_invoice_fee: d.mail_invoice_fee,
+      template: d.template, dealer: null, services: (d.services || []).map((s: any) => ({ name: s.service?.name || '', monthly_price: s.monthly_price })),
+      personalInfo: { full_name: d.contact?.full_name || `${d.contact?.first_name || ''} ${d.contact?.last_name || ''}`, email: d.contact?.email || '', phone: d.contact?.phone || '' },
+      propertyInfo: { address_line1: d.property_address || '', city: d.property_city || '', state: d.property_state || '', zip_code: d.property_zip || '' },
+    };
+    const terms = readableAgreementTerms(d.template?.contract_terms || '').replace(/\[term\]/g, `${d.term_months} months`);
+    try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date)); }
+    catch (error) { alert(error instanceof Error ? error.message : 'Could not print the agreement.'); }
   }
 
   if (loading) {
@@ -710,7 +266,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   const missingPhone = !contractData?.contact?.phone;
   const missingAddress = !contractData?.contact?.address_line1;
 
-  const sections = [
+  const sections: any[] = [
     {
       id: 'personal',
       title: 'Step 1: Personal Information',
@@ -785,8 +341,8 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   return (
     <>
 
-      <div className="p-8 contract-print-root">
-        <SecurityBillingPanel contractId={contractData.id} organizationId={contractData.organization_id} />
+      <div className="security-onboarding-controls p-8 contract-print-root">
+        <SecurityBillingPanel contractId={contractData.id} organizationId={contractData.organization_id} canEdit={canManage && !contractData.customer_completed_at} />
         <div className="mb-6 no-print">
           <button
             onClick={onClose}
@@ -836,6 +392,11 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                   <Printer className="w-4 h-4" />
                   Print Contract
                 </button>
+                {contractData.onboarding_original_snapshot?.document && <button type="button" onClick={() => {
+                  const original = contractData.onboarding_original_snapshot;
+                  const terms = readableAgreementTerms(original.document.template?.contract_terms || '').replace(/\[term\]/g, `${original.document.term_months} months`);
+                  printSecurityAgreement(securityAgreementHtml(original.document, terms, undefined, original.signature, original.signed_at));
+                }} className="px-4 py-2 bg-white text-blue-600 rounded-lg">Print Original Submission</button>}
                 {(contractData.status === 'draft' || contractData.status === 'pending_customer') && (
                   <button
                     onClick={() => setShowManualEntry(true)}
@@ -880,7 +441,8 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
       <div className="grid grid-cols-1 gap-6">
         <div className="space-y-6">
-          {sections.map((section) => {
+          {contractData.customer_completed_at && <SecurityContractReviewFields contract={contractData} canAdmin={profile?.role === 'admin'} canEdit={canManage && ['customer_completed','pending_approval','approved','rejected'].includes(contractData.status)} onEditing={setEditingReview} onSaved={async () => { await loadContractDetails(); onUpdate?.(); }} />}
+          {!contractData.customer_completed_at && sections.map((section) => {
             const Icon = section.icon;
             return (
               <div key={section.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -913,7 +475,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                 <div className="p-6">
                   {section.fields && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      {section.fields.map((field, idx) => (
+                      {section.fields.map((field: any, idx: number) => (
                         <div key={idx} className={field.thirdWidth ? '' : field.options ? 'md:col-span-2' : ''}>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             {field.label}
@@ -1289,7 +851,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                 <div>
                   <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Service Account Numbers</div>
                   <div className="space-y-1">
-                    {Object.entries(contractData.service_account_numbers).map(([svc, num]) => {
+                    {Object.entries(contractData.service_account_numbers as Record<string, string>).map(([svc, num]) => {
                       const labels: Record<string, string> = {
                         dial_up: 'Monitoring',
                         telguard: 'Telguard',
@@ -1452,6 +1014,12 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
             <div className="space-y-3">
+              {canManage && ['pending_approval','customer_completed'].includes(contractData.status) && <>
+                <button type="button" disabled={editingReview || approving} onClick={()=>setConfirmApprove(true)} className="w-full bg-green-700 text-white rounded-lg p-3 disabled:opacity-50">Approve Contract</button>
+                <button type="button" disabled={editingReview} onClick={()=>setRejecting(true)} className="w-full border border-red-300 text-red-700 rounded-lg p-3">Request Corrections</button>
+              </>}
+              {canManage && contractData.status==='approved' && <button type="button" disabled={editingReview} onClick={()=>setConfirmActivate(true)} className="w-full bg-blue-700 text-white rounded-lg p-3 disabled:opacity-50">Complete and Activate</button>}
+              {!contractData.customer_completed_at && ['draft','pending_customer','rejected'].includes(contractData.status) && <button type="button" disabled={sending} onClick={()=>setConfirmSendInvitation(true)} className="w-full bg-blue-700 text-white rounded-lg p-3">Send Invitation</button>}
               {(contractData.status === 'approved' || contractData.status === 'active') && (
                 <button
                   onClick={() => setShowCancelModal(true)}
@@ -1656,7 +1224,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
       {showManualEntry && (
         <ManualContractEntry
-          contract={contract}
+          contract={contractData}
           onClose={() => setShowManualEntry(false)}
           onComplete={() => {
             setShowManualEntry(false);

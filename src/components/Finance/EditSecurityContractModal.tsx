@@ -1,3 +1,4 @@
+import { staffSecurityOnboarding, SECURITY_INITIAL_TERMS } from '../../lib/securityOnboarding';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -33,7 +34,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   const [monitoringServices, setMonitoringServices] = useState<MonitoringService[]>([]);
   const [selectedContact, setSelectedContact] = useState(contract.contact_id || '');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [priceOverride, setPriceOverride] = useState(contract.monthly_price?.toString() || '');
+  const [priceOverride, setPriceOverride] = useState(contract.price_override?.toString() || '');
   const [termMonths, setTermMonths] = useState<number>(contract.term_months || 36);
   const [renewalTermMonths, setRenewalTermMonths] = useState<number>(contract.renewal_term_months || 1);
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>(contract.account_type || '');
@@ -152,56 +153,14 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
 
     setSaving(true);
     try {
-      const monthlyPrice = calculateMonthlyPrice();
-
-      // Update the contract
-      const { error: updateError } = await supabase
-        .from('security_contracts')
-        .update({
-          contact_id: selectedContact,
-          email_override: emailOverride.trim() || null,
-          monthly_price: monthlyPrice,
-          term_months: termMonths,
-          renewal_term_months: renewalTermMonths,
-          ...(renewalTermMonths === 1 ? { cancellation_notice_days: 30 } : {}),
-          account_type: accountType || null,
-          account_services: accountServices,
-          is_monitoring: isMonitoring,
-          account_number: isMonitoring ? (monitoringAccountNumber.trim() || null) : null,
-          installation_date: installationDate || null,
-          service_account_numbers: serviceAccountNumbers,
-          notes: notes.trim() || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', contract.id);
-
-      if (updateError) throw updateError;
-
-      // Delete existing services
-      const { error: deleteError } = await supabase
-        .from('security_contract_services')
-        .delete()
-        .eq('contract_id', contract.id);
-
-      if (deleteError) throw deleteError;
-
-      // Insert new services
-      if (selectedServices.length > 0) {
-        const serviceInserts = selectedServices.map(serviceId => {
-          const service = monitoringServices.find(s => s.id === serviceId);
-          return {
-            contract_id: contract.id,
-            service_id: serviceId,
-            monthly_price: service?.monthly_price || 0
-          };
-        });
-
-        const { error: insertError } = await supabase
-          .from('security_contract_services')
-          .insert(serviceInserts);
-
-        if (insertError) throw insertError;
-      }
+      await staffSecurityOnboarding('edit', contract.id, {
+        contact_id: selectedContact, service_ids: selectedServices,
+        price_override: priceOverride || null, term_months: termMonths,
+        email_override: emailOverride.trim() || null, account_type: accountType || null,
+        account_services: accountServices, is_monitoring: isMonitoring,
+        account_number: isMonitoring ? monitoringAccountNumber.trim() || null : null,
+        installation_date: installationDate || null, service_account_numbers: serviceAccountNumbers, notes: notes.trim(),
+      });
 
       alert('Contract updated successfully!');
       onSuccess();
@@ -219,7 +178,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg p-6">
           <div className="text-center">Loading...</div>
         </div>
@@ -228,7 +187,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+    <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl my-4 sm:my-8 max-h-[calc(100vh-2rem)]">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 gap-3">
           <div className="min-w-0 flex-1">
@@ -397,14 +356,9 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
               </label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={termMonths}
-                  onChange={(e) => setTermMonths(parseInt(e.target.value) || 12)}
-                  className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <select value={termMonths} onChange={e => setTermMonths(Number(e.target.value))} className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 border border-gray-300 rounded-lg">
+                  {SECURITY_INITIAL_TERMS.map(months => <option key={months} value={months}>{months} months</option>)}
+                </select>
               </div>
             </div>
           </div>

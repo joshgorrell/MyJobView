@@ -37,7 +37,8 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     .terms{white-space:pre-wrap;font-size:11pt;overflow-wrap:anywhere}.signature{max-width:260px;max-height:100px}h2,thead{break-after:avoid}tr,.sign{break-inside:avoid}
     @media print{body{max-width:none;margin:0;padding:0}}</style></head><body>
     <h1>${esc(document.dealer?.company_name || 'Security monitoring')} — Security agreement</h1>
-    <p>Agreement ${esc(document.contract_number)} · ${signed ? 'Signed copy' : 'For review — unsigned'}</p>
+    <p>Agreement ${esc(document.contract_number)} · ${document.staff_corrected_at ? 'Staff-corrected copy — original customer submission retained' : signed ? 'Signed copy' : document.accepted_at ? 'Customer agreement recorded by staff' : 'For review — unsigned'}</p>
+    ${document.staff_corrected_at ? `<p>Corrected by staff: ${esc(new Date(document.staff_corrected_at).toLocaleString())}. The customer signature below belongs to the original submission unless a replacement was captured during correction.</p>` : ''}
     <p>Customer: ${esc(personal?.full_name || 'To be completed')}<br>Email: ${esc(personal?.email)}<br>Phone: ${esc(personal?.phone)}</p>
     <p>Service address: ${esc(property?.address_line1 || 'To be completed')}, ${esc(property?.city)} ${esc(property?.state)} ${esc(property?.zip_code)}</p>
     <h2>Services and billing</h2><table><thead><tr><th>Service</th><th>Monthly price</th></tr></thead><tbody>
