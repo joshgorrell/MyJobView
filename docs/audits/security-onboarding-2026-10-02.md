@@ -1,6 +1,6 @@
 # Security onboarding audit — October 2, 2026
 
-Reviewed the original main `a50ef20` and integrated current main `e866e7a` (employee-time PR #77), the fixes in draft PR #78, and read-only metadata from connected MJV Supabase project `bqtsuzvuvqvgidipbsis`. Local tests exercise repository code with isolated database fixtures and mocked providers. They do not establish that the deployed portal works. No production migration, function deployment, invitation email, payment enrollment, or charge was performed.
+Reviewed the original main `a50ef20` and integrated current main `e866e7a` (employee-time PR #77), the fixes in draft PR #78, and read-only metadata from connected MJV Supabase project `bqtsuzvuvqvgidipbsis`. Local tests exercise repository code with isolated database fixtures and mocked providers. They do not establish that the deployed portal works. The original audit was read-only. Josh subsequently authorized direct MJV fixes without a test branch and post-merge testing; the deployed changes are recorded below. No invitation email, payment enrollment, or charge was performed.
 
 ## Requested behavior
 
@@ -32,15 +32,15 @@ Reviewed the original main `a50ef20` and integrated current main `e866e7a` (empl
 
 New migration: `20261002142729_security_onboarding_staff_workflows.sql`. It follows the four September 30 onboarding/billing/summary/review migrations.
 
-## Deployment and acceptance gates still open
+## Deployment findings and remaining acceptance
 
-These are observed deployment gaps or previously recorded acceptance dependencies, not passing tests.
+The first three deployment gaps below were resolved under Josh's October 2 authorization. Merchant/business acceptance remains post-merge work; it is not represented as a passing test.
 
 | Priority | Evidence | Remaining action |
 |---|---|---|
-| Critical | Connected project lacks `portal_security_onboarding`, accepted snapshot/payment-method columns, billing anchor, and `quickbooks_settings.payments_enabled`, despite deployed security functions. | Confirm the actual portal project; apply all five onboarding migrations and matching functions/configuration/frontend in a coordinated release. Exercise the new staff RPCs and synthetic end-to-end flow in the designated test environment. |
-| Critical | Connected anon contract SELECT/UPDATE and related policies check only that a nonexpired token exists on a row, not that the caller holds it. | Deploy the September 30 token/ownership RPC migration and verify denied anonymous table reads and cross-customer/cross-tenant access. No anonymous customer data extraction was attempted. |
-| High | Connected security function metadata has `verify_jwt=true`; repository config has false for token-scoped payment and secret-authenticated cron handlers. | Deploy matching config and confirm gateway plus handler authentication. A dedicated cron secret is not a Supabase JWT. Reference: https://supabase.com/docs/guides/functions/auth . |
+| Resolved | All five repository onboarding migrations were applied to MJV. Staff, portal and correction RPCs plus required columns are present. | Actual-schema read-only print/permission checks passed. Full customer and merchant acceptance will follow the authorized merge. |
+| Resolved | The deployed token/ownership migration removed anonymous table policies. | Fresh policy checks found no anonymous policies on contract/service/emergency tables; anonymous and portal actors cannot invoke staff entry/printing. |
+| Resolved | Eight matching Edge Function bundles were deployed, with repository JWT settings and handler authentication. | Print/invitation/OAuth initiation retain JWT verification; payment enrollment, callback, webhook and worker use their reviewed custom authentication. |
 | High | Active Electronic Life agreement still specifies same-term renewal and annual +$2/month or monthly +$7/month surcharges; recorded renewal is one month and mailed invoices have a distinct Admin fee. | Approve and publish the future reviewed template consistent with the selected business policy. Preserve original executed documents. The inactive draft remains inactive and blocked by review markers. |
 | High | Connected cron metadata shows legacy `generate-recurring-invoices-daily` (`0 6 * * *`), not the security worker schedule. Actual Payments merchant acceptance is not recorded. | Verify approved Payments capability/OAuth/customer mapping; sandbox card and ACH enrollment, gateway access, invoice/tax totals, advance delivery notices, debit/settlement/decline/timeout/revocation/refund cases; configure the dedicated server scheduler. Never use live charges as enrollment tests. |
 | Existing release gate | September 30 premerge packet retains unresolved approved legal provisions, transaction-specific notices, and electronic-record consent/delivery/retention procedures. | Complete `tests/security-onboarding/PREMERGE-REVIEW.md` acceptance. This change records corrections without claiming the customer's original signature proves acceptance of changed commercial terms. It does not provide legal approval or invent transaction-specific notices. |
@@ -61,7 +61,7 @@ The audit covers staff creation/editing, invitation/return access, personal/prop
 - `npm run test:employee-time`: passed after integrating current main.
 - `git diff --check`: passed.
 - Repository TypeScript check completes with existing project errors. Compared against current main using the same compiler/dependencies; it is not reported as a passing repository-wide check.
-- No production writes or merchant transactions performed. Keep PR #78 in draft until remaining release gates are resolved.
+- Under subsequent explicit authorization, the five onboarding migrations and eight matching functions were deployed to MJV. No merchant transactions or invitations were performed. Josh authorized customer/merchant testing after merge.
 
 ## Final conditional-merge audit
 
@@ -70,3 +70,15 @@ Reviewed PR head `4583baccf96166abca88335e213171c57f510c73` after Josh authorize
 The full deployment audit is **not passed**. A fresh read-only query confirmed that the connected MJV database lacks `staff_security_onboarding`, `portal_security_onboarding`, and `security_correct_onboarding`. The GitHub `Supabase Preview` check on that same head was **skipped**, explicitly because the Git branch is not associated with a Supabase branch. The default branch already reports migration failure, so automatic migration delivery on merge is not established. Local fixtures and green Actions checks do not replace a hosted migration/authorization check.
 
 Keep the PR unmerged while arranging an isolated hosted test, validating the migration sequence against the actual schema, and confirming coordinated migration/function/frontend delivery. The user's conditional merge approval remains valid once that audit passes. No production write was performed to bypass the blocker.
+
+## Authorized direct deployment — October 2, 2026
+
+Josh declined a test branch, confirmed onboarding is not actively used, and instructed us to fix the required pieces directly and test afterward. A count-only preflight confirmed zero contracts, zero active contracts and zero completed contracts.
+
+Applied all five reviewed repository migrations to MJV successfully. Reconciled **only those five newly applied history entries** to their existing repository versions (20260930130305, 20260930140901, 20260930142857, 20260930175017, 20261002142729), preserving applied SQL and names, so merge does not replay them. Historical migration records were not repaired or rewritten.
+
+Deployed `generate-blank-contract-form`, `send-contract-invitation`, `security-payment-methods`, `security-recurring-billing`, `quickbooks-payment-webhook`, `quickbooks-oauth-initiate`, `quickbooks-oauth-callback`, and `quickbooks-oauth-complete` with their shared dependencies and repository JWT settings. The legacy OAuth completion route remains a redirect explaining that the legacy flow is disabled; the current callback carries Payments authorization state.
+
+Actual database checks passed: staff/portal/correction RPC existence, read-only print preparation for all five initial terms using real active template/service configuration, no contract creation, denied staff printing for anonymous or portal-marked identities, no anonymous contract/service/emergency policies, and no anonymous correction privilege. The security advisor reported only an informational no-policy notice for intentionally RPC-only onboarding tables; those tables revoke anonymous/authenticated direct access. Full customer and merchant tests remain deferred as instructed. Direct HTTP checks also passed: unsigned recurring-worker calls returned 401 from its custom handler; payment listing without contract authorization returned 403; unsigned print requests returned 401 from the gateway. These negative checks did not invoke providers. Broader pre-existing project advisor warnings were not certified resolved by this onboarding audit.
+
+The prior missing-schema merge blocker is resolved. Automatic billing remains gated by approved QuickBooks Payments capability/customer mapping, a dedicated cron secret/schedule and merchant acceptance; no worker was invoked, scheduler enabled, invitation sent, payment instrument enrolled or charge initiated. The inactive reviewed template stays inactive. These are post-merge launch tasks, not claims that this unused workflow has completed merchant/legal acceptance.
