@@ -167,18 +167,21 @@ class LocationTrackingService {
     } catch (error) {
       console.error('Failed to get high accuracy location:', error);
 
-      // Fallback to last known location
-      if (this.lastKnownLocation) {
-        return this.lastKnownLocation;
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== 'granted') return null;
+
+      // Fallback only to a recent reading with permission still granted
+      if (this.lastKnownLocation && Date.now() - this.lastKnownLocation.timestamp <= 30000) {
+        return {...this.lastKnownLocation,coords:{...this.lastKnownLocation.coords,method:'cached',duration_ms:Date.now()-startTime} as any};
       }
 
       // Try balanced accuracy as last resort
       try {
         const location = await Location.getLastKnownPositionAsync({
-          maxAge: 60000, // 1 minute
+          maxAge: 30000, // Clock events must not use stale locations
           requiredAccuracy: 100,
         });
-        return location;
+        return location ? {...location,coords:{...location.coords,method:'cached',duration_ms:Date.now()-startTime} as any} : null;
       } catch (fallbackError) {
         console.error('All location capture methods failed:', fallbackError);
         return null;
