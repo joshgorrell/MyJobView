@@ -11,11 +11,12 @@ interface ClockOutModalProps {
   entryId: string;
   technicianId: string;
   workOrderId?: string;
+  allowCompletion?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClose, onSuccess }: ClockOutModalProps) {
+export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowCompletion=true, onClose, onSuccess }: ClockOutModalProps) {
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
@@ -104,7 +105,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       }
 
       // Mark job as complete if selected
-      if (type === 'job' && jobStatus === 'complete') {
+      if (type === 'job' && allowCompletion && jobStatus === 'complete') {
         updateData.marked_complete = true;
       }
 
@@ -117,7 +118,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       if (updateError) throw updateError;
 
       // 1.5. Update work order status to completed if marked complete
-      if (type === 'job' && workOrderId && jobStatus === 'complete') {
+      if (type === 'job' && workOrderId && allowCompletion && jobStatus === 'complete') {
         const { error: woError } = await supabase
           .from('work_orders')
           .update({
@@ -172,7 +173,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       }
 
       // 3. Send feedback email if requested (only if online and job is marked complete)
-      if (type === 'job' && workOrderId && jobStatus === 'complete' && sendFeedbackEmail && navigator.onLine) {
+      if (type === 'job' && workOrderId && allowCompletion && jobStatus === 'complete' && sendFeedbackEmail && navigator.onLine) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
@@ -347,7 +348,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           </div>
 
           {/* Job Status Selection - Only for job clock out */}
-          {type === 'job' && workOrderId && (
+          {type === 'job' && workOrderId && allowCompletion && (
             <div className="border-2 border-gray-200 rounded-lg p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-3">
@@ -469,7 +470,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           </div>
 
           {/* Photos Section - Only for job clock out */}
-          {type === 'job' && workOrderId && (
+          {type === 'job' && workOrderId && allowCompletion && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Job Photos (Optional - 1 point per photo with description)
