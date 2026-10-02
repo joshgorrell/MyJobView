@@ -10,12 +10,15 @@ export function useEmployeeTimePolicy() {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let disposed = false;
+    let loadedDay='';let timezone='';
     setLoading(true);
     setPolicy(null);
     async function load() {
       if (!profile) return;
+      if(!disposed){setLoading(true);setPolicy(null);}
       try {
-        const day = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
+        timezone=await getOrganizationTimezone(profile.organization_id || undefined);
+        const day=formatDateInTimezone(new Date().toISOString(),timezone);loadedDay=day;
         const { data: employee, error: employeeError } = await supabase.from('employees')
           .select('id').eq('user_id', profile.id).eq('organization_id', profile.organization_id).maybeSingle();
         if (employeeError) throw employeeError;
@@ -40,7 +43,8 @@ export function useEmployeeTimePolicy() {
       } finally { if (!disposed) setLoading(false); }
     }
     void load();
-    return () => { disposed = true; };
+    const dayCheck=setInterval(()=>{if(timezone && loadedDay!==formatDateInTimezone(new Date().toISOString(),timezone)){void load();}},60000);
+    return () => { disposed = true;clearInterval(dayCheck); };
   }, [profile?.id, profile?.organization_id, profile?.employment_type, profile?.requires_daily_clock]);
-  return { ...policy, loading, ready: policy !== null, canManage: canManageTime(profile?.role) };
+  return { ...policy, loading, ready: policy !== null, canManage: profile?.is_active!==false && canManageTime(profile?.role) };
 }
