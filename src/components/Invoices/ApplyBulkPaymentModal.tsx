@@ -110,7 +110,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   const totalAllocated = allocations.reduce((s, row) => s + (parseFloat(row.allocation) || 0), 0);
   const remaining = totalEntered - totalAllocated;
 
-  const feeResult = calculateConvenienceFee(totalEntered, paymentMethod, feeSettings);
+  const feeResult = calculateConvenienceFee(totalAllocated, paymentMethod, feeSettings);
   const convenienceFee = feeResult.feeAmount;
 
   const autoDistribute = useCallback((amount: string) => {
@@ -168,22 +168,30 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
     const rows = allocations.filter(row => (parseFloat(row.allocation) || 0) > 0);
 
     try {
-      const paymentNotes = convenienceFee > 0
-        ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(convenienceFee)}`
-        : notes || null;
-
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error('Please sign in before recording a payment.');
       const insertedPaymentIds: string[] = [];
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && paymentProcessor;
 
-      for (const row of rows) {
+      let allocatedFee = 0;
+      let cumulativePrincipal = 0;
+      for (const [index, row] of rows.entries()) {
         const alloc = parseFloat(row.allocation);
+        cumulativePrincipal += alloc;
+        const feeShare = (index === rows.length - 1 ? convenienceFee
+          : Math.round(convenienceFee * cumulativePrincipal / totalAllocated * 100) / 100) - allocatedFee;
+        allocatedFee = Math.round((allocatedFee + feeShare) * 100) / 100;
+        const paymentNotes = feeShare > 0
+          ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(feeShare)}`
+          : notes || null;
 
         const { data: paymentData, error: paymentError } = await supabase
           .from('payments')
           .insert({
             invoice_id: row.id,
-            contact_id: contactId,
-            amount: alloc,
+            amount: alloc + feeShare,
+            convenience_fee_amount: feeShare,
+            created_by: user.id,
             payment_date: paymentDate,
             payment_method: paymentMethod,
             reference_number: referenceNumber || null,
@@ -195,17 +203,6 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
 
         if (paymentError) throw paymentError;
         insertedPaymentIds.push(paymentData.id);
-
-        const newAmountPaid = row.amount_paid + alloc;
-        const newAmountDue = row.total - newAmountPaid;
-        const newStatus = newAmountDue <= 0.005 ? 'paid' : 'partial';
-
-        const { error: invoiceError } = await supabase
-          .from('invoices')
-          .update({ amount_paid: newAmountPaid, amount_due: Math.max(0, newAmountDue), status: newStatus })
-          .eq('id', row.id);
-
-        if (invoiceError) throw invoiceError;
       }
 
       if (sendReceipt && contactEmail && insertedPaymentIds.length > 0) {
@@ -225,7 +222,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
               contactId,
               contactEmail,
               contactName,
-              totalPaid: totalAllocated,
+              totalPaid: totalAllocated + convenienceFee,
               paymentMethod,
               paymentDate,
               referenceNumber: referenceNumber || undefined,

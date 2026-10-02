@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { organizationToday } from '../../lib/commissionPeriods';
 import { CompanyCommissionSettings } from './CompanyCommissionSettings';
 import { EmployeeCommissionConfig } from './EmployeeCommissionConfig';
 import { CommissionReportPage } from './CommissionReportPage';
@@ -108,7 +109,7 @@ const approvalBadgeStyles: Record<string, string> = {
 
 export function CommissionsPage() {
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'finance' || profile?.role === 'sales_manager';
+  const isAdmin = ['admin', 'manager', 'finance', 'sales_manager'].includes(profile?.role || '');
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showHelp, setShowHelp] = useState(false);
@@ -124,6 +125,7 @@ export function CommissionsPage() {
   });
   const [employees, setEmployees] = useState<{ id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     employees: [],
@@ -141,6 +143,8 @@ export function CommissionsPage() {
   }, [profile, filters, activeTab]);
 
   async function loadManagementData() {
+    if (!profile?.organization_id) return;
+    setError('');
     try {
       setLoading(true);
 
@@ -165,12 +169,13 @@ export function CommissionsPage() {
       if (filters.dateRange.start) query = query.gte('created_at', filters.dateRange.start);
       if (filters.dateRange.end) query = query.lte('created_at', filters.dateRange.end);
 
-      const { data: commissionsData } = await query;
+      const { data: commissionsData, error: commissionsError } = await query;
+      if (commissionsError) throw commissionsError;
 
       const formatted = (commissionsData || []).map((c: any) => ({
         id: c.id,
         employee_id: c.employee_id,
-        employee_name: c.employee?.full_name || 'Unknown',
+        employee_name: c.recipient_type === 'service_department' ? 'Service Department' : c.employee?.full_name || 'Former employee',
         role_type: c.role_type,
         basis_amount: Number(c.basis_amount || 0),
         commission_rate: Number(c.commission_rate || 0),
@@ -191,14 +196,17 @@ export function CommissionsPage() {
 
       const pendingApproval = formatted.filter((c: CommissionRecord) => c.approval_status === 'pending_approval');
       const readyToPay = formatted.filter((c: CommissionRecord) =>
-        c.approval_status === 'approved' && c.status === 'ready_to_pay'
+        ['approved', 'auto_approved'].includes(c.approval_status) && c.status === 'ready_to_pay'
       );
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-      const paidThisPeriod = formatted
-        .filter((c: CommissionRecord) => c.status === 'paid' && c.created_at >= monthStart)
-        .reduce((sum: number, c: CommissionRecord) => sum + c.amount_paid, 0);
+      const { data: organization } = await supabase.from('organizations').select('timezone').eq('id', profile.organization_id).single();
+      const monthStart = `${organizationToday(organization?.timezone || 'America/Chicago').slice(0, 7)}-01`;
+      let payoutsQuery = supabase.from('commission_payments').select('amount_paid').eq('organization_id', profile.organization_id)
+        .eq('payment_status', 'completed').gte('payment_date', monthStart).lte('payment_date', organizationToday(organization?.timezone || 'America/Chicago'));
+      if (filters.employees.length > 0) payoutsQuery = payoutsQuery.in('employee_id', filters.employees);
+      const { data: payouts, error: payoutsError } = await payoutsQuery;
+      if (payoutsError) throw payoutsError;
+      const paidThisPeriod = (payouts || []).reduce((sum, payout) => sum + Number(payout.amount_paid), 0);
       const totalLiability = formatted
-        .filter((c: CommissionRecord) => c.status !== 'paid')
         .reduce((sum: number, c: CommissionRecord) => sum + (c.amount_earned - c.amount_paid), 0);
 
       setMetrics({
@@ -210,6 +218,7 @@ export function CommissionsPage() {
         totalLiability
       });
     } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not load commission data.');
       console.error('Error loading commission management data:', error);
     } finally {
       setLoading(false);
@@ -263,14 +272,16 @@ export function CommissionsPage() {
     { id: 'company-settings', label: 'Commission Settings', icon: Settings }
   ];
 
-  const visibleTabs = tabs;
+  const visibleTabs = isAdmin ? tabs : tabs.filter(t => ['overview', 'records', 'payments', 'pay-period-report'].includes(t.id));
 
   const showManagementHeader = managementTabs.includes(activeTab) && activeTab !== 'pay-period-report' && activeTab !== 'contract-report';
 
   return (
     <div className="space-y-0">
+      {error && <p role="alert" className="p-3 bg-red-900/30 text-red-300">{error}</p>}
       {/* Page Header */}
       <div className="bg-gray-800 rounded-t-lg border border-gray-700 border-b-0 p-5">
+        <p className="text-sm text-amber-300 mb-3">Earnings tracking is available. Approval actions, payroll payout recording, and draw reconciliation are the next repair phase.</p>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <DollarSign className="w-6 h-6 text-green-400" />

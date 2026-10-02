@@ -38,7 +38,6 @@ const rateFields = [
   { key: 'custom_design_rate' as const, defaultKey: 'default_design_rate' as const, label: 'Design', desc: 'When credited as designer' },
   { key: 'custom_pm_rate' as const, defaultKey: 'default_pm_rate' as const, label: 'Project Mgmt', desc: 'On collected project funds' },
   { key: 'custom_service_sales_rate' as const, defaultKey: 'default_service_sales_rate' as const, label: 'Service Sales', desc: 'On collected service work' },
-  { key: 'custom_service_pm_rate' as const, defaultKey: 'default_service_pm_rate' as const, label: 'Service PM', desc: 'On collected service work' },
   { key: 'custom_contract_commission_rate' as const, defaultKey: 'default_contract_commission_rate' as const, label: 'Contract Sales', desc: 'Security/VIP/service plan contracts' },
 ];
 
@@ -347,6 +346,7 @@ export function EmployeeCommissionConfig() {
         <ul className="text-xs text-gray-500 space-y-1">
           <li>Toggle "Eligible" to enable commission tracking for an employee</li>
           <li>Click the edit icon to set custom rates that override company defaults</li>
+          <li>The service department allocation is configured in Company Commission Settings.</li>
           <li>Leave a rate blank to use the company default for that commission type</li>
           <li>Bonus tiers add extra commission when an employee's total sales exceed the threshold</li>
         </ul>

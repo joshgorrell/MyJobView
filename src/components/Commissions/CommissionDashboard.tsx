@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  DollarSign, TrendingUp, Clock, CheckCircle, ArrowUpDown, Users,
-  Loader2, Calendar, ChevronDown, Download, Briefcase, PenTool,
+  DollarSign, TrendingUp, Clock, CheckCircle, Users,
+  Loader2, Briefcase, PenTool,
   Filter, X, ChevronsUpDown
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -141,7 +141,7 @@ export function CommissionDashboard() {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'finance';
+  const isAdmin = ['admin', 'manager', 'finance', 'sales_manager'].includes(profile?.role || '');
 
   useEffect(() => {
     loadData();
@@ -165,7 +165,7 @@ export function CommissionDashboard() {
 
       const formatted = (data || []).map((r: any) => ({
         ...r,
-        employee_name: r.profiles?.full_name || 'Unknown',
+        employee_name: r.recipient_type === 'service_department' ? 'Service Department' : r.profiles?.full_name || 'Former employee',
       }));
       setRecords(formatted);
 

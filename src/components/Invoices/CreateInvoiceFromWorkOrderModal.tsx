@@ -23,6 +23,7 @@ interface WorkOrder {
   type: string;
   contact_id: string;
   project_id: string | null;
+  customer_sales_rep_id: string | null;
   is_billable: boolean;
   billable_type: string | null;
   actual_completion_date: string | null;
@@ -131,6 +132,7 @@ const EMPTY_BILLING: BillingAddress = {
 };
 
 interface CreateInvoiceFromWorkOrderModalProps {
+  initialWorkOrderId?: string;
   onClose: () => void;
   onSuccess: (invoiceId: string) => void;
   preSelectedContactId?: string;
@@ -168,7 +170,7 @@ function getBillingBadge(status: BillingQueueStatus | null, isBillable: boolean)
   }
 }
 
-export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateInvoiceFromWorkOrderModalProps) {
+export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, initialWorkOrderId }: CreateInvoiceFromWorkOrderModalProps) {
   const [step, setStep] = useState<'select' | 'review'>('select');
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [selectedWorkOrderIds, setSelectedWorkOrderIds] = useState<string[]>([]);
@@ -226,6 +228,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
           type,
           contact_id,
           project_id,
+          customer_sales_rep_id,
           is_billable,
           billable_type,
           actual_completion_date,
@@ -268,6 +271,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
 
       const enriched: WorkOrder[] = (woData || []).map(wo => ({
         ...wo,
+        contacts: Array.isArray(wo.contacts) ? wo.contacts[0] : wo.contacts,
         billing_queue_status: billingQueueMap[wo.id] ?? null,
       }));
 
@@ -282,6 +286,9 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
       });
 
       setWorkOrders(sorted);
+      if (initialWorkOrderId && sorted.some(wo => wo.id === initialWorkOrderId)) {
+        setSelectedWorkOrderIds([initialWorkOrderId]);
+      }
     } catch (error) {
       console.error('Error loading work orders:', error);
       alert('Failed to load work orders');
@@ -382,7 +389,10 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
       if (laborRes.error) throw laborRes.error;
       if (partsRes.error) throw partsRes.error;
 
-      const labor = laborRes.data as LaborEntry[];
+      const labor: LaborEntry[] = (laborRes.data || []).map(entry => ({
+        ...entry,
+        profiles: Array.isArray(entry.profiles) ? entry.profiles[0] : entry.profiles,
+      }));
       const parts = partsRes.data as PartsUsed[];
 
       setLaborEntries(labor);
@@ -544,6 +554,14 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
 
     setSubmitting(true);
     try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error("Please sign in before creating an invoice.");
+      const selectedOrders = workOrders.filter(wo => selectedWorkOrderIds.includes(wo.id));
+      if (selectedOrders.some(wo => wo.contact_id !== selectedWorkOrder.contact_id ||
+        wo.project_id !== selectedWorkOrder.project_id ||
+        wo.customer_sales_rep_id !== selectedWorkOrder.customer_sales_rep_id)) {
+        throw new Error("Combine work orders only when the customer, project, and sales rep match.");
+      }
       const taxResult = computeInvoiceTax({
         lineItems: lineItems.map(item => ({
           amount: item.amount,
@@ -566,6 +584,8 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
         .insert({
           contact_id: selectedWorkOrder.contact_id,
           project_id: selectedWorkOrder.project_id,
+          commission_work_order_id: selectedWorkOrder.id,
+          created_by: user.id,
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           status: 'draft',
