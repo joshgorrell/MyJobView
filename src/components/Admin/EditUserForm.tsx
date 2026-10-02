@@ -1850,24 +1850,25 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Payroll Time Basis</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">What determines payable time?</label>
                       <select
                         value={employeeForm.payroll_time_basis}
                         onChange={(e) => {
                           setEmployeeForm({
                             ...employeeForm,
                             payroll_time_basis: e.target.value as any,
+                            requires_daily_clock: e.target.value === 'work_allocation' ? false : e.target.value === 'daily_clock' ? true : employeeForm.requires_daily_clock,
                           });
                           setShowEffectiveDatePrompt(true);
                         }}
                         className={selectClass}
                       >
-                        <option value="salary">Salary (no hourly segments)</option>
-                        <option value="daily_clock">Daily Clock (one segment per clock entry)</option>
-                        <option value="work_allocation">Work Allocation (segments from job time)</option>
+                        <option value="salary">Salary</option>
+                        <option value="daily_clock">Daily Clock / Hourly</option>
+                        <option value="work_allocation">Job Time Only</option>
                       </select>
                       <p className="text-xs text-gray-400 mt-1">
-                        Controls how payroll segments are generated for this employee.
+                        {employeeForm.payroll_time_basis === 'work_allocation' ? 'No Daily Clock. Approved Work Order time determines pay. Manual Job Time and Shop/Training Time require permission and approval.' : employeeForm.payroll_time_basis === 'salary' ? 'Salary determines pay. Recorded time is used for job costing and operational reporting.' : 'Daily Clock determines paid hours. Job Time records where that labor went.'}
                       </p>
                     </div>
 

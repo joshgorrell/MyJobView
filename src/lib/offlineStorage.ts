@@ -1,5 +1,6 @@
+import {supabase} from './supabase';
 const DB_NAME = 'LeadManagerOfflineDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export interface QueuedAction {
   id: string;
@@ -7,6 +8,7 @@ export interface QueuedAction {
   table: string;
   data: any;
   timestamp: number;
+  ownerId?: string;
 }
 
 class OfflineStorage {
@@ -65,6 +67,8 @@ class OfflineStorage {
           db.createObjectStore('work_orders', { keyPath: 'id' });
         }
 
+        if (!db.objectStoreNames.contains('time_entries')) {db.createObjectStore('time_entries',{keyPath:'id'});}
+
         if (!db.objectStoreNames.contains('daily_clock_entries')) {
           db.createObjectStore('daily_clock_entries', { keyPath: 'id' });
         }
@@ -79,8 +83,11 @@ class OfflineStorage {
   async addToSyncQueue(action: Omit<QueuedAction, 'id' | 'timestamp'>): Promise<void> {
     if (!this.db) await this.init();
 
+    const {data:{session},error}=await supabase.auth.getSession();
+    if(error || !session?.user.id) throw new Error('Sign in before saving changes offline');
     const queuedAction: QueuedAction = {
       ...action,
+      ownerId:session.user.id,
       id: crypto.randomUUID(),
       timestamp: Date.now(),
     };
@@ -88,10 +95,11 @@ class OfflineStorage {
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['syncQueue'], 'readwrite');
       const store = transaction.objectStore('syncQueue');
-      const request = store.add(queuedAction);
+      store.add(queuedAction);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
     });
   }
 
@@ -114,10 +122,11 @@ class OfflineStorage {
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['syncQueue'], 'readwrite');
       const store = transaction.objectStore('syncQueue');
-      const request = store.delete(id);
+      store.delete(id);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
     });
   }
 

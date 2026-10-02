@@ -1,0 +1,10 @@
+import React from 'react';
+export const useAuth=()=>({profile:{id:'tech',organization_id:'org'}});
+export const useEmployeeTimePolicy=()=>({ready:true,basis:'work_allocation',dailyClock:false});
+export const getOrganizationTimezone=async()=> 'America/Chicago';
+export const formatDateInTimezone=()=> '2026-10-02';
+export const supabase={from(table:string){const q:any=new Proxy({}, {get(_,key){if(key==='then')return(resolve:any)=>resolve({error:null,data:table==='work_orders'?[{id:'wo',work_order_number:'WO-100',title:'Install Speakers',status:'assigned',scheduled_start_time:'08:00',project:{name:'Home'}}]:{}});return()=>q;}});return q;}};
+export const ManualJobTimeRequestModal=()=> <div>Manual request</div>;
+export const RequestInternalTimeModal=()=> <div>Internal request</div>;
+export const MyTimeView=()=> <div>Approved Job Time</div>;
+export const AppointmentsCalendar=({personalOnly,onWorkOrderSelect}:any)=> <div><p>{personalOnly?'Personal daily calendar':'Wrong view'}</p><button onClick={()=>onWorkOrderSelect('calendar-wo')}>Scheduled Work Order</button></div>;

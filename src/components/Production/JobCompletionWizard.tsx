@@ -1,8 +1,8 @@
+import { formatDateInTimezone,getOrganizationTimezone } from '../../lib/timezoneUtils';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { SignaturePad } from './SignaturePad';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 import { CheckCircle, Circle, Camera, AlertCircle, FileText, PenTool, Send, ChevronRight, ChevronLeft, Mail } from 'lucide-react';
 
 interface JobCompletionWizardProps {
@@ -160,6 +160,9 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
     setSubmitting(true);
 
     try {
+      const {data:runningTime,error:timeError}=await supabase.from('time_entries').select('id').eq('work_order_id',workOrderId).eq('technician_id',profile.id).is('clock_out',null).maybeSingle();
+      if(timeError) throw timeError;
+      if(runningTime) throw new Error('Stop Job Time in this Work Order before completing the visit.');
       let signatureUrl = null;
 
       if (signatureDataUrl) {
@@ -208,55 +211,10 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
       const { error: updateError } = await supabase
         .from('work_orders')
-        .update({ status: 'completed', actual_completion_date: new Date().toISOString().split('T')[0] })
+        .update({ status: 'completed', actual_completion_date: formatDateInTimezone(new Date().toISOString(),await getOrganizationTimezone()) })
         .eq('id', workOrderId);
 
       if (updateError) throw updateError;
-
-      // Capture GPS coordinates for job clock-out
-      const gpsResult = await gpsTrackingService.captureLocationForClockEvent(true);
-
-      // Update active time_entry with clock_out and GPS coordinates
-      const now = new Date();
-      const { data: activeEntry, error: fetchError } = await supabase
-        .from('time_entries')
-        .select('id, clock_in')
-        .eq('work_order_id', workOrderId)
-        .eq('technician_id', profile.id)
-        .is('clock_out', null)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('Error fetching active time entry:', fetchError);
-      } else if (activeEntry) {
-        const clockInTime = new Date(activeEntry.clock_in);
-        const clockOutTime = now;
-        const diffMs = clockOutTime.getTime() - clockInTime.getTime();
-        const totalHours = Math.max(0, diffMs / (1000 * 60 * 60));
-
-        const { error: timeUpdateError } = await supabase
-          .from('time_entries')
-          .update({
-            clock_out: now.toISOString(),
-            total_hours: totalHours,
-            status: 'completed',
-            clock_out_latitude: gpsResult.latitude,
-            clock_out_longitude: gpsResult.longitude,
-            clock_out_gps_accuracy: gpsResult.accuracy,
-            clock_out_gps_capture_method: gpsResult.method,
-            clock_out_gps_duration_ms: gpsResult.duration_ms,
-            clock_out_gps_attempted_at: gpsResult.attempted_at,
-            clock_out_gps_captured_at: gpsResult.captured_at
-          })
-          .eq('id', activeEntry.id);
-
-        if (timeUpdateError) {
-          console.error('Error updating time entry:', timeUpdateError);
-        }
-      }
-
-      // Stop GPS tracking
-      gpsTrackingService.stopTracking();
 
       // Send feedback email if requested
       if (sendFeedbackEmail && customerEmail.trim()) {
@@ -291,9 +249,9 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       }
 
       onComplete();
-    } catch (error) {
+    } catch (error:any) {
       console.error('Error submitting job completion:', error);
-      alert('Failed to submit job completion');
+      alert(error.message||'Failed to submit job completion');
     } finally {
       setSubmitting(false);
     }
@@ -331,7 +289,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
   return (
     <div className="bg-white rounded-xl shadow-lg max-w-2xl mx-auto">
       {/* Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-gray-200 bg-slate-800 rounded-t-xl">
         <h2 className="text-xl sm:text-2xl font-bold text-white">Complete Job</h2>
         <p className="text-gray-300">
           {workOrder.work_order_number}: {workOrder.title}

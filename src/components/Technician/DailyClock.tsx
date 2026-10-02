@@ -1,9 +1,9 @@
+import { saveClockEventGps } from '../../lib/clockEventGps';
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, Calendar, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { gpsTrackingService } from '../../lib/gpsTracking';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
 import { getOrganizationTimezone, formatDateInTimezone, formatTimeInTimezone } from '../../lib/timezoneUtils';
@@ -37,6 +37,7 @@ interface RewardEvent {
 
 export function DailyClock() {
   const { profile } = useAuth();
+  const timePolicy=useEmployeeTimePolicy();
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
   const [activeBreak, setActiveBreak] = useState<Break | null>(null);
   const [breaks, setBreaks] = useState<Break[]>([]);
@@ -58,7 +59,7 @@ export function DailyClock() {
   useEffect(() => {
     getOrganizationTimezone().then(tz => setOrgTimezone(tz));
 
-    if (profile?.requires_daily_clock) {
+    if (timePolicy.ready && timePolicy.dailyClock) {
       loadTodaysClock();
     }
 
@@ -78,11 +79,6 @@ export function DailyClock() {
       console.error('Geolocation requires HTTPS on iOS. Current protocol:', window.location.protocol);
     }
 
-    // Start GPS pre-warming when component mounts (only if not clocked in)
-    if (!todayEntry && navigator.geolocation) {
-      gpsTrackingService.startPreWarming();
-    }
-
     if (profile?.id) {
       loadLeaveBalances();
     }
@@ -91,9 +87,8 @@ export function DailyClock() {
       clearInterval(timer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      gpsTrackingService.stopPreWarming();
     };
-  }, [profile, todayEntry]);
+  }, [profile, todayEntry, timePolicy.ready, timePolicy.dailyClock]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -173,11 +168,7 @@ export function DailyClock() {
         await loadBreaks(entry.id);
         await loadRewardEvent(entry.id);
 
-        if (entry.status === 'clocked_in' && !entry.clock_out && navigator.onLine) {
-          if (!gpsTrackingService.isCurrentlyTracking()) {
-            await gpsTrackingService.startTracking(profile.id, entry.id);
-          }
-        }
+
       }
     } catch (error) {
       console.error('Error loading daily clock:', error);
@@ -262,7 +253,7 @@ export function DailyClock() {
       return;
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatDateInTimezone(new Date().toISOString(),orgTimezone);
     const isSameDay = true;
 
     if (isSameDay && !['bereavement', 'jury_duty', 'unpaid'].includes(policy.policy.pto_type)) {
@@ -306,52 +297,7 @@ export function DailyClock() {
     if (!profile) return;
 
     // Clock in immediately without waiting for GPS
-    const entryId = await performClockIn();
-
-    // Capture GPS location in background (non-blocking)
-    if (entryId && navigator.geolocation) {
-      gpsTrackingService.captureLocationForClockEvent(false).then(async (gpsResult) => {
-        try {
-          // Calculate GPS quality score
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy,
-            p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms,
-            p_refined: false,
-            p_original_accuracy: null
-          });
-
-          // Update the clock entry with GPS metadata
-          await supabase
-            .from('daily_clock_entries')
-            .update({
-              clock_in_latitude: gpsResult.latitude,
-              clock_in_longitude: gpsResult.longitude,
-              clock_in_gps_accuracy: gpsResult.accuracy,
-              clock_in_gps_capture_method: gpsResult.method,
-              clock_in_gps_duration_ms: gpsResult.duration_ms,
-              clock_in_gps_attempted_at: gpsResult.attempted_at,
-              clock_in_gps_captured_at: gpsResult.captured_at,
-              clock_in_gps_quality_score: scoreData || 0,
-            })
-            .eq('id', entryId);
-
-          // Reverse geocode address if GPS was captured
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, false, 'daily_clock_entries').catch(() => {});
-          }
-
-          // Start refinement if accuracy is poor (>50m)
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, false, 'daily_clock_entries');
-          }
-        } catch (error) {
-          // Silently fail - GPS metadata is not critical
-        }
-      }).catch(() => {
-        // Silently fail - GPS capture is best-effort only
-      });
-    }
+    await performClockIn();
   }
 
   async function performClockIn(): Promise<string | null> {
@@ -392,19 +338,14 @@ export function DailyClock() {
       };
 
       // Use offline-capable insert
-      const { data, error } = await offlineSupabaseInsert<any>(
+      const { error } = await offlineSupabaseInsert<any>(
         'daily_clock_entries',
         clockInData
       );
 
       if (error) throw error;
 
-      const insertedEntry = Array.isArray(data) ? data[0] : data;
-
-      // Start GPS tracking silently in the background
-      if (navigator.geolocation) {
-        gpsTrackingService.startTracking(profile.id, insertedEntry.id);
-      }
+      void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       await loadTodaysClock();
 
@@ -437,7 +378,6 @@ export function DailyClock() {
   }
 
   async function handleClockOutSuccess() {
-    gpsTrackingService.stopTracking();
     await loadTodaysClock();
   }
 
@@ -540,14 +480,13 @@ export function DailyClock() {
     return '';
   }
 
-  if (!profile?.requires_daily_clock) {
+  if (!timePolicy.ready || !timePolicy.dailyClock) {
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
         <Clock className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Daily Clock Not Required</h3>
-        <p className="text-gray-300">
-          Your employment type ({profile?.employment_type}) does not require daily clock-in/out.
-          {profile?.employment_type === 'job_time' && ' You only need to clock into specific jobs.'}
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{!timePolicy.ready?'Loading time configuration…':'Daily Clock Not Required'}</h3>
+        <p className="text-gray-600">
+          {timePolicy.ready?'Your payroll configuration does not require daily clock-in/out. Open the assigned Work Order to record job time.':'If this persists, refresh to load your payroll configuration.'}
         </p>
       </div>
     );
@@ -623,7 +562,7 @@ export function DailyClock() {
 
         <div className="text-center mb-6">
           <div className="text-6xl font-bold mb-2">
-            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone:orgTimezone })}
           </div>
           <div className="text-xl opacity-90">
             {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
