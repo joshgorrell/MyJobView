@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { staffSecurityOnboarding, securityPaymentRequest } from '../../lib/securityOnboarding';
+import SecurityPaymentEnrollment from '../Portal/SecurityPaymentEnrollment';
 import { supabase } from '../../lib/supabase';
-import { Save, X, Plus, Trash2, User, MapPin, Phone, Shield, CreditCard, FileSignature, Printer, Home, Building2 } from 'lucide-react';
+import { Save, X, Plus, Trash2, User, MapPin, Phone, Shield, Printer, Home, Building2 } from 'lucide-react';
 
 interface ManualContractEntryProps {
   contract: any;
@@ -12,18 +14,21 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [paperSigned, setPaperSigned] = useState(false);
+  const [autopayAccepted, setAutopayAccepted] = useState(false);
+  const [documentVersion, setDocumentVersion] = useState('');
+  const [annualAvailable,setAnnualAvailable] = useState(false);
+  const [billingMode, setBillingMode] = useState('autopay');
   const [contractData, setContractData] = useState<any>(null);
   const [formData, setFormData] = useState({
+    personalInfo: { full_name: '', email: '', phone: '' },
     propertyAddress: '',
     propertyCity: '',
     propertyState: '',
     propertyZip: '',
     emergencyContacts: [{ name: '', phone: '', password: '', canAuthorize: false }],
     paymentMethod: 'credit_card' as 'credit_card' | 'ach',
-    paymentDetails: {
-      lastFour: '',
-      token: 'manual_entry'
-    },
+    paymentMethodId: '',
+    billingPreference: 'monthly',
     accountType: '' as 'residential' | 'commercial' | '',
     accountServices: [] as string[]
   });
@@ -47,6 +52,11 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
 
       if (error) throw error;
       setContractData(data);
+      setFormData(prev => ({ ...prev, personalInfo: { full_name: data.contact.full_name || `${data.contact.first_name || ''} ${data.contact.last_name || ''}`.trim(), email: data.contact.email || '', phone: data.contact.phone || '' } }));
+      const agreement = await staffSecurityOnboarding<any>('get', contract.id);
+      setDocumentVersion(agreement.document_version);
+      setBillingMode(agreement.document.billing_mode);
+      setAnnualAvailable(agreement.document.dealer?.annual_billing_enabled === true);
 
       if (data.property_address) {
         setFormData(prev => ({
@@ -67,17 +77,6 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
             password: c.password_codeword,
             canAuthorize: c.can_authorize_entry
           }))
-        }));
-      }
-
-      if (data.payment_method) {
-        setFormData(prev => ({
-          ...prev,
-          paymentMethod: data.payment_method,
-          paymentDetails: {
-            lastFour: data.last_four || '',
-            token: data.payment_token || 'manual_entry'
-          }
         }));
       }
 
@@ -143,53 +142,26 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
 
     setSaving(true);
     try {
-      const { error: contractError } = await supabase
-        .from('security_contracts')
-        .update({
-          property_address: formData.propertyAddress,
-          property_city: formData.propertyCity,
-          property_state: formData.propertyState,
-          property_zip: formData.propertyZip,
-          account_type: formData.accountType,
-          account_services: formData.accountServices,
-          payment_method: formData.paymentMethod,
-          payment_token: formData.paymentDetails.token,
-          last_four: formData.paymentDetails.lastFour,
-          status: 'completed',
-          customer_completed_at: new Date().toISOString(),
-          completed_by_staff: true
-        })
-        .eq('id', contract.id);
-
-      if (contractError) throw contractError;
-
-      const { error: deleteError } = await supabase
-        .from('security_contract_emergency_contacts')
-        .delete()
-        .eq('contract_id', contract.id);
-
-      if (deleteError) throw deleteError;
-
-      const contactsData = formData.emergencyContacts.map((ec, index) => ({
-        contract_id: contract.id,
-        contact_name: ec.name,
-        phone_number: ec.phone,
-        password_codeword: ec.password,
-        can_authorize_entry: ec.canAuthorize || false,
-        priority_order: index + 1
-      }));
-
-      const { error: contactError } = await supabase
-        .from('security_contract_emergency_contacts')
-        .insert(contactsData);
-
-      if (contactError) throw contactError;
+      if (billingMode !== 'mail') {
+        if (!formData.paymentMethodId || !autopayAccepted) throw new Error('Select a saved payment method and confirm the signed AutoPay authorization.');
+        await securityPaymentRequest('verify', contract.id, '', { methodId: formData.paymentMethodId });
+      }
+      await staffSecurityOnboarding('paper', contract.id, {
+        paper_signed: paperSigned, autopay_accepted: autopayAccepted, document_version: documentVersion,
+        account_type: formData.accountType, account_services: formData.accountServices,
+        form_data: {
+          personalInfo: formData.personalInfo,
+          propertyInfo: { address_line1: formData.propertyAddress, city: formData.propertyCity, state: formData.propertyState, zip_code: formData.propertyZip },
+          emergencyContacts: formData.emergencyContacts, paymentMethodId: formData.paymentMethodId,
+          paymentMethod: formData.paymentMethod, billingPreference: formData.billingPreference,
+        },
+      });
 
       alert('Contract information saved successfully!');
       onComplete();
     } catch (error) {
       console.error('Error saving contract:', error);
-      alert('Failed to save contract information');
+      alert(error instanceof Error ? error.message : 'Failed to save contract information');
     } finally {
       setSaving(false);
     }
@@ -269,6 +241,13 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
               </div>
             </div>
 
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Customer Information</h3>
+              {(['full_name','email','phone'] as const).map(field => <label key={field} className="block text-sm font-medium text-gray-700 mb-3">
+                {field==='full_name'?'Full name':field==='email'?'Email':'Phone'}
+                <input type={field==='email'?'email':field==='phone'?'tel':'text'} value={formData.personalInfo[field]} onChange={e=>setFormData(prev=>({...prev,personalInfo:{...prev.personalInfo,[field]:e.target.value}}))} className="block w-full border border-gray-300 rounded-lg px-4 py-2 mt-1" />
+              </label>)}
+            </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-4">
                 <User className="w-5 h-5 text-gray-600" />
@@ -517,48 +496,16 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <CreditCard className="w-5 h-5 text-gray-600" />
-                <h3 className="font-semibold text-gray-900">Payment Method</h3>
-              </div>
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      value="credit_card"
-                      checked={formData.paymentMethod === 'credit_card'}
-                      onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as any })}
-                      className="w-4 h-4"
-                    />
-                    <span>Credit Card</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      value="ach"
-                      checked={formData.paymentMethod === 'ach'}
-                      onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as any })}
-                      className="w-4 h-4"
-                    />
-                    <span>ACH / Bank Account</span>
-                  </label>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Last 4 Digits {formData.paymentMethod === 'credit_card' ? 'of Card' : 'of Account'}
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.paymentDetails.lastFour}
-                    onChange={(e) => setFormData({ ...formData, paymentDetails: { ...formData.paymentDetails, lastFour: e.target.value }})}
-                    placeholder="1234"
-                    maxLength={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">For record keeping only</p>
-                </div>
-              </div>
+              <h3 className="font-semibold text-gray-900 mb-4">Payment Method</h3>
+              <label className="block text-sm font-medium mb-4">Billing preference<select value={formData.billingPreference} onChange={e=>setFormData(prev=>({...prev,billingPreference:e.target.value}))} className="block w-full border rounded-lg px-4 py-2 mt-1"><option value="monthly">Monthly</option>{annualAvailable && <option value="annual">Annual</option>}</select></label>
+              {billingMode === 'mail' ? <p>Admin-approved mailed invoices apply, including the monthly mailing fee.</p> : <>
+                <SecurityPaymentEnrollment contractId={contract.id} token="" selectedId={formData.paymentMethodId}
+                  onSelect={method => { setAutopayAccepted(false); setFormData(prev => ({ ...prev, paymentMethodId: method.id, paymentMethod: method.payment_type === 'card' ? 'credit_card' : 'ach' })); }} />
+                <label className="flex items-start gap-2 mt-4 text-sm text-gray-800">
+                  <input type="checkbox" checked={autopayAccepted} onChange={e => setAutopayAccepted(e.target.checked)} />
+                  The customer signed the recurring AutoPay authorization for this payment method.
+                </label>
+              </>}
             </div>
           </div>
 

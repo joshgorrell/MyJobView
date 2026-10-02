@@ -144,8 +144,8 @@ await staffContext.route('https://security-test.supabase.co/**', async route => 
   if (u.pathname.endsWith('/monitoring_services')) return route.fulfill({json:[{id:'service-1',name:'Monitoring',monthly_price:35,category:'Monitoring'}]});
   if (u.pathname.endsWith('/contacts')) return route.fulfill({json:{id:'00000000-0000-0000-0000-000000000004',first_name:'Test',last_name:'Customer',full_name:'Test Customer',email:'customer@example.com',phone:'5551231234',street_address:'1 Main Street',city:'Topeka',state:'KS',zip_code:'66604',company_name:''}});
   if (u.pathname.endsWith('/profiles')) return route.fulfill({json:{role:'admin'}});
-  if (u.pathname.endsWith('/security_contracts') && route.request().method()==='POST') {
-    insertedContract=route.request().postDataJSON();
+  if (u.pathname.endsWith('/rpc/staff_security_onboarding') && route.request().method()==='POST') {
+    insertedContract={...route.request().postDataJSON().p_payload,renewal_term_months:1};
     return route.fulfill({json:{id:'new-contract',...insertedContract}});
   }
   return route.fulfill({json:[]});
@@ -175,6 +175,43 @@ for (const selector of ['input[type="text"]','select','textarea','input[type="ch
 }
 assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Staff creation fits mobile');
 await staffContext.close();
+const reviewContext=await browser.newContext({viewport:{width:390,height:844}});
+const reviewRecord={id:'review-contract',organization_id:'org-1',status:'pending_approval',customer_completed_at:'2026-10-01T12:00:00Z',onboarding_revision:0,
+  contract_number:'SC-REVIEW',monthly_price:35,term_months:36,renewal_term_months:1,cancellation_notice_days:30,account_type:'residential',security_billing_mode:'autopay',service_account_numbers:{alarm_com:'Original account'},
+  contact,emergency_contacts:[{contact_name:'First',phone_number:'5551111111',password_codeword:'one',can_authorize_entry:true},{contact_name:'Second',phone_number:'5552222222',password_codeword:'two',can_authorize_entry:false}],onboarding_agreement_snapshot:{...document,personalInfo:contact,propertyInfo:{address_line1:'1 Main',city:'Topeka',state:'KS',zip_code:'66604'}},services:[]};
+let correctionCount=0;
+await reviewContext.addInitScript(record=>{window.__reviewRecord=record;document.documentElement.style.colorScheme='dark';},reviewRecord);
+await reviewContext.route('https://security-test.supabase.co/**',async route=>{
+ if(route.request().url().includes('/rpc/security_correct_onboarding')) {
+  const body=route.request().postDataJSON();assert.equal(body.p_revision,correctionCount);assert.ok(body.p_reason);
+  correctionCount++;
+  await reviewPage.evaluate(patch=>{window.__reviewRecord={...window.__reviewRecord,...patch,onboarding_revision:window.__reviewRecord.onboarding_revision+1};},body.p_patch);
+  return route.fulfill({json:{revision:correctionCount}});
+ }
+ return route.fulfill({json:[]});
+});
+const reviewPage=await reviewContext.newPage();
+await reviewPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?review');
+await reviewPage.getByRole('heading',{name:'Review completed contract'}).waitFor();
+assert.equal(await reviewPage.locator('input,textarea,select').count(),0,'All review fields are locked by default');
+await reviewPage.getByRole('button',{name:'Edit Alarm.com account number',exact:true}).click();
+await reviewPage.getByRole('textbox',{name:'Alarm.com account number',exact:true}).fill('Accidental edit');
+await reviewPage.getByRole('button',{name:'Cancel',exact:true}).click();
+assert.equal(correctionCount,0,'Cancel does not persist changes');
+await reviewPage.getByText('Original account',{exact:true}).waitFor();
+await reviewPage.getByRole('button',{name:'Edit Alarm.com account number',exact:true}).click();
+await reviewPage.getByRole('textbox',{name:'Alarm.com account number',exact:true}).fill('1234567');
+await reviewPage.getByRole('textbox',{name:'Reason for correction'}).fill('Manager entered account number');
+await reviewPage.getByRole('button',{name:'Save correction',exact:true}).click();
+await reviewPage.getByText('1234567',{exact:true}).waitFor();
+assert.equal(correctionCount,1);assert.equal(await reviewPage.locator('input,textarea,select').count(),0,'Fields relock after saving');
+await reviewPage.getByRole('button',{name:'Edit Phone',exact:true}).click();
+assert.deepEqual(await reviewPage.getByRole('textbox',{name:'Phone',exact:true}).evaluate(el=>{const s=getComputedStyle(el);return [s.backgroundColor,s.color];}),['rgb(255, 255, 255)','rgb(0, 0, 0)']);
+await reviewPage.getByRole('button',{name:'Cancel',exact:true}).click();
+assert.ok(await reviewPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Review fits mobile');
+await reviewPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?review&readonly');
+await reviewPage.getByRole('heading',{name:'Review completed contract'}).waitFor();assert.equal(await reviewPage.getByRole('button',{name:/^Edit /}).count(),0,'Read-only staff do not receive edit controls');
+await reviewContext.close();
 await context.close();await browser.close();
 server.kill();
 console.log('Browser tests passed: all five initial terms saved with monthly renewal, light controls in dark theme, mobile resume, failure/retry, save for later, signature reset, existing/new payment selection, AutoPay consent, signed download and print layout.');

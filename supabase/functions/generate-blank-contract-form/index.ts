@@ -1,6 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]!));
+}
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -51,6 +54,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const { error: permissionError } = await supabaseClient.rpc('staff_security_onboarding', { p_action: 'get', p_id: contractId });
+    if (permissionError) return new Response(JSON.stringify({ error: 'Security onboarding permission required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
     const { data: contract, error: contractError } = await supabaseClient
       .from('security_contracts')
       .select(`
@@ -75,7 +81,7 @@ Deno.serve(async (req: Request) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Security Monitoring Contract - ${contract.contract_number}</title>
+<title>Security Monitoring Contract - ${escapeHtml(contract.contract_number)}</title>
 <style>
   @page {
     size: letter;
@@ -310,8 +316,8 @@ Deno.serve(async (req: Request) => {
 <div class="page">
   <div class="header">
     <h1>Security Monitoring Contract</h1>
-    <div class="contract-number">Contract Number: ${contract.contract_number}</div>
-    <div class="template-name">${contract.template?.name || 'Standard Contract'}</div>
+    <div class="contract-number">Contract Number: ${escapeHtml(contract.contract_number)}</div>
+    <div class="template-name">${escapeHtml(contract.template?.name || 'Standard Contract')}</div>
   </div>
 
   <div class="section">
@@ -319,15 +325,15 @@ Deno.serve(async (req: Request) => {
     <div class="grid">
       <div class="field-group full-width">
         <div class="field-label">Full Name</div>
-        <div class="field-value">${contract.contact?.full_name || ''}</div>
+        <div class="field-value">${escapeHtml(contract.contact?.full_name || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">Email Address</div>
-        <div class="field-value">${contract.contact?.email || ''}</div>
+        <div class="field-value">${escapeHtml(contract.contact?.email || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">Phone Number</div>
-        <div class="field-value">${contract.contact?.phone || ''}</div>
+        <div class="field-value">${escapeHtml(contract.contact?.phone || '')}</div>
       </div>
     </div>
     <div class="field-group">
@@ -467,7 +473,7 @@ Deno.serve(async (req: Request) => {
 
   <div class="section">
     <div class="section-header">Terms and Conditions</div>
-    <div class="terms">${termsText}</div>
+    <div class="terms">${escapeHtml(termsText)}</div>
   </div>
 </div>
 
@@ -503,7 +509,7 @@ Deno.serve(async (req: Request) => {
 
   <div class="footer">
     <p>For office use only - Staff will enter this information into the system</p>
-    <p style="margin-top: 6px;">Contract Number: ${contract.contract_number} | Date Created: ${new Date(contract.created_at).toLocaleDateString()}</p>
+    <p style="margin-top: 6px;">Contract Number: ${escapeHtml(contract.contract_number)} | Date Created: ${new Date(contract.created_at).toLocaleDateString()}</p>
   </div>
 </div>
 

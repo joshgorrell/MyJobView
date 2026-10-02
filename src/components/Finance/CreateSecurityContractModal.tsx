@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { SECURITY_INITIAL_TERMS } from '../../lib/securityOnboarding';
+import React, { useState, useEffect, useRef } from 'react';
+import { SECURITY_INITIAL_TERMS, staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { supabase } from '../../lib/supabase';
 import { X, Search, Plus, Wrench } from 'lucide-react';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
@@ -57,6 +57,7 @@ interface CreateSecurityContractModalProps {
 }
 
 export default function CreateSecurityContractModal({ onClose, onSuccess, onPaperCreated, prefill }: CreateSecurityContractModalProps) {
+  const creationRequest = useRef(crypto.randomUUID());
   const [templates, setTemplates] = useState<Template[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [monitoringServices, setMonitoringServices] = useState<MonitoringService[]>([]);
@@ -250,115 +251,19 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
     setSaving(true);
 
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Not authenticated');
-
-      console.log('Creating contract with user ID:', user.user.id);
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.user.id)
-        .single();
-
-      console.log('User profile role:', profile?.role);
-
-      let contactId = selectedContact;
-
-      if (showNewContactForm && !selectedContact) {
-        const { data: contactData, error: contactError } = await supabase
-          .from('contacts')
-          .insert({
-            first_name: newContact.first_name,
-            last_name: newContact.last_name,
-            email: newContact.email,
-            phone: newContact.phone,
-            street_address: newContact.street_address,
-            city: newContact.city,
-            state: newContact.state,
-            zip_code: newContact.zip_code,
-            company_name: newContact.company_name
-          })
-          .select()
-          .single();
-
-        if (contactError) throw contactError;
-        contactId = contactData.id;
-      } else if (selectedContactData) {
-        const hasChanges =
-          contactEdits.first_name !== (selectedContactData.first_name || '') ||
-          contactEdits.last_name !== (selectedContactData.last_name || '') ||
-          contactEdits.email !== selectedContactData.email ||
-          contactEdits.phone !== selectedContactData.phone ||
-          contactEdits.street_address !== selectedContactData.street_address ||
-          contactEdits.city !== selectedContactData.city ||
-          contactEdits.state !== selectedContactData.state ||
-          contactEdits.zip_code !== selectedContactData.zip_code ||
-          contactEdits.company_name !== (selectedContactData.company_name || '');
-
-        if (hasChanges) {
-          const { error: updateError } = await supabase
-            .from('contacts')
-            .update({
-              first_name: contactEdits.first_name,
-              last_name: contactEdits.last_name,
-              email: contactEdits.email,
-              phone: contactEdits.phone,
-              street_address: contactEdits.street_address,
-              city: contactEdits.city,
-              state: contactEdits.state,
-              zip_code: contactEdits.zip_code,
-              company_name: contactEdits.company_name
-            })
-            .eq('id', selectedContact);
-
-          if (updateError) throw updateError;
-        }
-      }
-
-      const { data: contractData, error } = await supabase
-        .from('security_contracts')
-        .insert({
-          template_id: selectedTemplate,
-          contact_id: contactId,
-          sales_order_id: selectedSalesOrder || null,
-          created_by_user_id: user.user.id,
-          status: 'draft',
-          monthly_price: finalMonthlyPrice,
-          price_override: priceOverride ? parseFloat(priceOverride) : null,
-          term_months: termMonths,
-          renewal_term_months: 1,
-          cancellation_notice_days: 30,
-          account_type: accountType || null,
-          account_services: accountServices,
-          is_monitoring: isMonitoring,
-          account_number: isMonitoring ? (monitoringAccountNumber.trim() || null) : null,
-          installation_date: installationDate || null,
-          service_account_numbers: Object.keys(serviceAccountNumbers).length > 0 ? serviceAccountNumbers : null,
-          notes,
-          email_override: emailOverride || null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (selectedServices.length > 0) {
-        const serviceInserts = selectedServices.map(serviceId => {
-          const service = monitoringServices.find(s => s.id === serviceId);
-          return {
-            contract_id: contractData.id,
-            service_id: serviceId,
-            monthly_price: service?.monthly_price || 0
-          };
-        });
-
-        const { error: servicesError } = await supabase
-          .from('security_contract_services')
-          .insert(serviceInserts);
-
-        if (servicesError) throw servicesError;
-      }
+      const hasContactChanges = selectedContactData && Object.entries(contactEdits).some(([key, value]) => value !== ((selectedContactData as unknown as Record<string, unknown>)[key] || ''));
+      const contractData = await staffSecurityOnboarding<{ id: string }>('create', undefined, {
+        request_id: creationRequest.current,
+        template_id: selectedTemplate, contact_id: selectedContact || null,
+        new_contact: showNewContactForm && !selectedContact ? newContact : null,
+        contact_edits: hasContactChanges ? contactEdits : null,
+        sales_order_id: selectedSalesOrder || null, service_ids: selectedServices,
+        price_override: priceOverride || null, term_months: termMonths,
+        account_type: accountType || null, account_services: accountServices,
+        is_monitoring: isMonitoring, account_number: isMonitoring ? monitoringAccountNumber.trim() || null : null,
+        installation_date: installationDate || null, service_account_numbers: serviceAccountNumbers,
+        notes, email_override: emailOverride.trim() || null,
+      });
 
       if (onPaperCreated) onPaperCreated(contractData);
       else onSuccess();

@@ -1,11 +1,13 @@
+import { Pencil } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
 
 interface Cycle { id:string; state:string; amount:number|null; period_start:string; last_message:string|null; processor_id:string|null }
-export function SecurityBillingPanel({ contractId, organizationId }: { contractId:string; organizationId:string }) {
+export function SecurityBillingPanel({ contractId, organizationId, canEdit = false }: { contractId:string; organizationId:string; canEdit?:boolean }) {
   const { profile } = useAuth();
+  const [editingClassification,setEditingClassification] = useState(false);
   const [classes,setClasses] = useState<{id:string;label:string}[]>([]);
   const [classification,setClassification] = useState('');
   const [cycles,setCycles] = useState<Cycle[]>([]);
@@ -34,11 +36,12 @@ export function SecurityBillingPanel({ contractId, organizationId }: { contractI
   return <section className="no-print bg-white text-gray-900 rounded-xl p-5 mb-6 space-y-4">
     <h2 className="font-semibold text-lg">Monitoring billing</h2>
     <label className="block">Tax classification (required before activation)
-      <select value={classification} onChange={e=>setClassification(e.target.value)} className="block w-full border rounded p-2 mt-1"><option value="">Select classification</option>{classes.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-    <button className="bg-blue-700 text-white px-3 py-2 rounded" onClick={async()=>{
+      {canEdit && <button type="button" aria-label="Edit tax classification" onClick={()=>setEditingClassification(true)} className="p-2 text-blue-700"><Pencil className="w-4 h-4"/></button>}
+      <select disabled={!editingClassification} value={classification} onChange={e=>setClassification(e.target.value)} className="block w-full border rounded p-2 mt-1"><option value="">Select classification</option>{classes.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+    {editingClassification && <><button className="bg-blue-700 text-white px-3 py-2 rounded" onClick={async()=>{
       const {error}=await supabase.from('security_contracts').update({monitoring_tax_classification_id:classification||null}).eq('id',contractId).eq('organization_id',organizationId);
-      setMessage(error ? error.message : 'Tax classification saved.');
-    }}>Save classification</button>
+      setMessage(error ? error.message : 'Tax classification saved.');if(!error)setEditingClassification(false);
+    }}>Save classification</button><button className="border rounded px-3 py-2 ml-2" onClick={()=>{setEditingClassification(false);void reload();}}>Cancel</button></>}
     {profile?.role==='admin' && <button className="border rounded px-3 py-2 ml-2" disabled={revoked} onClick={async()=>{
       const {error}=await supabase.from('security_contracts').update({autopay_paused:!paused}).eq('id',contractId).eq('organization_id',organizationId);
       setMessage(error ? error.message : 'AutoPay status saved.');if(!error) await reload();

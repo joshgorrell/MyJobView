@@ -1,3 +1,4 @@
+import { sendSecurityInvitation } from '../../lib/securityOnboarding';
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Shield, Plus, Clock, FileText, Send, Calendar, User, RotateCcw, Search, Trash2, AlertCircle, Eye, CreditCard as Edit2, ArrowRight, UserCheck, CheckCircle, XCircle, Loader2, Mail, X, Printer } from 'lucide-react';
@@ -19,6 +20,8 @@ interface Contract {
   magic_link_expires_at: string;
   monthly_price: number;
   notes: string;
+  email_override?: string;
+  contact_id?: string;
   pipelineStatus?: string;
   invitation_sent_by?: {
     id: string;
@@ -184,7 +187,7 @@ function SendAgreementDialog({
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
                       <p className="text-xs text-gray-500 truncate">
-                        {state.contract.contact?.email || 'No email'}
+                        {state.contract.email_override || state.contract.contact?.email || 'No email'}
                       </p>
                     </div>
                   </div>
@@ -361,7 +364,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
         .from('security_contracts')
         .select(`
           id, contract_number, status, created_at, invitation_sent_at,
-          customer_completed_at, magic_link_expires_at, monthly_price, notes,
+          customer_completed_at, magic_link_expires_at, monthly_price, notes, email_override,
           contact:contacts(id, full_name, first_name, last_name, email, phone, company_name),
           template:security_contract_templates(id, name, description),
           invitation_sent_by:profiles!invitation_sent_by_user_id(id, full_name, first_name, last_name)
@@ -380,7 +383,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           pipelineStatus = 'in_progress';
         }
 
-        return { ...contract, pipelineStatus };
+        return { ...contract, pipelineStatus, contact: Array.isArray(contract.contact) ? contract.contact[0] : contract.contact, template: Array.isArray(contract.template) ? contract.template[0] : contract.template, invitation_sent_by: Array.isArray(contract.invitation_sent_by) ? contract.invitation_sent_by[0] : contract.invitation_sent_by };
       });
 
       if (mountedRef.current) setContracts(processedContracts);
@@ -392,7 +395,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
   }
 
   function promptSendInvitation(contract: Contract, isResend = false) {
-    if (!contract.contact || !contract.contact.email) {
+    if (!(contract.email_override || contract.contact?.email)) {
       setDialog({
         type: 'error',
         message: 'Customer contact information is missing. Please ensure the agreement has a valid customer assigned.'
@@ -405,55 +408,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
   async function executeSendInvitation(contract: Contract, isResend: boolean) {
     setDialog({ type: 'sending', action: 'send' });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setDialog({ type: 'error', message: 'You must be logged in to send invitations.' });
-        return;
-      }
-
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
-      const magicToken = crypto.randomUUID();
-
-      const updateData: any = {
-        status: 'pending_customer',
-        invitation_sent_at: new Date().toISOString(),
-        invitation_sent_by_user_id: user.id,
-        magic_link_token: magicToken,
-        magic_link_expires_at: expiresAt.toISOString()
-      };
-
-      const { error: updateError } = await supabase
-        .from('security_contracts')
-        .update(updateData)
-        .eq('id', contract.id);
-
-      if (updateError) throw updateError;
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-contract-invitation`;
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const fetchResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contractId: contract.id,
-          customerEmail: contract.contact.email,
-          customerName: contract.contact.full_name || 'Customer',
-          token: magicToken,
-          appOrigin: window.location.origin
-        })
-      });
-
-      const responseData = await fetchResponse.json();
-
-      if (!fetchResponse.ok || !responseData.success) {
-        const errorMsg = responseData.error || 'Unknown error occurred';
-        throw new Error(errorMsg);
-      }
+      await sendSecurityInvitation(contract.id);
 
       setDialog({
         type: 'success',
