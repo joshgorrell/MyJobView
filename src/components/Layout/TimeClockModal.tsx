@@ -1,3 +1,4 @@
+import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { useState, useEffect } from 'react';
 import {
@@ -11,7 +12,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { gpsTrackingService } from '../../lib/gpsTracking';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 import { getOrganizationTimezone, formatDateInTimezone, formatTimeInTimezone } from '../../lib/timezoneUtils';
 
 interface TimeClockModalProps {
@@ -183,33 +183,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
 
   async function handleClockIn() {
     if (!profile) return;
-    const entryId = await performClockIn();
-    if (entryId && navigator.geolocation) {
-      gpsTrackingService.captureLocationForClockEvent(false).then(async (gpsResult) => {
-        try {
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy, p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms, p_refined: false, p_original_accuracy: null
-          });
-          await supabase.from('daily_clock_entries').update({
-            clock_in_latitude: gpsResult.latitude, clock_in_longitude: gpsResult.longitude,
-            clock_in_gps_accuracy: gpsResult.accuracy, clock_in_gps_capture_method: gpsResult.method,
-            clock_in_gps_duration_ms: gpsResult.duration_ms, clock_in_gps_attempted_at: gpsResult.attempted_at,
-            clock_in_gps_captured_at: gpsResult.captured_at, clock_in_gps_quality_score: scoreData || 0,
-          }).eq('id', entryId);
-          setLocationPermission('granted');
-          localStorage.removeItem('gps_permission_declined');
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, false).catch(() => {});
-          }
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, false);
-          }
-        } catch { }
-      }).catch((error) => {
-        if (error.code === 1) { localStorage.setItem('gps_permission_declined', 'true'); setLocationPermission('denied'); }
-      });
-    }
+    await performClockIn();
   }
 
   async function performClockIn(): Promise<string | null> {
@@ -239,6 +213,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
       if (error) throw error;
 
       const insertedEntry = Array.isArray(data) ? data[0] : data;
+      void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
       if (navigator.geolocation && navigator.onLine) {
         gpsTrackingService.startTracking(profile.id, insertedEntry?.id || entryId);
       }
@@ -300,7 +275,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
   }
 
   async function handleClockOutSuccess() {
-    gpsTrackingService.stopTracking();
+    gpsTrackingService.stopTracking('daily');
     gpsTrackingService.stopPostCaptureRefinement();
     await loadTodaysClock();
     setShowClockOutModal(false);
