@@ -20,7 +20,7 @@
     "test:user-setup": "node tests/user-setup/database.mjs && node tests/user-setup/runtime.mjs && node tests/user-setup/payroll.mjs",
     "test:user-setup:browser": "npm run build && node tests/user-setup/browser.mjs",
     "test:employee-time:browser": "node tests/employee-time/browser.mjs",
-    "test:employee-time": "node tests/employee-time/database.mjs && node tests/employee-time/runtime.mjs && node tests/employee-time/sync.mjs && node tests/employee-time/gps.mjs"
+    "test:employee-time": "node tests/employee-time/database.mjs && node tests/employee-time/integration.mjs && node tests/employee-time/runtime.mjs && node tests/employee-time/sync.mjs && node tests/employee-time/gps.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
