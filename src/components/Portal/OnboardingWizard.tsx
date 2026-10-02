@@ -18,7 +18,7 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-const inputClass = 'w-full px-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400 text-sm';
+const inputClass = 'w-full px-4 py-3.5 border border-gray-200 rounded-xl bg-white focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400 text-sm';
 const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5';
 
 export default function OnboardingWizard({ contract, token, onComplete }: OnboardingWizardProps) {
@@ -217,7 +217,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   }
 
   return (
-    <div className="relative">
+    <div className="security-onboarding-controls relative">
       <div className="px-4 sm:px-8 py-5 bg-blue-50 border-b border-blue-100 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="font-semibold text-gray-900">Agreement {contract.contract_number}</p>

@@ -54,7 +54,11 @@ Review this branch as a draft until merchant sandbox acceptance, target-project 
 ## Additional pre-merge findings (September 30)
 
 - Corrected activation so new portal-signed monitoring agreements do not also create a legacy recurring subscription. Existing non-portal contracts keep the legacy path. An existing linked subscription must be reconciled before enrolling in the new scheduler.
-- New Electronic Life monitoring contracts use a 36-month initial term and month-to-month renewal; other dealers keep their existing initial-duration choices. Historical contracts are not converted.
+- New monitoring contracts allow 12, 24, 36, 48, or 60 months for the initial term (default 36), with month-to-month renewal. Historical contracts are not converted.
 - Migration `20260930175017_security_monitoring_terms_review.sql` creates a separate **inactive** Electronic Life review template. It removes the legacy renewal surcharges, separates Admin mail fees, drafts payment/revocation and electronic-record disclosures, and consolidates the conflicting early-termination/default provisions. Unresolved legal-review markers block activation and portal signing. The original template and signed copies are preserved.
 - Still requiring approval: early-termination formula; statutory cancellation forms and transaction applicability; central-station/service responsibility; liability, warranties, indemnity and insurance provisions; legal identity, venue and electronic-record delivery procedures. Drafting is not counsel sign-off.
 - Connected project currently reports an accounting connection in **sandbox**, but the new Payments capability column/functions are not deployed. No real merchant debit or enrollment test has been run. Confirm the target environment, deploy to the designated test project, reconnect with Payments access, and execute merchant acceptance before removing draft status.
+
+## October 2 audit
+
+See `docs/audits/security-onboarding-2026-10-02.md` for current source and connected-project findings. Initial terms and light form controls are corrected in this branch; the audit identifies remaining deployment, paper-completion, invitation and approval-flow work. Browser coverage saves each initial duration and checks light controls under a dark workspace.

@@ -219,7 +219,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg p-6">
           <div className="text-center">Loading...</div>
         </div>
@@ -228,7 +228,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+    <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl my-4 sm:my-8 max-h-[calc(100vh-2rem)]">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 gap-3">
           <div className="min-w-0 flex-1">

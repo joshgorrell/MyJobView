@@ -237,7 +237,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   }
 
   return (
-    <div className="p-8">
+    <div className="security-onboarding-controls p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">

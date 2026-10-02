@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+// Initial commitment is independent of the month-to-month renewal interval.
+export const SECURITY_INITIAL_TERMS: readonly number[] = [12, 24, 36, 48, 60];
+
 export interface SecurityDraftForm {
   personalInfo: { full_name: string; email: string; phone: string };
   propertyInfo: { address_line1: string; city: string; state: string; zip_code: string };

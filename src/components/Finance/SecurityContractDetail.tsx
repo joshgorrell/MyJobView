@@ -785,7 +785,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   return (
     <>
 
-      <div className="p-8 contract-print-root">
+      <div className="security-onboarding-controls p-8 contract-print-root">
         <SecurityBillingPanel contractId={contractData.id} organizationId={contractData.organization_id} />
         <div className="mb-6 no-print">
           <button

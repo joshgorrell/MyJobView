@@ -591,7 +591,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
   }
 
   return (
-    <div className="p-3 sm:p-4 lg:p-6 max-w-full overflow-x-hidden">
+    <div className="security-onboarding-controls p-3 sm:p-4 lg:p-6 max-w-full overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
