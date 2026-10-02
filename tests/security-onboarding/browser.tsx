@@ -1,4 +1,5 @@
 // Local component fixture; all network calls are intercepted by browser.mjs.
+import PrintSecurityOnboardingForm from '../../src/components/Finance/PrintSecurityOnboardingForm';
 import React, { useState } from 'react';
 import SecurityContractReviewFields from '../../src/components/Finance/SecurityContractReviewFields';
 import ReactDOM from 'react-dom/client';
@@ -12,6 +13,6 @@ function ReviewFixture() {
 }
 const review = new URLSearchParams(window.location.search).has('review');
 const staff = new URLSearchParams(window.location.search).has('staff');
-ReactDOM.createRoot(document.getElementById('root')!).render(review ? <ReviewFixture/> : staff
+ReactDOM.createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('print') ? <PrintSecurityOnboardingForm onClose={()=>{}}/> : review ? <ReviewFixture/> : staff
   ? <CreateSecurityContractModal prefill={{ contactId: '00000000-0000-0000-0000-000000000004', templateId: 'template-1', serviceIds: ['service-1'] }} onClose={() => {}} onSuccess={() => {}} />
   : <TenantProvider><SecurityOnboardingPortal /></TenantProvider>);

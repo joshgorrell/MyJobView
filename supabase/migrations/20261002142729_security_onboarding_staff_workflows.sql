@@ -89,12 +89,12 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
   PERFORM pg_advisory_xact_lock(hashtextextended(actor.organization_id::text||req::text,0));
   SELECT * INTO c FROM public.security_contracts WHERE organization_id=actor.organization_id AND creation_request_id=req;
   IF c.id IS NOT NULL THEN RETURN jsonb_build_object('id',c.id); END IF;
- ELSE
+ ELSIF p_action<>'print_form' THEN
   SELECT * INTO c FROM public.security_contracts WHERE id=p_id AND organization_id=actor.organization_id FOR UPDATE;
   IF c.id IS NULL THEN RAISE EXCEPTION 'Agreement not found' USING ERRCODE='42501'; END IF;
  END IF;
  IF p_action IN ('get','review') THEN RETURN jsonb_build_object('id',c.id,'status',c.status,'customer_completed_at',c.customer_completed_at,'document',private.security_staff_document(c.id),'document_version',md5(private.security_staff_document(c.id)::text)); END IF;
- IF p_action='create' OR p_action='edit' THEN
+ IF p_action IN ('create','edit','print_form') THEN
   IF p_action='edit' AND (c.customer_completed_at IS NOT NULL OR c.status NOT IN ('draft','pending_customer','rejected')) THEN RAISE EXCEPTION 'Signed agreements cannot be edited; use an amendment'; END IF;
   IF nullif(p_payload->>'term_months','') IS NULL OR (p_payload->>'term_months')::integer NOT IN (12,24,36,48,60) THEN RAISE EXCEPTION 'Choose a supported initial term'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.security_contract_templates t WHERE t.id=coalesce((p_payload->>'template_id')::uuid,c.template_id) AND t.organization_id=actor.organization_id AND t.is_active AND t.contract_terms NOT LIKE '%[LEGAL REVIEW:%') THEN RAISE EXCEPTION 'Choose an active, reviewed agreement template'; END IF;
@@ -105,6 +105,13 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
   override:=nullif(p_payload->>'price_override','')::numeric;
   total:=coalesce(override,total);
   IF total IS NULL OR total<0 OR total>1000000 THEN RAISE EXCEPTION 'Enter a valid monthly price'; END IF;
+  IF p_action='print_form' THEN
+   RETURN jsonb_build_object('term_months',(p_payload->>'term_months')::integer,'renewal_term_months',1,'cancellation_notice_days',30,'monthly_price',total,
+    'template',(SELECT jsonb_build_object('name',t.name,'contract_terms',t.contract_terms) FROM public.security_contract_templates t WHERE t.id=(p_payload->>'template_id')::uuid),
+    'services',(SELECT jsonb_agg(jsonb_build_object('name',svc.name,'monthly_price',svc.monthly_price) ORDER BY svc.name) FROM public.monitoring_services svc WHERE svc.id=ANY(services)),
+    'autopay_authorization',private.security_autopay_authorization(),
+    'dealer',(SELECT jsonb_build_object('company_name',s.company_name,'company_email',s.company_email,'annual_billing_enabled',s.annual_billing_enabled,'annual_discount_type',s.annual_discount_type,'annual_discount_percentage',s.annual_discount_percentage,'annual_discount_flat_amount',s.annual_discount_flat_amount) FROM public.company_settings s WHERE s.organization_id=actor.organization_id LIMIT 1));
+  END IF;
   IF nullif(p_payload->>'email_override','') IS NOT NULL AND p_payload->>'email_override' !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN RAISE EXCEPTION 'Enter a valid invitation email'; END IF;
   cid:=nullif(p_payload->>'contact_id','')::uuid;
   IF cid IS NULL THEN

@@ -22,13 +22,6 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const contractId = url.searchParams.get('contractId');
 
-    if (!contractId) {
-      return new Response(JSON.stringify({ error: 'Contract ID is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Authentication required' }), {
@@ -54,38 +47,36 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { error: permissionError } = await supabaseClient.rpc('staff_security_onboarding', { p_action: 'get', p_id: contractId });
-    if (permissionError) return new Response(JSON.stringify({ error: 'Security onboarding permission required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-    const { data: contract, error: contractError } = await supabaseClient
-      .from('security_contracts')
-      .select(`
-        *,
-        contact:contacts(*),
-        template:security_contract_templates(*)
-      `)
-      .eq('id', contractId)
-      .maybeSingle();
-
-    if (contractError || !contract) {
-      return new Response(JSON.stringify({ error: 'Contract not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    let contract: any;
+    if (!contractId) {
+      if (req.method !== 'POST') return new Response(JSON.stringify({error:'Choose a template and services'}), {status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+      const payload = await req.json();
+      const {data,error} = await supabaseClient.rpc('staff_security_onboarding', {p_action:'print_form',p_id:null,p_payload:payload});
+      if (error) return new Response(JSON.stringify({error:error.message}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
+      contract = data;
+    } else {
+      const {data:review,error} = await supabaseClient.rpc('staff_security_onboarding', {p_action:'get',p_id:contractId});
+      if (error) return new Response(JSON.stringify({error:'Security onboarding permission required'}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
+      contract = review.document;
     }
 
     const termsText = (contract.template?.contract_terms || 'Terms and conditions unavailable.').replaceAll('[term]', `${contract.term_months || ''} months`);
 
+    const annualBase = Math.max(0, Number(contract.monthly_price || 0) - Number(contract.mail_invoice_fee || 0)) * 12;
+    const annualDiscount = contract.dealer?.annual_discount_type === 'percentage'
+      ? Math.round(annualBase * Number(contract.dealer.annual_discount_percentage || 0)) / 100
+      : Math.min(annualBase, Number(contract.dealer?.annual_discount_flat_amount || 0));
+    const annualTotal = annualBase - annualDiscount + Number(contract.mail_invoice_fee || 0) * 12;
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Security Monitoring Contract - ${escapeHtml(contract.contract_number)}</title>
+<title>Security Monitoring Contract - ${escapeHtml(contract.contract_number || 'Assigned when entered online')}</title>
 <style>
   @page {
     size: letter;
-    margin: 0.75in;
+    margin: 0.5in;
   }
   *, *::before, *::after {
     box-sizing: border-box;
@@ -117,7 +108,6 @@ Deno.serve(async (req: Request) => {
     body { background: white; }
     .page {
       page-break-after: always;
-      page-break-inside: avoid;
     }
     .page:last-child {
       page-break-after: auto;
@@ -277,6 +267,8 @@ Deno.serve(async (req: Request) => {
     font-size: 9pt;
     line-height: 1.55;
     color: #333;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     margin-top: 12px;
     padding: 12px;
     border: 1px solid #d1d5db;
@@ -307,6 +299,25 @@ Deno.serve(async (req: Request) => {
     gap: 30px;
     margin-top: 8px;
   }
+  @media print {
+    body { background: white; font-size: 10pt; }
+    .header { margin-bottom: 12px; padding-bottom: 8px; }
+    .header h1 { font-size: 18pt; }
+    .section { margin-bottom: 8px; }
+    .section-header { padding: 6px 10px; font-size: 11pt; margin-bottom: 8px; }
+    .field-group { margin-bottom: 8px; }
+    .field-input { min-height: 28px; }
+    .field-value { min-height: 28px; background: white; }
+    .grid, .grid-thirds { gap: 8px; }
+    .emergency-contact { padding: 8px; margin-bottom: 6px; background: white; }
+    .emergency-contact .field-group { margin-bottom: 4px; }
+    .emergency-contact .field-label { margin-bottom: 2px; }
+    .emergency-contact .field-input { min-height: 24px; }
+    .emergency-contact-header { padding: 4px 8px; margin-bottom: 4px; font-size: 10pt; }
+    .note { padding: 8px 10px; margin: 6px 0; font-size: 9pt; }
+    .checkbox-field { margin-top: 6px; }
+    .signature-block { margin-top: 20px; }
+  }
 </style>
 </head>
 <body>
@@ -316,24 +327,26 @@ Deno.serve(async (req: Request) => {
 <div class="page">
   <div class="header">
     <h1>Security Monitoring Contract</h1>
-    <div class="contract-number">Contract Number: ${escapeHtml(contract.contract_number)}</div>
+    <div class="contract-number">Contract Number: ${escapeHtml(contract.contract_number || 'Assigned when entered online')}</div>
+    <div class="template-name">${escapeHtml(contract.dealer?.company_name || '')} ${escapeHtml(contract.dealer?.company_email || '')}</div>
     <div class="template-name">${escapeHtml(contract.template?.name || 'Standard Contract')}</div>
   </div>
 
+  <p style="margin-bottom:16px">Complete this form by hand and return it to our staff. We will enter your information through web onboarding. Printing this form does not create an account or complete onboarding.</p>
   <div class="section">
     <div class="section-header">Customer Information</div>
     <div class="grid">
       <div class="field-group full-width">
         <div class="field-label">Full Name</div>
-        <div class="field-value">${escapeHtml(contract.contact?.full_name || '')}</div>
+        <div class="field-value">${escapeHtml(contract.personalInfo?.full_name || contract.contact?.full_name || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">Email Address</div>
-        <div class="field-value">${escapeHtml(contract.contact?.email || '')}</div>
+        <div class="field-value">${escapeHtml(contract.personalInfo?.email || contract.contact?.email || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">Phone Number</div>
-        <div class="field-value">${escapeHtml(contract.contact?.phone || '')}</div>
+        <div class="field-value">${escapeHtml(contract.personalInfo?.phone || contract.contact?.phone || '')}</div>
       </div>
     </div>
     <div class="field-group">
@@ -378,16 +391,17 @@ Deno.serve(async (req: Request) => {
     <div class="checkbox-field">
       <span class="checkbox"></span>
       <span>Yes, this system calls a monitoring center when the alarm goes off</span>
+      <span class="checkbox"></span><span>No</span>
     </div>
-    <div class="field-group" style="margin-top: 10px;">
-      <div class="field-label">Monitoring Account Number (if applicable)</div>
-      <div class="field-input"></div>
+    <div class="grid" style="margin-top:10px">
+      <div class="field-group"><div class="field-label">Monitoring Account Number (if applicable)</div><div class="field-input"></div></div>
+      <div class="field-group"><div class="field-label">Installation Date</div><div class="field-input"></div></div>
     </div>
   </div>
 
   <div class="section">
     <div class="section-header">Account Services (Check All That Apply)</div>
-    <div class="grid">
+    <div class="grid-thirds">
       <div class="checkbox-field">
         <span class="checkbox"></span>
         <span>Dial-Up</span>
@@ -413,6 +427,7 @@ Deno.serve(async (req: Request) => {
         <span>Access Control</span>
       </div>
     </div>
+    <div class="field-group" style="margin-top:12px"><div class="field-label">Service Account Numbers (label each service)</div><div class="field-input"></div><div class="field-input"></div></div>
   </div>
 </div>
 
@@ -420,7 +435,7 @@ Deno.serve(async (req: Request) => {
   <div class="section">
     <div class="section-header">Emergency Call List (Minimum 2 Contacts Required)</div>
     <div class="note">
-      <strong>Important:</strong> In the event of an alarm, the monitoring station will call these contacts in the order listed. Each contact must have a unique password/codeword for verification.
+      <strong>Important:</strong> In the event of an alarm, the monitoring station will call these contacts in the order listed. Each contact must have a unique password/codeword for verification. Attach additional contacts in priority order if needed (up to 10 total).
     </div>
     ${[1, 2, 3, 4].map(num => `
     <div class="emergency-contact">
@@ -451,9 +466,15 @@ Deno.serve(async (req: Request) => {
   <div class="section">
     <div class="section-header">Payment Information</div>
     <div class="note">
-      Monthly monitoring fee: ${(contract.monthly_price || 0).toFixed(2)}<br>
-      An invoice will be generated monthly and automatically charged to your payment method on file.
+      Monthly monitoring fee: $${Number(contract.monthly_price || 0).toFixed(2)}<br>
+      Initial term: ${escapeHtml(contract.term_months)} months. Renewal: ${escapeHtml(contract.renewal_term_months)} month(s). Cancellation notice: ${escapeHtml(contract.cancellation_notice_days)} days.<br>
+      Services: ${escapeHtml((contract.services || []).map((s:any) => s.name).join(', '))}
     </div>
+    <div class="field-group"><div class="field-label">Billing Frequency (Check One)</div>
+      <div class="checkbox-field"><span class="checkbox"></span><span>Monthly</span></div>
+      ${contract.dealer?.annual_billing_enabled ? `<div class="checkbox-field"><span class="checkbox"></span><span>Annual</span></div><p>Annual discount: ${escapeHtml(contract.dealer.annual_discount_type === 'percentage' ? `${contract.dealer.annual_discount_percentage || 0}%` : `$${Number(contract.dealer.annual_discount_flat_amount || 0).toFixed(2)}`)}. Annual monitoring total before tax: $${annualTotal.toFixed(2)}.</p>` : ''}
+    </div>
+    ${contract.billing_mode === 'mail' ? `<p class="note">Admin-approved mailed invoices. The monthly price above includes the $${Number(contract.mail_invoice_fee || 0).toFixed(2)} mailing fee.</p>` : `
     <div class="field-group" style="margin-top: 16px;">
       <div class="field-label">Payment Method (Check One)</div>
       <div class="checkbox-field">
@@ -469,6 +490,10 @@ Deno.serve(async (req: Request) => {
       <div class="field-label">Last 4 Digits of Card/Account (For records only)</div>
       <div class="field-input"></div>
     </div>
+    <p class="note">Staff will securely enroll and verify your selected payment method when entering this form. Last four digits alone do not enroll a payment method. Do not write full card or bank account numbers on this form.</p>
+    <div class="field-label">Recurring Payment Authorization</div>
+    <p class="terms">${escapeHtml(contract.autopay_authorization || '')}</p>
+    <div class="checkbox-field"><span class="checkbox"></span><span>I agree to this recurring-payment authorization.</span></div>`}
   </div>
 
   <div class="section">
@@ -509,7 +534,7 @@ Deno.serve(async (req: Request) => {
 
   <div class="footer">
     <p>For office use only - Staff will enter this information into the system</p>
-    <p style="margin-top: 6px;">Contract Number: ${escapeHtml(contract.contract_number)} | Date Created: ${new Date(contract.created_at).toLocaleDateString()}</p>
+    <p style="margin-top: 6px;">Contract Number: ${escapeHtml(contract.contract_number || 'Assigned when entered online')} | Blank form for handwritten completion</p>
   </div>
 </div>
 

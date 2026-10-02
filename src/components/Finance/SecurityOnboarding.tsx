@@ -6,6 +6,7 @@ import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 const CreateSecurityContractModal = lazy(() => import('./CreateSecurityContractModal'));
 const SecurityContractDetail = lazy(() => import('./SecurityContractDetail'));
 const EditSecurityContractModal = lazy(() => import('./EditSecurityContractModal'));
+const PrintSecurityOnboardingForm = lazy(() => import('./PrintSecurityOnboardingForm'));
 const ManualContractEntry = lazy(() => import('./ManualContractEntry'));
 
 interface Contract {
@@ -316,6 +317,7 @@ function SendAgreementDialog({
 
 export default function SecurityOnboarding({ onNavigateToContracts, canAccessContractManagement }: SecurityOnboardingProps = {}) {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPrintForm, setShowPrintForm] = useState(false);
   const [createPaperOnboarding, setCreatePaperOnboarding] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -571,14 +573,15 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           )}
           <button
             type="button"
-            onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }}
-            aria-label="Paper onboarding"
-            title="Paper onboarding"
+            onClick={() => setShowPrintForm(true)}
+            aria-label="Print blank onboarding form"
+            title="Print blank onboarding form"
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Paper Form</span>
+            <span className="hidden sm:inline">Print Paper Form</span>
           </button>
+          <button type="button" onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }} aria-label="Enter completed paper form" title="Enter completed paper form" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 hover:bg-blue-50"><FileText className="h-4 w-4" /><span className="hidden sm:inline">Enter Completed Paper Form</span></button>
           <button
             type="button"
             onClick={() => { setCreatePaperOnboarding(false); setShowCreateModal(true); }}
@@ -813,6 +816,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
 
       {/* Modals */}
       <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-white" role="status">Loading form...</div>}>
+      {showPrintForm && <PrintSecurityOnboardingForm onClose={() => setShowPrintForm(false)} />}
       {showCreateModal && (
         <CreateSecurityContractModal
           onClose={() => setShowCreateModal(false)}

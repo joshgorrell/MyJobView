@@ -143,7 +143,7 @@ await staffContext.route('https://security-test.supabase.co/**', async route => 
   if (u.pathname.endsWith('/security_contract_templates')) return route.fulfill({json:[{id:'template-1',name:'Monitoring',description:'Initial term [term]'}]});
   if (u.pathname.endsWith('/monitoring_services')) return route.fulfill({json:[{id:'service-1',name:'Monitoring',monthly_price:35,category:'Monitoring'}]});
   if (u.pathname.endsWith('/contacts')) return route.fulfill({json:{id:'00000000-0000-0000-0000-000000000004',first_name:'Test',last_name:'Customer',full_name:'Test Customer',email:'customer@example.com',phone:'5551231234',street_address:'1 Main Street',city:'Topeka',state:'KS',zip_code:'66604',company_name:''}});
-  if (u.pathname.endsWith('/profiles')) return route.fulfill({json:{role:'admin'}});
+  if (u.pathname.endsWith('/profiles')) return route.fulfill({json:{role:'admin',organization_id:'org-1'}});
   if (u.pathname.endsWith('/rpc/staff_security_onboarding') && route.request().method()==='POST') {
     insertedContract={...route.request().postDataJSON().p_payload,renewal_term_months:1};
     return route.fulfill({json:{id:'new-contract',...insertedContract}});
@@ -174,6 +174,21 @@ for (const selector of ['input[type="text"]','select','textarea','input[type="ch
   assert.deepEqual(await staffPage.locator(selector).first().evaluate(el=>{const s=getComputedStyle(el);return [s.colorScheme,s.backgroundColor,s.color];}),['light','rgb(255, 255, 255)','rgb(0, 0, 0)']);
 }
 assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Staff creation fits mobile');
+let printPayload;
+await staffContext.route('https://security-test.supabase.co/functions/v1/generate-blank-contract-form',async route=>{printPayload=route.request().postDataJSON();await route.fulfill({contentType:'text/html',body:'<h1>Handwritten onboarding form</h1>'});});
+await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?print');
+await staffPage.getByRole('combobox',{name:'Agreement template'}).selectOption('template-1');
+await staffPage.getByRole('combobox',{name:'Initial term'}).selectOption('24');
+await staffPage.getByRole('checkbox').check();
+insertedContract=undefined;
+const [paperPopup]=await Promise.all([staffPage.waitForEvent('popup'),staffPage.getByRole('button',{name:'Print Blank Form',exact:true}).click()]);
+await paperPopup.getByRole('heading',{name:'Handwritten onboarding form'}).waitFor();
+assert.equal(printPayload.term_months,24);assert.deepEqual(printPayload.service_ids,['service-1']);assert.equal(insertedContract,undefined,'Blank printing never calls contract creation');
+assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Blank print options fit mobile');
+await paperPopup.close();
+await staffPage.goto('file:///tmp/mjv-security-blank-form.html');await staffPage.emulateMedia({media:'print'});
+await staffPage.pdf({path:'/tmp/mjv-security-blank-form.pdf',format:'Letter'});
+assert.ok(await staffPage.getByText('FINAL CLAUSE INCLUDED',{exact:false}).count());
 await staffContext.close();
 const reviewContext=await browser.newContext({viewport:{width:390,height:844}});
 const reviewRecord={id:'review-contract',organization_id:'org-1',status:'pending_approval',customer_completed_at:'2026-10-01T12:00:00Z',onboarding_revision:0,

@@ -298,7 +298,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
     <div className="security-onboarding-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Start Paper Onboarding' : 'Create Security Agreement'}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"

@@ -37,6 +37,14 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  let created=await staff('create',null,create);
  assert.equal((await staff('create',null,create)).id,created.id,'Creation retries return the same agreement');
  let view=await staff('get',created.id);assert.equal(view.document.term_months,12);
+ await role('postgres');const printBefore=(await db.query('select (select count(*) from contacts) customers,(select count(*) from security_contracts) contracts')).rows[0];
+ await role('authenticated',id(11));
+ for (const term of [12,24,36,48,60]) { const blank=await staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:term});assert.equal(blank.term_months,term);assert.equal(blank.monthly_price,35);assert.ok(blank.autopay_authorization); }
+ await assert.rejects(staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:18}));
+ await assert.rejects(staff('print_form',null,{template_id:id(71),service_ids:[id(70)],term_months:36}));
+ await role('authenticated',id(12));await assert.rejects(staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:36}));
+ await role('postgres');assert.deepEqual((await db.query('select (select count(*) from contacts) customers,(select count(*) from security_contracts) contracts')).rows[0],printBefore,'Printing creates no customer or agreement');
+ await role('authenticated',id(11));
  // A failed service insert must roll back the new customer and agreement.
  await role('postgres');await db.exec(`CREATE FUNCTION fail_staff_service() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF current_setting('test.fail_service',true)='true' THEN RAISE EXCEPTION 'Service unavailable'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_staff_service BEFORE INSERT ON security_contract_services FOR EACH ROW EXECUTE FUNCTION fail_staff_service(); SET test.fail_service='true';`);
  const before=(await db.query('select count(*) from contacts')).rows[0].count;

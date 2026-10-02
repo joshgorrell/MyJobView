@@ -65,3 +65,7 @@ See `docs/audits/security-onboarding-2026-10-02.md` for current source and conne
 
 
 Staff corrections require the existing Contract Management module capability. `security_correct_onboarding` accepts only approved form fields, validates tenant/payment/service ownership, checks the expected revision, and atomically retains original evidence, changes the current document/operational fields, and appends correction history. Original submission copies and staff-corrected copies remain distinct. Direct signed-field and related service/emergency changes are blocked. The mailed-invoice exception remains Admin-only and adds/removes exactly $7/month. Invitation attempts freeze the message and provider key; provider failure leaves the existing link valid, and a recording failure can be safely reconciled by retry within the provider window.
+
+### Paper form flow
+
+Print Paper Form prepares a customer-fillable form without creating any customer or contract. After the handwritten form is returned, Enter Completed Paper Form starts staff web entry. Printing uses a read-only, tenant-checked template/service RPC. The print tests verify no records or workflow states change, selected terms and all web fields are represented, and the browser test checks mobile print options and a letter-sized PDF.
