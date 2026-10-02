@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { updateClockEntryAddress } from './reverseGeocode';
 
 interface GPSPoint {
   latitude: number;
@@ -26,12 +25,6 @@ interface GPSCaptureResult {
   captured_at: string | null;
 }
 
-interface PreWarmedLocation {
-  position: GeolocationPosition;
-  capturedAt: number;
-  accuracy: number;
-}
-
 class GPSTrackingService {
   private watchId: number | null = null;
   private isTracking: boolean = false;
@@ -39,12 +32,10 @@ class GPSTrackingService {
   private syncInterval: NodeJS.Timeout | null = null;
   private recordInterval: NodeJS.Timeout | null = null;
   private lastPosition: GeolocationPosition | null = null;
-  private technicianId: string | null = null;
   private dailyClockEntryId: string | null = null;
   private workOrderId: string | null = null;
   private permissionState: PermissionState | null = null;
   private permissionChecked: boolean = false;
-  private preWarmedLocation: PreWarmedLocation | null = null;
   private preWarmInterval: NodeJS.Timeout | null = null;
   private isPreWarming: boolean = false;
   private refinementWatchId: number | null = null;
@@ -142,23 +133,6 @@ class GPSTrackingService {
     this.permissionState = permission === 'unknown' ? null : permission;
     if (this.permissionState === 'denied') {
       return {latitude:null,longitude:null,accuracy:null,method:'failed',duration_ms:Date.now()-startTime,attempted_at:attemptedAt,captured_at:null};
-    }
-
-    // Try to use pre-warmed location if available and fresh
-    if (this.preWarmedLocation && (Date.now() - this.preWarmedLocation.position.timestamp) < 30000) {
-      // Pre-warmed location is less than 30 seconds old
-      if (this.preWarmedLocation.accuracy < 100) {
-        // Good accuracy, use it immediately
-        return {
-          latitude: this.preWarmedLocation.position.coords.latitude,
-          longitude: this.preWarmedLocation.position.coords.longitude,
-          accuracy: this.preWarmedLocation.position.coords.accuracy,
-          method: 'high_accuracy',
-          duration_ms: Date.now() - startTime,
-          attempted_at: attemptedAt,
-          captured_at: new Date(this.preWarmedLocation.position.timestamp).toISOString()
-        };
-      }
     }
 
     // Attempt 1: High accuracy with extended timeout (15 seconds)
@@ -338,18 +312,7 @@ class GPSTrackingService {
 
   // Pre-warm GPS before user clicks clock-in button
   startPreWarming() {
-    if (this.isPreWarming || !navigator.geolocation) return;
-
-    console.log('Starting GPS pre-warming...');
-    this.isPreWarming = true;
-
-    // Get initial location
-    this.updatePreWarmedLocation();
-
-    // Refresh every 15 seconds while pre-warming is active
-    this.preWarmInterval = setInterval(() => {
-      this.updatePreWarmedLocation();
-    }, 15000);
+    // Location capture is restricted to explicit clock actions.
   }
 
   stopPreWarming() {
@@ -364,109 +327,8 @@ class GPSTrackingService {
     }
   }
 
-  private async updatePreWarmedLocation() {
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 5000
-          }
-        );
-      });
-
-      this.preWarmedLocation = {
-        position,
-        capturedAt: Date.now(),
-        accuracy: position.coords.accuracy
-      };
-
-      console.log(`GPS pre-warmed: accuracy ${position.coords.accuracy.toFixed(1)}m`);
-    } catch (error) {
-      console.log('GPS pre-warming failed:', error);
-    }
-  }
-
-  async startPostCaptureRefinement(entryId: string, isClockOut: boolean = false, tableName: 'daily_clock_entries' | 'time_entries' = 'daily_clock_entries') {
-    if (!navigator.geolocation) return;
-
-    const startTime = Date.now();
-    const refinementDuration = 60000;
-    let bestPosition: GeolocationPosition | null = null;
-    let originalAccuracy: number | null = null;
-
-    try {
-      const { data } = await supabase
-        .from(tableName)
-        .select(isClockOut ? 'clock_out_gps_accuracy' : 'clock_in_gps_accuracy')
-        .eq('id', entryId)
-        .single();
-
-      if (data) {
-        originalAccuracy = (data as Record<string, number>)[isClockOut ? 'clock_out_gps_accuracy' : 'clock_in_gps_accuracy'];
-      }
-    } catch (error) {
-      return;
-    }
-
-    if (!originalAccuracy) return;
-
-    this.refinementWatchId = navigator.geolocation.watchPosition(
-      async (position) => {
-        const elapsed = Date.now() - startTime;
-
-        if (elapsed > refinementDuration) {
-          if (this.refinementWatchId !== null) {
-            navigator.geolocation.clearWatch(this.refinementWatchId);
-            this.refinementWatchId = null;
-          }
-          return;
-        }
-
-        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy * 0.5) {
-          if (position.coords.accuracy < originalAccuracy * 0.5) {
-            bestPosition = position;
-
-            const updateData: Record<string, unknown> = {};
-            if (isClockOut) {
-              updateData.clock_out_latitude = position.coords.latitude;
-              updateData.clock_out_longitude = position.coords.longitude;
-              updateData.clock_out_gps_accuracy = position.coords.accuracy;
-              updateData.clock_out_gps_refined = true;
-              updateData.clock_out_gps_refined_at = new Date().toISOString();
-              updateData.clock_out_gps_original_accuracy = originalAccuracy;
-            } else {
-              updateData.clock_in_latitude = position.coords.latitude;
-              updateData.clock_in_longitude = position.coords.longitude;
-              updateData.clock_in_gps_accuracy = position.coords.accuracy;
-              updateData.clock_in_gps_refined = true;
-              updateData.clock_in_gps_refined_at = new Date().toISOString();
-              updateData.clock_in_gps_original_accuracy = originalAccuracy;
-            }
-
-            try {
-              await supabase
-                .from(tableName)
-                .update(updateData)
-                .eq('id', entryId);
-
-              updateClockEntryAddress(entryId, position.coords.latitude, position.coords.longitude, isClockOut, tableName).catch(() => {});
-            } catch (error) {
-              console.error('Failed to save GPS refinement:', error);
-            }
-          }
-        }
-      },
-      () => {},
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
+  async startPostCaptureRefinement(_entryId: string, _isClockOut = false, _tableName: 'daily_clock_entries' | 'time_entries' = 'daily_clock_entries') {
+    // Retired: later positions must never replace the clock-action reading.
   }
 
   stopPostCaptureRefinement() {
@@ -477,58 +339,9 @@ class GPSTrackingService {
     }
   }
 
-  async startTracking(technicianId: string, dailyClockEntryId?: string, workOrderId?: string): Promise<boolean> {
-    if (this.isTracking && this.technicianId !== technicianId) this.stopTracking();
-    if (this.isTracking) {
-      if (dailyClockEntryId) this.dailyClockEntryId = dailyClockEntryId ?? null;
-      if (workOrderId) this.workOrderId = workOrderId ?? null;
-      return true;
-    }
-
-    if (!navigator.geolocation) {
-      return false;
-    }
-
-    const state = await this.getPermissionState();
-    if (state === 'denied') {
-      return false;
-    }
-
-    this.technicianId = technicianId;
-    this.dailyClockEntryId = dailyClockEntryId ?? null;
-    this.workOrderId = workOrderId ?? null;
-    this.isTracking = true;
-
-    this.watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        this.lastPosition = position;
-
-        localStorage.removeItem('gps_permission_declined');
-      },
-      (error) => {
-        if (error.code === 1) {
-          localStorage.setItem('gps_permission_declined', 'true');
-          this.stopTracking();
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 30000,
-        maximumAge: 0
-      }
-    );
-
-    this.recordInterval = setInterval(() => {
-      if (this.lastPosition) {
-        this.recordBreadcrumb(this.lastPosition);
-      }
-    }, 120000); // Record breadcrumb every 2 minutes
-
-    this.syncInterval = setInterval(() => {
-      this.syncOfflineQueue();
-    }, 60000);
-
-    return true;
+  async startTracking(_technicianId: string, _dailyClockEntryId?: string, _workOrderId?: string): Promise<boolean> {
+    // Retired: web clock actions record one reading, never a location trail.
+    return false;
   }
 
   stopTracking(context?: 'daily' | 'job') {
@@ -560,39 +373,12 @@ class GPSTrackingService {
     this.syncOfflineQueue();
 
     this.isTracking = false;
-    this.technicianId = null;
     this.dailyClockEntryId = null;
     this.workOrderId = null;
   }
 
   updateWorkOrder(workOrderId: string | null) {
     this.workOrderId = workOrderId ?? null;
-  }
-
-  private async recordBreadcrumb(position: GeolocationPosition) {
-    if (!this.technicianId) return;
-
-    const point: QueuedGPSPoint = {
-      technician_id: this.technicianId,
-      daily_clock_entry_id: this.dailyClockEntryId ?? undefined,
-      work_order_id: this.workOrderId ?? undefined,
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy,
-      speed: position.coords.speed ?? undefined,
-      heading: position.coords.heading ?? undefined,
-      recorded_at: new Date(position.timestamp).toISOString()
-    };
-
-    if (navigator.onLine) {
-      try {
-        await this.saveBreadcrumb(point);
-      } catch (error) {
-        this.addToQueue(point);
-      }
-    } else {
-      this.addToQueue(point);
-    }
   }
 
   private async saveBreadcrumb(point: QueuedGPSPoint) {
@@ -611,11 +397,6 @@ class GPSTrackingService {
       });
 
     if (error) throw error;
-  }
-
-  private addToQueue(point: QueuedGPSPoint) {
-    this.offlineQueue.push(point);
-    this.saveOfflineQueue();
   }
 
   private async syncOfflineQueue() {
