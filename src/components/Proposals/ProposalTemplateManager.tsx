@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Plus, Copy, Trash2, Star, X, Eye, EyeOff, FileText, Settings } from 'lucide-react';
+import { Save, Plus, Copy, Trash2, Star, X, Eye, EyeOff, FileText, Settings, CheckCircle, LayoutGrid } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface ReportTemplate {
@@ -235,8 +235,12 @@ export default function ProposalTemplateManager() {
     (!selectedTemplate.is_personal && profile?.role === 'admin')
   );
 
+  const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
+  const [savingDefaultTemplate, setSavingDefaultTemplate] = useState(false);
+
   useEffect(() => {
     loadTemplates();
+    loadDefaultTemplate();
   }, []);
 
   async function loadTemplates() {
@@ -257,6 +261,44 @@ export default function ProposalTemplateManager() {
       alert('Failed to load templates');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadDefaultTemplate() {
+    if (!profile?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_proposal_report_template_id')
+        .eq('id', profile.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data?.default_proposal_report_template_id) {
+        setDefaultTemplateId(data.default_proposal_report_template_id);
+      }
+    } catch (error) {
+      console.error('Error loading default template:', error);
+    }
+  }
+
+  async function saveDefaultTemplate() {
+    if (!profile?.id) return;
+
+    setSavingDefaultTemplate(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_proposal_report_template_id: defaultTemplateId || null })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      alert('Default proposal template saved!');
+    } catch (error) {
+      console.error('Error saving template preference:', error);
+      alert('Failed to save template preference');
+    } finally {
+      setSavingDefaultTemplate(false);
     }
   }
 
@@ -418,6 +460,102 @@ export default function ProposalTemplateManager() {
           Create and manage templates that control what appears in customer-facing proposal PDFs.
           You can have different templates for different types of proposals (residential, commercial, service agreements, etc.)
         </p>
+      </div>
+
+      {/* My Default Template */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <LayoutGrid className="w-5 h-5 text-blue-600" />
+          My Default Template
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Choose your preferred template layout for new proposals. This will be automatically
+          selected when you review proposals before sending to customers.
+        </p>
+
+        {templates.length === 0 ? (
+          <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-600 font-medium">No templates available</p>
+            <p className="text-sm text-gray-500 mt-1">Create a template below to get started.</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2 mb-4">
+              {/* No selection option */}
+              <button
+                onClick={() => setDefaultTemplateId('')}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                  !defaultTemplateId
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  !defaultTemplateId ? 'bg-blue-100' : 'bg-gray-100'
+                }`}>
+                  <FileText className={`w-4 h-4 ${!defaultTemplateId ? 'text-blue-600' : 'text-gray-400'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-gray-900 text-sm">Use Company Default</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Uses the default template set by your administrator</p>
+                </div>
+                {!defaultTemplateId && <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+              </button>
+
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => setDefaultTemplateId(template.id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                    defaultTemplateId === template.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    defaultTemplateId === template.id ? 'bg-blue-100' : 'bg-gray-100'
+                  }`}>
+                    <LayoutGrid className={`w-4 h-4 ${defaultTemplateId === template.id ? 'text-blue-600' : 'text-gray-400'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 text-sm">{template.name}</span>
+                      {template.is_personal && (
+                        <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">Personal</span>
+                      )}
+                      {template.is_default && !template.is_personal && (
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Company Default</span>
+                      )}
+                    </div>
+                    {template.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{template.description}</p>
+                    )}
+                  </div>
+                  {defaultTemplateId === template.id && <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setDefaultTemplateId('')}
+                disabled={!defaultTemplateId}
+                className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Clear Selection
+              </button>
+              <button
+                onClick={saveDefaultTemplate}
+                disabled={savingDefaultTemplate}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                {savingDefaultTemplate ? 'Saving...' : 'Save Default Template'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Template List */}
