@@ -1,3 +1,4 @@
+import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
 import { X, Upload, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -91,6 +92,8 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
         clock_out: new Date().toISOString(),
       };
 
+      if (type === 'job') updateData.status = 'submitted';
+
       if (notes.trim()) {
         updateData.notes = notes.trim();
       }
@@ -119,7 +122,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           .from('work_orders')
           .update({
             status: 'completed',
-            actual_completion_date: new Date().toISOString().split('T')[0],
+            actual_completion_date: formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone()),
           })
           .eq('id', workOrderId);
 
