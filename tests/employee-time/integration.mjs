@@ -21,6 +21,14 @@ ALTER TABLE daily_clock_entries ADD clock_in timestamptz,ADD clock_out timestamp
 CREATE UNIQUE INDEX integration_one_open_config ON employee_payroll_configs(employee_id) WHERE effective_to IS NULL;
 INSERT INTO pay_schedules(id,organization_id,name,frequency) VALUES('${id(80)}','${id(1)}','Weekly','weekly');
 GRANT ALL ON pay_schedules TO authenticated;`);
+await db.exec(`ALTER TABLE profiles ADD full_name text,ADD email text,ADD home_latitude numeric,ADD home_longitude numeric,ADD home_address text;
+ALTER TABLE daily_clock_entries ADD clock_in_latitude numeric,ADD clock_in_longitude numeric,ADD clock_out_latitude numeric,ADD clock_out_longitude numeric,ADD clocked_in_from_home boolean DEFAULT false,ADD clocked_out_from_home boolean DEFAULT false;
+CREATE TABLE company_settings(organization_id uuid,time_request_approver_ids uuid[],home_clock_notification_enabled boolean,home_location_radius_meters int,home_clock_notification_roles text[]);
+CREATE TABLE notifications(id uuid DEFAULT gen_random_uuid(),user_id uuid,organization_id uuid NOT NULL DEFAULT get_user_org_id(),type text,title text,body text,related_id uuid,is_read boolean);
+CREATE FUNCTION calculate_distance_meters(numeric,numeric,numeric,numeric) RETURNS int LANGUAGE sql AS $$SELECT CASE WHEN $1=$3 AND $2=$4 THEN 0 ELSE 10000 END$$;
+INSERT INTO company_settings VALUES('${id(2)}',ARRAY['${id(13)}']::uuid[],true,150,ARRAY['admin']),('${id(1)}',ARRAY['${id(12)}','${id(13)}']::uuid[],true,150,ARRAY['admin']);
+UPDATE profiles SET full_name='Technician',home_latitude=39,home_longitude=-95 WHERE id='${id(14)}';
+GRANT SELECT ON notifications TO authenticated;`);
 await db.exec(await readFile('tests/employee-time/existing-triggers.sql','utf8'));
 await db.exec(await readFile('tests/employee-time/existing-setup-rpcs.sql','utf8'));
 // Existing user-setup migration is also pending on production and is a dependency.
@@ -59,8 +67,20 @@ assert.equal((await db.query(`SELECT status FROM manual_job_time_requests WHERE 
 await db.exec(`RESET ROLE;UPDATE pay_periods SET status='open' WHERE id='${id(86)}'`);
 await as(12);await db.query(`SELECT review_manual_job_time_request('${id(87)}','approve')`);
 assert.equal((await db.query(`SELECT status FROM manual_job_time_requests WHERE id='${id(87)}'`)).rows[0].status,'approved');
+// Delayed GPS triggers home-clock evidence once, without modifying clock timestamps.
+await as(14);await db.exec(`UPDATE daily_clock_entries SET clock_in_latitude=39,clock_in_longitude=-95 WHERE id='${id(85)}';UPDATE daily_clock_entries SET clock_out_latitude=39,clock_out_longitude=-95 WHERE id='${id(85)}';UPDATE daily_clock_entries SET clock_out_latitude=39,clock_out_longitude=-95 WHERE id='${id(85)}';`);
+assert.equal((await db.query(`SELECT count(*)::int n FROM notifications WHERE related_id='${id(85)}' AND type='home_clock'`)).rows[0].n,2,'Exactly one home alert per clock action');
+await db.exec(`INSERT INTO internal_time_sessions(id,assigned_to,requested_by,created_by,session_type,title,session_date,predetermined_hours,status) VALUES('${id(88)}','${id(14)}','${id(14)}','${id(14)}','training','Training','2026-09-07',2,'pending_approval')`);
+const submitted=(await db.query(`SELECT user_id,organization_id FROM notifications WHERE related_id='${id(88)}'`)).rows;assert.equal(submitted.length,1);assert.equal(submitted[0].user_id,id(12));assert.equal(submitted[0].organization_id,id(1));
+await as(12);await db.exec(`SELECT review_internal_time('${id(88)}','approve');SELECT review_internal_time('${id(88)}','approve')`);
+const approval=(await db.query(`SELECT body FROM notifications WHERE related_id='${id(88)}' AND type='internal_time_request_approved'`)).rows;assert.equal(approval.length,1);assert.match(approval[0].body,/scheduled/);assert.equal(approval[0].body.includes('added to your payroll'),false);
+await db.exec(`SELECT review_internal_time('${id(88)}','complete');SELECT review_internal_time('${id(88)}','approve_time');`);
+assert.equal((await db.query(`SELECT count(*)::int n FROM notifications WHERE related_id='${id(88)}' AND type='internal_time_request_approved'`)).rows[0].n,1,'Completion and payroll review do not duplicate request approval alerts');
+await as(14);await db.exec(`INSERT INTO internal_time_sessions(id,assigned_to,requested_by,created_by,session_type,title,session_date,predetermined_hours,status) VALUES('${id(89)}','${id(14)}','${id(14)}','${id(14)}','training','Training','2026-09-08',2,'pending_approval')`);
+await as(12);await db.exec(`SELECT review_internal_time('${id(89)}','deny','Schedule conflict');SELECT review_internal_time('${id(89)}','deny','Schedule conflict');`);
+const denial=(await db.query(`SELECT body FROM notifications WHERE related_id='${id(89)}' AND type='internal_time_request_denied'`)).rows;assert.equal(denial.length,1);assert.match(denial[0].body,/Schedule conflict/);
 // SECURITY DEFINER setup RPCs must not bypass inactive-actor config authority.
 await db.exec(`UPDATE profiles SET is_active=false WHERE id='${id(12)}'`);
 await assert.rejects(()=>db.query(`SELECT update_employee_and_config(p_user_id=>'${id(14)}',p_hire_date=>'2026-01-01',p_expected_weekly_hours=>41,p_reviewed_by=>'${id(12)}')`),/authorized manager/);
 assert.equal((await db.query(`SELECT count(*)::int n FROM employee_payroll_configs c JOIN employees e ON e.id=c.employee_id WHERE e.user_id='${id(14)}'`)).rows[0].n,2,'Rejected inactive-actor update preserves both historical configs');
-await db.close();console.log('Existing trigger/RPC integration: classification, effective-dated successor config, direct-write guards, WO scheduling/project inheritance, Daily Clock calculations and payroll status locks passed.');
+await db.close();console.log('Existing trigger/RPC integration: classification, effective-dated successor config, direct-write guards, WO scheduling/project inheritance, Daily Clock calculations payroll status locks, tenant-scoped request outcomes, and delayed GPS home alerts passed.');
