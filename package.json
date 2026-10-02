@@ -16,7 +16,9 @@
     "test:punchlist": "node tests/punchlist/database.mjs",
     "test:work-orders": "node tests/work-orders/modal-runtime.mjs",
     "test:vip-plans": "node tests/vip-plans/flow.mjs",
-    "test:program-access": "node tests/program-access/database.mjs"
+    "test:program-access": "node tests/program-access/database.mjs",
+    "test:user-setup": "node tests/user-setup/database.mjs && node tests/user-setup/runtime.mjs && node tests/user-setup/payroll.mjs",
+    "test:user-setup:browser": "npm run build && node tests/user-setup/browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
@@ -40,6 +42,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
+    "playwright": "1.62.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.5.3",

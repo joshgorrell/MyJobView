@@ -1,13 +1,32 @@
+import {
+  UserSetupTabs,
+  UserNotifications,
+  UserDataCard,
+  setupSections,
+  notificationDefaults,
+  saveSetupReview,
+  useSetupReview,
+} from './UserSetup';
 import { useState, useEffect } from 'react';
 import {
-  X, Key, AtSign, Mail, Briefcase, Shield, Calendar as CalendarIcon,
-  Target, UserCircle, Clock, DollarSign, AlertCircle,
-  ChevronDown, ChevronRight, Eye, EyeOff,
+  X,
+  Key,
+  AtSign,
+  Briefcase,
+  Shield,
+  Calendar as CalendarIcon,
+  UserCircle,
+  Clock,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
 
-type TabKey = 'details' | 'access' | 'employee';
+type TabKey = (typeof setupSections)[number]['key'] | 'review';
 
 interface PaySchedule {
   id: string;
@@ -103,8 +122,14 @@ interface EditUserFormProps {
 }
 
 export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserFormProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('details');
+  const [dataLoadFailed, setDataLoadFailed] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
+  const { reviewed, setReviewed, reviewError } = useSetupReview(user.id);
+  const [notifications, setNotifications] = useState(() =>
+    notificationDefaults(user as unknown as Record<string, unknown>),
+  );
   // --- Details tab state ---
   const [roles, setRoles] = useState<Role[]>([]);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
@@ -122,7 +147,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     email_leads: user.email_leads,
     is_sales_rep: (user as any).is_sales_rep ?? false,
     can_create_proposals: (user as any).can_create_proposals ?? true,
-    can_create_purchase_orders: (user as any).can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(user.role),
+    can_create_purchase_orders:
+      (user as any).can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(user.role),
     can_view_prospects: (user as any).can_view_prospects ?? false,
     can_view_all_tasks: (user as any).can_view_all_tasks ?? true,
     can_view_all_messages: (user as any).can_view_all_messages ?? false,
@@ -136,8 +162,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     notify_lost_opportunity_submissions: user.notify_lost_opportunity_submissions ?? false,
     can_edit_contacts: (user as any).can_edit_contacts ?? true,
     has_calendar_access: (user as any).has_calendar_access ?? true,
-    proposal_visibility_scope: (user as any).proposal_visibility_scope || 'company' as 'own' | 'office' | 'company',
-    discussion_visibility_scope: (user as any).discussion_visibility_scope || 'all' as 'all' | 'assigned_only' | 'private_only' | 'own_posts',
+    proposal_visibility_scope: (user as any).proposal_visibility_scope || ('company' as 'own' | 'office' | 'company'),
+    discussion_visibility_scope:
+      (user as any).discussion_visibility_scope || ('all' as 'all' | 'assigned_only' | 'private_only' | 'own_posts'),
     travel_bonus_enabled: (user as any).travel_bonus_enabled || false,
     travel_bonus_rate: (user as any).travel_bonus_rate || '0.50',
     travel_bonus_method: (user as any).travel_bonus_method || 'round_trip',
@@ -154,7 +181,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [modRoleAccess, setModRoleAccess] = useState<Map<string, boolean>>(new Map());
   const [modOverrides, setModOverrides] = useState<Map<string, ModuleOverride>>(new Map());
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
-  const [accessMessage, setAccessMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [accessMessage, setAccessMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   // --- Employee tab state ---
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
@@ -190,20 +220,29 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    loadRoles();
-    loadOffices();
-    loadUserOffices();
-    loadPaySchedules();
-    loadEmployeeData();
-    loadDepartments();
-    loadModules();
+    Promise.all([
+      loadRoles(),
+      loadOffices(),
+      loadUserOffices(),
+      loadPaySchedules(),
+      loadEmployeeData(),
+      loadDepartments(),
+      loadModules(),
+    ]).finally(() => setDataLoading(false));
   }, []);
 
   useEffect(() => {
+    if (formData.role_id) {
+      loadDepartments();
+      loadModules();
+    }
+  }, [formData.role_id]);
+
+  useEffect(() => {
     if (roles.length > 0 && !formData.role_id && formData.role) {
-      const matchingRole = roles.find(r => r.role_key === formData.role);
+      const matchingRole = roles.find((r) => r.role_key === formData.role);
       if (matchingRole) {
-        setFormData(prev => ({ ...prev, role_id: matchingRole.id }));
+        setFormData((prev) => ({ ...prev, role_id: matchingRole.id }));
       }
     }
   }, [roles]);
@@ -212,14 +251,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
   async function loadRoles() {
     try {
-      const { data, error } = await supabase
-        .from('roles')
-        .select('*')
-        .eq('is_active', true)
-        .order('role_key');
+      const { data, error } = await supabase.from('roles').select('*').eq('is_active', true).order('role_key');
       if (error) throw error;
       setRoles(data || []);
     } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading roles:', error);
     }
   }
@@ -233,19 +270,20 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (error) throw error;
       setOffices(data || []);
     } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading offices:', error);
     }
   }
 
   async function loadUserOffices() {
     try {
-      const { data, error } = await supabase
-        .from('user_offices')
-        .select('office_id')
-        .eq('user_id', user.id);
+      const { data, error } = await supabase.from('user_offices').select('office_id').eq('user_id', user.id);
       if (error) throw error;
-      setSelectedOffices((data || []).map(uo => uo.office_id));
+      setSelectedOffices((data || []).map((uo) => uo.office_id));
     } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading user offices:', error);
     }
   }
@@ -260,6 +298,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (error) throw error;
       setPaySchedules(data || []);
     } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading pay schedules:', error);
     }
   }
@@ -278,7 +318,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         setIsEmployee(true);
         setEmployeeRecord(empData);
         setClassification('employee');
-        setEmployeeForm(prev => ({
+        setEmployeeForm((prev) => ({
           ...prev,
           hire_date: empData.hire_date,
           employment_status: empData.employment_status as any,
@@ -297,7 +337,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
         if (configData) {
           setCurrentConfig(configData);
-          setEmployeeForm(prev => ({
+          setEmployeeForm((prev) => ({
             ...prev,
             compensation_type: configData.compensation_type,
             requires_daily_clock: configData.requires_daily_clock,
@@ -326,6 +366,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         }
       }
     } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading employee data:', error);
     }
   }
@@ -344,8 +386,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       (deptData || []).forEach((d: Department) => initialExpanded.add(d.id));
       setExpandedDepts(initialExpanded);
 
-      if (formData.role_id || user.role_id) {
-        const roleId = formData.role_id || user.role_id;
+      if (formData.role_id || (user as Profile & { role_id?: string }).role_id) {
+        const roleId = formData.role_id || (user as Profile & { role_id?: string }).role_id;
         const { data: roleAccessData, error: roleError } = await supabase
           .from('role_department_access')
           .select('department_id, has_access')
@@ -367,6 +409,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       (overrideData || []).forEach((o: DepartmentOverride) => overrideMap.set(o.department_id, o));
       setDeptOverrides(overrideMap);
     } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading departments:', error);
     }
   }
@@ -387,8 +431,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       });
       setModules(grouped);
 
-      if (formData.role_id || user.role_id) {
-        const roleId = formData.role_id || user.role_id;
+      if (formData.role_id || (user as Profile & { role_id?: string }).role_id) {
+        const roleId = formData.role_id || (user as Profile & { role_id?: string }).role_id;
         const { data: roleAccessData, error: roleError } = await supabase
           .from('role_module_access')
           .select('module_id, has_access')
@@ -410,6 +454,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       (overrideData || []).forEach((o: ModuleOverride) => overrideMap.set(o.module_id, o));
       setModOverrides(overrideMap);
     } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading modules:', error);
     }
   }
@@ -436,13 +482,13 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     const roleHasAccess = deptRoleAccess.get(deptId) ?? false;
 
     try {
+      const remaining = reviewed.filter((k) => k !== 'permissions');
+      await saveSetupReview(user.id, remaining);
+      setReviewed(remaining);
       if (currentOverride) {
         const newAccess = !currentOverride.has_access;
         if (newAccess === roleHasAccess) {
-          const { error } = await supabase
-            .from('department_user_overrides')
-            .delete()
-            .eq('id', currentOverride.id);
+          const { error } = await supabase.from('department_user_overrides').delete().eq('id', currentOverride.id);
           if (error) throw error;
           const newMap = new Map(deptOverrides);
           newMap.delete(deptId);
@@ -461,7 +507,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         const newAccess = !roleHasAccess;
         const { data, error } = await supabase
           .from('department_user_overrides')
-          .insert({ user_id: user.id, department_id: deptId, has_access: newAccess })
+          .insert({
+            user_id: user.id,
+            department_id: deptId,
+            has_access: newAccess,
+          })
           .select()
           .single();
         if (error) throw error;
@@ -491,14 +541,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     const roleHasAccess = modRoleAccess.get(moduleId) ?? false;
 
     try {
+      const remaining = reviewed.filter((k) => k !== 'permissions');
+      await saveSetupReview(user.id, remaining);
+      setReviewed(remaining);
       if (currentOverride) {
         const currentAccess = currentOverride.override_type === 'grant';
         const newAccess = !currentAccess;
         if (newAccess === roleHasAccess) {
-          const { error } = await supabase
-            .from('user_permission_overrides')
-            .delete()
-            .eq('id', currentOverride.id);
+          const { error } = await supabase.from('user_permission_overrides').delete().eq('id', currentOverride.id);
           if (error) throw error;
           const newMap = new Map(modOverrides);
           newMap.delete(moduleId);
@@ -518,7 +568,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         const newType: 'grant' | 'revoke' = !roleHasAccess ? 'grant' : 'revoke';
         const { data, error } = await supabase
           .from('user_permission_overrides')
-          .insert({ user_id: user.id, module_id: moduleId, override_type: newType })
+          .insert({
+            user_id: user.id,
+            module_id: moduleId,
+            override_type: newType,
+          })
           .select()
           .single();
         if (error) throw error;
@@ -544,15 +598,25 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
   function checkConfigChanged(newValues: any): boolean {
     if (!currentConfig) return true;
-    const fields = ['compensation_type', 'requires_daily_clock', 'requires_time_allocation',
-      'payroll_time_basis', 'expected_weekly_hours', 'standard_start_time', 'standard_end_time',
-      'work_days', 'overtime_eligible', 'pto_eligible', 'pay_schedule_id'];
-    return fields.some(f => {
+    const fields = [
+      'compensation_type',
+      'requires_daily_clock',
+      'requires_time_allocation',
+      'payroll_time_basis',
+      'expected_weekly_hours',
+      'standard_start_time',
+      'standard_end_time',
+      'work_days',
+      'overtime_eligible',
+      'pto_eligible',
+      'pay_schedule_id',
+    ];
+    return fields.some((f) => {
       const oldVal = (currentConfig as any)[f];
       const newVal = newValues[f];
       if (f === 'work_days') {
-        const oldArr = (oldVal || []).sort().join(',');
-        const newArr = (newVal || []).sort().join(',');
+        const oldArr = [...(oldVal || [])].sort().join(',');
+        const newArr = [...(newVal || [])].sort().join(',');
         return oldArr !== newArr;
       }
       if (f === 'expected_weekly_hours') {
@@ -567,15 +631,26 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     e.stopPropagation();
+    if (dataLoading) return;
+    if (dataLoadFailed) {
+      setError('Setup data did not load. Close and reopen this form before saving.');
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
 
     try {
+      if (!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+        throw new Error('Enter a full name and valid email.');
+      if (isEmployee && (!employeeForm.hire_date || !employeeForm.pay_schedule_id))
+        throw new Error('Employees require a hire date and pay schedule.');
       if (!formData.role_id) throw new Error('Please select a role for this user');
 
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('role')
@@ -585,22 +660,25 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (currentProfile?.role !== 'admin') throw new Error('Only admins can edit users');
 
       if (formData.email !== user.email) {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session) throw new Error('Not authenticated');
 
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-user-email`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-            body: JSON.stringify({ userId: user.id, newEmail: formData.email }),
-          }
-        );
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-user-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ userId: user.id, newEmail: formData.email }),
+        });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Failed to update email');
       }
 
       const updateData = {
+        ...notifications,
         full_name: formData.full_name,
         first_name: formData.first_name || null,
         last_name: formData.last_name || null,
@@ -643,23 +721,27 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (!updatedProfile) throw new Error('Update succeeded but no data returned.');
 
       if (['sales', 'admin', 'manager', 'sales_manager'].includes(formData.role)) {
-        await supabase.rpc('recalculate_sales_quota_for_user', { p_user_id: user.id });
+        await supabase.rpc('recalculate_sales_quota_for_user', {
+          p_user_id: user.id,
+        });
       }
 
-      const { error: deleteError } = await supabase
-        .from('user_offices')
-        .delete()
-        .eq('user_id', user.id);
-      if (deleteError) console.error('Error deleting office assignments:', deleteError);
+      const { error: deleteError } = await supabase.from('user_offices').delete().eq('user_id', user.id);
+      if (deleteError) throw new Error(`Office assignment update failed: ${deleteError.message}`);
 
       if (selectedOffices.length > 0) {
-        const { error: officeError } = await supabase
-          .from('user_offices')
-          .insert(selectedOffices.map(officeId => ({ user_id: user.id, office_id: officeId })));
+        const { error: officeError } = await supabase.from('user_offices').insert(
+          selectedOffices.map((officeId) => ({
+            user_id: user.id,
+            office_id: officeId,
+          })),
+        );
         if (officeError) throw new Error(`Office assignment failed: ${officeError.message}`);
       }
 
-      const { data: { user: currentUser2 } } = await supabase.auth.getUser();
+      const {
+        data: { user: currentUser2 },
+      } = await supabase.auth.getUser();
 
       if (isEmployee && employeeRecord) {
         const { error: rpcError } = await supabase.rpc('update_employee_and_config', {
@@ -672,14 +754,16 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           p_requires_daily_clock: employeeForm.requires_daily_clock,
           p_requires_time_allocation: employeeForm.requires_time_allocation,
           p_payroll_time_basis: employeeForm.payroll_time_basis,
-          p_expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+          p_expected_weekly_hours: employeeForm.expected_weekly_hours
+            ? parseFloat(employeeForm.expected_weekly_hours)
+            : null,
           p_standard_start_time: employeeForm.standard_start_time,
           p_standard_end_time: employeeForm.standard_end_time,
           p_work_days: employeeForm.work_days,
           p_overtime_eligible: employeeForm.overtime_eligible,
           p_pto_eligible: employeeForm.pto_eligible,
           p_pay_schedule_id: employeeForm.pay_schedule_id || null,
-          p_effective_date: showEffectiveDatePrompt ? effectiveDate : null,
+          p_effective_date: showEffectiveDatePrompt && checkConfigChanged(employeeForm) ? effectiveDate : null,
           p_reviewed_by: currentUser2?.id,
         });
         if (rpcError) throw new Error(`Employee update failed: ${rpcError.message}`);
@@ -693,7 +777,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           p_requires_daily_clock: employeeForm.requires_daily_clock,
           p_requires_time_allocation: employeeForm.requires_time_allocation,
           p_payroll_time_basis: employeeForm.payroll_time_basis,
-          p_expected_weekly_hours: employeeForm.expected_weekly_hours ? parseFloat(employeeForm.expected_weekly_hours) : null,
+          p_expected_weekly_hours: employeeForm.expected_weekly_hours
+            ? parseFloat(employeeForm.expected_weekly_hours)
+            : null,
           p_standard_start_time: employeeForm.standard_start_time,
           p_standard_end_time: employeeForm.standard_end_time,
           p_work_days: employeeForm.work_days,
@@ -711,8 +797,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         if (rpcError) throw new Error(`Non-employee classification failed: ${rpcError.message}`);
       }
 
+      await saveSetupReview(
+        user.id,
+        !isEmployee && !showNonEmployeeConfirm && classification === 'unreviewed'
+          ? reviewed.filter((k) => k !== 'access' && k !== 'pay')
+          : reviewed,
+      );
       setSuccessMessage('User updated successfully! Closing...');
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
       onSuccess();
     } catch (err: any) {
       console.error('Error during update:', err);
@@ -729,17 +821,19 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     setSuccessMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ email: user.email, password: newPassword }),
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email: user.email, password: newPassword }),
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to reset password');
 
@@ -755,15 +849,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   }
 
   // ===== Shared styling =====
-  const inputClass = "w-full px-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent";
+  const inputClass =
+    'w-full px-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent';
   const selectClass = inputClass;
-  const checkboxClass = "mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500";
-
-  const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-    { key: 'details', label: 'User Details', icon: <UserCircle className="w-4 h-4" /> },
-    { key: 'access', label: 'Department Access', icon: <Shield className="w-4 h-4" /> },
-    { key: 'employee', label: 'Employee Info', icon: <Briefcase className="w-4 h-4" /> },
-  ];
+  const checkboxClass =
+    'mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-0 z-50 overflow-hidden">
@@ -772,7 +862,22 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-700 flex-shrink-0">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-white">Edit User</h2>
-            <p className="text-sm text-gray-400 mt-0.5">{user.full_name}</p>
+            <div className="flex items-center gap-3 mt-2">
+              {user.avatar_url && <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />}
+              <div>
+                <p className="text-white">{formData.full_name}</p>
+                <p className="text-sm text-gray-300">
+                  {roles.find((r) => r.id === formData.role_id)?.display_name || formData.role} ·{' '}
+                  {user.is_active ? 'Active' : 'Inactive'} ·{' '}
+                  {selectedOffices.length
+                    ? offices
+                        .filter((o) => selectedOffices.includes(o.id))
+                        .map((o) => o.office_name)
+                        .join(', ')
+                    : 'All offices'}
+                </p>
+              </div>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -782,44 +887,26 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           </button>
         </div>
 
-        {/* Tab bar */}
-        <div className="flex border-b border-gray-700 flex-shrink-0 overflow-x-auto">
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
-                activeTab === tab.key
-                  ? 'text-cyan-400 border-cyan-500 bg-gray-800/50'
-                  : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-800/30'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
+        <UserSetupTabs active={activeTab} onSelect={setActiveTab} reviewed={reviewed} />
         {/* Messages */}
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
             {error && (
-              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
-                {error}
-              </div>
+              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">{error}</div>
             )}
             {successMessage && (
               <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-sm">
                 {successMessage}
               </div>
             )}
-            {accessMessage && activeTab === 'access' && (
-              <div className={`p-3 rounded-lg text-sm ${
-                accessMessage.type === 'success'
-                  ? 'bg-green-500/20 border border-green-500/50 text-green-300'
-                  : 'bg-red-500/20 border border-red-500/50 text-red-300'
-              }`}>
+            {accessMessage && activeTab === 'permissions' && (
+              <div
+                className={`p-3 rounded-lg text-sm ${
+                  accessMessage.type === 'success'
+                    ? 'bg-green-500/20 border border-green-500/50 text-green-300'
+                    : 'bg-red-500/20 border border-red-500/50 text-red-300'
+                }`}
+              >
                 {accessMessage.text}
               </div>
             )}
@@ -827,13 +914,74 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         )}
 
         {/* Tab content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+        <form
+          onSubmit={handleSubmit}
+          onChange={() => setReviewed((prev) => prev.filter((k) => k !== activeTab))}
+          className="flex-1 overflow-y-auto"
+        >
           <div className="p-4 sm:p-6 space-y-5">
+            {reviewError && <p className="text-red-300">{reviewError}</p>}
+            {activeTab === 'notifications' && (
+              <UserNotifications
+                value={{
+                  ...notifications,
+                  email_leads: formData.email_leads,
+                  notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
+                }}
+                onChange={(v) => {
+                  setNotifications(v);
+                  setFormData({
+                    ...formData,
+                    email_leads: v.email_leads,
+                    notify_lost_opportunity_submissions: v.notify_lost_opportunity_submissions,
+                  });
+                }}
+                canViewResponses={formData.can_view_lost_opportunity_submissions}
+              />
+            )}
+            {activeTab === 'review' && (
+              <UserDataCard
+                profile={{
+                  ...user,
+                  ...formData,
+                  ...notifications,
+                  email_leads: formData.email_leads,
+                  notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
+                }}
+                classification={isEmployee ? 'employee' : showNonEmployeeConfirm ? 'non_employee' : classification}
+                employee={employeeForm}
+                offices={offices.filter((o) => selectedOffices.includes(o.id)).map((o) => o.office_name)}
+                roleName={roles.find((r) => r.id === formData.role_id)?.display_name}
+                paySchedule={paySchedules.find((p) => p.id === employeeForm.pay_schedule_id)?.name}
+                access={departments.map((d) => ({
+                  name: d.display_name,
+                  enabled: getDeptEffectiveAccess(d.id),
+                  custom: deptOverrides.has(d.id),
+                  modules: (modules[d.id] || []).map((m) => ({
+                    name: m.display_name,
+                    enabled: getDeptEffectiveAccess(d.id) && getModEffectiveAccess(m.id),
+                    custom: modOverrides.has(m.id),
+                  })),
+                }))}
+              />
+            )}
+            {activeTab !== 'review' && (
+              <label className="flex items-center gap-2 text-cyan-300 text-sm">
+                <input
+                  type="checkbox"
+                  checked={reviewed.includes(activeTab)}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    setReviewed(e.target.checked ? [...reviewed, activeTab] : reviewed.filter((k) => k !== activeTab));
+                  }}
+                />
+                I have reviewed this section
+              </label>
+            )}
 
             {/* ===== USER DETAILS TAB ===== */}
-            {activeTab === 'details' && (
-              <>
-                {/* Identity */}
+            {activeTab === 'profile' && (
+              <div className="space-y-5">
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Identity</h3>
                   <div className="space-y-4">
@@ -843,7 +991,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         type="text"
                         required
                         value={formData.full_name}
-                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            full_name: e.target.value,
+                          })
+                        }
                         className={inputClass}
                       />
                     </div>
@@ -854,7 +1007,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <input
                           type="text"
                           value={formData.first_name}
-                          onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              first_name: e.target.value,
+                            })
+                          }
                           className={inputClass}
                           placeholder="John"
                         />
@@ -865,7 +1023,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <input
                           type="text"
                           value={formData.last_name}
-                          onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              last_name: e.target.value,
+                            })
+                          }
                           className={inputClass}
                           placeholder="Doe"
                         />
@@ -874,7 +1037,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Username (@ mention name) *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Username (@ mention name) *
+                      </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                           <AtSign className="w-4 h-4 text-gray-500" />
@@ -883,7 +1048,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           type="text"
                           required
                           value={formData.username}
-                          onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') })}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''),
+                            })
+                          }
                           className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                         />
                       </div>
@@ -905,38 +1075,47 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
                   </div>
                 </div>
-
-                {/* Role */}
+              </div>
+            )}
+            {activeTab === 'access' && (
+              <div className="space-y-5">
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Role</h3>
                   <select
                     value={formData.role_id}
                     onChange={(e) => {
-                      const selectedRole = roles.find(r => r.id === e.target.value);
-                      setFormData({ ...formData, role_id: e.target.value, role: selectedRole?.role_key as any || 'sales' });
+                      setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'permissions'));
+                      const selectedRole = roles.find((r) => r.id === e.target.value);
+                      setFormData({
+                        ...formData,
+                        role_id: e.target.value,
+                        role: (selectedRole?.role_key as any) || 'sales',
+                      });
                     }}
                     className={`w-full px-4 py-2 bg-gray-800 border ${formData.role_id ? 'border-gray-700' : 'border-orange-500'} text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent`}
                   >
                     {roles.length === 0 && <option value="">Loading roles...</option>}
                     {roles.length > 0 && !formData.role_id && <option value="">-- Select a Role --</option>}
-                    {roles.map(role => (
-                      <option key={role.id} value={role.id}>{role.display_name}</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.display_name}
+                      </option>
                     ))}
                   </select>
                   {formData.role_id && roles.length > 0 && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {roles.find(r => r.id === formData.role_id)?.description}
+                      {roles.find((r) => r.id === formData.role_id)?.description}
                     </p>
                   )}
                   {!formData.role_id && roles.length > 0 && (
                     <p className="text-xs text-orange-400 mt-1">Please select a role to continue</p>
                   )}
                 </div>
-
-                {/* Office Assignments */}
                 {offices.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Office Assignments</h3>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      Office Assignments
+                    </h3>
                     <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-2">
                       <p className="text-xs text-gray-400 mb-3">
                         Select which offices this user has access to. Leave empty for access to all offices.
@@ -948,7 +1127,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                             checked={selectedOffices.includes(office.id)}
                             onChange={(e) => {
                               if (e.target.checked) setSelectedOffices([...selectedOffices, office.id]);
-                              else setSelectedOffices(selectedOffices.filter(id => id !== office.id));
+                              else setSelectedOffices(selectedOffices.filter((id) => id !== office.id));
                             }}
                             className={checkboxClass}
                           />
@@ -958,172 +1137,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
                   </div>
                 )}
-
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Lost Opportunity Notifications</h3>
-                  <label className="flex items-start gap-3 text-gray-200 mb-4"><input type="checkbox" checked={formData.notify_lost_opportunity_submissions} onChange={e=>setFormData({...formData,notify_lost_opportunity_submissions:e.target.checked})}/><span>Email and in-app notifications for Lost Opportunity responses (requires Can View Responses)</span></label>
-
-                {/* Permissions */}
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Permissions</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      { key: 'is_sales_rep', icon: Briefcase, label: 'Sales Rep', desc: 'Business designation: appears anywhere MJV asks for a Sales Rep' },
-                      { key: 'can_create_proposals', icon: Briefcase, label: 'Can Create Proposals', desc: 'Permission to create and manage proposals' },
-                      { key: 'can_create_purchase_orders', icon: Briefcase, label: 'Can Create Purchase Orders', desc: 'Create, submit, email, and delete draft POs' },
-                      { key: 'email_leads', icon: Mail, label: 'Email Leads', desc: 'Receive email notifications for new leads' },
-                      { key: 'can_view_prospects', icon: Shield, label: 'Can View Prospects', desc: 'Access to prospect contacts and competitor tracking' },
-                      { key: 'can_view_all_tasks', icon: Shield, label: 'Can View All Tasks', desc: 'See all company tasks (off = own tasks only)' },
-                      { key: 'can_view_all_messages', icon: Shield, label: 'View All Company Conversations', desc: 'Executive oversight of customer and job conversations' },
-                      { key: 'can_view_all_pipeline', icon: Shield, label: 'Can View All Pipeline', desc: 'See company-wide pipeline data' },
-                      { key: 'can_edit_contact_assignments', icon: Shield, label: 'Can Edit Contact Assignments', desc: 'Reassign contacts to different sales reps' },
-                      { key: 'can_create_work_orders', icon: Briefcase, label: 'Can Create Work Orders', desc: 'Create work orders from My Work Center' },
-                      { key: 'can_edit_products', icon: Shield, label: 'Can Edit Products', desc: 'Add, edit, and delete products in the catalog' },
-                      { key: 'can_edit_contacts', icon: Shield, label: 'Can Edit Contacts', desc: 'Add, edit, and delete contacts' },
-                      { key: 'can_send_lost_opportunity_reviews', icon: Shield, label: 'Can Send Lost Opportunity Reviews', desc: 'Send private feedback requests to customers' },
-                      { key: 'can_view_lost_opportunity_submissions', icon: Shield, label: 'Can View Lost Opportunity Responses', desc: 'Read private customer responses and competing bids' },
-                      { key: 'can_see_all_review_requests', icon: Shield, label: 'Can See All Review Requests', desc: 'See all company review requests (off = own only)' },
-                      { key: 'has_calendar_access', icon: CalendarIcon, label: 'Has Calendar Access', desc: 'Access personal calendar for scheduling' },
-                    ].map(({ key, icon: Icon, label, desc }) => (
-                      <label
-                        key={key}
-                        className="flex items-start gap-3 cursor-pointer bg-gray-800 border border-gray-700 rounded-lg p-3 hover:border-gray-600 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={(formData as any)[key]}
-                          onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
-                          className={checkboxClass}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Icon className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                            <span className="text-sm font-medium text-white">{label}</span>
-                          </div>
-                          <p className="text-xs text-gray-400 mt-1">{desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Visibility Scopes */}
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Visibility Scopes</h3>
-                  <div className="space-y-3">
-                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-white mb-2">Proposal Visibility Scope</label>
-                      <select
-                        value={formData.proposal_visibility_scope}
-                        onChange={(e) => setFormData({ ...formData, proposal_visibility_scope: e.target.value as any })}
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      >
-                        <option value="own">Only My Proposals</option>
-                        <option value="office">My Office Proposals</option>
-                        <option value="company">All Company Proposals</option>
-                      </select>
-                      <p className="text-xs text-gray-400 mt-2">
-                        <span className="font-medium">Only My:</span> sees only proposals they created &middot;{' '}
-                        <span className="font-medium">My Office:</span> sees proposals from assigned office(s) &middot;{' '}
-                        <span className="font-medium">All Company:</span> sees all proposals
-                      </p>
-                    </div>
-
-                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-white mb-2">Team Pulse (Discussion) Visibility</label>
-                      <select
-                        value={formData.discussion_visibility_scope}
-                        onChange={(e) => setFormData({ ...formData, discussion_visibility_scope: e.target.value as any })}
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      >
-                        <option value="all">All Discussion Posts</option>
-                        <option value="assigned_only">Only Assigned or Mentioned Posts</option>
-                        <option value="private_only">Only Private Posts (Assigned/Mentioned)</option>
-                        <option value="own_posts">Only Their Own Posts</option>
-                      </select>
-                      <p className="text-xs text-gray-400 mt-2">
-                        <span className="font-medium">All:</span> sees all posts &middot;{' '}
-                        <span className="font-medium">Assigned:</span> only posts assigned to or mentioning them &middot;{' '}
-                        <span className="font-medium">Private:</span> only private posts they're part of &middot;{' '}
-                        <span className="font-medium">Own:</span> only posts they created
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Travel Bonus */}
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Travel Bonus</h3>
-                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-4">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.travel_bonus_enabled}
-                        onChange={(e) => setFormData({ ...formData, travel_bonus_enabled: e.target.checked })}
-                        className={checkboxClass}
-                      />
-                      <div className="flex-1">
-                        <span className="text-sm font-medium text-white">Enable Travel Bonus</span>
-                        <p className="text-xs text-gray-400 mt-1">GPS tracking with automatic travel bonus calculation</p>
-                      </div>
-                    </label>
-                    {formData.travel_bonus_enabled && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-1">Rate per Mile</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={formData.travel_bonus_rate}
-                            onChange={(e) => setFormData({ ...formData, travel_bonus_rate: e.target.value })}
-                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-1">Method</label>
-                          <select
-                            value={formData.travel_bonus_method}
-                            onChange={(e) => setFormData({ ...formData, travel_bonus_method: e.target.value as any })}
-                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                          >
-                            <option value="round_trip">Round Trip</option>
-                            <option value="one_way">One Way</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Sales Target Settings */}
-                {(formData.role === 'sales' || formData.role === 'admin' || formData.role === 'manager') && (
-                  <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sales Target Settings</h3>
-                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Sales Start Date</label>
-                        <input
-                          type="date"
-                          value={formData.sales_rep_start_date}
-                          onChange={(e) => setFormData({ ...formData, sales_rep_start_date: e.target.value })}
-                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">
-                          Drives automatic annual quota calculation. For the full 30-year trajectory and growth rate overrides,{' '}
-                          <button
-                            type="button"
-                            onClick={() => { onNavigate?.('settings_salestargets'); onClose(); }}
-                            className="text-cyan-400 font-medium hover:text-cyan-300 underline underline-offset-2 transition-colors"
-                          >
-                            go to Settings &rarr; Sales Targets
-                          </button>.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Password Reset */}
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Password</h3>
                   {!showPasswordReset ? (
@@ -1156,7 +1169,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       <div className="flex gap-3">
                         <button
                           type="button"
-                          onClick={() => { setShowPasswordReset(false); setNewPassword(''); }}
+                          onClick={() => {
+                            setShowPasswordReset(false);
+                            setNewPassword('');
+                          }}
                           className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors font-medium text-sm"
                         >
                           Cancel
@@ -1164,7 +1180,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <button
                           type="button"
                           onClick={handlePasswordReset}
-                          disabled={loading}
+                          disabled={loading || dataLoading || dataLoadFailed}
                           className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 text-sm"
                         >
                           {loading ? 'Resetting...' : 'Reset Password'}
@@ -1173,11 +1189,306 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
                   )}
                 </div>
-              </>
+              </div>
+            )}
+            {activeTab === 'permissions' && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Permissions</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      {
+                        key: 'can_create_proposals',
+                        icon: Briefcase,
+                        label: 'Can Create Proposals',
+                        desc: 'Permission to create and manage proposals',
+                      },
+                      {
+                        key: 'can_create_purchase_orders',
+                        icon: Briefcase,
+                        label: 'Can Create Purchase Orders',
+                        desc: 'Create, submit, email, and delete draft POs',
+                      },
+                      {
+                        key: 'can_view_prospects',
+                        icon: Shield,
+                        label: 'Can View Prospects',
+                        desc: 'Access to prospect contacts and competitor tracking',
+                      },
+                      {
+                        key: 'can_view_all_tasks',
+                        icon: Shield,
+                        label: 'Can View All Tasks',
+                        desc: 'See all company tasks (off = own tasks only)',
+                      },
+                      {
+                        key: 'can_view_all_messages',
+                        icon: Shield,
+                        label: 'View All Company Conversations',
+                        desc: 'Executive oversight of customer and job conversations',
+                      },
+                      {
+                        key: 'can_view_all_pipeline',
+                        icon: Shield,
+                        label: 'Can View All Pipeline',
+                        desc: 'See company-wide pipeline data',
+                      },
+                      {
+                        key: 'can_edit_contact_assignments',
+                        icon: Shield,
+                        label: 'Can Edit Contact Assignments',
+                        desc: 'Reassign contacts to different sales reps',
+                      },
+                      {
+                        key: 'can_create_work_orders',
+                        icon: Briefcase,
+                        label: 'Can Create Work Orders',
+                        desc: 'Create work orders from My Work Center',
+                      },
+                      {
+                        key: 'can_edit_products',
+                        icon: Shield,
+                        label: 'Can Edit Products',
+                        desc: 'Add, edit, and delete products in the catalog',
+                      },
+                      {
+                        key: 'can_edit_contacts',
+                        icon: Shield,
+                        label: 'Can Edit Contacts',
+                        desc: 'Add, edit, and delete contacts',
+                      },
+                      {
+                        key: 'can_send_lost_opportunity_reviews',
+                        icon: Shield,
+                        label: 'Can Send Lost Opportunity Reviews',
+                        desc: 'Send private feedback requests to customers',
+                      },
+                      {
+                        key: 'can_view_lost_opportunity_submissions',
+                        icon: Shield,
+                        label: 'Can View Lost Opportunity Responses',
+                        desc: 'Read private customer responses and competing bids',
+                      },
+                      {
+                        key: 'can_see_all_review_requests',
+                        icon: Shield,
+                        label: 'Can See All Review Requests',
+                        desc: 'See all company review requests (off = own only)',
+                      },
+                      {
+                        key: 'has_calendar_access',
+                        icon: CalendarIcon,
+                        label: 'Has Calendar Access',
+                        desc: 'Access personal calendar for scheduling',
+                      },
+                    ].map(({ key, icon: Icon, label, desc }) => (
+                      <label
+                        key={key}
+                        className="flex items-start gap-3 cursor-pointer bg-gray-800 border border-gray-700 rounded-lg p-3 hover:border-gray-600 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(formData as any)[key]}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              [key]: e.target.checked,
+                            })
+                          }
+                          className={checkboxClass}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                            <span className="text-sm font-medium text-white">{label}</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">{desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                    Visibility Scopes
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                      <label className="block text-sm font-medium text-white mb-2">Proposal Visibility Scope</label>
+                      <select
+                        value={formData.proposal_visibility_scope}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            proposal_visibility_scope: e.target.value as any,
+                          })
+                        }
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      >
+                        <option value="own">Only My Proposals</option>
+                        <option value="office">My Office Proposals</option>
+                        <option value="company">All Company Proposals</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-2">
+                        <span className="font-medium">Only My:</span> sees only proposals they created &middot;{' '}
+                        <span className="font-medium">My Office:</span> sees proposals from assigned office(s) &middot;{' '}
+                        <span className="font-medium">All Company:</span> sees all proposals
+                      </p>
+                    </div>
+
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                      <label className="block text-sm font-medium text-white mb-2">
+                        Team Pulse (Discussion) Visibility
+                      </label>
+                      <select
+                        value={formData.discussion_visibility_scope}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            discussion_visibility_scope: e.target.value as any,
+                          })
+                        }
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      >
+                        <option value="all">All Discussion Posts</option>
+                        <option value="assigned_only">Only Assigned or Mentioned Posts</option>
+                        <option value="private_only">Only Private Posts (Assigned/Mentioned)</option>
+                        <option value="own_posts">Only Their Own Posts</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-2">
+                        <span className="font-medium">All:</span> sees all posts &middot;{' '}
+                        <span className="font-medium">Assigned:</span> only posts assigned to or mentioning them
+                        &middot; <span className="font-medium">Private:</span> only private posts they're part of
+                        &middot; <span className="font-medium">Own:</span> only posts they created
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'pay' && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Travel Bonus</h3>
+                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.travel_bonus_enabled}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            travel_bonus_enabled: e.target.checked,
+                          })
+                        }
+                        className={checkboxClass}
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-white">Enable Travel Bonus</span>
+                        <p className="text-xs text-gray-400 mt-1">
+                          GPS tracking with automatic travel bonus calculation
+                        </p>
+                      </div>
+                    </label>
+                    {formData.travel_bonus_enabled && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Rate per Mile</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.travel_bonus_rate}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                travel_bonus_rate: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Method</label>
+                          <select
+                            value={formData.travel_bonus_method}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                travel_bonus_method: e.target.value as any,
+                              })
+                            }
+                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                          >
+                            <option value="round_trip">Round Trip</option>
+                            <option value="one_way">One Way</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            {activeTab === 'sales' && (
+              <div className="space-y-5">
+                <label className="flex gap-3 text-white">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_sales_rep}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        is_sales_rep: e.target.checked,
+                      })
+                    }
+                  />
+                  Sales representative (business designation)
+                </label>
+                {(formData.role === 'sales' || formData.role === 'admin' || formData.role === 'manager') && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      Sales Target Settings
+                    </h3>
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Sales Start Date</label>
+                        <input
+                          type="date"
+                          value={formData.sales_rep_start_date}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              sales_rep_start_date: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">
+                          Drives automatic annual quota calculation. For the full 30-year trajectory and growth rate
+                          overrides,{' '}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onNavigate?.('settings_salestargets');
+                              onClose();
+                            }}
+                            className="text-cyan-400 font-medium hover:text-cyan-300 underline underline-offset-2 transition-colors"
+                          >
+                            go to Settings &rarr; Sales Targets
+                          </button>
+                          .
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* ===== DEPARTMENT ACCESS TAB ===== */}
-            {activeTab === 'access' && (
+            {activeTab === 'permissions' && (
               <>
                 <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <div className="flex items-start gap-3">
@@ -1196,7 +1507,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
                 {/* Department-level access */}
                 <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Department Access</h3>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                    Department Access
+                  </h3>
                   <div className="space-y-2">
                     {departments.map((dept) => {
                       const hasAccess = getDeptEffectiveAccess(dept.id);
@@ -1207,9 +1520,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <div
                           key={dept.id}
                           className={`rounded-lg border transition-all ${
-                            hasAccess
-                              ? 'border-green-500/30 bg-green-500/10'
-                              : 'border-gray-700 bg-gray-800/50'
+                            hasAccess ? 'border-green-500/30 bg-green-500/10' : 'border-gray-700 bg-gray-800/50'
                           }`}
                         >
                           <div className="p-3 flex items-center justify-between">
@@ -1224,10 +1535,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-medium text-sm text-white">{dept.display_name}</h4>
                                   {isOverridden && (
-                                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded">Override</span>
+                                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded">
+                                      Override
+                                    </span>
                                   )}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-0.5">Role default: {roleHasAccess ? 'Has access' : 'No access'}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Role default: {roleHasAccess ? 'Has access' : 'No access'}
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
@@ -1236,7 +1551,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                                 onClick={() => toggleDeptExpand(dept.id)}
                                 className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded transition-colors"
                               >
-                                {expandedDepts.has(dept.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                {expandedDepts.has(dept.id) ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
                               </button>
                               <button
                                 type="button"
@@ -1247,7 +1566,15 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                                     : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                                 }`}
                               >
-                                {hasAccess ? <><Eye className="w-3 h-3" /> Access</> : <><EyeOff className="w-3 h-3" /> No Access</>}
+                                {hasAccess ? (
+                                  <>
+                                    <Eye className="w-3 h-3" /> Access
+                                  </>
+                                ) : (
+                                  <>
+                                    <EyeOff className="w-3 h-3" /> No Access
+                                  </>
+                                )}
                               </button>
                             </div>
                           </div>
@@ -1273,11 +1600,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                                       <div className="flex items-center gap-2">
                                         <span className="text-sm text-white font-medium">{mod.display_name}</span>
                                         {modIsOverridden && (
-                                          <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded">Override</span>
+                                          <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded">
+                                            Override
+                                          </span>
                                         )}
                                       </div>
                                       <p className="text-xs text-gray-500 mt-0.5">
-                                        {mod.description || `Role default: ${modRoleHasAccess ? 'Has access' : 'No access'}`}
+                                        {mod.description ||
+                                          `Role default: ${modRoleHasAccess ? 'Has access' : 'No access'}`}
                                       </p>
                                     </div>
                                     <button
@@ -1289,7 +1619,15 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                                           : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                                       }`}
                                     >
-                                      {modHasAccess ? <><Eye className="w-3 h-3" /> On</> : <><EyeOff className="w-3 h-3" /> Off</>}
+                                      {modHasAccess ? (
+                                        <>
+                                          <Eye className="w-3 h-3" /> On
+                                        </>
+                                      ) : (
+                                        <>
+                                          <EyeOff className="w-3 h-3" /> Off
+                                        </>
+                                      )}
                                     </button>
                                   </div>
                                 );
@@ -1298,7 +1636,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           )}
 
                           {expandedDepts.has(dept.id) && (modules[dept.id] || []).length === 0 && (
-                            <div className="px-3 pb-3 text-center text-gray-500 text-xs">No pages in this department</div>
+                            <div className="px-3 pb-3 text-center text-gray-500 text-xs">
+                              No pages in this department
+                            </div>
                           )}
                         </div>
                       );
@@ -1309,9 +1649,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
             )}
 
             {/* ===== EMPLOYEE INFO TAB ===== */}
-            {activeTab === 'employee' && (
-              <>
-                {/* Classification status */}
+            {activeTab === 'access' && (
+              <div className="space-y-5">
                 <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-4">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                     <UserCircle className="w-4 h-4 text-blue-400" />
@@ -1339,7 +1678,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       </p>
                       <button
                         type="button"
-                        onClick={() => { setIsEmployee(true); setShowEmployeeSetup(true); }}
+                        onClick={() => {
+                          setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
+                          setIsEmployee(true);
+                          setShowEmployeeSetup(true);
+                        }}
                         className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                       >
                         {classification === 'non_employee' ? 'Change to Employee' : 'Make this person an Employee'}
@@ -1347,7 +1690,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       {classification !== 'non_employee' && (
                         <button
                           type="button"
-                          onClick={() => setShowNonEmployeeConfirm(true)}
+                          onClick={() => {
+                            setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
+                            setShowNonEmployeeConfirm(true);
+                          }}
                           className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
                         >
                           Confirm as Non-Employee User
@@ -1370,7 +1716,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                             type="date"
                             required={isEmployee}
                             value={employeeForm.hire_date}
-                            onChange={(e) => setEmployeeForm({ ...employeeForm, hire_date: e.target.value })}
+                            onChange={(e) =>
+                              setEmployeeForm({
+                                ...employeeForm,
+                                hire_date: e.target.value,
+                              })
+                            }
                             className={inputClass}
                           />
                         </div>
@@ -1379,7 +1730,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           <input
                             type="text"
                             value={employeeForm.employee_number}
-                            onChange={(e) => setEmployeeForm({ ...employeeForm, employee_number: e.target.value })}
+                            onChange={(e) =>
+                              setEmployeeForm({
+                                ...employeeForm,
+                                employee_number: e.target.value,
+                              })
+                            }
                             className={inputClass}
                             placeholder="Optional"
                           />
@@ -1391,7 +1747,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           <label className="block text-sm font-medium text-gray-300 mb-1">Employment Status</label>
                           <select
                             value={employeeForm.employment_status}
-                            onChange={(e) => setEmployeeForm({ ...employeeForm, employment_status: e.target.value as any })}
+                            onChange={(e) =>
+                              setEmployeeForm({
+                                ...employeeForm,
+                                employment_status: e.target.value as any,
+                              })
+                            }
                             className={selectClass}
                           >
                             <option value="active">Active</option>
@@ -1404,7 +1765,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           <input
                             type="date"
                             value={employeeForm.termination_date}
-                            onChange={(e) => setEmployeeForm({ ...employeeForm, termination_date: e.target.value })}
+                            onChange={(e) =>
+                              setEmployeeForm({
+                                ...employeeForm,
+                                termination_date: e.target.value,
+                              })
+                            }
                             disabled={employeeForm.employment_status !== 'terminated'}
                             className={`${inputClass} disabled:opacity-50`}
                           />
@@ -1413,8 +1779,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
                   )}
                 </div>
-
-                {/* Timekeeping & Payroll */}
+              </div>
+            )}
+            {activeTab === 'pay' && (
+              <div className="space-y-5">
                 {isEmployee && (
                   <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-4">
                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -1431,7 +1799,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           onChange={(e) => setEffectiveDate(e.target.value)}
                           className={inputClass}
                         />
-                        <p className="text-xs text-gray-400">The prior configuration will be preserved through the day before this date.</p>
+                        <p className="text-xs text-gray-400">
+                          The prior configuration will be preserved through the day before this date.
+                        </p>
                       </div>
                     )}
 
@@ -1443,7 +1813,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           onChange={(e) => {
                             const val = e.target.value as 'salary' | 'hourly';
                             const newBasis = val === 'salary' ? 'salary' : 'daily_clock';
-                            setEmployeeForm({ ...employeeForm, compensation_type: val, payroll_time_basis: newBasis as any });
+                            setEmployeeForm({
+                              ...employeeForm,
+                              compensation_type: val,
+                              payroll_time_basis: newBasis as any,
+                            });
                             setShowEffectiveDatePrompt(true);
                           }}
                           className={selectClass}
@@ -1457,14 +1831,19 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <select
                           value={employeeForm.pay_schedule_id}
                           onChange={(e) => {
-                            setEmployeeForm({ ...employeeForm, pay_schedule_id: e.target.value });
+                            setEmployeeForm({
+                              ...employeeForm,
+                              pay_schedule_id: e.target.value,
+                            });
                             setShowEffectiveDatePrompt(true);
                           }}
                           className={selectClass}
                         >
                           <option value="">No pay schedule assigned</option>
-                          {paySchedules.map(ps => (
-                            <option key={ps.id} value={ps.id}>{ps.name} ({ps.frequency})</option>
+                          {paySchedules.map((ps) => (
+                            <option key={ps.id} value={ps.id}>
+                              {ps.name} ({ps.frequency})
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -1475,7 +1854,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       <select
                         value={employeeForm.payroll_time_basis}
                         onChange={(e) => {
-                          setEmployeeForm({ ...employeeForm, payroll_time_basis: e.target.value as any });
+                          setEmployeeForm({
+                            ...employeeForm,
+                            payroll_time_basis: e.target.value as any,
+                          });
                           setShowEffectiveDatePrompt(true);
                         }}
                         className={selectClass}
@@ -1484,7 +1866,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <option value="daily_clock">Daily Clock (one segment per clock entry)</option>
                         <option value="work_allocation">Work Allocation (segments from job time)</option>
                       </select>
-                      <p className="text-xs text-gray-400 mt-1">Controls how payroll segments are generated for this employee.</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Controls how payroll segments are generated for this employee.
+                      </p>
                     </div>
 
                     <div>
@@ -1495,7 +1879,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         min="0"
                         value={employeeForm.expected_weekly_hours}
                         onChange={(e) => {
-                          setEmployeeForm({ ...employeeForm, expected_weekly_hours: e.target.value });
+                          setEmployeeForm({
+                            ...employeeForm,
+                            expected_weekly_hours: e.target.value,
+                          });
                           setShowEffectiveDatePrompt(true);
                         }}
                         className={inputClass}
@@ -1504,17 +1891,36 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
                     <div className="space-y-2 border-t border-gray-700 pt-3">
                       {[
-                        { key: 'requires_daily_clock', label: 'Requires Daily Clock', desc: 'Employee must clock in/out each work day' },
-                        { key: 'requires_time_allocation', label: 'Requires Time Allocation', desc: 'Employee must allocate time to specific jobs/projects' },
-                        { key: 'overtime_eligible', label: 'Overtime Eligible', desc: 'Overtime rules may apply to this employee' },
-                        { key: 'pto_eligible', label: 'PTO Eligible', desc: 'PTO functionality applies' },
+                        {
+                          key: 'requires_daily_clock',
+                          label: 'Requires Daily Clock',
+                          desc: 'Employee must clock in/out each work day',
+                        },
+                        {
+                          key: 'requires_time_allocation',
+                          label: 'Requires Time Allocation',
+                          desc: 'Employee must allocate time to specific jobs/projects',
+                        },
+                        {
+                          key: 'overtime_eligible',
+                          label: 'Overtime Eligible',
+                          desc: 'Overtime rules may apply to this employee',
+                        },
+                        {
+                          key: 'pto_eligible',
+                          label: 'PTO Eligible',
+                          desc: 'PTO functionality applies',
+                        },
                       ].map(({ key, label, desc }) => (
                         <label key={key} className="flex items-start gap-3 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={(employeeForm as any)[key]}
                             onChange={(e) => {
-                              setEmployeeForm({ ...employeeForm, [key]: e.target.checked });
+                              setEmployeeForm({
+                                ...employeeForm,
+                                [key]: e.target.checked,
+                              });
                               setShowEffectiveDatePrompt(true);
                             }}
                             className={checkboxClass}
@@ -1536,7 +1942,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                               type="time"
                               value={employeeForm.standard_start_time}
                               onChange={(e) => {
-                                setEmployeeForm({ ...employeeForm, standard_start_time: e.target.value });
+                                setEmployeeForm({
+                                  ...employeeForm,
+                                  standard_start_time: e.target.value,
+                                });
                                 setShowEffectiveDatePrompt(true);
                               }}
                               className={inputClass}
@@ -1548,7 +1957,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                               type="time"
                               value={employeeForm.standard_end_time}
                               onChange={(e) => {
-                                setEmployeeForm({ ...employeeForm, standard_end_time: e.target.value });
+                                setEmployeeForm({
+                                  ...employeeForm,
+                                  standard_end_time: e.target.value,
+                                });
                                 setShowEffectiveDatePrompt(true);
                               }}
                               className={inputClass}
@@ -1558,30 +1970,35 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">Work Days</label>
                           <div className="flex flex-wrap gap-2">
-                            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
-                              <label key={day} className="flex items-center gap-1 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={employeeForm.work_days.includes(day)}
-                                  onChange={(e) => {
-                                    const newDays = e.target.checked
-                                      ? [...employeeForm.work_days, day]
-                                      : employeeForm.work_days.filter(d => d !== day);
-                                    setEmployeeForm({ ...employeeForm, work_days: newDays });
-                                    setShowEffectiveDatePrompt(true);
-                                  }}
-                                  className={checkboxClass}
-                                />
-                                <span className="text-xs text-white capitalize">{day.slice(0, 3)}</span>
-                              </label>
-                            ))}
+                            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(
+                              (day) => (
+                                <label key={day} className="flex items-center gap-1 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={employeeForm.work_days.includes(day)}
+                                    onChange={(e) => {
+                                      const newDays = e.target.checked
+                                        ? [...employeeForm.work_days, day]
+                                        : employeeForm.work_days.filter((d) => d !== day);
+                                      setEmployeeForm({
+                                        ...employeeForm,
+                                        work_days: newDays,
+                                      });
+                                      setShowEffectiveDatePrompt(true);
+                                    }}
+                                    className={checkboxClass}
+                                  />
+                                  <span className="text-xs text-white capitalize">{day.slice(0, 3)}</span>
+                                </label>
+                              ),
+                            )}
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </form>
@@ -1598,7 +2015,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           <button
             type="submit"
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || dataLoading || dataLoadFailed}
             className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all font-medium disabled:opacity-50"
           >
             {loading ? 'Saving...' : 'Save Changes'}

@@ -1,3 +1,4 @@
+import { setupSections } from './UserSetup';
 import { useEffect, useState } from 'react';
 import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, AlertCircle, UserCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -11,13 +12,15 @@ import { useToast } from '../Shared/Toast';
 
 interface EmployeeInfo {
   user_id: string;
-  employee_id: string;
+  id: string;
   employment_status: string;
   hire_date: string;
 }
 
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
+  const [setupReviews,setSetupReviews] = useState<Map<string,string[]>>(new Map());
+  const [setupReviewError,setSetupReviewError] = useState(false);
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -57,6 +60,9 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
 
       console.log('Users loaded:', data?.length || 0);
       setUsers(data || []);
+      const {data:reviews,error:reviewError}=await supabase.from('user_setup_reviews').select('user_id,reviewed_sections');
+      setSetupReviewError(!!reviewError);
+      setSetupReviews(new Map((reviews||[]).map(r=>[r.user_id,r.reviewed_sections])));
 
       // Load employee records
       const { data: empData } = await supabase
@@ -335,9 +341,9 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       user.role === 'admin' ? 'bg-blue-100 text-blue-700' :
                       user.role === 'finance' ? 'bg-purple-100 text-purple-700' :
                       user.role === 'manager' ? 'bg-orange-100 text-orange-700' :
-                      user.role === 'service_manager' ? 'bg-teal-100 text-teal-700' :
-                      user.role === 'office_manager' ? 'bg-indigo-100 text-indigo-700' :
-                      user.role === 'project_manager' ? 'bg-cyan-100 text-cyan-700' :
+                      String(user.role) === 'service_manager' ? 'bg-teal-100 text-teal-700' :
+                      String(user.role) === 'office_manager' ? 'bg-indigo-100 text-indigo-700' :
+                      String(user.role) === 'project_manager' ? 'bg-cyan-100 text-cyan-700' :
                       user.role === 'sales' ? 'bg-green-100 text-green-700' :
                       user.role === 'tech' ? 'bg-yellow-100 text-yellow-700' :
                       'bg-gray-100 text-gray-700'
@@ -352,6 +358,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       }`}>
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
+                      <button type="button" onClick={()=>setEditingUser(user)} className="text-xs text-cyan-700 underline" title={setupSections.filter(s=>!(setupReviews.get(user.id)||[]).includes(s.key)).map(s=>s.label).join(', ')}>{setupReviewError?'Setup status unavailable':setupSections.every(s=>(setupReviews.get(user.id)||[]).includes(s.key))?'Setup complete':'Needs setup review'}</button>
                       {(user as any).employment_classification === 'employee' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <UserCircle className="w-3 h-3" />
