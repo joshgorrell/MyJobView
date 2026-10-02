@@ -3,7 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
-import { initializeLocationTracking } from './src/services/LocationTrackingService';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { OfflineProvider } from './src/contexts/OfflineContext';
@@ -29,8 +28,6 @@ export default function App() {
         const session = await SecureStore.getItemAsync('session');
         if (session) {
           setIsAuthenticated(true);
-          // Initialize location tracking in background
-          await initializeLocationTracking();
         }
       } catch (error) {
         console.error('Error preparing app:', error);

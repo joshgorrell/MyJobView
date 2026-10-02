@@ -1,8 +1,10 @@
+import { saveClockEventGps } from '../../lib/clockEventGps';
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { useState, useEffect } from 'react';
 import {
   X, Clock, Play, StopCircle, Coffee, User, Pause, WifiOff,
-  Briefcase, Wrench, GraduationCap, ChevronRight, CheckCircle,
-  AlertCircle, Loader2, Send, MapPin
+  Wrench, GraduationCap, CheckCircle,
+  AlertCircle, Loader2, Send
 } from 'lucide-react';
 import { useToast } from '../Shared/Toast';
 import { supabase } from '../../lib/supabase';
@@ -10,7 +12,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { gpsTrackingService } from '../../lib/gpsTracking';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 import { getOrganizationTimezone, formatDateInTimezone, formatTimeInTimezone } from '../../lib/timezoneUtils';
 
 interface TimeClockModalProps {
@@ -34,17 +35,6 @@ interface ActiveBreak {
   break_type: string;
 }
 
-interface WorkOrder {
-  id: string;
-  work_order_number: string;
-  title: string;
-  status: string;
-  project: {
-    name: string;
-    customer_name: string;
-  };
-}
-
 interface InternalSession {
   id: string;
   session_type: 'shop_time' | 'training';
@@ -54,10 +44,11 @@ interface InternalSession {
   predetermined_hours: number | null;
 }
 
-type ActivePanel = 'none' | 'job' | 'shop_time' | 'training' | 'break';
+type ActivePanel = 'none' | 'shop_time' | 'training' | 'break';
 
-export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalProps) {
+export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
   const { profile } = useAuth();
+  const timePolicy = useEmployeeTimePolicy();
   const toast = useToast();
 
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
@@ -70,12 +61,8 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
 
   const [activePanel, setActivePanel] = useState<ActivePanel>('none');
-  const [assignedJobs, setAssignedJobs] = useState<WorkOrder[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(false);
-  const [startingJobId, setStartingJobId] = useState<string | null>(null);
-
   const [approvedSessions, setApprovedSessions] = useState<InternalSession[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [, setLoadingSessions] = useState(false);
   const [sessionRequestType, setSessionRequestType] = useState<'shop_time' | 'training'>('shop_time');
   const [sessionDescription, setSessionDescription] = useState('');
   const [sessionHours, setSessionHours] = useState('');
@@ -86,7 +73,6 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
     if (isOpen) {
       loadTodaysClock();
       checkLocationPermission();
-      gpsTrackingService.startPreWarming();
       setActivePanel('none');
 
       const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -99,7 +85,6 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
         clearInterval(timer);
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
-        gpsTrackingService.stopPreWarming();
       };
     }
   }, [isOpen, profile]);
@@ -150,34 +135,11 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
     }
   }
 
-  async function loadAssignedJobs() {
-    if (!profile) return;
-    setLoadingJobs(true);
-    try {
-      const { data, error } = await supabase
-        .from('work_orders')
-        .select(`
-          id, work_order_number, title, status,
-          project:projects!work_orders_project_id_fkey(name, customer_name)
-        `)
-        .eq('assigned_to', profile.id)
-        .in('status', ['assigned', 'in_progress', 'pending'])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAssignedJobs((data || []) as WorkOrder[]);
-    } catch (error) {
-      console.error('Error loading jobs:', error);
-    } finally {
-      setLoadingJobs(false);
-    }
-  }
-
   async function loadApprovedSessions(type: 'shop_time' | 'training') {
     if (!profile) return;
     setLoadingSessions(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
       const { data, error } = await supabase
         .from('internal_time_sessions')
         .select('id, session_type, title, session_date, status, predetermined_hours')
@@ -207,7 +169,6 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
     setSessionDescription('');
     setSessionHours('');
 
-    if (panel === 'job') loadAssignedJobs();
     if (panel === 'shop_time') {
       setSessionRequestType('shop_time');
       loadApprovedSessions('shop_time');
@@ -220,33 +181,7 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
 
   async function handleClockIn() {
     if (!profile) return;
-    const entryId = await performClockIn();
-    if (entryId && navigator.geolocation) {
-      gpsTrackingService.captureLocationForClockEvent(false).then(async (gpsResult) => {
-        try {
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy, p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms, p_refined: false, p_original_accuracy: null
-          });
-          await supabase.from('daily_clock_entries').update({
-            clock_in_latitude: gpsResult.latitude, clock_in_longitude: gpsResult.longitude,
-            clock_in_gps_accuracy: gpsResult.accuracy, clock_in_gps_capture_method: gpsResult.method,
-            clock_in_gps_duration_ms: gpsResult.duration_ms, clock_in_gps_attempted_at: gpsResult.attempted_at,
-            clock_in_gps_captured_at: gpsResult.captured_at, clock_in_gps_quality_score: scoreData || 0,
-          }).eq('id', entryId);
-          setLocationPermission('granted');
-          localStorage.removeItem('gps_permission_declined');
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, false).catch(() => {});
-          }
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, false);
-          }
-        } catch { }
-      }).catch((error) => {
-        if (error.code === 1) { localStorage.setItem('gps_permission_declined', 'true'); setLocationPermission('denied'); }
-      });
-    }
+    await performClockIn();
   }
 
   async function performClockIn(): Promise<string | null> {
@@ -272,13 +207,10 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
         office_id: profile.primary_office_id, offline_entry: !navigator.onLine
       };
 
-      const { data, error } = await offlineSupabaseInsert<any>('daily_clock_entries', clockInData);
+      const { error } = await offlineSupabaseInsert<any>('daily_clock_entries', clockInData);
       if (error) throw error;
 
-      const insertedEntry = Array.isArray(data) ? data[0] : data;
-      if (navigator.geolocation && navigator.onLine) {
-        gpsTrackingService.startTracking(profile.id, insertedEntry?.id || entryId);
-      }
+      void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       await loadTodaysClock();
       await checkLocationPermission();
@@ -292,61 +224,6 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
     }
   }
 
-  async function handleStartJob(jobId: string) {
-    if (!profile) return;
-    setStartingJobId(jobId);
-    try {
-      const { error: woError } = await supabase.from('work_orders').update({ status: 'in_progress' }).eq('id', jobId);
-      if (woError) throw woError;
-
-      const now = new Date();
-      const entryData: any = {
-        technician_id: profile.id, work_order_id: jobId,
-        entry_date: now.toISOString().split('T')[0], clock_in: now.toISOString(),
-        clock_out: null, total_hours: 0, break_minutes: 0, status: 'draft',
-      };
-
-      const { data: insertedEntry, error: timeError } = await supabase.from('time_entries').insert(entryData).select().single();
-      if (timeError) throw timeError;
-
-      await gpsTrackingService.startTracking(profile.id, undefined, jobId);
-
-      if (insertedEntry && navigator.geolocation) {
-        gpsTrackingService.captureLocationForClockEvent(false).then(async (gpsResult) => {
-          try {
-            const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-              p_accuracy: gpsResult.accuracy, p_method: gpsResult.method,
-              p_duration_ms: gpsResult.duration_ms, p_refined: false, p_original_accuracy: null
-            });
-            await supabase.from('time_entries').update({
-              clock_in_latitude: gpsResult.latitude, clock_in_longitude: gpsResult.longitude,
-              clock_in_gps_accuracy: gpsResult.accuracy, clock_in_gps_capture_method: gpsResult.method,
-              clock_in_gps_duration_ms: gpsResult.duration_ms, clock_in_gps_attempted_at: gpsResult.attempted_at,
-              clock_in_gps_captured_at: gpsResult.captured_at, clock_in_gps_quality_score: scoreData || 0,
-            }).eq('id', insertedEntry.id);
-            if (gpsResult.latitude && gpsResult.longitude) {
-              updateClockEntryAddress(insertedEntry.id, gpsResult.latitude, gpsResult.longitude, false, 'time_entries').catch(() => {});
-            }
-            if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-              gpsTrackingService.startPostCaptureRefinement(insertedEntry.id, false, 'time_entries');
-            }
-          } catch { }
-        }).catch(() => {});
-      }
-
-      toast.success('Job started — opening work order');
-      onClose();
-      if (onNavigate) {
-        onNavigate('work_orders', { workOrderId: jobId });
-      }
-    } catch (error: any) {
-      console.error('Error starting job:', error);
-      toast.error('Failed to start job: ' + error.message);
-    } finally {
-      setStartingJobId(null);
-    }
-  }
-
   async function handleSubmitSessionRequest() {
     if (!profile) return;
     if (!sessionDescription.trim()) { toast.warning('Please describe what you need this time for'); return; }
@@ -354,7 +231,7 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
 
     setSubmittingRequest(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
       const { data: insertedSession, error } = await supabase.from('internal_time_sessions').insert({
         session_type: sessionRequestType,
         title: sessionRequestType === 'shop_time' ? 'Shop Time Request' : 'Training Request',
@@ -392,8 +269,6 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
   }
 
   async function handleClockOutSuccess() {
-    gpsTrackingService.stopTracking();
-    gpsTrackingService.stopPostCaptureRefinement();
     await loadTodaysClock();
     setShowClockOutModal(false);
   }
@@ -448,7 +323,7 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
     locationPermission === 'denied' ? 'bg-red-400' :
     'bg-yellow-400';
 
-  if (!isOpen) return null;
+  if (!isOpen || !timePolicy.dailyClock) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -470,8 +345,8 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
             <div className="flex items-center gap-3">
               {!checkingPermission && (
                 <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${gpsStatusColor} ${locationPermission === 'granted' ? 'animate-pulse' : ''}`} />
-                  <span className={`text-xs ${isClockedIn && !isClockedOut ? 'text-white/60' : 'text-gray-400'}`}>GPS</span>
+                  <div className={`w-2 h-2 rounded-full ${gpsStatusColor}`} />
+                  <span className={`text-xs ${isClockedIn && !isClockedOut ? 'text-white/60' : 'text-gray-400'}`}>Location access</span>
                 </div>
               )}
               <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isClockedIn && !isClockedOut ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-500'}`}>
@@ -563,16 +438,6 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
                 <>
                   {/* ACTION GRID */}
                   <div className="grid grid-cols-2 gap-3">
-                    {/* Clock Into a Job */}
-                    <ActionCard
-                      icon={<Briefcase className="w-5 h-5 text-blue-600" />}
-                      bgColor="bg-blue-50"
-                      borderColor={activePanel === 'job' ? 'border-blue-500' : 'border-blue-200'}
-                      label="Clock Into Job"
-                      sublabel="Start a work order"
-                      active={activePanel === 'job'}
-                      onClick={() => handlePanelToggle('job')}
-                    />
                     {/* Shop Time */}
                     <ActionCard
                       icon={<Wrench className="w-5 h-5 text-slate-600" />}
@@ -606,68 +471,6 @@ export function TimeClockModal({ isOpen, onClose, onNavigate }: TimeClockModalPr
                   </div>
 
                   {/* INLINE PANELS */}
-
-                  {/* Job Panel */}
-                  {activePanel === 'job' && (
-                    <div className="border border-blue-200 rounded-xl overflow-hidden">
-                      <div className="bg-blue-50 px-4 py-2.5 flex items-center justify-between border-b border-blue-200">
-                        <span className="text-sm font-semibold text-blue-800">Your Assigned Jobs</span>
-                        {loadingJobs && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-                      </div>
-                      <div className="divide-y divide-gray-100">
-                        {loadingJobs ? (
-                          <div className="p-4 text-center text-sm text-gray-400">Loading jobs...</div>
-                        ) : assignedJobs.length === 0 ? (
-                          <div className="p-4 text-center">
-                            <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                            <p className="text-sm text-gray-500">No jobs assigned</p>
-                            <button
-                              onClick={() => { onClose(); if (onNavigate) onNavigate('tech_center'); }}
-                              className="mt-2 text-xs text-blue-600 hover:underline"
-                            >
-                              Visit your Work Center
-                            </button>
-                          </div>
-                        ) : (
-                          assignedJobs.map(job => (
-                            <div key={job.id} className="flex items-center gap-3 px-4 py-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-mono text-gray-400">{job.work_order_number}</span>
-                                  {job.status === 'in_progress' && (
-                                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Active</span>
-                                  )}
-                                </div>
-                                <div className="text-sm font-medium text-gray-900 truncate">{job.title}</div>
-                                <div className="flex items-center gap-1 text-xs text-gray-500">
-                                  <MapPin className="w-3 h-3" />
-                                  <span className="truncate">{job.project?.customer_name || job.project?.name || 'No customer'}</span>
-                                </div>
-                              </div>
-                              {job.status === 'in_progress' ? (
-                                <button
-                                  onClick={() => { onClose(); if (onNavigate) onNavigate('work_orders', { workOrderId: job.id }); }}
-                                  className="flex-shrink-0 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
-                                >
-                                  Open
-                                  <ChevronRight className="w-3 h-3" />
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleStartJob(job.id)}
-                                  disabled={!!startingJobId}
-                                  className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
-                                >
-                                  {startingJobId === job.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                                  Start
-                                </button>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Shop Time / Training Request Panel */}
                   {(activePanel === 'shop_time' || activePanel === 'training') && (

@@ -3,6 +3,19 @@ import { offlineStorage, QueuedAction } from './offlineStorage';
 
 type SyncListener = (syncing: boolean, queueLength: number) => void;
 
+function sameCreatedValue(wanted:any,actual:any):boolean {
+  if(wanted===actual) return true;
+  if(typeof wanted==='number' && typeof actual==='string') return Number(actual)===wanted;
+  if(typeof wanted==='string' && typeof actual==='string' && /^\d{4}-\d{2}-\d{2}T/.test(wanted) && /^\d{4}-\d{2}-\d{2}T/.test(actual))
+    return Number.isFinite(Date.parse(wanted)) && Date.parse(wanted)===Date.parse(actual);
+  if(wanted && actual && typeof wanted==='object' && typeof actual==='object') {
+    const keys=Object.keys(wanted);
+    return Array.isArray(wanted)===Array.isArray(actual) && keys.length===Object.keys(actual).length
+      && keys.every(key=>sameCreatedValue(wanted[key],actual[key]));
+  }
+  return false;
+}
+
 class SyncManager {
   private syncInProgress = false;
   private listeners: SyncListener[] = [];
@@ -24,7 +37,7 @@ class SyncManager {
     if (!navigator.onLine) return;
 
     // Check if there's anything to sync first
-    const queue = await offlineStorage.getSyncQueue();
+    const queue = (await offlineStorage.getSyncQueue()).sort((a,b)=>a.timestamp-b.timestamp);
     if (queue.length === 0) {
       this.queueLength = 0;
       return;
@@ -35,19 +48,25 @@ class SyncManager {
     this.notifyListeners();
 
     try {
+      const blockedRows=new Set<string>();
       for (const action of queue) {
+        const {data:{session},error:sessionError}=await supabase.auth.getSession();
+        if(sessionError || !session || action.ownerId!==session.user.id) continue;
+        const rowKey=`${action.table}:${action.data?.id||action.id}`;
+        if(blockedRows.has(rowKey)) continue;
         try {
           await this.processAction(action);
           await offlineStorage.removeFromSyncQueue(action.id);
           this.queueLength--;
           this.notifyListeners();
         } catch (error) {
-          console.error('Failed to sync action:', action, error);
+          blockedRows.add(rowKey);
+          console.error('Failed to sync action:', action.id, error);
         }
       }
     } finally {
       this.syncInProgress = false;
-      this.queueLength = 0;
+      this.queueLength = (await offlineStorage.getSyncQueue()).length;
       this.notifyListeners();
     }
   }
@@ -55,19 +74,29 @@ class SyncManager {
   private async processAction(action: QueuedAction): Promise<void> {
     const { type, table, data } = action;
 
+    let result;
     switch (type) {
-      case 'create':
-        // Remove offline-specific fields and let the database set timestamps
-        const { id, created_at, synced, ...createData } = data;
-        await supabase.from(table).insert(createData);
+      case 'create': {
+        // Preserve client IDs: queued follow-up updates and child records reference them.
+        const { synced, ...createData } = data;
+        result=await supabase.from(table).insert(createData);
+        if(result.error?.code==='23505' && createData.id) {
+          const existing=await supabase.from(table).select('*').eq('id',createData.id).maybeSingle();
+          if(!existing.error && existing.data && Object.entries(createData).filter(([,value])=>value!==undefined).every(([key,value])=>sameCreatedValue(value,existing.data[key]))) {result={error:null};}
+        }
         break;
+      }
       case 'update':
-        await supabase.from(table).update(data).eq('id', data.id);
+        result=await supabase.from(table).update(data).eq('id',data.id).select('id');
+        if(!result.error && !result.data?.length) throw new Error('Queued update did not find an accessible record');
         break;
       case 'delete':
-        await supabase.from(table).delete().eq('id', data.id);
+        result=await supabase.from(table).delete().eq('id',data.id).select('id');
+        if(!result.error && !result.data?.length) throw new Error('Queued delete did not find an accessible record');
         break;
+      default: throw new Error('Unsupported queued action');
     }
+    if(result.error) throw result.error;
   }
 
   async getQueueLength(): Promise<number> {

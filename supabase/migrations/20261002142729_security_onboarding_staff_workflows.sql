@@ -1,3 +1,9 @@
+-- Older deployed schemas do not have operational service-address columns.
+ALTER TABLE public.security_contracts ADD COLUMN IF NOT EXISTS property_address text;
+ALTER TABLE public.security_contracts ADD COLUMN IF NOT EXISTS property_city text;
+ALTER TABLE public.security_contracts ADD COLUMN IF NOT EXISTS property_state text;
+ALTER TABLE public.security_contracts ADD COLUMN IF NOT EXISTS property_zip text;
+
 -- Staff workflows use the existing module grants. Portal users never gain staff
 -- access merely by sharing an organization. All definer functions use empty paths.
 CREATE FUNCTION private.security_staff_access(p_org uuid,p_manage boolean DEFAULT false)
@@ -47,6 +53,10 @@ REVOKE ALL ON FUNCTION private.security_validate_form(jsonb) FROM PUBLIC,anon,au
 
 ALTER TABLE public.security_contracts ADD COLUMN creation_request_id uuid;
 CREATE UNIQUE INDEX security_contract_creation_request ON public.security_contracts(organization_id,creation_request_id) WHERE creation_request_id IS NOT NULL;
+CREATE FUNCTION private.security_autopay_authorization()
+RETURNS text LANGUAGE sql IMMUTABLE SET search_path='' AS $$ SELECT 'I authorize MyJobView to initiate recurring automatic charges or ACH debits through QuickBooks Payments to my selected payment method for security monitoring, at the billing frequency and amounts shown in this agreement, plus applicable taxes disclosed on invoices. Billing begins when monitoring is activated. Invoices identify the payment amount and scheduled debit date and are sent at least 10 days before an automatic debit. Monthly or annual billing periods recur from the activation date; short months use the last day of the month. This authorization continues until revoked. Contact the provider using the contact information in this agreement to revoke or change payment authorization before the next scheduled payment. Revoking AutoPay does not cancel the monitoring agreement or amounts owed.'::text; $$;
+REVOKE ALL ON FUNCTION private.security_autopay_authorization() FROM PUBLIC,anon,authenticated;
+
 -- Draft and executed documents use one server representation. Private helper is
 -- callable only inside authorized workflows; no caller-provided tenant/customer IDs.
 CREATE FUNCTION private.security_staff_document(p_id uuid)
@@ -58,7 +68,7 @@ DECLARE c public.security_contracts%ROWTYPE; d jsonb; BEGIN
  'template',(SELECT jsonb_build_object('name',t.name,'contract_terms',t.contract_terms) FROM public.security_contract_templates t WHERE t.id=c.template_id AND t.organization_id=c.organization_id),
  'dealer',(SELECT jsonb_build_object('company_name',s.company_name,'company_email',s.company_email,'annual_billing_enabled',s.annual_billing_enabled,'annual_discount_type',s.annual_discount_type,'annual_discount_percentage',s.annual_discount_percentage,'annual_discount_flat_amount',s.annual_discount_flat_amount) FROM public.company_settings s WHERE s.organization_id=c.organization_id LIMIT 1),
  'services',coalesce((SELECT jsonb_agg(jsonb_build_object('name',m.name,'monthly_price',cs.monthly_price) ORDER BY m.name,cs.id) FROM public.security_contract_services cs JOIN public.monitoring_services m ON m.id=cs.service_id WHERE cs.contract_id=c.id),'[]'),
- 'billing_mode',c.security_billing_mode,'mail_invoice_fee',c.mail_invoice_fee,
+ 'billing_mode',c.security_billing_mode,'mail_invoice_fee',c.mail_invoice_fee,'autopay_authorization',CASE WHEN c.security_billing_mode='autopay' THEN private.security_autopay_authorization() ELSE NULL END,
  'billingPreference',CASE WHEN c.billing_frequency_override='yearly' THEN 'annual' ELSE 'monthly' END) INTO d;
  RETURN coalesce(c.onboarding_agreement_snapshot,d);
 END $$;
@@ -68,7 +78,7 @@ CREATE FUNCTION private.staff_security_onboarding(p_action text,p_id uuid,p_payl
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid uuid; req uuid; services uuid[];
  total numeric; override numeric; f jsonb; d jsonb; e jsonb; ord bigint; m public.security_payment_methods%ROWTYPE;
- ct public.contacts%ROWTYPE; BEGIN
+ ct public.contacts%ROWTYPE; office uuid; BEGIN
  SELECT * INTO actor FROM public.profiles WHERE id=auth.uid();
  IF NOT private.security_staff_access(actor.organization_id,p_action IN ('approve','activate','reject','review')) THEN
   RAISE EXCEPTION 'Security onboarding permission is required' USING ERRCODE='42501'; END IF;
@@ -101,8 +111,11 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
    IF p_action<>'create' OR p_payload->'new_contact' IS NULL THEN RAISE EXCEPTION 'Choose a customer'; END IF;
    f:=p_payload->'new_contact';
    IF nullif(btrim(f->>'first_name'),'') IS NULL OR nullif(btrim(f->>'last_name'),'') IS NULL OR coalesce(f->>'email','') !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN RAISE EXCEPTION 'Enter a customer name and valid email'; END IF;
-   INSERT INTO public.contacts(organization_id,first_name,last_name,email,phone,street_address,city,state,zip_code,company_name)
-    VALUES(actor.organization_id,f->>'first_name',f->>'last_name',f->>'email',f->>'phone',f->>'street_address',f->>'city',f->>'state',f->>'zip_code',f->>'company_name') RETURNING id INTO cid;
+   SELECT o.id INTO office FROM public.company_offices o WHERE o.organization_id=actor.organization_id AND o.is_active
+    ORDER BY (o.id=actor.primary_office_id) DESC NULLS LAST,(o.id=actor.default_office_id) DESC NULLS LAST,o.is_headquarters DESC NULLS LAST,o.display_order,o.id LIMIT 1;
+   IF office IS NULL THEN RAISE EXCEPTION 'Configure an active company office before creating a customer'; END IF;
+   INSERT INTO public.contacts(organization_id,contact_name,username,office_id,created_by,first_name,last_name,email,phone,street_address,city,state,zip_code,company_name)
+    VALUES(actor.organization_id,btrim(f->>'first_name')||' '||btrim(f->>'last_name'),'contact-'||gen_random_uuid()::text,office,actor.id,f->>'first_name',f->>'last_name',f->>'email',f->>'phone',f->>'street_address',f->>'city',f->>'state',f->>'zip_code',f->>'company_name') RETURNING id INTO cid;
   END IF;
   SELECT * INTO ct FROM public.contacts WHERE id=cid AND organization_id=actor.organization_id;
   IF ct.id IS NULL THEN RAISE EXCEPTION 'Choose a customer from this organization'; END IF;
@@ -110,7 +123,7 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
    IF NOT (actor.role='admin' OR actor.can_edit_contacts) THEN RAISE EXCEPTION 'Contact editing permission is required'; END IF;
    f:=p_payload->'contact_edits';
    IF nullif(btrim(f->>'first_name'),'') IS NULL OR nullif(btrim(f->>'last_name'),'') IS NULL OR coalesce(f->>'email','') !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN RAISE EXCEPTION 'Enter a customer name and valid email'; END IF;
-   UPDATE public.contacts SET first_name=f->>'first_name',last_name=f->>'last_name',email=f->>'email',phone=f->>'phone',street_address=f->>'street_address',city=f->>'city',state=f->>'state',zip_code=f->>'zip_code',company_name=f->>'company_name' WHERE id=cid;
+   UPDATE public.contacts SET contact_name=btrim(f->>'first_name')||' '||btrim(f->>'last_name'),first_name=f->>'first_name',last_name=f->>'last_name',email=f->>'email',phone=f->>'phone',street_address=f->>'street_address',city=f->>'city',state=f->>'state',zip_code=f->>'zip_code',company_name=f->>'company_name' WHERE id=cid;
   END IF;
   IF nullif(p_payload->>'sales_order_id','') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.sales_orders WHERE id=(p_payload->>'sales_order_id')::uuid AND organization_id=actor.organization_id AND contact_id=cid) THEN RAISE EXCEPTION 'Sales order must belong to this customer'; END IF;
   IF p_action='create' THEN
@@ -385,7 +398,7 @@ DECLARE c public.security_contracts%ROWTYPE; n public.security_contracts%ROWTYPE
   billing_frequency_override=CASE WHEN f->>'billingPreference'='annual' THEN 'yearly' ELSE 'monthly' END,account_type=n.account_type,account_services=n.account_services,is_monitoring=n.is_monitoring,account_number=n.account_number,installation_date=n.installation_date,service_account_numbers=n.service_account_numbers,notes=n.notes,email_override=n.email_override,
   security_payment_method_id=n.security_payment_method_id,autopay_authorized_at=n.autopay_authorized_at,autopay_paused=n.autopay_paused,autopay_revoked_at=n.autopay_revoked_at,payment_method=n.payment_method,customer_signature=n.customer_signature,customer_signature_date=n.customer_signature_date,monitoring_tax_classification_id=n.monitoring_tax_classification_id,
   security_billing_mode=n.security_billing_mode,status='pending_approval',updated_at=now() WHERE id=c.id RETURNING * INTO n;
- d:=d||jsonb_build_object('monthly_price',n.monthly_price,'billing_mode',n.security_billing_mode,'mail_invoice_fee',n.mail_invoice_fee);
+ d:=d||jsonb_build_object('monthly_price',n.monthly_price,'billing_mode',n.security_billing_mode,'mail_invoice_fee',n.mail_invoice_fee,'autopay_authorization',CASE WHEN n.security_billing_mode='autopay' THEN private.security_autopay_authorization() ELSE NULL END);
  UPDATE public.security_contracts SET onboarding_agreement_snapshot=d WHERE id=c.id;
  INSERT INTO public.security_onboarding_corrections(contract_id,organization_id,actor_id,revision,reason,before_data,after_data) VALUES(c.id,c.organization_id,auth.uid(),c.onboarding_revision+1,btrim(p_reason),old_data,jsonb_build_object('patch',p_patch,'document',d));
  PERFORM set_config('mjv.security_signing','false',true);

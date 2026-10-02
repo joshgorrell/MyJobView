@@ -1,5 +1,8 @@
 export interface Profile {
   id: string;
+  employment_type?: 'hourly' | 'job_time' | 'salary' | null;
+  requires_daily_clock?: boolean;
+  points_earned?: number;
   email: string;
   full_name: string;
   first_name?: string;

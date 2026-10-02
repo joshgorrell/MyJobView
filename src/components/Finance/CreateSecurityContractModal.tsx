@@ -265,6 +265,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
         notes, email_override: emailOverride.trim() || null,
       });
 
+      creationRequest.current = crypto.randomUUID();
       if (onPaperCreated) onPaperCreated(contractData);
       else onSuccess();
     } catch (error: any) {

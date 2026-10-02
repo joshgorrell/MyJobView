@@ -1,7 +1,9 @@
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { useState, useEffect } from 'react';
 import { Clock, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { TimeClockModal } from './TimeClockModal';
 
 interface TimeButtonProps {
@@ -20,6 +22,7 @@ interface ClockStatus {
 export function TimeButton({ onNavigate }: TimeButtonProps) {
   const [showModal, setShowModal] = useState(false);
   const { profile } = useAuth();
+  const timePolicy = useEmployeeTimePolicy();
   const [clockStatus, setClockStatus] = useState<ClockStatus>({
     isClockedIn: false,
     clockInTime: null,
@@ -31,7 +34,7 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    if (profile?.requires_daily_clock) {
+    if (timePolicy.dailyClock) {
       checkClockStatus();
 
       const timer = setInterval(() => {
@@ -58,12 +61,12 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
         channel.unsubscribe();
       };
     }
-  }, [profile]);
+  }, [profile, timePolicy.dailyClock]);
 
   async function checkClockStatus() {
     if (!profile) return;
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
 
       const { data: dailyEntry } = await supabase
         .from('daily_clock_entries')
@@ -113,7 +116,7 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
     }
   }
 
-  if (!profile?.requires_daily_clock) return null;
+  if (!timePolicy.dailyClock) return null;
 
   const getElapsedTime = (startTime: string) => {
     const diffMs = currentTime.getTime() - new Date(startTime).getTime();

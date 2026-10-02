@@ -4,18 +4,25 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await role('postgres');
  await db.exec(`
  CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{}'::jsonb $$;
+ ALTER TABLE profiles ADD COLUMN primary_office_id uuid; ALTER TABLE profiles ADD COLUMN default_office_id uuid;
+ CREATE TABLE company_offices(id uuid PRIMARY KEY,organization_id uuid,is_active boolean,is_headquarters boolean,display_order integer);
+ INSERT INTO company_offices VALUES('${id(90)}','${org}',true,true,0);
  ALTER TABLE profiles ADD COLUMN is_active boolean DEFAULT true; ALTER TABLE profiles ADD COLUMN can_edit_contacts boolean DEFAULT false;
  ALTER TABLE department_modules ADD COLUMN id uuid DEFAULT gen_random_uuid();
  CREATE FUNCTION public.get_user_module_access(uuid,uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
  ALTER TABLE contacts ALTER COLUMN id SET DEFAULT gen_random_uuid(); ALTER TABLE contacts ADD COLUMN first_name text; ALTER TABLE contacts ADD COLUMN last_name text; ALTER TABLE contacts ADD COLUMN company_name text;
  UPDATE contacts SET first_name='Test',last_name='Customer';
+ ALTER TABLE contacts ADD COLUMN contact_name text; ALTER TABLE contacts ADD COLUMN username text; ALTER TABLE contacts ADD COLUMN office_id uuid REFERENCES company_offices(id); ALTER TABLE contacts ADD COLUMN created_by uuid;
+ UPDATE contacts SET contact_name=full_name,username=id::text,office_id='${id(90)}';
+ ALTER TABLE contacts ALTER COLUMN contact_name SET NOT NULL; ALTER TABLE contacts ALTER COLUMN username SET NOT NULL; ALTER TABLE contacts ADD UNIQUE(username); ALTER TABLE contacts ALTER COLUMN office_id SET NOT NULL;
+ ALTER TABLE contacts DROP COLUMN full_name; ALTER TABLE contacts ADD COLUMN full_name text GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED;
  ALTER TABLE monitoring_services ADD COLUMN organization_id uuid; ALTER TABLE monitoring_services ADD COLUMN is_active boolean DEFAULT true; ALTER TABLE monitoring_services ADD COLUMN monthly_price numeric DEFAULT 35;
  INSERT INTO monitoring_services(id,name,organization_id) VALUES('${id(70)}','Monitoring','${org}');
  ALTER TABLE security_contract_services ADD COLUMN organization_id uuid; ALTER TABLE security_contract_services ALTER COLUMN id SET DEFAULT gen_random_uuid();
  CREATE TABLE sales_orders(id uuid,organization_id uuid,contact_id uuid);
  ALTER TABLE security_contracts ALTER COLUMN id SET DEFAULT gen_random_uuid();
  ALTER TABLE security_contracts ADD COLUMN created_by_user_id uuid; ALTER TABLE security_contracts ADD COLUMN sales_order_id uuid; ALTER TABLE security_contracts ADD COLUMN price_override numeric;
- ALTER TABLE security_contracts ADD COLUMN property_address text; ALTER TABLE security_contracts ADD COLUMN property_city text; ALTER TABLE security_contracts ADD COLUMN property_state text; ALTER TABLE security_contracts ADD COLUMN property_zip text;
+
  ALTER TABLE security_contracts ADD COLUMN completed_by_staff boolean; ALTER TABLE security_contracts ADD COLUMN account_type text; ALTER TABLE security_contracts ADD COLUMN account_services text[]; ALTER TABLE security_contracts ADD COLUMN is_monitoring boolean; ALTER TABLE security_contracts ADD COLUMN account_number text; ALTER TABLE security_contracts ADD COLUMN installation_date date; ALTER TABLE security_contracts ADD COLUMN service_account_numbers jsonb; ALTER TABLE security_contracts ADD COLUMN notes text; ALTER TABLE security_contracts ADD COLUMN email_override text; ALTER TABLE security_contracts ADD COLUMN approved_at timestamptz; ALTER TABLE security_contracts ADD COLUMN approved_by_user_id uuid; ALTER TABLE security_contracts ADD COLUMN rejection_reason text; ALTER TABLE security_contracts ADD COLUMN invitation_sent_at timestamptz; ALTER TABLE security_contracts ADD COLUMN invitation_sent_by_user_id uuid;
  `);
  await db.exec(await readFile(new URL('../../supabase/migrations/20261002142729_security_onboarding_staff_workflows.sql',import.meta.url),'utf8'));
@@ -36,6 +43,22 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await role('authenticated',id(11));await assert.rejects(staff('create',null,{...create,request_id:id(72),contact_id:null,new_contact:{first_name:'Rollback',last_name:'Customer',email:'rollback@example.com'}}));
  await role('postgres');assert.equal((await db.query('select count(*) from contacts')).rows[0].count,before,'Failed service save rolls back customer creation');await db.exec("SET test.fail_service='false'; update security_payment_methods set verified_at=now() where id='"+id(13)+"'");
  await role('authenticated',id(11));
+ const newCustomer=await staff('create',null,{...create,request_id:id(91),contact_id:null,new_contact:{first_name:'New',last_name:'Customer',email:'new@example.com'}});
+ await role('postgres');
+ const addedContact=(await db.query('select ct.* from contacts ct join security_contracts c on c.contact_id=ct.id where c.id=$1',[newCustomer.id])).rows[0];
+ assert.equal(addedContact.contact_name,'New Customer');assert.equal(addedContact.full_name,'New Customer');assert.equal(addedContact.office_id,id(90));assert.equal(addedContact.created_by,id(11));assert.ok(addedContact.username);
+ await db.exec('update company_offices set is_active=false');
+ await role('authenticated',id(11));
+ await assert.rejects(staff('create',null,{...create,request_id:id(92),contact_id:null,new_contact:{first_name:'No',last_name:'Office',email:'no-office@example.com'}}),/active company office/);
+ await role('postgres');await db.exec('update company_offices set is_active=true');
+ await role('authenticated',id(11));
+ await staff('edit',newCustomer.id,{...create,contact_id:addedContact.id,contact_edits:{first_name:'Corrected',last_name:'Customer',email:'new@example.com'}});
+ await role('postgres');
+ assert.equal((await db.query('select contact_name from contacts where id=$1',[addedContact.id])).rows[0].contact_name,'Corrected Customer');
+ await role('authenticated',id(1));
+ const portalMandate=(await rpc('get',id(5))).document.autopay_authorization;
+ await role('authenticated',id(11));
+ assert.equal(view.document.autopay_authorization,portalMandate,'Staff and customer entry retain the same recurring-payment mandate');
  const paper={paper_signed:true,autopay_accepted:true,document_version:view.document_version,account_type:'residential',form_data:form};
  await assert.rejects(staff('paper',created.id,{...paper,form_data:{...form,paymentMethodId:'manual_entry'}}),'Manual marker is never a payment credential');
  await assert.rejects(staff('paper',created.id,{...paper,autopay_accepted:false}));
@@ -85,11 +108,12 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await correct(7,{security_billing_mode:'mail'});
  corrected=(await db.query('select * from security_contracts where id=$1',[reviewContract.id])).rows[0];
  assert.equal(Number(corrected.monthly_price),52);assert.equal(Number(corrected.mail_invoice_fee),7);
+ assert.equal(corrected.onboarding_agreement_snapshot.autopay_authorization,null);
  assert.equal(Number(corrected.onboarding_agreement_snapshot.monthly_price),52,'Corrected snapshot includes the mailing fee once');
  await assert.rejects(correct(8,{security_billing_mode:'autopay'}),'Removing mail exception requires verified AutoPay');
  await correct(8,{security_billing_mode:'autopay',paymentMethodId:id(13),autopay_accepted:true});
  corrected=(await db.query('select * from security_contracts where id=$1',[reviewContract.id])).rows[0];
- assert.equal(Number(corrected.monthly_price),45);assert.equal(Number(corrected.onboarding_agreement_snapshot.mail_invoice_fee),0);
+ assert.equal(Number(corrected.monthly_price),45);assert.equal(Number(corrected.onboarding_agreement_snapshot.mail_invoice_fee),0);assert.equal(corrected.onboarding_agreement_snapshot.autopay_authorization,portalMandate);
  assert.equal(corrected.onboarding_original_snapshot.document.monthly_price,35);
  // The decorated portal submit still mirrors the accepted property atomically.
  const portalContract=await staff('create',null,{...create,request_id:id(88)});

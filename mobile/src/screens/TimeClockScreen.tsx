@@ -1,3 +1,6 @@
+import * as Crypto from 'expo-crypto';
+import { openMJV } from '../services/OpenMJV';
+import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -35,8 +38,9 @@ interface Break {
   break_type: string;
 }
 
-export default function TimeClockScreen() {
+export default function TimeClockScreen({ navigation }: { navigation: any }) {
   const { profile } = useAuth();
+  const [timeContext,setTimeContext] = useState<{timezone:string;basis:string;dailyClock:boolean}|null>(null);
   const { currentLocation, isTracking } = useLocation();
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
   const [breaks, setBreaks] = useState<Break[]>([]);
@@ -54,7 +58,7 @@ export default function TimeClockScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!todayEntry) return;
@@ -80,7 +84,10 @@ export default function TimeClockScreen() {
     if (!profile) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const context = await getEmployeeTimeContext(profile.id);
+      setTimeContext(context);
+      if(!context.dailyClock) return;
+      const today = workDate(new Date(),context.timezone);
 
       const { data, error } = await supabase
         .from('daily_clock_entries')
@@ -150,8 +157,10 @@ export default function TimeClockScreen() {
 
     try {
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const entryId = `${Date.now()}-${Math.random()}`;
+      const context = await getEmployeeTimeContext(profile.id);
+      if(!context.dailyClock) return;
+      const today = workDate(now,context.timezone);
+      const entryId = Crypto.randomUUID();
 
       const clockInData = {
         id: entryId,
@@ -166,12 +175,16 @@ export default function TimeClockScreen() {
       // Capture high-accuracy location
       const location = await locationTrackingService.captureHighAccuracyLocation();
 
+      Object.assign(clockInData, {clock_in_gps_attempted_at:now.toISOString(),clock_in_gps_capture_method:'failed'});
       if (location) {
         Object.assign(clockInData, {
           clock_in_latitude: location.coords.latitude,
           clock_in_longitude: location.coords.longitude,
           clock_in_gps_accuracy: location.coords.accuracy,
-          clock_in_gps_capture_method: 'native_mobile',
+          clock_in_gps_capture_method: (location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy',
+          clock_in_gps_attempted_at: now.toISOString(),
+          clock_in_gps_captured_at: new Date(location.timestamp).toISOString(),
+          clock_in_gps_duration_ms: (location.coords as any).duration_ms || 0,
         });
       }
 
@@ -181,8 +194,6 @@ export default function TimeClockScreen() {
 
       if (error) throw error;
 
-      // Start background GPS tracking
-      await locationTrackingService.startTracking(profile.id, entryId);
 
       await loadTodaysClock();
       Alert.alert('Success', 'Clocked in successfully!');
@@ -214,12 +225,17 @@ export default function TimeClockScreen() {
             clock_out: now.toISOString(),
             status: 'clocked_out',
             notes: notes || null,
+            clock_out_gps_attempted_at: now.toISOString(),
+            clock_out_gps_capture_method: 'failed',
           };
 
           if (location) {
             updates.clock_out_latitude = location.coords.latitude;
             updates.clock_out_longitude = location.coords.longitude;
             updates.clock_out_gps_accuracy = location.coords.accuracy;
+            updates.clock_out_gps_capture_method = (location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy';
+            updates.clock_out_gps_captured_at = new Date(location.timestamp).toISOString();
+            updates.clock_out_gps_duration_ms = (location.coords as any).duration_ms || 0;
           }
 
           const { error } = await supabase
@@ -229,8 +245,6 @@ export default function TimeClockScreen() {
 
           if (error) throw error;
 
-          // Stop GPS tracking
-          await locationTrackingService.stopTracking();
 
           await loadTodaysClock();
           Alert.alert('Success', 'Clocked out successfully!');
@@ -250,7 +264,7 @@ export default function TimeClockScreen() {
       const { error } = await supabase
         .from('daily_clock_breaks')
         .insert({
-          id: `${Date.now()}-${Math.random()}`,
+          id: Crypto.randomUUID(),
           daily_clock_entry_id: todayEntry.id,
           break_start: new Date().toISOString(),
           break_type: breakType,
@@ -283,6 +297,12 @@ export default function TimeClockScreen() {
     }
   }
 
+  async function openCommandCenter() {
+    if(!profile) return;
+    try { await openMJV(profile.id,{commandCenter:'1'}); }
+    catch(error:any) { Alert.alert('Unable to open Command Center',error.message); }
+  }
+
   function getTimeSince(timestamp: string): string {
     const start = new Date(timestamp);
     const diff = currentTime.getTime() - start.getTime();
@@ -313,14 +333,16 @@ export default function TimeClockScreen() {
     );
   }
 
-  if (!profile?.requires_daily_clock) {
+  if (!timeContext?.dailyClock) {
     return (
       <View style={styles.container}>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Daily Clock Not Required</Text>
+          <Text style={styles.infoTitle}>My Work & Time</Text>
           <Text style={styles.infoText}>
-            Your employment type ({profile?.employment_type}) does not require daily clock-in/out.
+            {timeContext?.basis === 'work_allocation' ? 'Your approved Work Order time determines pay. Manual Job Time and Shop/Training Time require manager approval.' : 'Your recorded job time is used for job costing. Your configuration does not require a Daily Clock.'}
           </Text>
+          <TouchableOpacity onPress={openCommandCenter} style={{padding:12,marginTop:8}}><Text style={{color:'#2563eb',textAlign:'center'}}>Daily Calendar, My Time & Requests</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} style={{padding:12,backgroundColor:'#2563eb',borderRadius:8,marginTop:12}}><Text style={{color:'white',textAlign:'center'}}>Open My Work Orders</Text></TouchableOpacity>
         </View>
       </View>
     );
