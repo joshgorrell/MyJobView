@@ -73,7 +73,6 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
     if (isOpen) {
       loadTodaysClock();
       checkLocationPermission();
-      gpsTrackingService.startPreWarming();
       setActivePanel('none');
 
       const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -86,7 +85,6 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
         clearInterval(timer);
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
-        gpsTrackingService.stopPreWarming();
       };
     }
   }, [isOpen, profile]);
@@ -209,14 +207,10 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
         office_id: profile.primary_office_id, offline_entry: !navigator.onLine
       };
 
-      const { data, error } = await offlineSupabaseInsert<any>('daily_clock_entries', clockInData);
+      const { error } = await offlineSupabaseInsert<any>('daily_clock_entries', clockInData);
       if (error) throw error;
 
-      const insertedEntry = Array.isArray(data) ? data[0] : data;
       void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
-      if (navigator.geolocation && navigator.onLine) {
-        gpsTrackingService.startTracking(profile.id, insertedEntry?.id || entryId);
-      }
 
       await loadTodaysClock();
       await checkLocationPermission();
@@ -275,8 +269,6 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
   }
 
   async function handleClockOutSuccess() {
-    gpsTrackingService.stopTracking('daily');
-    gpsTrackingService.stopPostCaptureRefinement();
     await loadTodaysClock();
     setShowClockOutModal(false);
   }
@@ -353,8 +345,8 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
             <div className="flex items-center gap-3">
               {!checkingPermission && (
                 <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${gpsStatusColor} ${locationPermission === 'granted' ? 'animate-pulse' : ''}`} />
-                  <span className={`text-xs ${isClockedIn && !isClockedOut ? 'text-white/60' : 'text-gray-400'}`}>GPS</span>
+                  <div className={`w-2 h-2 rounded-full ${gpsStatusColor}`} />
+                  <span className={`text-xs ${isClockedIn && !isClockedOut ? 'text-white/60' : 'text-gray-400'}`}>Location access</span>
                 </div>
               )}
               <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isClockedIn && !isClockedOut ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-500'}`}>
