@@ -34,6 +34,8 @@ BEGIN
  result:=public.security_recurring_billing('generate',null,'{}'); IF (result->>'generated')::int<>0 THEN RAISE EXCEPTION 'Duplicate invoice generated'; END IF;
  SELECT invoice_id INTO invoice FROM public.security_billing_cycles WHERE contract_id=cid;
  IF NOT EXISTS(SELECT 1 FROM public.invoices WHERE id=invoice AND created_by=actor.id AND invoice_number IS NOT NULL AND due_date=(now() AT TIME ZONE 'America/Chicago')::date+15) THEN RAISE EXCEPTION 'Invoice creator/number/date mismatch'; END IF;
+ IF (SELECT sum(amount) FROM public.invoice_line_items WHERE invoice_id=invoice) IS DISTINCT FROM (SELECT subtotal FROM public.invoices WHERE id=invoice) THEN RAISE EXCEPTION 'Itemized costs do not equal invoice subtotal'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.invoice_line_items WHERE invoice_id=invoice AND description LIKE '% through %' AND description LIKE '%agreement %') THEN RAISE EXCEPTION 'Invoice lacks service period and agreement description'; END IF;
  cycle:=public.security_recurring_billing('lease',null,'{}');
  PERFORM public.security_recurring_billing('prepare',(cycle->>'id')::uuid,jsonb_build_object('lease_token',cycle->>'lease_token'));
  -- A tax review result is a valid safe stop; never bypass tax or invoke a charge in this audit.
@@ -48,6 +50,13 @@ BEGIN
  SELECT to_jsonb(b) INTO cycle FROM public.security_billing_cycles b WHERE contract_id=cid;
  PERFORM public.security_recurring_billing('result',(cycle->>'id')::uuid,jsonb_build_object('lease_token',cycle->>'lease_token','state','paid','processor_id','rollback-only-processor','processor_status','SETTLED'));
  IF (SELECT count(*) FROM public.payments WHERE security_billing_cycle_id=(cycle->>'id')::uuid)<>1 THEN RAISE EXCEPTION 'Confirmed payment ledger count mismatch'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.payments WHERE security_billing_cycle_id=(cycle->>'id')::uuid AND invoice_id=invoice) THEN RAISE EXCEPTION 'Confirmed receipt is not applied to its invoice'; END IF;
+ blocked:=false;
+ BEGIN
+  INSERT INTO public.payments(invoice_id,organization_id,amount,payment_method,payment_processor,processor_transaction_id,security_billing_cycle_id)
+   VALUES(gen_random_uuid(),org,(cycle->>'amount')::numeric,'qbo_payments','quickbooks','rollback-only-processor',(cycle->>'id')::uuid);
+ EXCEPTION WHEN OTHERS THEN IF SQLERRM LIKE 'Automatic payment must match%' THEN blocked:=true; ELSE RAISE; END IF; END;
+ IF NOT blocked THEN RAISE EXCEPTION 'Unmatched automatic receipt was accepted'; END IF;
  IF (private.security_contract_summary(cid)->>'first_payment_made_at') IS NULL THEN RAISE EXCEPTION 'First confirmed payment date missing'; END IF;
  IF (SELECT amount_due FROM public.invoices WHERE id=invoice)<>0 THEN RAISE EXCEPTION 'Confirmed payment did not reduce invoice balance'; END IF;
 
