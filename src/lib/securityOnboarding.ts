@@ -40,6 +40,7 @@ export interface SecurityAgreementDocument {
 
 export interface SecurityContractSummary {
   monthly_price: number; amount_due: number | null; pending_payment_amount: number;
+  first_payment_date?: string | null; first_payment_made_at?: string | null;
   start_date: string | null; initial_term_end: string | null; term_months: number;
   months_remaining: number | null; initial_term_complete: boolean; renewal_term_months: number | null;
   next_debit_at: string | null; billing_frequency: string; billing_mode: 'autopay' | 'mail';

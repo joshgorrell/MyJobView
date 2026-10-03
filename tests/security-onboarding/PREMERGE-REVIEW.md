@@ -135,3 +135,6 @@ Printing has no creation/completion side effects, and no new paper upload is req
 ## October 2 authorized deployment update
 
 Josh authorized direct fixes in the unused MJV onboarding system without a test branch and testing after merge. All five onboarding migrations and eight matching functions were deployed; actual-schema read-only print and denied-access checks passed. Newly applied migration history entries now match repository versions. The prior missing-RPC deployment blocker is resolved. Merchant capability/OAuth setup, dedicated recurring-billing schedule, and customer/business/template acceptance remain post-merge launch tasks. No enrollment, invitation, invoice generation or debit was performed. See the audit for exact checks and limitations.
+
+
+AutoPay follow-up: staff controls monitoring start and scheduled first payment after approval; first confirmed payment is distinct. Hosted rollback now exercises the actual invoice/payment schema and catches the legacy commission-trigger failure. Dedicated Vault auth and 15-minute billing cron deployed. Build, onboarding/worker/commission checks, and mobile date-field checks pass. Merchant sandbox transaction verification remains pending QuickBooks Payments consent and monitoring item configuration; activation rejects the incomplete setup.
