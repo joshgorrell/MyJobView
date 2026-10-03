@@ -28,9 +28,9 @@ These are example dealer settings, not platform defaults to impose on every tena
 
 ## Calculation basis
 
-The dealer selects **Pretax revenue** or **Gross profit dollars**. Josh confirmed profit dollars rather than margin tiers.
+The dealer selects one of three calculation methods: **Fixed percentage of pretax revenue**, **Fixed percentage of gross profit dollars**, or **Margin-tier sliding scale**. The sliding-scale method additionally selects whether its rate applies to pretax revenue or gross profit dollars. Josh confirmed profit dollars for the fixed profit method and subsequently requested margin tiers as an additional method.
 
-Pretax revenue excludes sales tax and non-revenue payment convenience fees. Gross profit is commissionable pretax revenue minus the approved direct costs attributable to that sale. A margin percentage itself is not the commission base. Margin-tier rates are outside this confirmed model.
+Pretax revenue excludes sales tax and non-revenue payment convenience fees. Gross profit is commissionable pretax revenue minus the approved direct costs attributable to that sale. A margin percentage itself is not the commission base: it selects the rate in the sliding-scale method.
 
 For a $10,000 pretax sale with $6,000 of approved costs:
 
@@ -38,6 +38,31 @@ For a $10,000 pretax sale with $6,000 of approved costs:
 - Profit basis, 7% pool: $280 total on $4,000 profit; a separate designer receives $40 and the salesperson $240.
 
 Cost provenance is required: do not treat missing costs as zero, or use materials alone when labor costs are omitted. Keep incomplete-cost earnings visibly pending cost review. Time-of-sale profit calculations need an approved cost snapshot; later cost changes produce auditable adjustments rather than replacing paid history.
+
+## Margin-tier sliding scale
+
+Gross profit margin (GPM) is `(commissionable pretax revenue - approved direct costs) / commissionable pretax revenue * 100`. Select the highest configured threshold met by the actual, unrounded margin. Do not round 49.999% to 50% before selecting a tier. Nonpositive revenue, missing costs and invalid cost snapshots require review rather than awarding the goal rate.
+
+The dealer edits the number of tiers, margin thresholds, pool rate at each threshold and applicable role allocations for each sale type. The requested example has thresholds of 10%, 20%, 30%, 40% and 50%, with a goal pool rate of 7% at 50% or above. Lower rates have not been specified by Josh; the following is an illustrative schedule requiring dealer selection:
+
+| GPM | Example pool rate |
+| --- | --- |
+| Below 10% | 0% |
+| 10% to below 20% | 3% |
+| 20% to below 30% | 4% |
+| 30% to below 40% | 5% |
+| 40% to below 50% | 6% |
+| 50% and above | 7% |
+
+Use explicit lower-inclusive, upper-exclusive brackets, with an open-ended top tier and an explicit below-first-tier rate. Reject duplicate/out-of-order thresholds, invalid percentages and role allocations exceeding a tier's pool. Recommended below-first-tier rate is zero, rather than extending the lowest positive tier to loss-making sales. Rates apply to the entire selected base, not progressively to pieces of the sale.
+
+Once GPM selects the pool rate, calculate `pretax revenue * pool rate / 100` or `gross profit dollars * pool rate / 100`, depending on the dealer's sliding-scale base. Then allocate the pool among eligible assigned roles. Designer shares must be configurable for each tier and must come out of its pool. Do not automatically pay an additional fixed 1% on top of a reduced tier; a tier below 1% cannot support a 1% design share. Same-person sales/design and retail designer prohibition still apply.
+
+On Josh's $999 sale with $940 costs, profit is $59 and GPM is approximately 5.91%. A fixed 7% revenue commission is $69.93, exceeding the $59 profit by $10.93 before any other costs. Under the illustrative below-10% tier above, commission is zero. A fixed 7% profit-dollar commission would instead be $4.13. Sliding scale should therefore show margin, selected tier, base, pool and role shares in the sale preview.
+
+Margin evaluation is recommended on the complete sale/job, including its applicable direct costs; single-item retail naturally uses that item's sale. If per-line tiers are offered later, define them explicitly rather than silently mixing job-level and item-level margins.
+
+Cost snapshots and tier-policy versions must be recorded even when the commission base is revenue, because costs determine the selected rate. Cash collection percentage does not select or change the margin tier. Freeze the tier with the entitlement; later approved sale/cost corrections produce auditable recalculation deltas. Either earning timing option remains available with sliding scale.
 
 ## Earning timing
 
@@ -50,7 +75,7 @@ The dealer selects **Cash basis** or **Time of sale**, independently from calcul
 
 ## Required implementation changes
 
-1. Versioned tenant matrix with separate proposal/service/retail rows, pool and role-share validation, calculation basis and earning timing. Keep existing rate settings until a dealer explicitly adopts a reviewed matrix.
+1. Versioned tenant matrix with separate proposal/service/retail rows, pool and role-share validation, fixed-revenue/fixed-profit/sliding-scale methods, editable margin tiers and their revenue/profit base, and earning timing. Keep existing rate settings until a dealer explicitly adopts a reviewed matrix.
 2. User setup eligibility backed by the existing configuration, saved securely for new and existing employees.
 3. Proposal-time designer attribution, non-proposal service designer attribution, and explicit retail classification. Do not classify every invoice without a project as retail.
 4. A sale-level entitlement with unique recognition identity, linked invoice collections and frozen policy snapshot. Progress invoices, deposits, sales-order conversion and change orders must not pay the same sale twice. Cash earnings can stay invoice-linked, but a sale-level cap reconciles them to the entitlement.
@@ -58,6 +83,6 @@ The dealer selects **Cash basis** or **Time of sale**, independently from calcul
 6. One calculation engine for ledger, sale previews and reports. Reports use payment dates for cash earnings and sale recognition/correction dates for time-of-sale earnings. Display earned, approved, paid and outstanding separately.
 7. Replace ordinary per-employee rate overrides with eligibility-driven dealer matrix rates. Retain old overrides/history for reconciliation; exceptional future overrides, if supported, require explicit audited authorization.
 
-Acceptance cases: rep alone; separate designer; rep also designer; ineligible rep/designer; service with/without designer; retail designer prohibition; pretax/tax/fee treatment; revenue/profit examples; partial receipts/refunds; time-of-sale without payment; draft/cancel/return; deposit and progress-invoice duplication; missing/updated costs; matrix edits; multi-tenant isolation and own-employee visibility.
+Acceptance cases: rep alone; separate designer; rep also designer; ineligible rep/designer; service with/without designer; retail designer prohibition; pretax/tax/fee treatment; revenue/profit examples; exact tier thresholds and just-below boundaries; below-first/above-top/negative margin; $999/$940 low-margin example; both sliding-scale bases; tier pool/design validation; partial receipts/refunds without tier changes; time-of-sale without payment; draft/cancel/return; deposit and progress-invoice duplication; missing/updated costs; matrix edits; multi-tenant isolation and own-employee visibility.
 
 Draft PR #79 remains foundational repair code and must not be described as implementing this matrix until the changes above are completed and verified.
