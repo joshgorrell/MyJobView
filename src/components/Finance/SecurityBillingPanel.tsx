@@ -1,10 +1,11 @@
+import { staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { Pencil } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
 
-interface Cycle { id:string; state:string; amount:number|null; period_start:string; last_message:string|null; processor_id:string|null }
+interface Cycle { id:string; state:string; amount:number|null; period_start:string; last_message:string|null; processor_id:string|null;updated_at:string }
 export function SecurityBillingPanel({ contractId, organizationId, canEdit = false }: { contractId:string; organizationId:string; canEdit?:boolean }) {
   const { profile } = useAuth();
   const [editingClassification,setEditingClassification] = useState(false);
@@ -16,15 +17,19 @@ export function SecurityBillingPanel({ contractId, organizationId, canEdit = fal
   const [message,setMessage] = useState('');
   const [paused,setPaused] = useState(false);
   const [revoked,setRevoked] = useState(false);
+  const [dates,setDates] = useState<{monitoring_start_date?:string;first_payment_date?:string}>({});
+  const [firstPaid,setFirstPaid] = useState<string|null>(null);
   const reload = useCallback(async () => {
-    const [tax,billing,contract] = await Promise.all([
+    const [tax,billing,contract,review] = await Promise.all([
       supabase.from('tax_classifications').select('id,label').eq('organization_id',organizationId).eq('is_active',true),
-      supabase.from('security_billing_cycles').select('id,state,amount,period_start,last_message,processor_id').eq('contract_id',contractId).eq('organization_id',organizationId).order('period_index',{ascending:false}),
-      supabase.from('security_contracts').select('monitoring_tax_classification_id,autopay_paused,autopay_revoked_at').eq('id',contractId).eq('organization_id',organizationId).single(),
+      supabase.from('security_billing_cycles').select('id,state,amount,period_start,last_message,processor_id,updated_at').eq('contract_id',contractId).eq('organization_id',organizationId).order('period_index',{ascending:false}),
+      supabase.from('security_contracts').select('monitoring_tax_classification_id,autopay_paused,autopay_revoked_at,monitoring_start_date,first_payment_date').eq('id',contractId).eq('organization_id',organizationId).single(),
+      staffSecurityOnboarding<{summary:{first_payment_made_at:string|null}}>('get',contractId).catch(()=>null),
     ]);
     const error=tax.error||billing.error||contract.error;
     if(error) {setMessage(error.message);return;}
     setClasses(tax.data||[]);setCycles(billing.data||[]);setClassification(contract.data?.monitoring_tax_classification_id||'');
+    setDates(contract.data||{});setFirstPaid(review?.summary?.first_payment_made_at||null);
     setPaused(Boolean(contract.data?.autopay_paused));setRevoked(Boolean(contract.data?.autopay_revoked_at));
   },[contractId,organizationId]);
   useEffect(()=>{void reload();},[reload]);
@@ -35,6 +40,7 @@ export function SecurityBillingPanel({ contractId, organizationId, canEdit = fal
   }
   return <section className="no-print bg-white text-gray-900 rounded-xl p-5 mb-6 space-y-4">
     <h2 className="font-semibold text-lg">Monitoring billing</h2>
+    <p>Monitoring starts: {dates.monitoring_start_date || 'Not scheduled'}. First payment scheduled: {dates.first_payment_date || 'Not scheduled'}. First payment confirmed: {firstPaid ? new Date(firstPaid).toLocaleDateString() : 'Not yet confirmed'}.</p>
     <label className="block">Tax classification (required before activation)
       {canEdit && <button type="button" aria-label="Edit tax classification" onClick={()=>setEditingClassification(true)} className="p-2 text-blue-700"><Pencil className="w-4 h-4"/></button>}
       <select disabled={!editingClassification} value={classification} onChange={e=>setClassification(e.target.value)} className="block w-full border rounded p-2 mt-1"><option value="">Select classification</option>{classes.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
@@ -46,7 +52,7 @@ export function SecurityBillingPanel({ contractId, organizationId, canEdit = fal
       const {error}=await supabase.from('security_contracts').update({autopay_paused:!paused}).eq('id',contractId).eq('organization_id',organizationId);
       setMessage(error ? error.message : 'AutoPay status saved.');if(!error) await reload();
     }}>{revoked ? 'New authorization required after revocation' : paused ? 'Resume authorized AutoPay' : 'Pause AutoPay'}</button>}
-    {cycles.length===0 && <p className="text-sm text-gray-600">Billing starts after activation of a portal-signed monitoring agreement. Historical accounts are not automatically charged.</p>}
+    {cycles.length===0 && <p className="text-sm text-gray-600">Staff sets the dates after the completed agreement is approved. Billing starts on that schedule; customer submission alone does not activate monitoring.</p>}
     {cycles.map(cycle=><div key={cycle.id} className="border rounded-lg p-3 space-y-2">
       <p>{cycle.period_start} · {cycle.amount===null ? 'Awaiting tax calculation' : formatCurrency(Number(cycle.amount))} · {cycle.state}</p>
       {cycle.last_message && <p className="text-sm text-amber-900">{cycle.last_message}</p>}

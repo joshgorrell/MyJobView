@@ -47,7 +47,7 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
     const doc = agreement.document;
     const terms = readableAgreementTerms(doc.template?.contract_terms || '').replace(/\[term\]/g, `${doc.term_months || '__'} months`);
     return securityAgreementHtml(doc, terms, { personalInfo: agreement.contact, propertyInfo: agreement.contact },
-      agreement.customer_signature, agreement.signed_snapshot_available ? agreement.customer_signature_date : null);
+      agreement.customer_signature, agreement.signed_snapshot_available ? agreement.customer_signature_date : null, undefined, agreement.summary || undefined);
   }
 
   const completed = agreement && (!!agreement.customer_completed_at || ['pending_approval', 'approved', 'active', 'cancelled'].includes(agreement.status));

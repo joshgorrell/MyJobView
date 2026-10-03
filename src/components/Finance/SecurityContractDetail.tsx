@@ -1,3 +1,4 @@
+import { SecurityActivationDates } from './SecurityActivationDates';
 import SecurityContractReviewFields from './SecurityContractReviewFields';
 import { sendSecurityInvitation, staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { SecurityBillingPanel } from './SecurityBillingPanel';
@@ -36,6 +37,9 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   const [confirmSendInvitation, setConfirmSendInvitation] = useState(false);
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmActivate, setConfirmActivate] = useState(false);
+  const [monitoringStartDate, setMonitoringStartDate] = useState('');
+  const [firstPaymentDate, setFirstPaymentDate] = useState('');
+  const [editingActivationDates, setEditingActivationDates] = useState(false);
   const [cancellationDate, setCancellationDate] = useState('');
   const [cancellationReason, setCancellationReason] = useState('');
   const [immediateCancel, setImmediateCancel] = useState(true);
@@ -153,7 +157,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   async function handleActivate() {
     if (editingReview) { alert('Save or cancel the field edit before activation.'); return; }
     try {
-      await staffSecurityOnboarding('activate', resolvedContractId, { revision: contractData.onboarding_revision || 0 });
+      await staffSecurityOnboarding('activate', resolvedContractId, { revision: contractData.onboarding_revision || 0, monitoring_start_date: monitoringStartDate, first_payment_date: firstPaymentDate });
 
       alert('Contract activated!');
       onUpdate?.();
@@ -224,7 +228,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
     if (d?.onboarding_agreement_snapshot) {
       const doc = d.onboarding_agreement_snapshot;
       const terms = readableAgreementTerms(doc.template?.contract_terms || '').replace(/\[term\]/g, `${doc.term_months} months`);
-      try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date)); }
+      try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date, undefined, {start_date:d.monitoring_start_date || null,first_payment_date:d.first_payment_date || null})); }
       catch (error) { alert(error instanceof Error ? error.message : 'Could not print the agreement.'); }
       return;
     }
@@ -237,7 +241,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
       propertyInfo: { address_line1: d.property_address || '', city: d.property_city || '', state: d.property_state || '', zip_code: d.property_zip || '' },
     };
     const terms = readableAgreementTerms(d.template?.contract_terms || '').replace(/\[term\]/g, `${d.term_months} months`);
-    try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date)); }
+    try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date, undefined, {start_date:d.monitoring_start_date || null,first_payment_date:d.first_payment_date || null})); }
     catch (error) { alert(error instanceof Error ? error.message : 'Could not print the agreement.'); }
   }
 
@@ -1018,7 +1022,8 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                 <button type="button" disabled={editingReview || approving} onClick={()=>setConfirmApprove(true)} className="w-full bg-green-700 text-white rounded-lg p-3 disabled:opacity-50">Approve Contract</button>
                 <button type="button" disabled={editingReview} onClick={()=>setRejecting(true)} className="w-full border border-red-300 text-red-700 rounded-lg p-3">Request Corrections</button>
               </>}
-              {canManage && contractData.status==='approved' && <button type="button" disabled={editingReview} onClick={()=>setConfirmActivate(true)} className="w-full bg-blue-700 text-white rounded-lg p-3 disabled:opacity-50">Complete and Activate</button>}
+              {canManage && contractData.status==='approved' && <SecurityActivationDates startDate={monitoringStartDate} firstPaymentDate={firstPaymentDate} onEditing={setEditingActivationDates} onChange={(start,first)=>{setMonitoringStartDate(start);setFirstPaymentDate(first);}}/>}
+              {canManage && contractData.status==='approved' && <button type="button" disabled={editingReview || editingActivationDates || !monitoringStartDate || !firstPaymentDate} onClick={()=>setConfirmActivate(true)} className="w-full bg-blue-700 text-white rounded-lg p-3 disabled:opacity-50">Complete and Activate</button>}
               {!contractData.customer_completed_at && ['draft','pending_customer','rejected'].includes(contractData.status) && <button type="button" disabled={sending} onClick={()=>setConfirmSendInvitation(true)} className="w-full bg-blue-700 text-white rounded-lg p-3">Send Invitation</button>}
               {(contractData.status === 'approved' || contractData.status === 'active') && (
                 <button
@@ -1263,7 +1268,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
       <ConfirmModal
         isOpen={confirmActivate}
         title="Activate Contract"
-        message="Activate this contract and start its configured billing workflow?"
+        message={`Monitoring starts ${monitoringStartDate}. First payment is scheduled for ${firstPaymentDate}, subject to advance notice. Activate this contract?`}
         variant="neutral"
         confirmLabel="Activate"
         onConfirm={() => {

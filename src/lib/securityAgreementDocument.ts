@@ -1,4 +1,4 @@
-import type { SecurityAgreementDocument, SecurityDraftForm } from './securityOnboarding';
+import type { SecurityAgreementDocument, SecurityDraftForm, SecurityContractSummary } from './securityOnboarding';
 
 export function escapeAgreementText(value: unknown): string {
   return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -17,7 +17,7 @@ export function readableAgreementTerms(terms: string): string {
 
 export function securityAgreementHtml(document: SecurityAgreementDocument, termsText: string,
   form?: Pick<SecurityDraftForm, 'personalInfo' | 'propertyInfo'>, signature?: string | null, signedAt?: string | null,
-  billingPreference?: 'monthly' | 'annual'): string {
+  billingPreference?: 'monthly' | 'annual', schedule?: Pick<SecurityContractSummary,'start_date'|'first_payment_date'|'first_payment_made_at'>): string {
   const esc = escapeAgreementText;
   const personal = document.personalInfo || form?.personalInfo;
   const property = document.propertyInfo || form?.propertyInfo;
@@ -50,6 +50,7 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     ${document.payment_display ? `<br>Payment method: ${esc(document.payment_display)}.` : ''}</p>
     ${document.autopay_authorization ? `<h2>Recurring payment authorization</h2><p>${esc(document.autopay_authorization)}</p>` : ''}
     <p>Review the terms below for renewal, cancellation and payment obligations.${document.dealer?.company_email ? ` Contact: ${esc(document.dealer.company_email)}.` : ''}</p>
+    ${schedule ? `<h2>Monitoring schedule — set by provider</h2><p>Monitoring starts: ${esc(schedule.start_date || 'Not scheduled')}.<br>First payment scheduled: ${esc(schedule.first_payment_date || 'Not scheduled')}.${schedule.first_payment_made_at !== undefined ? `<br>First payment confirmed: ${esc(schedule.first_payment_made_at ? new Date(schedule.first_payment_made_at).toLocaleDateString() : 'Not yet confirmed')}.` : ''}<br>These dates are set after installation and account setup. Advance notice may delay a scheduled debit.</p>` : ''}
     <h2>Terms and conditions</h2><div class="terms">${esc(termsText)}</div>
     ${signed && safeSignature ? `<div class="sign"><h2>Customer signature</h2><img class="signature" src="${safeSignature}" alt="Customer signature"><p>Signed: ${esc(new Date(signedAt!).toLocaleString())}</p></div>` : ''}
     </body></html>`;
