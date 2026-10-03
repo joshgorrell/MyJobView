@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, Upload, X, Save, Eye, ExternalLink, Copy, Share2 } from 'lucide-react';
+import { Upload, X, Save, Eye, Copy, Share2, Edit3, Mail, Phone, Globe } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BusinessCard } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,6 +11,8 @@ export function UserBusinessCardEditor() {
   const [card, setCard] = useState<BusinessCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [company, setCompany] = useState<{ company_name: string; website: string | null } | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -27,8 +29,11 @@ export function UserBusinessCardEditor() {
 
   useEffect(() => {
     loadCard();
+  }, [user?.id]);
+
+  useEffect(() => {
     loadOrganizationSubdomain();
-  }, [user]);
+  }, [profile?.organization_id]);
 
   async function loadOrganizationSubdomain() {
     if (!profile?.organization_id) return;
@@ -40,6 +45,12 @@ export function UserBusinessCardEditor() {
       .maybeSingle();
 
     if (!error) setSubdomain(data?.subdomain || null);
+    const { data: settings } = await supabase
+      .from('company_settings')
+      .select('company_name, website')
+      .eq('organization_id', profile.organization_id)
+      .maybeSingle();
+    setCompany(settings);
   }
 
   function getCardUrl(): string {
@@ -47,18 +58,48 @@ export function UserBusinessCardEditor() {
   }
 
   async function copyCardLink() {
-    await navigator.clipboard.writeText(getCardUrl());
-    setShareMessage('Link copied');
-    window.setTimeout(() => setShareMessage(null), 2500);
+    try {
+      await navigator.clipboard.writeText(getCardUrl());
+      setShareMessage('Link copied');
+    } catch {
+      setShareMessage('Unable to copy. Open View Card to copy the address.');
+    }
   }
 
   async function shareCardLink() {
-    const url = getCardUrl();
-    if (navigator.share) {
-      await navigator.share({ title: card?.full_name || 'Digital business card', url });
-      return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: card?.full_name || 'Digital business card', url: getCardUrl() });
+      } else {
+        await copyCardLink();
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        setShareMessage('Unable to share. Try Copy Link.');
+      }
     }
-    await copyCardLink();
+  }
+
+  function resetDraft(savedCard: BusinessCard | null = card, savedPhoto = savedCard?.photo_url || profile?.avatar_url || '') {
+    setFullName(savedCard?.full_name || profile?.full_name || '');
+    setTitle(savedCard?.title || '');
+    setEmail(savedCard?.email || profile?.email || '');
+    setPhone(savedCard?.phone || '');
+    setLinkedinUrl(savedCard?.linkedin_url || '');
+    setBio(savedCard?.bio || '');
+    setPhotoUrl(savedPhoto);
+  }
+
+  function startEditing() {
+    resetDraft();
+    setShareMessage(null);
+    setEditing(true);
+  }
+
+  function cancelEditing() {
+    resetDraft();
+    setConfirmModal(null);
+    setEditing(false);
   }
 
   async function loadCard() {
@@ -73,18 +114,8 @@ export function UserBusinessCardEditor() {
 
       if (error) throw error;
 
-      if (data) {
-        setCard(data);
-        setFullName(data.full_name);
-        setTitle(data.title);
-        setEmail(data.email);
-        setPhone(data.phone);
-        setLinkedinUrl(data.linkedin_url || '');
-        setBio(data.bio || '');
-        setPhotoUrl(data.photo_url || profile?.avatar_url || '');
-      } else {
-        setPhotoUrl(profile?.avatar_url || '');
-      }
+      setCard(data);
+      resetDraft(data);
     } catch (error) {
       console.error('Error loading card:', error);
     } finally {
@@ -136,30 +167,12 @@ export function UserBusinessCardEditor() {
     }
   }
 
-  async function removePhoto() {
-    if (!photoUrl || !user) return;
-
-    try {
-      if (card) {
-        const { error } = await supabase.from('business_cards').update({ photo_url: null }).eq('id', card.id);
-        if (error) throw error;
-      }
-      const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id);
-      if (error) throw error;
-      setProfileAvatar(null);
-      setPhotoUrl('');
-      const oldPath = photoUrl.split('/business-card-photos/')[1];
-      if (oldPath?.startsWith(`${user.id}/`)) {
-        await supabase.storage.from('business-card-photos').remove([decodeURIComponent(oldPath)]);
-      }
-    } catch (error) {
-      console.error('Error removing photo:', error);
-      alert('Failed to remove photo');
-    }
+  function removePhoto() {
+    setPhotoUrl('');
   }
 
   async function saveCard() {
-    if (!user) return;
+    if (!user || saving || uploading) return;
 
     setSaving(true);
     try {
@@ -175,23 +188,30 @@ export function UserBusinessCardEditor() {
         updated_at: new Date().toISOString()
       };
 
+      let savedCard: BusinessCard;
       if (card) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('business_cards')
           .update(cardData)
-          .eq('id', card.id);
+          .eq('id', card.id)
+          .select('*')
+          .single();
 
         if (error) throw error;
+        savedCard = data;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('business_cards')
           .insert({
             ...cardData,
-            slug: `${(profile?.username || fullName.split(/\s+/).map(name => name[0]).join('')).toLowerCase().replace(/[^a-z0-9-]/g, '') || 'card'}`, 
+            slug: `${(profile?.username || fullName.split(/\s+/).map(name => name[0]).join('')).toLowerCase().replace(/[^a-z0-9-]/g, '') || 'card'}`,
             is_active: true
-          });
+          })
+          .select('*')
+          .single();
 
         if (error) throw error;
+        savedCard = data;
       }
 
       const { error: avatarError } = await supabase
@@ -201,8 +221,10 @@ export function UserBusinessCardEditor() {
       if (avatarError) throw avatarError;
       setProfileAvatar(photoUrl || null);
 
-      alert('Business card saved successfully!');
-      loadCard();
+      setCard(savedCard);
+      resetDraft(savedCard, photoUrl);
+      setEditing(false);
+      setShareMessage('Business card saved');
     } catch (error) {
       console.error('Error saving card:', error);
       alert('Failed to save business card');
@@ -217,187 +239,199 @@ export function UserBusinessCardEditor() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {card && (
-        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start justify-between gap-3">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-cyan-400 mb-1">Your card is live!</p>
-            <p className="text-xs sm:text-sm text-muted break-all">
-              Share: {getCardUrl()}
-            </p>
+      {!editing ? (
+        <section className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm" aria-label="Your business card">
+          <div className="h-24 sm:h-28 bg-gradient-to-br from-cyan-500/30 via-blue-500/20 to-indigo-500/10" />
+          <div className="px-5 pb-6 sm:px-8 sm:pb-8">
+            <div className="-mt-14 flex justify-center sm:justify-start">
+              {photoUrl ? (
+                <img src={photoUrl} alt={fullName || 'Your profile'} className="h-28 w-28 sm:h-32 sm:w-32 rounded-full object-cover border-4 border-surface bg-elevated shadow-lg" />
+              ) : (
+                <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-full border-4 border-surface bg-elevated shadow-lg flex items-center justify-center text-3xl font-semibold text-brand" aria-label="Profile initials">
+                  {(fullName || profile?.full_name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(name => name[0]).join('')}
+                </div>
+              )}
+            </div>
+            <div className="mt-4 text-center sm:text-left">
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-primary break-words">{fullName || profile?.full_name || 'Your business card'}</h2>
+              {title && <p className="mt-1 text-base text-secondary">{title}</p>}
+              {company?.company_name && <p className="mt-1 text-sm font-medium text-brand">{company.company_name}</p>}
+            </div>
+            <div className="mt-5 flex flex-col sm:flex-row sm:flex-wrap items-center sm:items-start gap-3 text-sm text-muted">
+              {email && <a href={`mailto:${email}`} className="flex items-center gap-2 min-w-0 max-w-full hover:text-primary"><Mail className="h-4 w-4 shrink-0" /><span className="break-all">{email}</span></a>}
+              {phone && <a href={`tel:${phone}`} className="flex items-center gap-2 hover:text-primary"><Phone className="h-4 w-4 shrink-0" />{phone}</a>}
+              {company?.website && <a href={/^https?:\/\//i.test(company.website) ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 min-w-0 max-w-full hover:text-primary"><Globe className="h-4 w-4 shrink-0" /><span className="break-all">{company.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span></a>}
+            </div>
+            {card ? (
+              <div className="mt-6 border-t border-subtle pt-5">
+                <p className="text-xs text-muted text-center sm:text-left break-all">{getCardUrl().replace(/^https?:\/\//, '')}</p>
+                <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
+                  <a href={getCardUrl()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-700"><Eye className="h-4 w-4" />View Card</a>
+                  <button onClick={shareCardLink} className="inline-flex items-center justify-center gap-2 rounded-xl border border-strong px-4 py-2.5 text-sm font-medium text-primary hover:bg-elevated"><Share2 className="h-4 w-4" />Share</button>
+                  <button onClick={copyCardLink} className="inline-flex items-center justify-center gap-2 rounded-xl border border-strong px-4 py-2.5 text-sm font-medium text-primary hover:bg-elevated"><Copy className="h-4 w-4" />Copy Link</button>
+                </div>
+              </div>
+            ) : <p className="mt-5 text-center sm:text-left text-sm text-muted">Add your details to create your digital business card.</p>}
+            {shareMessage && <p role="status" className="mt-3 text-sm text-brand text-center sm:text-left">{shareMessage}</p>}
+            <div className="mt-5 flex justify-center sm:justify-start">
+              <button onClick={startEditing} className="inline-flex items-center gap-2 py-2 text-sm text-muted hover:text-primary"><Edit3 className="h-4 w-4" />{card ? 'Edit Business Card' : 'Create Business Card'}</button>
+            </div>
           </div>
-          <a
-            href={getCardUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm whitespace-nowrap"
-          >
-            <Eye className="w-4 h-4" />
-            Preview
-            <ExternalLink className="w-3 h-3" />
-          </a>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={copyCardLink}
-              className="flex items-center justify-center gap-1 px-3 py-1.5 border border-cyan-500/40 text-cyan-300 rounded-lg hover:bg-cyan-500/10 text-sm whitespace-nowrap"
-            >
-              <Copy className="w-4 h-4" />
-              {shareMessage || 'Copy Link'}
-            </button>
-            <button
-              onClick={shareCardLink}
-              className="flex items-center justify-center gap-1 px-3 py-1.5 border border-cyan-500/40 text-cyan-300 rounded-lg hover:bg-cyan-500/10 text-sm whitespace-nowrap"
-            >
-              <Share2 className="w-4 h-4" />
-              Share
-            </button>
+        </section>
+      ) : (
+        <form onSubmit={(event) => { event.preventDefault(); void saveCard(); }} className="bg-surface rounded-2xl shadow-sm border border-subtle p-4 sm:p-6 space-y-4 sm:space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold text-primary">{card ? 'Edit Business Card' : 'Create Business Card'}</h2>
+            <p className="mt-1 text-sm text-muted">Make it yours. Save to update your card and profile photo.</p>
           </div>
-        </div>
-      )}
+          <fieldset disabled={saving || uploading} className="space-y-4 sm:space-y-6 disabled:opacity-60">
+            <div>
+              <label className="block text-sm font-medium text-primary mb-2">
+                Profile Photo
+              </label>
 
-      <div className="bg-surface rounded-lg shadow-sm border border-subtle p-4 sm:p-6 space-y-4 sm:space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-primary mb-2">
-            Profile Photo
-          </label>
+              {photoUrl && (
+                <div className="mb-3 flex items-center gap-3 p-3 bg-elevated rounded-lg border border-strong">
+                  <img
+                    src={photoUrl}
+                    alt="Profile"
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModal({ title: 'Remove Photo', message: 'Are you sure you want to remove your photo?', onConfirm: removePhoto })}
+                    className="ml-auto p-2 text-danger hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                    title="Remove photo"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
 
-          {photoUrl && (
-            <div className="mb-3 flex items-center gap-3 p-3 bg-elevated rounded-lg border border-strong">
-              <img
-                src={photoUrl}
-                alt="Profile"
-                className="w-20 h-20 rounded-full object-cover"
-              />
+              <div className="space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                  id="photo-upload"
+                />
+                <label
+                  htmlFor="photo-upload"
+                  className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                    uploading
+                      ? 'border-strong bg-elevated cursor-not-allowed'
+                      : 'border-strong hover:border-cyan-500 hover:bg-elevated'
+                  }`}
+                >
+                  <Upload className="w-5 h-5 text-muted" />
+                  <span className="text-sm font-medium text-primary">
+                    {uploading ? 'Uploading...' : 'Upload Photo'}
+                  </span>
+                </label>
+                <p className="text-xs text-muted">
+                  Square JPG, PNG, or WebP recommended. Max 5MB. Save the card to update your header avatar.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 bg-elevated border border-strong text-primary rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Job Title *
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  placeholder="e.g., Sales Manager"
+                  className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 bg-elevated border border-strong text-primary rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Phone *
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  placeholder="(555) 123-4567"
+                  className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-primary mb-1">
+                  LinkedIn URL
+                </label>
+                <input
+                  type="url"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="https://linkedin.com/in/yourprofile"
+                  className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Bio
+                </label>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  rows={4}
+                  placeholder="Tell people about yourself and what you do..."
+                  className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
+              <button type="button" onClick={cancelEditing} disabled={saving || uploading} className="px-6 py-2.5 border border-strong text-primary rounded-lg hover:bg-elevated disabled:opacity-50">Cancel</button>
               <button
-                onClick={() => setConfirmModal({ title: 'Remove Photo', message: 'Are you sure you want to remove your photo?', onConfirm: removePhoto })}
-                className="ml-auto p-2 text-danger hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Remove photo"
+                type="submit"
+                disabled={saving || uploading || !fullName.trim() || !title.trim() || !email.trim() || !phone.trim()}
+                className="w-full sm:w-auto px-6 py-2.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm sm:text-base"
               >
-                <X className="w-5 h-5" />
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving...' : 'Save Business Card'}
               </button>
             </div>
-          )}
-
-          <div className="space-y-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handlePhotoUpload}
-              className="hidden"
-              id="photo-upload"
-            />
-            <label
-              htmlFor="photo-upload"
-              className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                uploading
-                  ? 'border-strong bg-elevated cursor-not-allowed'
-                  : 'border-strong hover:border-cyan-500 hover:bg-elevated'
-              }`}
-            >
-              <Upload className="w-5 h-5 text-muted" />
-              <span className="text-sm font-medium text-primary">
-                {uploading ? 'Uploading...' : 'Upload Photo'}
-              </span>
-            </label>
-            <p className="text-xs text-muted">
-              Square JPG, PNG, or WebP recommended. Max 5MB. Save the card to update your header avatar.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              className="w-full px-4 py-2 bg-elevated border border-strong text-primary rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1">
-              Job Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder="e.g., Sales Manager"
-              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1">
-              Email *
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-2 bg-elevated border border-strong text-primary rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1">
-              Phone *
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              placeholder="(555) 123-4567"
-              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-primary mb-1">
-              LinkedIn URL
-            </label>
-            <input
-              type="url"
-              value={linkedinUrl}
-              onChange={(e) => setLinkedinUrl(e.target.value)}
-              placeholder="https://linkedin.com/in/yourprofile"
-              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-primary mb-1">
-              Bio
-            </label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              rows={4}
-              placeholder="Tell people about yourself and what you do..."
-              className="w-full px-4 py-2 bg-elevated border border-strong text-primary placeholder:text-muted rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            onClick={saveCard}
-            disabled={saving || !fullName || !title || !email || !phone}
-            className="w-full sm:w-auto px-6 py-2.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm sm:text-base"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving...' : 'Save Business Card'}
-          </button>
-        </div>
-      </div>
+          </fieldset>
+        </form>
+      )}
 
       <ConfirmModal
         isOpen={confirmModal !== null}
