@@ -193,5 +193,7 @@ assert.ok((await db.query("select contract_terms from security_contract_template
 await assert.rejects(db.query('update security_contract_templates set is_active=true where id=$1',[revised.id]),'Unfinished legal draft cannot be activated');
 const { testStaff } = await import('./staff.mjs');
 await testStaff(db,{id,org,contact,otherContact,template,form,role,rpc});
+const {testPaymentAlerts}=await import('./payment-alerts-database.mjs');
+await testPaymentAlerts(db,{id,org,contact,otherContact,template,role});
 await db.close();
 console.log('Security onboarding database tests passed: ownership, expiry, safe drafts, revisions, atomic signing, immutable copy, required verified AutoPay, Admin-only mail billing/$7 fee, portal visibility/summary, recurring billing idempotency, advance notices, pending/settled payments, webhook deduplication, tax blocking, and revocation.');
