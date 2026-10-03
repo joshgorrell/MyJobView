@@ -97,3 +97,12 @@ Seven applied follow-up migrations: 20261002170404, 20261002170644, 202610021711
 Validation: onboarding/worker/commission tests, mobile browser checks (including locked date fields, Cancel/Save, white backgrounds and black text), production build, and hosted transaction rollback. Advisors report no new onboarding warning/error; RPC-only onboarding tables retain their intentional INFO findings. Full project typecheck still has previously documented unrelated baseline errors.
 
 Remaining merchant verification: Payments is false and the monitoring item is unset on the current sandbox connection. An Admin must reconnect QuickBooks including Payments consent and configure the actual monitoring item; provider delivery and actual card/ACH settlement must then be verified in the merchant sandbox. ACH settlement status must be verified, not guessed. Passing isolated and hosted database tests does not prove a merchant transaction has settled.
+
+
+## Itemized invoice and receipt verification — October 3
+
+Each security billing period now creates an invoice with separate frozen service names, period dates, agreement reference and costs. Agreed price overrides and annual discounts are allocated proportionally, with cent rounding reconciled to the accepted total. Mailed-invoice fees remain separate and undiscounted; tax preparation precedes notice and charging. Historical invoices and signed snapshots are not rewritten.
+
+The cycle must point to an invoice for the same customer and organization with the reverse cycle link intact. Automatic payment records must match the confirmed cycle, invoice, organization, amount and processor transaction. QuickBooks accounting receipts explicitly link to that invoice with ProcessPayment=false, so accounting sync does not charge again. Unique contract/period and cycle/payment keys prevent repeated scheduler runs from generating duplicate invoices or receipts.
+
+Validation covers monthly/annual costs, price overrides, flat/percentage discounts, mail fees, fallback descriptions, duplicate generation, missing invoice denial and unmatched payment rejection. Hosted transaction rollback also verifies descriptive lines, subtotal reconciliation, pending/confirmed receipts, invoice application and balance reduction. No real merchant transaction is performed. Migration 20261003105607 is applied, with only its new history entry aligned to the repository filename.

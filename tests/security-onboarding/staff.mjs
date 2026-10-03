@@ -34,6 +34,7 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await db.exec(await readFile(new URL('../../supabase/migrations/20261002171432_security_billing_tax_environment.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261002172438_security_billing_schedule_safeguards.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261002172637_security_shared_activation_mandate.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261003105607_security_itemized_recurring_invoices.sql',import.meta.url),'utf8'));
  const staff=async(action,cid=null,payload={})=>(await db.query('select public.staff_security_onboarding($1,$2,$3) result',[action,cid,JSON.stringify(payload)])).rows[0].result;
  const create={request_id:id(71),template_id:template,contact_id:contact,service_ids:[id(70)],term_months:12,account_type:'residential'};
  await role('authenticated',id(12));await assert.rejects(staff('create',null,create),'Organization membership does not grant onboarding access');
@@ -108,6 +109,8 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  const invoice=(await db.query('select i.due_date::text due, b.period_start::text start from invoices i join security_billing_cycles b on b.invoice_id=i.id where b.contract_id=$1',[created.id])).rows[0];
  assert.equal(invoice.due,activationDates.first);assert.equal(invoice.start,activationDates.start);
  assert.equal((await db.query('select private.security_contract_summary($1) summary',[created.id])).rows[0].summary.months_remaining,12,'Future start never displays more than the full initial term');
+ const {testItemizedInvoices}=await import('./itemized-invoices.mjs');
+ await testItemizedInvoices(db,created.id,generate);
  await db.query("insert into payments(invoice_id,amount,payment_method) select invoice_id,1,'check' from security_billing_cycles where contract_id=$1",[created.id]);
  assert.ok((await db.query('select private.security_contract_summary($1) summary',[created.id])).rows[0].summary.first_payment_made_at,'Manual invoice receipts also supply first confirmed payment date');
  await role('authenticated',id(11));

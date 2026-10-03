@@ -37,11 +37,13 @@ try {
  reset(['preparing','notice']);assert.equal((await globalThis.__workerHandler(req())).status,200);
  assert.deepEqual(calls.filter(c=>c.name==='security_recurring_billing').map(c=>c.args.p_action),['generate','lease','prepare','lease','notice','lease']);assert.equal(chargeCalls.length,0,'Notice never initiates a charge');
  reset(['notice']);noticeOk=false;await globalThis.__workerHandler(req());assert.ok(calls.some(c=>c.args?.p_action==='defer'));assert.ok(!calls.some(c=>c.args?.p_action==='notice'));
+ reset(['ready']);rows.invoices=null;await globalThis.__workerHandler(req());assert.equal(chargeCalls.length,0,'Missing invoice prevents an automatic debit');rows.invoices=invoice;
  reset(['ready']);connected=false;await globalThis.__workerHandler(req());assert.equal(chargeCalls.length,0);
  reset(['ready']);balance=34;await globalThis.__workerHandler(req());assert.equal(chargeCalls.length,0);
  reset(['ready','pending','paid']);await globalThis.__workerHandler(req());
  assert.equal(chargeCalls.length,2);assert.equal(chargeCalls[0][5],'stable-request-id');assert.equal(chargeCalls[0][8],undefined);assert.equal(chargeCalls[1][8],'ach-1','Pending settlement is reconciled with the existing processor ID');
  const results=calls.filter(c=>c.args?.p_action==='result');assert.deepEqual(results.map(c=>c.args.p_payload.state),['pending','paid']);
+ assert.equal(qboCalls.find(c=>c.path.startsWith('payment?')).body.Line[0].LinkedTxn[0].TxnId,'qb-invoice','Accounting receipt applies to the exact invoice');
  assert.equal(qboCalls.find(c=>c.path.startsWith('payment?')).body.ProcessPayment,false,'Accounting recording cannot debit the customer again');
  assert.ok(calls.some(c=>c.args?.p_action==='accounting'));
 } finally {globalThis.fetch=originalFetch;delete globalThis.__worker;delete globalThis.__workerHandler;}
