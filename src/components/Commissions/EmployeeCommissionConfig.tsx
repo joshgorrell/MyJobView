@@ -38,7 +38,6 @@ const rateFields = [
   { key: 'custom_design_rate' as const, defaultKey: 'default_design_rate' as const, label: 'Design', desc: 'When credited as designer' },
   { key: 'custom_pm_rate' as const, defaultKey: 'default_pm_rate' as const, label: 'Project Mgmt', desc: 'On collected project funds' },
   { key: 'custom_service_sales_rate' as const, defaultKey: 'default_service_sales_rate' as const, label: 'Service Sales', desc: 'On collected service work' },
-  { key: 'custom_service_pm_rate' as const, defaultKey: 'default_service_pm_rate' as const, label: 'Service PM', desc: 'On collected service work' },
   { key: 'custom_contract_commission_rate' as const, defaultKey: 'default_contract_commission_rate' as const, label: 'Contract Sales', desc: 'Security/VIP/service plan contracts' },
 ];
 
@@ -50,6 +49,7 @@ export function EmployeeCommissionConfig() {
   const [editRates, setEditRates] = useState<Record<string, string>>({});
   const [editBonusThreshold, setEditBonusThreshold] = useState('');
   const [editBonusRate, setEditBonusRate] = useState('');
+  const [matrixActive, setMatrixActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -63,7 +63,7 @@ export function EmployeeCommissionConfig() {
       const [employeesRes, configsRes, defaultsRes] = await Promise.all([
         supabase.from('profiles').select('id, full_name, email, role').eq('is_active', true).order('full_name'),
         supabase.from('employee_commission_config').select('*'),
-        supabase.from('company_commission_settings').select('default_sales_projects_rate, default_design_rate, default_pm_rate, default_service_sales_rate, default_service_pm_rate, default_contract_commission_rate').maybeSingle(),
+        supabase.from('company_commission_settings').select('active_matrix_policy_id, default_sales_projects_rate, default_design_rate, default_pm_rate, default_service_sales_rate, default_service_pm_rate, default_contract_commission_rate').maybeSingle(),
       ]);
 
       if (employeesRes.error) throw employeesRes.error;
@@ -71,6 +71,7 @@ export function EmployeeCommissionConfig() {
 
       setEmployees(employeesRes.data || []);
       setDefaults(defaultsRes.data || null);
+      setMatrixActive(!!defaultsRes.data?.active_matrix_policy_id);
 
       const configMap = new Map<string, EmployeeConfig>();
       (configsRes.data || []).forEach((config: any) => {
@@ -87,18 +88,8 @@ export function EmployeeCommissionConfig() {
   async function toggleEligibility(employeeId: string) {
     const existingConfig = configs.get(employeeId);
     try {
-      if (existingConfig) {
-        const { error } = await supabase
-          .from('employee_commission_config')
-          .update({ eligible_for_commissions: !existingConfig.eligible_for_commissions })
-          .eq('id', existingConfig.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('employee_commission_config')
-          .insert({ employee_id: employeeId, eligible_for_commissions: true });
-        if (error) throw error;
-      }
+      const { error } = await supabase.rpc('set_commission_eligibility', { p_employee: employeeId, p_eligible: !existingConfig?.eligible_for_commissions });
+      if (error) throw error;
       await loadData();
     } catch (err) {
       console.error('Error toggling eligibility:', err);
@@ -177,6 +168,7 @@ export function EmployeeCommissionConfig() {
 
   return (
     <div className="space-y-5">
+      {matrixActive && <p className="text-sm text-blue-300">The dealer matrix controls new-sale rates. Eligibility here is the same setting used in Add/Edit User. Legacy custom rates remain stored for existing sales.</p>}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Users className="w-5 h-5 text-blue-400" />
@@ -213,7 +205,7 @@ export function EmployeeCommissionConfig() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {hasCustomRates && (
+                  {hasCustomRates && !matrixActive && (
                     <span className="text-[10px] font-medium px-1.5 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded">
                       Custom Rates
                     </span>
@@ -230,7 +222,7 @@ export function EmployeeCommissionConfig() {
                     {isEligible ? 'Eligible' : 'Not Eligible'}
                   </button>
 
-                  {isEligible && (
+                  {isEligible && !matrixActive && (
                     <button
                       onClick={() => isEditing ? setEditingId(null) : startEditing(employee.id)}
                       className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
@@ -242,7 +234,7 @@ export function EmployeeCommissionConfig() {
                 </div>
               </div>
 
-              {isEditing && (
+              {isEditing && !matrixActive && (
                 <div className="px-4 pb-4 pt-1 border-t border-gray-700/50 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {rateFields.map(field => {
@@ -347,6 +339,7 @@ export function EmployeeCommissionConfig() {
         <ul className="text-xs text-gray-500 space-y-1">
           <li>Toggle "Eligible" to enable commission tracking for an employee</li>
           <li>Click the edit icon to set custom rates that override company defaults</li>
+          <li>The service department allocation is configured in Company Commission Settings.</li>
           <li>Leave a rate blank to use the company default for that commission type</li>
           <li>Bonus tiers add extra commission when an employee's total sales exceed the threshold</li>
         </ul>

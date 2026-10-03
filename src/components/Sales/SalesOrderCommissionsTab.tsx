@@ -1,9 +1,10 @@
+import { CommissionSalePanel } from '../Commissions/CommissionSalePanel';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   DollarSign, TrendingUp, Clock, CheckCircle, Users, Briefcase,
-  Loader2, AlertCircle, Percent, PenTool, ChevronDown, ChevronUp,
+  Loader2, AlertCircle, PenTool, ChevronDown, ChevronUp,
   Receipt, Sparkles, ArrowRight
 } from 'lucide-react';
 import type { SalesOrderFull, ChangeOrderSummary } from './SalesOrderDetail';
@@ -32,6 +33,8 @@ interface CommissionRecord {
   invoice_amount_paid?: number;
   invoice_amount_due?: number;
   created_at: string;
+  recipient_type: string;
+  calculation_revision: number;
 }
 
 interface CommissionSettings {
@@ -68,6 +71,7 @@ function fmt(n: number) {
 }
 
 export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderCommissionsTabProps) {
+  const [matrixActive, setMatrixActive] = useState(false);
   const { profile } = useAuth();
   const [records, setRecords] = useState<CommissionRecord[]>([]);
   const [settings, setSettings] = useState<CommissionSettings | null>(null);
@@ -75,7 +79,7 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
   const [loading, setLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(false);
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'finance';
+  const isAdmin = ['admin', 'manager', 'finance', 'sales_manager'].includes(profile?.role || '');
   const projectId = order.project?.id ?? (order as any).project_id ?? null;
 
   useEffect(() => {
@@ -90,28 +94,32 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
           id, employee_id, role_type, basis_type, basis_amount,
           commission_rate, total_potential_commission, amount_collected,
           amount_earned, amount_paid, status, invoice_id, created_at,
+          recipient_type, calculation_revision,
           profiles!commission_records_employee_id_fkey(full_name)
         `)
-        .eq('project_id', projectId || '00000000-0000-0000-0000-000000000000');
+        .or(projectId ? `project_id.eq.${projectId},source_sales_order_id.eq.${order.id}` : `source_sales_order_id.eq.${order.id}`);
 
       if (!isAdmin && profile?.id) {
         recordsQuery = recordsQuery.eq('employee_id', profile.id);
       }
 
       const [recordsResult, settingsResult, configResult] = await Promise.all([
-        projectId ? recordsQuery.order('created_at', { ascending: true }) : Promise.resolve({ data: [], error: null }),
+        recordsQuery.order('created_at', { ascending: true }),
         supabase
           .from('company_commission_settings')
-          .select('commission_basis, default_sales_projects_rate, default_design_rate, default_pm_rate')
+          .select('active_matrix_policy_id, commission_basis, default_sales_projects_rate, default_design_rate, default_pm_rate')
           .limit(1)
           .maybeSingle(),
         supabase
           .from('employee_commission_config')
-          .select('employee_id, role_type, commission_rate, eligible_for_commissions')
+          .select('employee_id, custom_sales_projects_rate, eligible_for_commissions')
           .eq('eligible_for_commissions', true),
       ]);
 
       if (recordsResult.error) throw recordsResult.error;
+      if (settingsResult.error) throw settingsResult.error;
+      setMatrixActive(!!settingsResult.data?.active_matrix_policy_id);
+      if (configResult.error) throw configResult.error;
 
       const rawRecords = recordsResult.data || [];
       const invoiceIds = rawRecords.map((r: any) => r.invoice_id).filter(Boolean);
@@ -136,7 +144,7 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
         const inv = r.invoice_id ? invoiceMap[r.invoice_id] : null;
         return {
           ...r,
-          employee_name: r.profiles?.full_name || 'Unknown',
+          employee_name: r.recipient_type === 'service_department' ? 'Service Department' : r.profiles?.full_name || 'Former employee',
           invoice_number: inv?.number,
           invoice_total: inv?.total,
           invoice_amount_paid: inv?.paid,
@@ -149,8 +157,8 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
       setEmployeeConfigs(
         (configResult.data || []).map((c: any) => ({
           employee_id: c.employee_id,
-          role_type: c.role_type,
-          commission_rate: Number(c.commission_rate),
+          role_type: 'sales_projects',
+          commission_rate: Number(c.custom_sales_projects_rate ?? settingsResult.data?.default_sales_projects_rate ?? 0),
           is_eligible: c.eligible_for_commissions,
         }))
       );
@@ -177,22 +185,22 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
   // Upcoming = commission on invoiced-but-unpaid invoices
   // = total_potential_commission - amount_earned  (the unearned portion on live invoices)
   const totalUpcoming = records
-    .filter(r => r.status === 'accruing' || (r.status === 'pending' && r.invoice_id))
+    .filter(r => Boolean(r.invoice_id))
     .reduce((s, r) => s + Math.max(0, (r.total_potential_commission || 0) - (r.amount_earned || 0)), 0);
 
   // Future potential = commission on unbilled contract + unbilled approved COs
   // We calculate this from the commission rate on existing records or employee configs
   const avgCommRate = records.length > 0
-    ? records.reduce((s, r) => s + Number(r.commission_rate), 0) / records.length
-    : (settings?.default_sales_projects_rate ? Number(settings.default_sales_projects_rate) : 0);
+    ? (records.find(r => r.role_type === 'sales_projects')?.commission_rate ?? 0)
+    : (employeeConfigs.find(c => c.employee_id === (isAdmin ? order.sales_rep_id : profile?.id))?.commission_rate ?? (isAdmin ? Number(settings?.default_sales_projects_rate || 0) : 0));
 
   const originalTotal = order.original_contract_total || order.contract_total || 0;
   const approvedCOs = changeOrders.filter(co => co.status === 'approved' && co.is_billable !== false);
-  const totalCOBillable = approvedCOs.reduce((s, co) => s + Math.abs(co.change_amount) + (co.tax_amount || 0), 0);
+  const totalCOBillable = approvedCOs.reduce((s, co) => s + co.change_amount + (co.tax_amount || 0), 0);
   const totalCOBilled = approvedCOs.reduce((s, co) => s + (co.amount_billed || 0), 0);
   const totalCOUnbilled = Math.max(0, totalCOBillable - totalCOBilled);
 
-  const totalInvoicedFromRecords = records.reduce((s, r) => s + (r.invoice_total || 0), 0);
+  const totalInvoicedFromRecords = [...new Map(records.filter(r => r.invoice_id).map(r => [r.invoice_id, r.invoice_total || 0])).values()].reduce((s, total) => s + total, 0);
   const originalUnbilled = Math.max(0, originalTotal - totalInvoicedFromRecords + totalCOBilled);
 
   const totalUnbilledAmount = originalUnbilled + totalCOUnbilled;
@@ -211,9 +219,12 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
 
   const hasRecords = records.length > 0;
   const hasNoProject = !projectId;
+  if (matrixActive) return <div className="space-y-4"><CommissionSalePanel sourceKind="order" sourceId={order.id} /><p className="text-sm text-gray-300">Matrix earnings use the approved sale entitlement. Deposits and progress invoices share that entitlement. Existing sales retain their original records.</p><div className="overflow-x-auto"><table className="w-full text-sm text-gray-300"><thead><tr><th>Recipient</th><th>Role</th><th>Rate</th><th>Potential</th><th>Earned</th><th>Paid</th></tr></thead><tbody>{records.map(record => <tr key={record.id}><td>{record.employee_name}</td><td>{record.role_type}</td><td>{record.commission_rate}%</td><td>${fmt(record.total_potential_commission)}</td><td>${fmt(record.amount_earned)}</td><td>${fmt(record.amount_paid)}</td></tr>)}</tbody></table></div></div>;
+
 
   return (
     <div className="space-y-5">
+      <CommissionSalePanel sourceKind="order" sourceId={order.id} />
 
       {/* ─── Three Core Buckets ─────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -381,7 +392,7 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
               </div>
             )}
             {approvedCOs.filter(co => co.billing_status !== 'fully_billed').map(co => {
-              const coTotal = Math.abs(co.change_amount) + (co.tax_amount || 0);
+              const coTotal = co.change_amount + (co.tax_amount || 0);
               const remaining = Math.max(0, coTotal - (co.amount_billed || 0));
               if (remaining <= 0) return null;
               return (

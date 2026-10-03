@@ -16,6 +16,7 @@ import { CompleteSalesOrderModal } from './CompleteSalesOrderModal';
 import { ErrorBoundary } from '../Shared/ErrorBoundary';
 
 export interface SalesOrderFull {
+  sales_rep_id?: string | null;
   id: string;
   order_number: string;
   status: 'pending_deposit' | 'pending_po' | 'planning' | 'active' | 'complete' | 'closed';

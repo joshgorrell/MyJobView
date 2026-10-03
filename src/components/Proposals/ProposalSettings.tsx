@@ -1,3 +1,4 @@
+import { CommissionSalePanel } from '../Commissions/CommissionSalePanel';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1307,6 +1308,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
             </div>
           )}
 
+          <CommissionSalePanel sourceKind="proposal" sourceId={proposalId} />
           {/* Tabs */}
           <div className="bg-white rounded-t-lg border-b border-gray-200">
             <div

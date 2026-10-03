@@ -115,6 +115,8 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
     setLoading(true);
 
     try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error('Please sign in before recording a payment.');
       const paymentNotes = convenienceFee > 0
         ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(convenienceFee)}`
         : notes || null;
@@ -125,8 +127,9 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
         .from('payments')
         .insert({
           invoice_id: invoice.id,
-          contact_id: invoice.contact_id,
+          created_by: user.id,
           amount: totalWithFee,
+          convenience_fee_amount: convenienceFee,
           payment_date: paymentDate,
           payment_method: paymentMethod,
           reference_number: referenceNumber || null,
@@ -137,17 +140,6 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
         .single();
 
       if (paymentError) throw paymentError;
-
-      const newAmountPaid = invoice.amount_paid + paymentAmount;
-      const newAmountDue = invoice.total - newAmountPaid;
-      const newStatus = newAmountDue <= 0 ? 'paid' : 'partial';
-
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .update({ amount_paid: newAmountPaid, amount_due: newAmountDue, status: newStatus })
-        .eq('id', invoice.id);
-
-      if (invoiceError) throw invoiceError;
 
       if (sendReceipt && hasEmail) {
         try {

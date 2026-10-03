@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Calendar, DollarSign, FileText, CreditCard as Edit2, Save, X, Timer, Clock, AlertTriangle, CheckCircle, Flag } from 'lucide-react';
 import { ProjectRoleAssignment } from './ProjectRoleAssignment';
@@ -24,7 +24,7 @@ export default function ProjectOverview({ project, onUpdate, onRefresh }: Projec
   const [roleAssignments, setRoleAssignments] = useState({
     salesperson_id: project.salesperson_id || null,
     designer_id: project.designer_id || null,
-    project_manager_id: project.project_manager_id || null,
+    project_manager_id: project.assigned_pm || null,
   });
 
   useEffect(() => {

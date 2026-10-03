@@ -108,6 +108,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     role_id: '' as string,
     email_leads: false,
     is_sales_rep: false,
+    eligible_for_commissions: false,
     can_create_proposals: true,
     can_create_purchase_orders: false,
     can_create_work_orders: false,
@@ -427,6 +428,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
       }
 
       setCreatedId(newUserId);
+      const { error: commissionError } = await supabase.rpc('set_commission_eligibility', { p_employee: newUserId, p_eligible: formData.eligible_for_commissions });
+      if (commissionError) throw new Error(`Commission eligibility setup failed: ${commissionError.message}`);
       const { error: notificationError } = await supabase
         .from('profiles')
         .update({
@@ -1410,6 +1413,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           )}
           {activeTab === 'sales' && (
             <div className="space-y-5">
+              <label className="flex gap-3 text-white"><input type="checkbox" checked={formData.eligible_for_commissions} onChange={e => setFormData({ ...formData, eligible_for_commissions: e.target.checked })} />Eligible for commissions</label>
+              <p className="text-xs text-gray-400">The dealer matrix and this person’s assigned sale role determine their share. Eligibility is separate from sales designation and app permissions.</p>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"

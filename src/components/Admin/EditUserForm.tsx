@@ -215,6 +215,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   });
 
   // --- Shared state ---
+  const [commissionEligible, setCommissionEligible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -224,6 +225,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       loadRoles(),
       loadOffices(),
       loadUserOffices(),
+      loadCommissionEligibility(),
       loadPaySchedules(),
       loadEmployeeData(),
       loadDepartments(),
@@ -274,6 +276,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading offices:', error);
     }
+  }
+
+  async function loadCommissionEligibility() {
+    const { data, error: commissionError } = await supabase.from('employee_commission_config').select('eligible_for_commissions').eq('employee_id', user.id).maybeSingle();
+    if (commissionError) { setDataLoadFailed(true); setError(`Commission eligibility did not load: ${commissionError.message}`); return; }
+    setCommissionEligible(data?.eligible_for_commissions === true);
   }
 
   async function loadUserOffices() {
@@ -719,6 +727,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
       if (updateError) throw new Error(`Database error: ${updateError.message} (${updateError.code})`);
       if (!updatedProfile) throw new Error('Update succeeded but no data returned.');
+      const { error: commissionError } = await supabase.rpc('set_commission_eligibility', { p_employee: user.id, p_eligible: commissionEligible });
+      if (commissionError) throw new Error(`Commission eligibility update failed: ${commissionError.message}`);
 
       if (['sales', 'admin', 'manager', 'sales_manager'].includes(formData.role)) {
         await supabase.rpc('recalculate_sales_quota_for_user', {
@@ -1433,6 +1443,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
             )}
             {activeTab === 'sales' && (
               <div className="space-y-5">
+                <label className="flex gap-3 text-white"><input type="checkbox" checked={commissionEligible} onChange={e => setCommissionEligible(e.target.checked)} />Eligible for commissions</label>
+                <p className="text-xs text-gray-400">Uses the same eligibility setting as commission management. Assigned work roles earn the dealer’s matrix rates; changes do not rewrite recognized sales.</p>
                 <label className="flex gap-3 text-white">
                   <input
                     type="checkbox"

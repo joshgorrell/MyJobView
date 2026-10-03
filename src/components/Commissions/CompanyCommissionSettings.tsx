@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, Save, RefreshCw, Loader2, CheckCircle, AlertCircle, Users } from 'lucide-react';
+import { DealerCommissionMatrix } from './DealerCommissionMatrix';
 import { supabase } from '../../lib/supabase';
 
 interface CommissionSettings {
   id: string;
   commission_basis: 'gross' | 'profit';
+  payroll_frequency: string;
+  payroll_start_date: string | null;
   default_sales_projects_rate: number;
   default_design_rate: number;
   default_pm_rate: number;
@@ -14,12 +17,12 @@ interface CommissionSettings {
   commission_role_user_types: Record<string, string[]>;
 }
 
-const rateFields: { key: keyof Omit<CommissionSettings, 'id' | 'commission_basis' | 'commission_role_user_types'>; label: string; desc: string; isContract?: boolean }[] = [
+const rateFields: { key: keyof Omit<CommissionSettings, 'id' | 'commission_basis' | 'commission_role_user_types' | 'payroll_frequency' | 'payroll_start_date'>; label: string; desc: string; isContract?: boolean }[] = [
   { key: 'default_sales_projects_rate', label: 'Sales (Projects)', desc: 'Paid on project funds collected' },
   { key: 'default_design_rate', label: 'Design', desc: 'Paid if separate designer credited' },
   { key: 'default_pm_rate', label: 'Project Management', desc: 'Paid on collected project funds' },
   { key: 'default_service_sales_rate', label: 'Service Sales', desc: 'Paid on collected service work' },
-  { key: 'default_service_pm_rate', label: 'Service PM', desc: 'Paid on collected service work' },
+  { key: 'default_service_pm_rate', label: 'Service Department', desc: 'Department allocation on collected service work' },
   { key: 'default_contract_commission_rate', label: 'Contract Sales', desc: 'Security contracts, VIP & service plans — term × monthly × rate', isContract: true },
 ];
 
@@ -96,6 +99,8 @@ export function CompanyCommissionSettings() {
         .from('company_commission_settings')
         .update({
           commission_basis: settings.commission_basis,
+          payroll_frequency: settings.payroll_frequency,
+          payroll_start_date: settings.payroll_start_date,
           default_sales_projects_rate: settings.default_sales_projects_rate,
           default_design_rate: settings.default_design_rate,
           default_pm_rate: settings.default_pm_rate,
@@ -134,6 +139,7 @@ export function CompanyCommissionSettings() {
 
   return (
     <div className="space-y-5">
+      <DealerCommissionMatrix />
       <div className="flex items-center gap-3">
         <DollarSign className="w-5 h-5 text-green-400" />
         <h2 className="text-lg font-semibold text-white">Company Commission Settings</h2>
@@ -153,6 +159,17 @@ export function CompanyCommissionSettings() {
       )}
 
       <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 p-5 space-y-5">
+        <div className="flex flex-wrap gap-4">
+          <label className="text-sm text-gray-300">Payroll frequency
+            <select value={settings.payroll_frequency || 'custom'} onChange={e => setSettings({ ...settings, payroll_frequency: e.target.value })} className="block mt-2 p-2 rounded bg-white text-black">
+              <option value="weekly">Weekly</option><option value="bi-weekly">Every 14 days</option><option value="semi-monthly">Twice monthly</option><option value="monthly">Monthly</option><option value="custom">Custom dates</option>
+            </select>
+          </label>
+          <label className="text-sm text-gray-300">First day of a payroll period
+            <input type="date" value={settings.payroll_start_date || ''} onChange={e => setSettings({ ...settings, payroll_start_date: e.target.value || null })} className="block mt-2 p-2 rounded bg-white text-black" />
+          </label>
+        </div>
+        <p className="text-xs text-gray-400">Weekly and 14-day reports use this start date as their schedule anchor.</p>
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Commission Basis</label>
           <select
@@ -165,15 +182,15 @@ export function CompanyCommissionSettings() {
           </select>
           <p className="text-xs text-gray-500 mt-1">
             {settings.commission_basis === 'gross'
-              ? 'Commissions calculated on the full sale amount'
-              : 'Commissions calculated on profit margin only'}
+              ? 'Commissions accrue on collected revenue, excluding sales tax and credit card convenience fees'
+              : 'Profit commissions are held until costs are verified'}
           </p>
         </div>
 
         <div className="border-t border-gray-700/50 pt-5">
-          <h3 className="text-sm font-semibold text-gray-300 mb-1">Default Commission Rates</h3>
+          <h3 className="text-sm font-semibold text-gray-300 mb-1">Legacy Commission Rates</h3>
           <p className="text-xs text-gray-500 mb-4">
-            Applied to all employees unless overridden at the employee or project level.
+            These settings apply to sales outside the activated matrix. New matrix sales use role shares and eligibility instead of employee rate overrides.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
