@@ -1,5 +1,7 @@
 # Commission repair: first phase
 
+October 3 clarification: [the dealer matrix specification](commission-matrix-spec.md) supersedes this phase's independent sales/design allocation model. This draft needs that implementation revision before it matches the requested commission policy.
+
 This branch repairs new commission accrual and its reporting. It does not change company/employee rates, initiate bank/payroll payments, or apply a historical commission backfill.
 
 ## Behavior
