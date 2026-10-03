@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, X, Save, Eye, Copy, Share2, Edit3, Mail, Phone, Globe } from 'lucide-react';
+import { Upload, X, Save, Eye, Copy, Share2, Edit3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BusinessCard } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
 import { getBusinessCardUrl } from '../../lib/businessCardLinks';
+import { BusinessCardIdentity, BusinessCardFooter, CardBranding } from './BusinessCardIdentity';
 
 export function UserBusinessCardEditor() {
   const { user, profile, setProfileAvatar } = useAuth();
@@ -12,7 +13,7 @@ export function UserBusinessCardEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [company, setCompany] = useState<{ company_name: string; website: string | null } | null>(null);
+  const [company, setCompany] = useState<CardBranding | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -47,7 +48,7 @@ export function UserBusinessCardEditor() {
     if (!error) setSubdomain(data?.subdomain || null);
     const { data: settings } = await supabase
       .from('company_settings')
-      .select('company_name, website')
+      .select('company_name, website, company_logo_url, business_card_banner_url')
       .eq('organization_id', profile.organization_id)
       .maybeSingle();
     setCompany(settings);
@@ -241,27 +242,11 @@ export function UserBusinessCardEditor() {
     <div className="space-y-4 sm:space-y-6">
       {!editing ? (
         <section className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm" aria-label="Your business card">
-          <div className="h-24 sm:h-28 bg-gradient-to-br from-cyan-500/30 via-blue-500/20 to-indigo-500/10" />
+          <div className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d]">
+            <BusinessCardIdentity fullName={fullName || profile?.full_name || 'Your business card'} title={title} email={email} phone={phone} linkedinUrl={linkedinUrl} photoUrl={photoUrl} company={company} />
+            <BusinessCardFooter company={company} />
+          </div>
           <div className="px-5 pb-6 sm:px-8 sm:pb-8">
-            <div className="-mt-14 flex justify-center sm:justify-start">
-              {photoUrl ? (
-                <img src={photoUrl} alt={fullName || 'Your profile'} className="h-28 w-28 sm:h-32 sm:w-32 rounded-full object-cover border-4 border-surface bg-elevated shadow-lg" />
-              ) : (
-                <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-full border-4 border-surface bg-elevated shadow-lg flex items-center justify-center text-3xl font-semibold text-brand" aria-label="Profile initials">
-                  {(fullName || profile?.full_name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(name => name[0]).join('')}
-                </div>
-              )}
-            </div>
-            <div className="mt-4 text-center sm:text-left">
-              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-primary break-words">{fullName || profile?.full_name || 'Your business card'}</h2>
-              {title && <p className="mt-1 text-base text-secondary">{title}</p>}
-              {company?.company_name && <p className="mt-1 text-sm font-medium text-brand">{company.company_name}</p>}
-            </div>
-            <div className="mt-5 flex flex-col sm:flex-row sm:flex-wrap items-center sm:items-start gap-3 text-sm text-muted">
-              {email && <a href={`mailto:${email}`} className="flex items-center gap-2 min-w-0 max-w-full hover:text-primary"><Mail className="h-4 w-4 shrink-0" /><span className="break-all">{email}</span></a>}
-              {phone && <a href={`tel:${phone}`} className="flex items-center gap-2 hover:text-primary"><Phone className="h-4 w-4 shrink-0" />{phone}</a>}
-              {company?.website && <a href={/^https?:\/\//i.test(company.website) ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 min-w-0 max-w-full hover:text-primary"><Globe className="h-4 w-4 shrink-0" /><span className="break-all">{company.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span></a>}
-            </div>
             {card ? (
               <div className="mt-6 border-t border-subtle pt-5">
                 <p className="text-xs text-muted text-center sm:text-left break-all">{getCardUrl().replace(/^https?:\/\//, '')}</p>

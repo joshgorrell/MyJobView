@@ -224,6 +224,7 @@ export interface CompanySettings {
   id: string;
   company_name: string;
   company_logo_url: string | null;
+  business_card_banner_url?: string | null;
   website: string | null;
   portal_url?: string | null;
   from_email?: string | null;
