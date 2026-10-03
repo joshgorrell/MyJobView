@@ -52,7 +52,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string;
   planning:        { label: 'Planning',         color: 'bg-infoSoft text-info border border-subtle', dot: 'bg-info', icon: Clock },
   active:          { label: 'Active',           color: 'bg-successSoft text-success border border-subtle', dot: 'bg-success', icon: CheckCircle },
   complete:        { label: 'Complete',         color: 'bg-elevated/60 text-secondary border border-strong/40', dot: 'bg-gray-400', icon: CheckCircle },
-  closed:          { label: 'Closed',           color: 'bg-elevated/40 text-muted border border-strong/30', dot: 'bg-gray-600', icon: AlertCircle },
+  closed:          { label: 'Closed',           color: 'bg-elevated/40 text-muted border border-strong/30', dot: 'bg-elevated', icon: AlertCircle },
 };
 const DEFAULT_STATUS = { label: 'Unknown', color: 'bg-elevated text-muted border border-strong/40', dot: 'bg-gray-500', icon: AlertCircle };
 
@@ -156,13 +156,13 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           <div className="text-center py-16 px-4">
             <p className="text-muted mb-2">Something went wrong loading this sales order.</p>
             {error?.message && (
-              <p className="text-red-400 text-xs font-mono mb-4 max-w-lg mx-auto break-all bg-surface/60 rounded-lg px-3 py-2">
+              <p className="text-danger text-xs font-mono mb-4 max-w-lg mx-auto break-all bg-surface/60 rounded-lg px-3 py-2">
                 {error.message}
               </p>
             )}
             <button
               onClick={() => setSelectedOrderId(null)}
-              className="text-blue-400 hover:text-blue-300 transition-colors"
+              className="text-info hover:text-info transition-colors"
             >
               &larr; Back to Sales Orders
             </button>
@@ -194,14 +194,14 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
       {/* Office filter banner */}
       {officeIdFilter && (
         <div className="flex items-center gap-3 px-4 py-3 bg-infoSoft border border-subtle rounded-lg text-sm">
-          <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
+          <Building2 className="w-4 h-4 text-info flex-shrink-0" />
           <span className="text-info flex-1">
             Showing orders for <span className="font-semibold text-info">{officeNameFilter || 'selected office'}</span>
           </span>
           {onClearOfficeFilter && (
             <button
               onClick={onClearOfficeFilter}
-              className="flex items-center gap-1.5 text-blue-400 hover:text-info transition-colors text-xs font-medium"
+              className="flex items-center gap-1.5 text-info hover:text-info transition-colors text-xs font-medium"
             >
               <X className="w-3.5 h-3.5" />
               Clear filter
@@ -245,7 +245,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               selectedRepId === null
                 ? 'bg-blue-600 text-white'
-                : 'bg-elevated text-secondary hover:bg-gray-600'
+                : 'bg-elevated text-secondary hover:bg-elevated'
             }`}
           >
             All Reps
@@ -257,7 +257,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 selectedRepId === rep.id
                   ? 'bg-blue-600 text-white'
-                  : 'bg-elevated text-secondary hover:bg-gray-600'
+                  : 'bg-elevated text-secondary hover:bg-elevated'
               }`}
             >
               {rep.full_name.split(' ')[0]}

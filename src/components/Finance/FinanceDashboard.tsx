@@ -156,22 +156,22 @@ export function FinanceDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'bg-green-100 text-green-800';
+        return 'bg-successSoft text-success';
       case 'submitted':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-infoSoft text-info';
       case 'overdue':
-        return 'bg-red-100 text-red-800';
+        return 'bg-dangerSoft text-danger';
       case 'draft':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-surface text-primary';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-surface text-primary';
     }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading financial data...</div>
+        <div className="text-muted">Loading financial data...</div>
       </div>
     );
   }
@@ -179,10 +179,10 @@ export function FinanceDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap gap-3 items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Finance Dashboard</h1>
-          <p className="text-gray-500 mt-1">Overview of your financial metrics</p>
+          <h1 className="text-2xl font-bold text-primary">Finance Dashboard</h1>
+          <p className="text-muted mt-1">Overview of your financial metrics</p>
         </div>
         <button
           onClick={loadFinancialData}
@@ -195,129 +195,129 @@ export function FinanceDashboard() {
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Monthly Revenue */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+            <div className="p-2 bg-successSoft rounded-lg">
+              <TrendingUp className="w-6 h-6 text-success" />
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">Sales Invoiced This Month</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.monthlySalesInvoiced)}</p>
+            <p className="text-sm text-muted">Sales Invoiced This Month</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(metrics.monthlySalesInvoiced)}</p>
           </div>
         </div>
 
         {/* Outstanding Invoices */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-yellow-600" />
+            <div className="p-2 bg-warningSoft rounded-lg">
+              <AlertCircle className="w-6 h-6 text-warning" />
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">Accounts Receivable</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.accountsReceivable)}</p>
+            <p className="text-sm text-muted">Accounts Receivable</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(metrics.accountsReceivable)}</p>
           </div>
         </div>
 
         {/* Recent Payments */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <CreditCard className="w-6 h-6 text-blue-600" />
+            <div className="p-2 bg-infoSoft rounded-lg">
+              <CreditCard className="w-6 h-6 text-info" />
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">Cash Collected This Month</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.cashCollected)}</p>
+            <p className="text-sm text-muted">Cash Collected This Month</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(metrics.cashCollected)}</p>
           </div>
         </div>
 
         {/* Recurring Revenue */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Calendar className="w-6 h-6 text-purple-600" />
+            <div className="p-2 bg-accentSoft rounded-lg">
+              <Calendar className="w-6 h-6 text-accent" />
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-gray-500">Recurring Subscription Value</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.recurringRevenue)}</p>
-            <p className="text-xs text-gray-400">{metrics.activeSubscriptions} active subscriptions</p>
+            <p className="text-sm text-muted">Recurring Subscription Value</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(metrics.recurringRevenue)}</p>
+            <p className="text-xs text-muted">{metrics.activeSubscriptions} active subscriptions</p>
           </div>
         </div>
       </div>
 
       {/* Secondary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
-            <DollarSign className="w-5 h-5 text-gray-600" />
-            <p className="text-sm font-medium text-gray-700">Sales Invoiced (All Time)</p>
+            <DollarSign className="w-5 h-5 text-muted" />
+            <p className="text-sm font-medium text-secondary">Sales Invoiced (All Time)</p>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatCurrency(metrics.salesInvoiced)}</p>
+          <p className="text-xl font-bold text-primary">{formatCurrency(metrics.salesInvoiced)}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
-            <FileText className="w-5 h-5 text-gray-600" />
-            <p className="text-sm font-medium text-gray-700">Paid Invoices</p>
+            <FileText className="w-5 h-5 text-muted" />
+            <p className="text-sm font-medium text-secondary">Paid Invoices</p>
           </div>
-          <p className="text-xl font-bold text-gray-900">{metrics.paidInvoices}</p>
+          <p className="text-xl font-bold text-primary">{metrics.paidInvoices}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
-            <Users className="w-5 h-5 text-gray-600" />
-            <p className="text-sm font-medium text-gray-700">Commissions (This Month)</p>
+            <Users className="w-5 h-5 text-muted" />
+            <p className="text-sm font-medium text-secondary">Commissions (This Month)</p>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatCurrency(metrics.totalCommissions)}</p>
+          <p className="text-xl font-bold text-primary">{formatCurrency(metrics.totalCommissions)}</p>
         </div>
       </div>
 
       {/* Recent Invoices */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Invoices</h2>
+      <div className="bg-canvas rounded-xl shadow-sm border border-subtle">
+        <div className="p-6 border-b border-subtle">
+          <h2 className="text-lg font-semibold text-primary">Recent Invoices</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-surface">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Invoice #
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Customer
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Due Date
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-canvas divide-y divide-subtle">
               {recentInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-muted">
                     No invoices found
                   </td>
                 </tr>
               ) : (
                 recentInvoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={invoice.id} className="hover:bg-surface">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary">
                       {invoice.invoice_number}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                       {invoice.contact_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-primary">
                       {formatCurrency(invoice.total)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -325,7 +325,7 @@ export function FinanceDashboard() {
                         {invoice.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                       {invoice.due_date ? formatDate(invoice.due_date) : '-'}
                     </td>
                   </tr>

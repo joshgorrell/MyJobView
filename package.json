@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test:themes": "node tests/themes/database.mjs",
+    "test:themes:browser": "npm run build && node tests/themes/browser.mjs",
     "test:proposals:browser": "npm run build && node tests/proposals/mobile-browser.mjs",
     "test:business-card": "node tests/business-card/database.mjs && node tests/business-card/runtime.mjs",
     "test:ai-assistant": "node tests/ai-assistant/permissions.mjs",

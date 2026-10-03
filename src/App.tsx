@@ -695,11 +695,11 @@ function AppContent() {
     if (!user || !profile) return <LoginForm />;
     if (!['admin', 'manager', 'sales_manager'].includes(profile.role)) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
-            <TrendingUp size={64} className="mx-auto text-gray-600 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-gray-400">You don't have permission to access the Sales TV Dashboard.</p>
+            <TrendingUp size={64} className="mx-auto text-muted mb-4" />
+            <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
+            <p className="text-muted">You don't have permission to access the Sales TV Dashboard.</p>
           </div>
         </div>
       );
@@ -722,14 +722,14 @@ function AppContent() {
 
     if (!soId) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
-          <p className="text-gray-400">No sales order specified.</p>
+        <div className="h-screen bg-workspace flex items-center justify-center">
+          <p className="text-muted">No sales order specified.</p>
         </div>
       );
     }
 
     return (
-      <div className="h-screen bg-gray-900 flex flex-col overflow-auto p-6">
+      <div className="h-screen bg-workspace flex flex-col overflow-auto p-3 sm:p-6">
         <Suspense fallback={<LoadingFallback />}>
           <SalesOrderDetail orderId={soId} onBack={() => window.close()} isStandalone={true} initialTab={soActiveTab ?? undefined} />
         </Suspense>
@@ -749,11 +749,11 @@ function AppContent() {
 
     if (!checkModuleAccess('proposals')) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
-            <FileText size={64} className="mx-auto text-gray-600 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-gray-400">You don't have permission to access Proposals.</p>
+            <FileText size={64} className="mx-auto text-muted mb-4" />
+            <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
+            <p className="text-muted">You don't have permission to access Proposals.</p>
           </div>
         </div>
       );
@@ -764,7 +764,7 @@ function AppContent() {
     const proposalId = urlParams.get('id');
 
     return (
-      <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
+      <div className="h-screen bg-workspace flex flex-col overflow-hidden">
         <Suspense fallback={<LoadingFallback />}>
           <ProposalsView isStandalone={!!proposalId} openProposalId={proposalId} />
         </Suspense>
@@ -1200,13 +1200,13 @@ function AppContent() {
       </div>
 
       {!isStandalone && (
-        <footer className="bg-gray-900/50 border-t border-purple-500/30 mt-8 sm:mt-12 py-4 sm:py-6">
+        <footer className="bg-canvas/50 border-t border-subtle mt-8 sm:mt-12 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4">
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
               <button
                 onClick={signOut}
-                className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors justify-center"
+                className="inline-flex items-center gap-2 px-4 py-2 text-secondary hover:text-primary hover:bg-elevated rounded-lg transition-colors justify-center"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4 flex-shrink-0" />

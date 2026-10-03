@@ -9,23 +9,23 @@ interface ProjectsListProps {
 export default function ProjectsList({ projects, onSelectProject }: ProjectsListProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'complete': return 'bg-teal-500/20 text-teal-400 border-teal-500/30';
-      case 'closed': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'planning': return 'bg-infoSoft text-info border-blue-500/30';
+      case 'active': return 'bg-successSoft text-success border-green-500/30';
+      case 'complete': return 'bg-successSoft text-success border-teal-500/30';
+      case 'closed': return 'bg-elevated text-secondary border-gray-500/30';
+      default: return 'bg-elevated text-secondary border-gray-500/30';
     }
   };
 
   const getSalesOrderStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_deposit': return 'text-yellow-400';
-      case 'pending_po': return 'text-orange-400';
-      case 'planning': return 'text-blue-400';
-      case 'active': return 'text-green-400';
-      case 'complete': return 'text-teal-400';
-      case 'closed': return 'text-gray-400';
-      default: return 'text-gray-400';
+      case 'pending_deposit': return 'text-warning';
+      case 'pending_po': return 'text-attention';
+      case 'planning': return 'text-info';
+      case 'active': return 'text-success';
+      case 'complete': return 'text-success';
+      case 'closed': return 'text-muted';
+      default: return 'text-muted';
     }
   };
 
@@ -49,15 +49,15 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
           <button
             key={project.id}
             onClick={() => onSelectProject(project.id)}
-            className="bg-gray-800 border border-gray-700 rounded-xl p-5 text-left hover:border-gray-600 hover:bg-gray-800/80 transition-all group"
+            className="bg-surface border border-subtle rounded-xl p-5 text-left hover:border-strong hover:bg-surface/80 transition-all group"
           >
             {/* Header */}
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1 min-w-0 pr-2">
-                <div className="font-semibold text-white text-base mb-0.5 group-hover:text-blue-300 transition-colors leading-snug">
+                <div className="font-semibold text-primary text-base mb-0.5 group-hover:text-info transition-colors leading-snug">
                   {project.name}
                 </div>
-                <div className="text-xs text-gray-500 font-mono">{project.project_number}</div>
+                <div className="text-xs text-muted font-mono">{project.project_number}</div>
               </div>
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${getStatusColor(project.status)}`}>
                 {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
@@ -65,16 +65,16 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
             </div>
 
             {/* Customer */}
-            <div className="flex items-center gap-2 text-sm text-gray-300 mb-2">
-              <Briefcase size={14} className="text-gray-500 shrink-0" />
+            <div className="flex items-center gap-2 text-sm text-secondary mb-2">
+              <Briefcase size={14} className="text-muted shrink-0" />
               <span className="customer-link truncate">{customerName}</span>
             </div>
 
             {/* Sales Order Link */}
             {soOrderNumber && (
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <FileText size={13} className="text-gray-500 shrink-0" />
+                <div className="flex items-center gap-2 text-xs text-muted">
+                  <FileText size={13} className="text-muted shrink-0" />
                   <span>SO #{soOrderNumber}</span>
                   {soStatus && (
                     <span className={`capitalize text-xs ${getSalesOrderStatusColor(soStatus)}`}>
@@ -83,7 +83,7 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
                   )}
                 </div>
                 {soContractTotal && (
-                  <span className="text-xs text-gray-300 font-medium tabular-nums">
+                  <span className="text-xs text-secondary font-medium tabular-nums">
                     ${soContractTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </span>
                 )}
@@ -93,21 +93,21 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
             {/* Work Order Progress */}
             {woStats.total > 0 && (
               <div className="mb-3">
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                <div className="flex items-center justify-between text-xs text-muted mb-1.5">
                   <span className="flex items-center gap-1">
                     <Wrench size={12} />
                     Work Orders
                   </span>
                   <span className="tabular-nums">{woStats.completed}/{woStats.total} done</span>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-elevated rounded-full h-1.5 overflow-hidden">
                   <div
                     className="h-full bg-green-500 rounded-full transition-all"
                     style={{ width: woStats.total > 0 ? `${Math.round((woStats.completed / woStats.total) * 100)}%` : '0%' }}
                   />
                 </div>
                 {woStats.inProgress > 0 && (
-                  <div className="flex items-center gap-1 text-xs text-blue-400 mt-1">
+                  <div className="flex items-center gap-1 text-xs text-info mt-1">
                     <Clock size={11} />
                     <span>{woStats.inProgress} in progress</span>
                   </div>
@@ -116,7 +116,7 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
             )}
 
             {/* Dates */}
-            <div className="flex items-center gap-3 text-xs text-gray-500 border-t border-gray-700 pt-3">
+            <div className="flex items-center gap-3 text-xs text-muted border-t border-subtle pt-3">
               {project.start_date && (
                 <div className="flex items-center gap-1">
                   <Calendar size={12} />
@@ -126,7 +126,7 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
               {project.target_completion_date && (
                 <div className="flex items-center gap-1 ml-auto">
                   {project.status === 'complete' || project.status === 'closed'
-                    ? <CheckCircle size={12} className="text-teal-400" />
+                    ? <CheckCircle size={12} className="text-success" />
                     : <Calendar size={12} />
                   }
                   <span>Due {new Date(project.target_completion_date + 'T00:00:00').toLocaleDateString()}</span>

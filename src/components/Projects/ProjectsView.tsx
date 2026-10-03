@@ -83,13 +83,13 @@ export default function ProjectsView() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col bg-canvas">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+      <div className="bg-surface border-b border-subtle px-6 py-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Projects</h1>
-            <p className="text-sm text-gray-400 mt-1">
+            <h1 className="text-2xl font-bold text-primary">Projects</h1>
+            <p className="text-sm text-muted mt-1">
               Manage active and completed projects
             </p>
           </div>
@@ -98,20 +98,20 @@ export default function ProjectsView() {
         {/* Search and Filters */}
         <div className="flex items-center gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={20} />
             <input
               type="text"
               placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 bg-canvas border border-subtle rounded-lg text-primary placeholder-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-canvas border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Status</option>
             <option value="planning">Planning</option>
@@ -128,18 +128,18 @@ export default function ProjectsView() {
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-400">Loading projects...</p>
+              <p className="text-muted">Loading projects...</p>
             </div>
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="text-gray-400 mb-2">No projects found</div>
+            <div className="text-muted mb-2">No projects found</div>
             {searchQuery || statusFilter !== 'all' ? (
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted">
                 Try adjusting your search or filters
               </div>
             ) : (
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted">
                 Projects are automatically created when proposals are approved
               </div>
             )}
