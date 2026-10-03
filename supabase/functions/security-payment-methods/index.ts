@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
       access = staffReview ? review : await caller.rpc('staff_security_onboarding', { p_action:'get', p_id:contractId });
     }
     const agreement = access.data;
-    if (access.error || !agreement || (agreement.customer_completed_at && !staffReview) || !(staffReview ? ['draft','pending_customer','customer_completed','pending_approval','approved','rejected'] : ['draft','pending_customer','customer_completed','rejected']).includes(agreement.status))
+    if (access.error || !agreement || (agreement.customer_completed_at && !staffReview) || !(staffReview ? ['draft','pending_customer','customer_completed','pending_approval','approved','rejected','active'] : ['draft','pending_customer','customer_completed','rejected']).includes(agreement.status))
       return respond({error:'Your invitation has expired or this agreement is no longer editable'},403);
     const admin = getSupabaseAdmin();
     const {data:contract} = await admin.from('security_contracts').select('contact_id,organization_id,security_billing_mode').eq('id',contractId).single();
