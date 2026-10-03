@@ -1,3 +1,4 @@
+import { CommissionSalePanel } from '../Commissions/CommissionSalePanel';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -70,6 +71,7 @@ function fmt(n: number) {
 }
 
 export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderCommissionsTabProps) {
+  const [matrixActive, setMatrixActive] = useState(false);
   const { profile } = useAuth();
   const [records, setRecords] = useState<CommissionRecord[]>([]);
   const [settings, setSettings] = useState<CommissionSettings | null>(null);
@@ -105,7 +107,7 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
         recordsQuery.order('created_at', { ascending: true }),
         supabase
           .from('company_commission_settings')
-          .select('commission_basis, default_sales_projects_rate, default_design_rate, default_pm_rate')
+          .select('active_matrix_policy_id, commission_basis, default_sales_projects_rate, default_design_rate, default_pm_rate')
           .limit(1)
           .maybeSingle(),
         supabase
@@ -116,6 +118,7 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
 
       if (recordsResult.error) throw recordsResult.error;
       if (settingsResult.error) throw settingsResult.error;
+      setMatrixActive(!!settingsResult.data?.active_matrix_policy_id);
       if (configResult.error) throw configResult.error;
 
       const rawRecords = recordsResult.data || [];
@@ -216,9 +219,12 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
 
   const hasRecords = records.length > 0;
   const hasNoProject = !projectId;
+  if (matrixActive) return <div className="space-y-4"><CommissionSalePanel sourceKind="order" sourceId={order.id} /><p className="text-sm text-gray-300">Matrix earnings use the approved sale entitlement. Deposits and progress invoices share that entitlement. Existing sales retain their original records.</p><div className="overflow-x-auto"><table className="w-full text-sm text-gray-300"><thead><tr><th>Recipient</th><th>Role</th><th>Rate</th><th>Potential</th><th>Earned</th><th>Paid</th></tr></thead><tbody>{records.map(record => <tr key={record.id}><td>{record.employee_name}</td><td>{record.role_type}</td><td>{record.commission_rate}%</td><td>${fmt(record.total_potential_commission)}</td><td>${fmt(record.amount_earned)}</td><td>${fmt(record.amount_paid)}</td></tr>)}</tbody></table></div></div>;
+
 
   return (
     <div className="space-y-5">
+      <CommissionSalePanel sourceKind="order" sourceId={order.id} />
 
       {/* ─── Three Core Buckets ─────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

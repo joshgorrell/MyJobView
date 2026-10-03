@@ -1,3 +1,4 @@
+import { CommissionReviewQueue } from './CommissionReviewQueue';
 import { useEffect, useState } from 'react';
 import {
   DollarSign,
@@ -278,6 +279,7 @@ export function CommissionsPage() {
 
   return (
     <div className="space-y-0">
+      {isAdmin && activeTab === 'overview' && <CommissionReviewQueue />}
       {error && <p role="alert" className="p-3 bg-red-900/30 text-red-300">{error}</p>}
       {/* Page Header */}
       <div className="bg-gray-800 rounded-t-lg border border-gray-700 border-b-0 p-5">

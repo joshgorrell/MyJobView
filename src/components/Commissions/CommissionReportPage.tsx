@@ -9,6 +9,7 @@ import {
 } from "../../lib/commissionPeriods";
 
 interface ReportLine {
+  earningEventId?: string;
   commissionRecordId: string;
   collectionId: string;
   invoiceId: string;
@@ -173,8 +174,8 @@ export function CommissionReportPage() {
   function exportCsv() {
     const rows = [
       [
-        "Payment Date",
-        "Invoice",
+        "Earning Date",
+        "Invoice / Sale",
         "Customer",
         "Recipient",
         "Role",
@@ -219,7 +220,7 @@ export function CommissionReportPage() {
           Commission Earnings Report
         </h2>
         <p className="text-sm text-gray-400">
-          Shows commission earned on payments received in the selected period,
+          Shows commission earned by cash collection, time of sale, or approved correction in the selected period,
           including deposits, partial payments, and refunds. Approval and
           recorded payouts are tracked separately.
         </p>
@@ -344,7 +345,7 @@ export function CommissionReportPage() {
           )}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded border border-gray-700 p-4 text-gray-300">
-              Commissionable collections
+              Commission base recognized
               <div className="text-xl font-bold text-white">
                 {money(totalBase)}
               </div>
@@ -393,7 +394,7 @@ export function CommissionReportPage() {
                   <tbody>
                     {group.lines.map((line) => (
                       <tr
-                        key={`${line.commissionRecordId}:${line.collectionId}`}
+                        key={line.earningEventId || `${line.commissionRecordId}:${line.collectionId}:${line.paymentDate}:${line.commissionAmount}`}
                         className="border-t border-gray-700 text-gray-300"
                       >
                         <td className="p-3 whitespace-nowrap">

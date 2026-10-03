@@ -170,7 +170,7 @@ assert.ok(
   "preserves server-rounded commission amounts without recalculation",
 );
 assert.ok(
-  text(tree).includes("Commissionable collections$500.00"),
+  text(tree).includes("Commission base recognized$500.00"),
   "receipt revenue not doubled across recipients",
 );
 assert.ok(

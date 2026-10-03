@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, Save, RefreshCw, Loader2, CheckCircle, AlertCircle, Users } from 'lucide-react';
+import { DealerCommissionMatrix } from './DealerCommissionMatrix';
 import { supabase } from '../../lib/supabase';
 
 interface CommissionSettings {
@@ -138,6 +139,7 @@ export function CompanyCommissionSettings() {
 
   return (
     <div className="space-y-5">
+      <DealerCommissionMatrix />
       <div className="flex items-center gap-3">
         <DollarSign className="w-5 h-5 text-green-400" />
         <h2 className="text-lg font-semibold text-white">Company Commission Settings</h2>
@@ -186,9 +188,9 @@ export function CompanyCommissionSettings() {
         </div>
 
         <div className="border-t border-gray-700/50 pt-5">
-          <h3 className="text-sm font-semibold text-gray-300 mb-1">Default Commission Rates</h3>
+          <h3 className="text-sm font-semibold text-gray-300 mb-1">Legacy Commission Rates</h3>
           <p className="text-xs text-gray-500 mb-4">
-            Applied to all employees unless overridden at the employee or project level.
+            These settings apply to sales outside the activated matrix. New matrix sales use role shares and eligibility instead of employee rate overrides.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

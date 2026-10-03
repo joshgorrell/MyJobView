@@ -47,12 +47,12 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
     const doc = agreement.document;
     const terms = readableAgreementTerms(doc.template?.contract_terms || '').replace(/\[term\]/g, `${doc.term_months || '__'} months`);
     return securityAgreementHtml(doc, terms, { personalInfo: agreement.contact, propertyInfo: agreement.contact },
-      agreement.customer_signature, agreement.signed_snapshot_available ? agreement.customer_signature_date : null);
+      agreement.customer_signature, agreement.signed_snapshot_available ? agreement.customer_signature_date : null, undefined, agreement.summary || undefined);
   }
 
   const completed = agreement && (!!agreement.customer_completed_at || ['pending_approval', 'approved', 'active', 'cancelled'].includes(agreement.status));
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="security-onboarding-controls min-h-screen bg-slate-50">
       <header className="bg-[#0f2347] text-white px-4 sm:px-6 py-4">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

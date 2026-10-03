@@ -1,4 +1,4 @@
-import type { SecurityAgreementDocument, SecurityDraftForm } from './securityOnboarding';
+import type { SecurityAgreementDocument, SecurityDraftForm, SecurityContractSummary } from './securityOnboarding';
 
 export function escapeAgreementText(value: unknown): string {
   return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -17,7 +17,7 @@ export function readableAgreementTerms(terms: string): string {
 
 export function securityAgreementHtml(document: SecurityAgreementDocument, termsText: string,
   form?: Pick<SecurityDraftForm, 'personalInfo' | 'propertyInfo'>, signature?: string | null, signedAt?: string | null,
-  billingPreference?: 'monthly' | 'annual'): string {
+  billingPreference?: 'monthly' | 'annual', schedule?: Pick<SecurityContractSummary,'start_date'|'first_payment_date'|'first_payment_made_at'>): string {
   const esc = escapeAgreementText;
   const personal = document.personalInfo || form?.personalInfo;
   const property = document.propertyInfo || form?.propertyInfo;
@@ -37,7 +37,8 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     .terms{white-space:pre-wrap;font-size:11pt;overflow-wrap:anywhere}.signature{max-width:260px;max-height:100px}h2,thead{break-after:avoid}tr,.sign{break-inside:avoid}
     @media print{body{max-width:none;margin:0;padding:0}}</style></head><body>
     <h1>${esc(document.dealer?.company_name || 'Security monitoring')} — Security agreement</h1>
-    <p>Agreement ${esc(document.contract_number)} · ${signed ? 'Signed copy' : 'For review — unsigned'}</p>
+    <p>Agreement ${esc(document.contract_number)} · ${document.staff_corrected_at ? 'Staff-corrected copy — original customer submission retained' : signed ? 'Signed copy' : document.accepted_at ? 'Customer agreement recorded by staff' : 'For review — unsigned'}</p>
+    ${document.staff_corrected_at ? `<p>Corrected by staff: ${esc(new Date(document.staff_corrected_at).toLocaleString())}. The customer signature below belongs to the original submission unless a replacement was captured during correction.</p>` : ''}
     <p>Customer: ${esc(personal?.full_name || 'To be completed')}<br>Email: ${esc(personal?.email)}<br>Phone: ${esc(personal?.phone)}</p>
     <p>Service address: ${esc(property?.address_line1 || 'To be completed')}, ${esc(property?.city)} ${esc(property?.state)} ${esc(property?.zip_code)}</p>
     <h2>Services and billing</h2><table><thead><tr><th>Service</th><th>Monthly price</th></tr></thead><tbody>
@@ -49,6 +50,7 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     ${document.payment_display ? `<br>Payment method: ${esc(document.payment_display)}.` : ''}</p>
     ${document.autopay_authorization ? `<h2>Recurring payment authorization</h2><p>${esc(document.autopay_authorization)}</p>` : ''}
     <p>Review the terms below for renewal, cancellation and payment obligations.${document.dealer?.company_email ? ` Contact: ${esc(document.dealer.company_email)}.` : ''}</p>
+    ${schedule ? `<h2>Monitoring schedule — set by provider</h2><p>Monitoring starts: ${esc(schedule.start_date || 'Not scheduled')}.<br>First payment scheduled: ${esc(schedule.first_payment_date || 'Not scheduled')}.${schedule.first_payment_made_at !== undefined ? `<br>First payment confirmed: ${esc(schedule.first_payment_made_at ? new Date(schedule.first_payment_made_at).toLocaleDateString() : 'Not yet confirmed')}.` : ''}<br>These dates are set after installation and account setup. Advance notice may delay a scheduled debit.</p>` : ''}
     <h2>Terms and conditions</h2><div class="terms">${esc(termsText)}</div>
     ${signed && safeSignature ? `<div class="sign"><h2>Customer signature</h2><img class="signature" src="${safeSignature}" alt="Customer signature"><p>Signed: ${esc(new Date(signedAt!).toLocaleString())}</p></div>` : ''}
     </body></html>`;

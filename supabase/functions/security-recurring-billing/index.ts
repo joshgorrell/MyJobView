@@ -1,12 +1,17 @@
 import {getSupabaseAdmin,getConnection,getValidAccessToken,qboRequest,upsertEntityMapping} from '../_shared/qbo-client.ts';
+import {authorizeSecurityWorker} from '../_shared/security-worker-auth.ts';
 import {securityCharge} from '../_shared/security-charge.ts';
 
 interface Cycle {id:string;contract_id:string;organization_id:string;invoice_id:string;state:string;lease_token:string;amount:number;processor_id:string|null;request_id:string|null}
 
 Deno.serve(async(req:Request)=>{
   const secret=Deno.env.get('SECURITY_BILLING_CRON_SECRET');
-  if(req.method!=='POST' || !secret || req.headers.get('Authorization')!==`Bearer ${secret}`) return json({error:'Unauthorized'},401);
   const admin=getSupabaseAdmin();
+  const authorized=await authorizeSecurityWorker(req,secret,async(token)=>{
+    const {data,error}=await admin.rpc('security_billing_worker_authorized',{p_secret:token});
+    return !error && data===true;
+  });
+  if(!authorized) return json({error:'Unauthorized'},401);
   const rpc=async(action:string,cycle?:Cycle,payload:Record<string,unknown>={})=>{
     const {data,error}=await admin.rpc('security_recurring_billing',{p_action:action,p_id:cycle?.id||null,p_payload:{...payload,lease_token:cycle?.lease_token}});
     if(error) throw new Error(error.message);return data;
@@ -44,7 +49,7 @@ Deno.serve(async(req:Request)=>{
           invoice.qbo_invoice_id=String(qb.Id);
         }
         if(cycle.state==='notice') {
-          const debitDate=new Date(Math.max(Date.now()+10*86400000,Date.parse(invoice.due_date))).toLocaleDateString('en-US',{timeZone:'America/Chicago'});
+          const debitDate=new Date(Math.max(Date.now()+10*86400000,Date.parse(`${invoice.due_date}T12:00:00-05:00`))).toLocaleDateString('en-US',{timeZone:'America/Chicago'});
           const email=contract.email_override||contact.email;
           const portal=`https://${org?.subdomain?org.subdomain+'.':''}myjobview.com/portal/security?contract=${cycle.contract_id}`;
           await sendNotice(email,settings,`Upcoming automatic payment — ${invoice.invoice_number}`,

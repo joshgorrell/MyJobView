@@ -4,7 +4,7 @@ import ts from 'typescript';
 const compile=source=>ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 const moduleFrom=source=>import('data:text/javascript;base64,'+Buffer.from(compile(source)).toString('base64'));
 const {maskedPayment,paymentsOrigin}=await moduleFrom(await readFile(new URL('../../supabase/functions/_shared/security-payment-vault.ts',import.meta.url),'utf8'));
-let allowed=true,enabled=true,mail=false,linked=true,adminReads=0,providerReads=0,stored;
+let staffAllowed=false,allowed=true,enabled=true,mail=false,linked=true,adminReads=0,providerReads=0,stored;
 const contract={contact_id:'customer-1',organization_id:'org-1'};
 const chain=table=>{
  const filters={};let write;
@@ -24,7 +24,7 @@ const chain=table=>{
  return q;
 };
 globalThis.__securityEdgeDeps={
- createClient:()=>({rpc:async()=>allowed?{data:{status:'pending_customer',customer_completed_at:null}}:{error:{message:'Denied'}}}),
+ createClient:()=>({rpc:async(name)=> (name==='staff_security_onboarding' ? staffAllowed : allowed)?{data:{status:'pending_customer',customer_completed_at:null}}:{error:{message:'Denied'}}}),
  corsHeaders:{},getSupabaseAdmin:()=>({from:chain}),getConnection:async()=>({environment:'sandbox',payments_enabled:enabled}),
  getValidAccessToken:async()=>'server-only-access-token',getQboIdByLocalId:async()=>null,maskedPayment,paymentsOrigin,
  vaultRequest:async(origin,access,customer,type,token,id)=>{
@@ -42,6 +42,8 @@ const call=async(body)=>{
  return {status:response.status,body:await response.json()};
 };
 allowed=false;assert.equal((await call({action:'list'})).status,403);assert.equal(adminReads,0,'Denied invitations do not reach service-role reads');
+staffAllowed=true;assert.equal((await call({action:'list',token:''})).status,200,'Authorized staff use the same enrollment gateway');
+staffAllowed=false;assert.equal((await call({action:'list',token:''})).status,403,'Staff access is enforced before provider reads');adminReads=0;providerReads=0;
 allowed=true;assert.equal((await call({action:'add',cardNumber:'4111111111111111'})).status,400,'Raw payment data is rejected');
 enabled=false;assert.equal((await call({action:'list'})).status,409);assert.equal(providerReads,0,'Accounting-only credentials cannot enroll methods');
 enabled=true;mail=true;assert.equal((await call({action:'list'})).status,400);mail=false;

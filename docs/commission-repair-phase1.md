@@ -1,6 +1,6 @@
 # Commission repair: first phase
 
-October 3 clarification: [the dealer matrix specification](commission-matrix-spec.md) supersedes this phase's independent sales/design allocation model. This draft needs that implementation revision before it matches the requested commission policy.
+October 3 update: [the dealer matrix implementation](commission-matrix-implementation.md) adds versioned shared role pools, eligibility in user setup, all three calculation methods and cash/sale recognition. The independent sales/design model described below remains the legacy path for sales outside the activated matrix.
 
 This branch repairs new commission accrual and its reporting. It does not change company/employee rates, initiate bank/payroll payments, or apply a historical commission backfill.
 

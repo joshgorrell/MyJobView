@@ -178,3 +178,30 @@ html {
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
   }
 }
+
+/* These forms use white surfaces even when the workspace uses a dark theme.
+   Keep native checkboxes, selects, date controls and autofill in the light scheme. */
+.security-onboarding-controls {
+  color-scheme: light;
+}
+
+.security-onboarding-controls input,
+.security-onboarding-controls select,
+.security-onboarding-controls textarea {
+  color-scheme: light;
+  background-color: #fff;
+  color: #000;
+  border-color: #9ca3af;
+  accent-color: #1d4ed8;
+}
+
+.security-onboarding-controls input::placeholder,
+.security-onboarding-controls textarea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.security-onboarding-controls input:-webkit-autofill {
+  -webkit-text-fill-color: #000;
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+}

@@ -1,3 +1,4 @@
+import { CommissionSalePanel } from '../Commissions/CommissionSalePanel';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -722,6 +723,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
             </button>
           </div>
 
+          {!readonly && <CommissionSalePanel sourceKind="invoice" sourceId={invoice.id} />}
           {/* Action Bar */}
           <div className="flex items-center gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 flex-wrap">
             {!readonly && canPay && (

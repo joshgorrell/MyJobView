@@ -1,6 +1,6 @@
 # Dealer commission matrix
 
-Status: requirements confirmed October 3, 2026; implementation revision required. This supersedes the independent sales/design percentages in draft PR #79. It does not apply new rates to production or historical records.
+Status: requirements confirmed October 3, 2026; implemented and regression-tested in draft PR #79. [Implementation and rollout notes](commission-matrix-implementation.md) explain the review flow, source identity, corrections and production validation still required. No new rates have been applied to production or historical records.
 
 ## Confirmed model
 
@@ -85,4 +85,4 @@ The dealer selects **Cash basis** or **Time of sale**, independently from calcul
 
 Acceptance cases: rep alone; separate designer; rep also designer; ineligible rep/designer; service with/without designer; retail designer prohibition; pretax/tax/fee treatment; revenue/profit examples; exact tier thresholds and just-below boundaries; below-first/above-top/negative margin; $999/$940 low-margin example; both sliding-scale bases; tier pool/design validation; partial receipts/refunds without tier changes; time-of-sale without payment; draft/cancel/return; deposit and progress-invoice duplication; missing/updated costs; matrix edits; multi-tenant isolation and own-employee visibility.
 
-Draft PR #79 remains foundational repair code and must not be described as implementing this matrix until the changes above are completed and verified.
+Draft PR #79 now includes the matrix and its regression checks. Merge/deployment still requires staging validation and review of actual dealer settings; approval/payout recording and historical reconciliation remain separate work.
