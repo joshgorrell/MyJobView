@@ -81,7 +81,7 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  : 'bg-surface text-muted hover:bg-elevated hover:text-primary'
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />

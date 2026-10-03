@@ -102,12 +102,12 @@ interface SalesOrderDetailProps {
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  pending_deposit: { label: 'Pending Deposit', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: DollarSign },
-  pending_po: { label: 'Pending PO', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: Clock },
-  planning: { label: 'Planning', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: Clock },
-  active: { label: 'Active', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: CheckCircle },
+  pending_deposit: { label: 'Pending Deposit', color: 'bg-yellow-500/20 text-warning border-yellow-500/30', icon: DollarSign },
+  pending_po: { label: 'Pending PO', color: 'bg-orange-500/20 text-attention border-orange-500/30', icon: Clock },
+  planning: { label: 'Planning', color: 'bg-blue-500/20 text-info border-blue-500/30', icon: Clock },
+  active: { label: 'Active', color: 'bg-green-500/20 text-success border-green-500/30', icon: CheckCircle },
   complete: { label: 'Complete', color: 'bg-teal-500/20 text-teal-400 border-teal-500/30', icon: CheckCircle },
-  closed: { label: 'Closed', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', icon: AlertCircle }
+  closed: { label: 'Closed', color: 'bg-gray-500/20 text-muted border-gray-500/30', icon: AlertCircle }
 };
 
 export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStandalone = false, initialTab }: SalesOrderDetailProps) {
@@ -300,8 +300,8 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
   if (!order) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-400">Sales order not found.</p>
-        <button onClick={onBack} className="mt-4 text-blue-400 hover:text-blue-300">Go back</button>
+        <p className="text-muted">Sales order not found.</p>
+        <button onClick={onBack} className="mt-4 text-info hover:text-info">Go back</button>
       </div>
     );
   }
@@ -332,24 +332,24 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
 
   return (
     <div className="space-y-0">
-      <div className="bg-gray-800 rounded-t-lg border border-gray-700 border-b-0 px-4 sm:px-5 pt-3 pb-3">
+      <div className="bg-surface rounded-t-lg border border-subtle border-b-0 px-4 sm:px-5 pt-3 pb-3">
         {/* Single compact row: back | title + status + meta | total + actions */}
         <div className="flex items-center gap-3 min-w-0">
           {/* Back / close */}
           <button
             onClick={isStandalone ? () => window.close() : onBack}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+            className="flex items-center gap-1 text-xs text-muted hover:text-secondary transition-colors flex-shrink-0"
           >
             {isStandalone ? <X className="w-3.5 h-3.5" /> : <ArrowLeft className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">{isStandalone ? 'Close' : 'Back'}</span>
           </button>
 
-          <div className="w-px h-4 bg-gray-700 flex-shrink-0" />
+          <div className="w-px h-4 bg-elevated flex-shrink-0" />
 
           {/* Title + status + meta stacked */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-white leading-tight">
+              <h1 className="text-base sm:text-lg font-bold text-primary leading-tight">
                 {order.proposal?.title || `SO #${order.order_number}`}
               </h1>
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border flex-shrink-0 ${cfg.color}`}>
@@ -357,7 +357,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
                 <span>{cfg.label}</span>
               </span>
             </div>
-            <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5 flex-wrap">
+            <div className="flex items-center gap-3 text-xs text-muted mt-0.5 flex-wrap">
               <span className="font-medium">SO #{order.order_number}</span>
               {order.proposal?.proposal_number && <span>Prop #{order.proposal.proposal_number}</span>}
               {order.contact?.full_name && (
@@ -375,14 +375,14 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
 
           {/* Total */}
           <div className="flex-shrink-0 text-right">
-            <div className="text-[10px] text-gray-500 leading-none mb-0.5">
+            <div className="text-[10px] text-muted leading-none mb-0.5">
               {totalChangeAmount !== 0 ? 'Adjusted Total' : 'Contract Total'}
             </div>
-            <div className="text-base sm:text-xl font-bold text-white tabular-nums leading-none">
+            <div className="text-base sm:text-xl font-bold text-primary tabular-nums leading-none">
               ${adjustedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             {totalChangeAmount !== 0 && (
-              <div className={`text-[10px] mt-0.5 leading-none ${totalChangeAmount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <div className={`text-[10px] mt-0.5 leading-none ${totalChangeAmount > 0 ? 'text-success' : 'text-danger'}`}>
                 {totalChangeAmount > 0 ? '+' : ''}${totalChangeAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} COs
               </div>
             )}
@@ -396,14 +396,14 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
               </span>
             )}
             {order.test_tune_status === 'paused' && (
-              <span className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-700/40 rounded-lg">
+              <span className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-warning bg-yellow-500/10 border border-yellow-700/40 rounded-lg">
                 <Award className="w-3 h-3" />T&amp;T
               </span>
             )}
             {(order.status === 'active' || order.status === 'planning') && isAdmin && (
               <button
                 onClick={() => setShowCompleteModal(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-green-400 hover:text-green-300 bg-green-500/10 hover:bg-green-500/20 border border-green-700/50 hover:border-green-600 rounded-lg transition-colors font-medium"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-success hover:text-success bg-green-500/10 hover:bg-green-500/20 border border-green-700/50 hover:border-green-600 rounded-lg transition-colors font-medium"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Complete</span>
@@ -412,7 +412,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
             {isAdmin && (
               <button
                 onClick={() => setShowRevertModal(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-500 hover:text-orange-400 hover:border-orange-700/50 border border-gray-700 rounded-lg transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-muted hover:text-attention hover:border-orange-700/50 border border-subtle rounded-lg transition-colors"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span className="hidden sm:inline">Revert</span>
@@ -424,7 +424,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
       </div>
 
       {['active', 'paused', 'completed'].includes(order.test_tune_status ?? '') && (
-        <div className="bg-gray-800 border-x border-gray-700 px-4 sm:px-6 py-3 sm:py-4">
+        <div className="bg-surface border-x border-subtle px-4 sm:px-6 py-3 sm:py-4">
           <TestTuneStatusPanel
             salesOrderId={orderId}
             salesOrderStatus={order.status}
@@ -433,7 +433,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
         </div>
       )}
 
-      <div className="bg-gray-800/50 border-x border-gray-700 px-1 relative">
+      <div className="bg-surface/50 border-x border-subtle px-1 relative">
         <div className="flex gap-0.5 overflow-x-auto scrollbar-hide pb-px">
           {tabs.map(tab => {
             const Icon = tab.icon;
@@ -444,14 +444,14 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
                 title={tab.label}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 min-h-[44px] ${
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-600'
+                    ? 'border-blue-500 text-info'
+                    : 'border-transparent text-muted hover:text-secondary hover:border-strong'
                 }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">{tab.label}</span>
                 {tab.badge && (
-                  <span className="ml-0.5 px-1.5 py-0.5 bg-gray-700 text-gray-300 rounded-full text-xs leading-none">
+                  <span className="ml-0.5 px-1.5 py-0.5 bg-elevated text-secondary rounded-full text-xs leading-none">
                     {tab.badge}
                   </span>
                 )}
@@ -461,20 +461,20 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
         </div>
       </div>
 
-      <div className="bg-gray-800 rounded-b-lg border border-gray-700 border-t-0 p-3 sm:p-6">
+      <div className="bg-surface rounded-b-lg border border-subtle border-t-0 p-3 sm:p-6">
         <ErrorBoundary
           key={activeTab}
           fallback={(error) => (
             <div className="py-12 text-center">
-              <p className="text-gray-400 mb-2">Something went wrong loading the <span className="font-semibold text-white">{activeTab}</span> tab.</p>
+              <p className="text-muted mb-2">Something went wrong loading the <span className="font-semibold text-primary">{activeTab}</span> tab.</p>
               {error?.message && (
-                <p className="text-red-400 text-xs font-mono mt-2 max-w-lg mx-auto break-all bg-gray-800/60 border border-red-700/30 rounded-lg px-3 py-2">
+                <p className="text-danger text-xs font-mono mt-2 max-w-lg mx-auto break-all bg-surface/60 border border-red-700/30 rounded-lg px-3 py-2">
                   {error.message}
                 </p>
               )}
               <button
                 onClick={() => setActiveTab('scope')}
-                className="mt-4 text-blue-400 hover:text-blue-300 transition-colors text-sm"
+                className="mt-4 text-info hover:text-info transition-colors text-sm"
               >
                 Go to Sales Order tab
               </button>
@@ -534,39 +534,39 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
 
       {showRevertModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-full sm:max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-gray-700">
+          <div className="bg-surface border border-subtle rounded-xl w-full max-w-full sm:max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-subtle">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                  <RotateCcw className="w-5 h-5 text-orange-400" />
+                  <RotateCcw className="w-5 h-5 text-attention" />
                 </div>
-                <h2 className="text-lg font-semibold text-white">Revert to Proposal</h2>
+                <h2 className="text-lg font-semibold text-primary">Revert to Proposal</h2>
               </div>
-              <button onClick={() => { setShowRevertModal(false); setRevertError(null); }} className="text-gray-400 hover:text-white">
+              <button onClick={() => { setShowRevertModal(false); setRevertError(null); }} className="text-muted hover:text-primary">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-gray-300 text-sm">
-                This will permanently delete Sales Order <span className="font-semibold text-white">SO #{order.order_number}</span> and restore the linked proposal back to <span className="font-semibold text-white">Sent</span> status.
+              <p className="text-secondary text-sm">
+                This will permanently delete Sales Order <span className="font-semibold text-primary">SO #{order.order_number}</span> and restore the linked proposal back to <span className="font-semibold text-primary">Sent</span> status.
               </p>
-              <div className="bg-orange-900/20 border border-orange-700/40 rounded-lg p-3 text-sm text-orange-300">
+              <div className="bg-attentionSoft border border-orange-700/40 rounded-lg p-3 text-sm text-attention">
                 Any deposit invoices linked to this sales order will also be removed. This action cannot be undone.
               </div>
               {changeOrders.length > 0 && (
-                <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-3 text-sm text-red-300">
+                <div className="bg-dangerSoft border border-red-700/40 rounded-lg p-3 text-sm text-danger">
                   This sales order has {changeOrders.length} change order(s). You must delete all change orders before reverting.
                 </div>
               )}
               {revertError && (
-                <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-3 text-sm text-red-300">
+                <div className="bg-dangerSoft border border-red-700/40 rounded-lg p-3 text-sm text-danger">
                   {revertError}
                 </div>
               )}
               <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-1">
                 <button
                   onClick={() => { setShowRevertModal(false); setRevertError(null); }}
-                  className="px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg transition-colors min-h-[44px] sm:min-h-0"
+                  className="px-4 py-2 text-sm text-secondary hover:text-primary border border-strong rounded-lg transition-colors min-h-[44px] sm:min-h-0"
                 >
                   Cancel
                 </button>

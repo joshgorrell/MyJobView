@@ -2,39 +2,34 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
-export type ThemePreference = 'light' | 'dark' | 'classic' | 'system';
+export type ThemePreference = 'light' | 'dark' | 'classic' | 'mjv';
 type ThemeContextValue = {
   preference: ThemePreference;
-  resolvedTheme: 'light' | 'dark' | 'classic';
+  resolvedTheme: 'light' | 'dark' | 'classic' | 'mjv';
   setPreference: (value: ThemePreference) => Promise<void>;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const validTheme = (value: unknown): value is ThemePreference =>
-  value === 'light' || value === 'dark' || value === 'classic' || value === 'system';
+  value === 'light' || value === 'dark' || value === 'classic' || value === 'mjv';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   const [preference, setPreferenceState] = useState<ThemePreference>('dark');
-  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => setSystemDark(media.matches);
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, []);
-
   useEffect(() => {
     if (!profile) return;
     const saved = localStorage.getItem(`mjv-theme-${profile.id}`);
-    setPreferenceState(validTheme(saved) ? saved : validTheme(profile.ui_theme) ? profile.ui_theme : 'dark');
+    // System was replaced by the branded MJV choice; migrate older preferences.
+    const normalized = saved === 'system' ? 'mjv' : saved;
+    const accountTheme = profile.ui_theme === 'system' ? 'mjv' : profile.ui_theme;
+    setPreferenceState(validTheme(normalized) ? normalized : validTheme(accountTheme) ? accountTheme : 'dark');
+    if (saved === 'system') localStorage.setItem(`mjv-theme-${profile.id}`, 'mjv');
   }, [profile?.id, profile?.ui_theme]);
 
-  const resolvedTheme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+  const resolvedTheme = preference;
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme;
-    document.documentElement.style.colorScheme = resolvedTheme === 'light' ? 'light' : 'dark';
+    document.documentElement.style.colorScheme = resolvedTheme === 'light' || resolvedTheme === 'mjv' ? 'light' : 'dark';
   }, [resolvedTheme]);
 
   const value = useMemo<ThemeContextValue>(() => ({

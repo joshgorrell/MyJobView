@@ -146,7 +146,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
   if (loading) {
     return (
-      <header className="bg-canvas border-b border-subtle">
+      <header className="theme-chrome theme-header bg-canvas border-b border-subtle">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="text-muted">Loading...</div>
@@ -158,7 +158,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   }
 
   return (
-    <header className="bg-canvas border-b border-subtle">
+    <header className="theme-chrome theme-header bg-canvas border-b border-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 gap-0 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}

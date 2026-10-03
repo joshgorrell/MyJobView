@@ -202,7 +202,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
 
       <aside
         ref={sidebarRef}
-        className={`fixed top-14 left-0 h-[calc(100vh-3.5rem)] bg-canvas border-r border-subtle transition-transform duration-300 ease-in-out w-64 overflow-hidden shadow-2xl ${
+        className={`theme-chrome fixed top-14 left-0 h-[calc(100vh-3.5rem)] bg-canvas border-r border-subtle transition-transform duration-300 ease-in-out w-64 overflow-hidden shadow-2xl ${
           isPinned ? 'z-20' : 'z-40'
         } ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
