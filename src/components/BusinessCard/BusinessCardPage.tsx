@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Mail, Phone, Linkedin, Globe, Send, User, Building2, Check, MapPin, Edit3, Download, QrCode, X, Copy, Share2 } from 'lucide-react';
+import { Send, Check, MapPin, Edit3, Download, QrCode, X, Copy, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { BusinessCard, CompanySettings, CompanyOffice } from '../../lib/types';
+import { BusinessCard, CompanyOffice } from '../../lib/types';
 import { UserBusinessCardEditor } from './UserBusinessCardEditor';
 import { getBusinessCardUrl } from '../../lib/businessCardLinks';
+import { BusinessCardIdentity, BusinessCardFooter, CardBranding } from './BusinessCardIdentity';
 
 interface BusinessCardPageProps {
   slug: string;
@@ -15,8 +16,8 @@ interface BusinessCardPageProps {
 export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: BusinessCardPageProps) {
   const { profile } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
-  const [offices, setOffices] = useState<CompanyOffice[]>([]);
+  const [companySettings, setCompanySettings] = useState<CardBranding | null>(null);
+  const [offices, setOffices] = useState<Pick<CompanyOffice, 'id' | 'office_name' | 'phone' | 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactPhone, setContactPhone] = useState('');
   const [contactName, setContactName] = useState('');
@@ -61,16 +62,18 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   }
 
   async function loadCompanyInfo() {
-    if (!profile?.organization_id) return;
-
+    setCompanySettings(null);
+    setOffices([]);
     try {
-      const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('*').eq('organization_id', profile?.organization_id).maybeSingle(),
-        supabase.from('company_offices').select('*').order('display_order', { ascending: true })
-      ]);
-
-      if (settingsResult.data) setCompanySettings(settingsResult.data);
-      if (officesResult.data) setOffices(officesResult.data);
+      // Resolve branding from the card owner, including for signed-out visitors.
+      const { data, error } = await supabase.rpc('get_business_card_branding', { p_slug: slug });
+      if (error) throw error;
+      if (!data) return;
+      setCompanySettings(data);
+      const { data: locations } = await supabase.from('company_offices')
+        .select('id, office_name, phone, address_line1, address_line2, city, state, zip')
+        .eq('organization_id', data.organization_id).order('display_order', { ascending: true });
+      setOffices(locations || []);
     } catch (error) {
       console.error('Error loading company info:', error);
     }
@@ -296,117 +299,14 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
     );
   }
 
+  if (!card) return null;
+
   return (
     <div className={isOwnCard ? "p-0" : "min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 py-12"}>
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 overflow-hidden">
-          {companySettings?.company_logo_url && (
-            <div className="bg-white py-6 px-4 sm:py-8 sm:px-8 flex justify-center border-b border-gray-700">
-              <img
-                src={companySettings.company_logo_url}
-                alt={companySettings.company_name}
-                className="h-12 sm:h-16 w-auto object-contain max-w-[200px] sm:max-w-md"
-              />
-            </div>
-          )}
-
-          <div className="relative h-24 sm:h-32 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600">
-            <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-8">
-              {card.photo_url ? (
-                <img
-                  src={card.photo_url}
-                  alt={card.full_name}
-                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-gray-900 object-cover shadow-lg shadow-purple-500/50"
-                />
-              ) : (
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-gray-900 bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/50">
-                  <User className="w-12 h-12 sm:w-16 sm:h-16 text-white" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="pt-16 sm:pt-20 px-4 sm:px-8 pb-6 sm:pb-8">
-            <div className="mb-6">
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                {card.full_name}
-              </h1>
-              <p className="text-lg sm:text-xl text-gray-300">{card.title}</p>
-              {companySettings?.company_name && (
-                <p className="text-base sm:text-lg text-gray-400 mt-1">{companySettings.company_name}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <a
-                href={`mailto:${card.email}`}
-                className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-              >
-                <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
-                  <Mail className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-400">Email</p>
-                  <p className="text-sm text-white truncate group-hover:text-cyan-400 transition-colors">
-                    {card.email}
-                  </p>
-                </div>
-              </a>
-
-              <a
-                href={`tel:${card.phone}`}
-                className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-              >
-                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg">
-                  <Phone className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-400">Phone</p>
-                  <p className="text-sm text-white truncate group-hover:text-purple-400 transition-colors">
-                    {card.phone}
-                  </p>
-                </div>
-              </a>
-
-              {card.linkedin_url && (
-                <a
-                  href={card.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-                >
-                  <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg">
-                    <Linkedin className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400">LinkedIn</p>
-                    <p className="text-sm text-white truncate group-hover:text-blue-400 transition-colors">
-                      View Profile
-                    </p>
-                  </div>
-                </a>
-              )}
-
-              {companySettings?.website && (
-                <a
-                  href={companySettings.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-                >
-                  <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
-                    <Globe className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400">Website</p>
-                    <p className="text-sm text-white truncate group-hover:text-green-400 transition-colors">
-                      {companySettings.website.replace(/^https?:\/\/(www\.)?/, '')}
-                    </p>
-                  </div>
-                </a>
-              )}
-            </div>
-
+      <div className="max-w-lg mx-auto">
+        <div className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d] rounded-3xl shadow-2xl border border-purple-400/30 overflow-hidden">
+          <BusinessCardIdentity fullName={card.full_name} title={card.title} email={card.email} phone={card.phone} linkedinUrl={card.linkedin_url} photoUrl={card.photo_url} company={companySettings} />
+          <div className="px-6 sm:px-8 pb-6">
             {card.bio && (
               <div className="mb-6 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-300 mb-2">About</h3>
@@ -479,6 +379,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
               </button>
             </div>
           </div>
+          <BusinessCardFooter company={companySettings} />
         </div>
 
         {profile && (
