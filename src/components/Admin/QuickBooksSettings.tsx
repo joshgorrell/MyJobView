@@ -207,9 +207,9 @@ export function QuickBooksSettings() {
   return (
     <div className="space-y-6">
       {settings?.is_connected && <div className="rounded-lg border p-4 space-y-3">
-        <label className="block font-medium" htmlFor="security-qbo-item">Security monitoring QuickBooks sales item ID</label>
+        <label className="block font-medium" htmlFor="security-qbo-item">QuickBooks reference item for monitoring/service income</label>
         <input id="security-qbo-item" value={monitoringItem} onChange={e => setMonitoringItem(e.target.value)} className="border rounded p-2 w-full" />
-        <p className="text-sm text-gray-600">Choose the sales item configured for monitoring invoices in this QuickBooks company. Payments access and tax classification must also be configured before billing.</p>
+        <p className="text-sm text-gray-600">Select an existing QuickBooks service item whose income account should be used for new monitoring and additional service items. Invoice lines use separate items matching the services selected on the agreement; this reference item is not used to combine them. Payments access and tax classification must also be configured before billing.</p>
         <button type="button" className="rounded bg-blue-700 text-white px-4 py-2" onClick={async () => {
           if (profile?.role !== 'admin') { setMonitoringMessage('Only Admin can configure monitoring billing.'); return; }
           const { error } = await supabase.from('quickbooks_settings').update({ security_monitoring_item_id: monitoringItem.trim() || null }).eq('id', settings.id).eq('organization_id', profile.organization_id);

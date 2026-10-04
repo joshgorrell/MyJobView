@@ -1,3 +1,4 @@
+import {customerSecurityInvoiceLines} from '../../../supabase/functions/_shared/security-customer-invoice';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -124,6 +125,7 @@ interface InvoiceDetailModalProps {
   onVoided?: () => void;
   onDeleted?: () => void;
   readonly?: boolean;
+  customerView?: boolean;
 }
 
 function formatPaymentTerms(terms: string | null): string {
@@ -139,7 +141,7 @@ function formatPaymentTerms(terms: string | null): string {
   return map[terms.toLowerCase()] || terms;
 }
 
-export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVoided, onDeleted, readonly = false }: InvoiceDetailModalProps) {
+export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVoided, onDeleted, readonly = false, customerView = false }: InvoiceDetailModalProps) {
   const { profile } = useAuth();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
@@ -340,7 +342,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
       .maybeSingle();
 
     if (!error && data) {
-      setInvoice(data as any);
+      setInvoice((customerView ? {...data,invoice_line_items:customerSecurityInvoiceLines(data,data.invoice_line_items||[])} : data) as any);
       const { data: coLinks } = await supabase
         .from('invoice_change_order_links')
         .select('fully_billed')
@@ -1752,7 +1754,7 @@ function buildPrintHTML(invoice: InvoiceDetail, settings: CompanySettings | null
   if (office?.phone) returnAddressLines.push(office.phone);
   if (settings?.company_email && !office?.phone) returnAddressLines.push(settings.company_email);
 
-  const itemsHTML = invoice.invoice_line_items.map(item => `
+  const itemsHTML = customerSecurityInvoiceLines(invoice,invoice.invoice_line_items).map(item => `
     <tr>
       <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">
         ${item.description}

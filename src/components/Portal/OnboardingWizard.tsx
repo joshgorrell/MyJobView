@@ -558,7 +558,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         {currentStep === 4 && (
           <div className="space-y-5">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Payment Method</h2>
-            {contract.billing_mode === 'mail' ? <p className="text-gray-700 bg-blue-50 p-4 rounded-xl">Your Admin has authorized mailed invoices for this agreement. The monthly price includes a $7 mailed-invoice fee.</p> :
+            {contract.billing_mode === 'mail' ? <p className="text-gray-700 bg-blue-50 p-4 rounded-xl">Your Admin has authorized mailed invoices for this agreement. Mailed billing is included in the overall account price.</p> :
               <SecurityPaymentEnrollment contractId={contract.id} token={token} selectedId={formData.paymentMethodId}
                 onSelect={method => { setFormData(previous => ({...previous,paymentMethodId:method.id,paymentMethod:method.payment_type === 'card' ? 'credit_card' : 'ach',signature:''})); setAccepted(false);setAutopayAccepted(false); }} />}
           </div>

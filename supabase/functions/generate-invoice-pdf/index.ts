@@ -1,3 +1,4 @@
+import {customerSecurityInvoiceLines} from '../_shared/security-customer-invoice.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -114,7 +115,7 @@ Deno.serve(async (req: Request) => {
 
 function generateInvoiceHTML(invoice: any, settings: any, hasPartialCO = false): string {
   const contact = invoice.contacts;
-  const items = invoice.invoice_line_items || [];
+  const items = customerSecurityInvoiceLines(invoice,invoice.invoice_line_items || []);
   const payments = invoice.payments || [];
 
   const customerName = contact?.contact_name || 

@@ -474,7 +474,7 @@ Deno.serve(async (req: Request) => {
       <div class="checkbox-field"><span class="checkbox"></span><span>Monthly</span></div>
       ${contract.dealer?.annual_billing_enabled ? `<div class="checkbox-field"><span class="checkbox"></span><span>Annual</span></div><p>Annual discount: ${escapeHtml(contract.dealer.annual_discount_type === 'percentage' ? `${contract.dealer.annual_discount_percentage || 0}%` : `$${Number(contract.dealer.annual_discount_flat_amount || 0).toFixed(2)}`)}. Annual monitoring total before tax: $${annualTotal.toFixed(2)}.</p>` : ''}
     </div>
-    ${contract.billing_mode === 'mail' ? `<p class="note">Admin-approved mailed invoices. The monthly price above includes the $${Number(contract.mail_invoice_fee || 0).toFixed(2)} mailing fee.</p>` : `
+    ${contract.billing_mode === 'mail' ? `<p class="note">Admin-approved mailed invoices. Mailed billing is included in the overall account price above.</p>` : `
     <div class="field-group" style="margin-top: 16px;">
       <div class="field-label">Payment Method (Check One)</div>
       <div class="checkbox-field">
