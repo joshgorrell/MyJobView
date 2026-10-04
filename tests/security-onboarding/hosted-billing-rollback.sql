@@ -60,5 +60,10 @@ BEGIN
  IF (private.security_contract_summary(cid)->>'first_payment_made_at') IS NULL THEN RAISE EXCEPTION 'First confirmed payment date missing'; END IF;
  IF (SELECT amount_due FROM public.invoices WHERE id=invoice)<>0 THEN RAISE EXCEPTION 'Confirmed payment did not reduce invoice balance'; END IF;
 
+ IF NOT EXISTS(SELECT 1 FROM public.invoice_line_items WHERE invoice_id=invoice AND security_service_id=svc AND security_service_name IS NOT NULL) THEN RAISE EXCEPTION 'Accepted service identity did not reach invoice'; END IF;
+ UPDATE public.security_contracts SET magic_link_token=mid,magic_link_expires_at=now()+interval '1 day' WHERE id=cid;
+ result:=public.portal_security_onboarding('get',cid,mid::text,'{}');
+ IF (result->'document'->'services'->0) ? 'monthly_price' THEN RAISE EXCEPTION 'Customer agreement exposes individual service pricing'; END IF;
+ IF NOT (public.staff_security_onboarding('get',cid,'{}')->'document'->'services'->0) ? 'monthly_price' THEN RAISE EXCEPTION 'Staff allocation was lost'; END IF;
 END $test$;
 ROLLBACK;

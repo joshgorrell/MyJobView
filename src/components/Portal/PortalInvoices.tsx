@@ -1021,6 +1021,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
           invoiceId={detailInvoiceId}
           onClose={() => setDetailInvoiceId(null)}
           readonly={true}
+          customerView={true}
         />
       )}
 

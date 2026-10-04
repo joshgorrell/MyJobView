@@ -41,12 +41,12 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     ${document.staff_corrected_at ? `<p>Corrected by staff: ${esc(new Date(document.staff_corrected_at).toLocaleString())}. The customer signature below belongs to the original submission unless a replacement was captured during correction.</p>` : ''}
     <p>Customer: ${esc(personal?.full_name || 'To be completed')}<br>Email: ${esc(personal?.email)}<br>Phone: ${esc(personal?.phone)}</p>
     <p>Service address: ${esc(property?.address_line1 || 'To be completed')}, ${esc(property?.city)} ${esc(property?.state)} ${esc(property?.zip_code)}</p>
-    <h2>Services and billing</h2><table><thead><tr><th>Service</th><th>Monthly price</th></tr></thead><tbody>
-    ${(document.services || []).map(s => `<tr><td>${esc(s.name)}</td><td>${money(s.monthly_price)}</td></tr>`).join('')}
-    <tr><th>Total</th><td>${money(document.monthly_price)}/month</td></tr></tbody></table>
+    <h2>Services and billing</h2><table><thead><tr><th>Included services</th></tr></thead><tbody>
+    ${(document.services || []).map(s => `<tr><td>${esc(s.name)}</td></tr>`).join('')}
+    <tr><td><strong>Overall account price: ${money(document.monthly_price)}/month</strong></td></tr></tbody></table>
     <p>Initial term: ${esc(document.term_months)} months.<br>Billing preference: ${billing === 'annual' ? 'Annual' : 'Monthly'}.
     ${billing === 'annual' ? `<br>Annual subtotal: ${money(annualSubtotal)}. Discount: ${money(annualDiscount)}. Annual billing amount: ${money(annualSubtotal - annualDiscount)}.` : ''}</p>
-    <p>${document.billing_mode === 'mail' ? `Admin-approved mailed invoices. The monthly total includes a ${money(document.mail_invoice_fee)} mailed-invoice fee.` : 'Automatic recurring payments are required for security monitoring.'}
+    <p>${document.billing_mode === 'mail' ? 'Admin-approved mailed invoices, included in the overall account price.' : 'Automatic recurring payments are required for security monitoring.'}
     ${document.payment_display ? `<br>Payment method: ${esc(document.payment_display)}.` : ''}</p>
     ${document.autopay_authorization ? `<h2>Recurring payment authorization</h2><p>${esc(document.autopay_authorization)}</p>` : ''}
     <p>Review the terms below for renewal, cancellation and payment obligations.${document.dealer?.company_email ? ` Contact: ${esc(document.dealer.company_email)}.` : ''}</p>

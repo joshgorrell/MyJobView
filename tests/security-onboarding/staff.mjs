@@ -35,6 +35,11 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await db.exec(await readFile(new URL('../../supabase/migrations/20261002172438_security_billing_schedule_safeguards.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261002172637_security_shared_activation_mandate.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261003105607_security_itemized_recurring_invoices.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261004174532_security_service_invoice_item_mappings.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261004175209_security_customer_pricing_summary.sql',import.meta.url),'utf8'));
+ await db.exec('ALTER TABLE invoices ADD COLUMN qbo_invoice_id text');
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261004175855_security_mailed_invoice_accounting_sync.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261004180433_security_monitoring_catalog_staff_scope.sql',import.meta.url),'utf8'));
  const staff=async(action,cid=null,payload={})=>(await db.query('select public.staff_security_onboarding($1,$2,$3) result',[action,cid,JSON.stringify(payload)])).rows[0].result;
  const create={request_id:id(71),template_id:template,contact_id:contact,service_ids:[id(70)],term_months:12,account_type:'residential'};
  await role('authenticated',id(12));await assert.rejects(staff('create',null,create),'Organization membership does not grant onboarding access');
@@ -45,7 +50,7 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await assert.rejects(staff('create',null,{...create,service_ids:[id(999)]}));
  let created=await staff('create',null,create);
  assert.equal((await staff('create',null,create)).id,created.id,'Creation retries return the same agreement');
- let view=await staff('get',created.id);assert.equal(view.document.term_months,12);
+ let view=await staff('get',created.id);assert.equal(view.document.term_months,12);assert.equal(view.document.services[0].service_id,id(70));
  await role('postgres');const printBefore=(await db.query('select (select count(*) from contacts) customers,(select count(*) from security_contracts) contracts')).rows[0];
  await role('authenticated',id(11));
  for (const term of [12,24,36,48,60]) { const blank=await staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:term});assert.equal(blank.term_months,term);assert.equal(blank.monthly_price,35);assert.ok(blank.autopay_authorization); }
@@ -76,7 +81,9 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await role('authenticated',id(1));
  const originalMandate=(await rpc('get',id(5))).document.autopay_authorization;
  assert.ok(originalMandate.includes('Billing begins when monitoring is activated'),'Existing signed mandate stays intact');
- const portalMandate=(await rpc('get',created.id)).document.autopay_authorization;
+ const customerDoc=(await rpc('get',created.id)).document;
+ assert.equal(customerDoc.monthly_price,35);assert.deepEqual(customerDoc.services,[{name:'Monitoring'}],'Customer receives names and overall price, never service allocation');
+ const portalMandate=customerDoc.autopay_authorization;
  assert.ok(portalMandate.includes('Completing this form does not activate monitoring'),'New customer mandate explains staff scheduling');
  await role('authenticated',id(11));
  assert.equal(view.document.autopay_authorization,portalMandate,'Staff and customer entry retain the same recurring-payment mandate');
@@ -109,6 +116,15 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  const invoice=(await db.query('select i.due_date::text due, b.period_start::text start from invoices i join security_billing_cycles b on b.invoice_id=i.id where b.contract_id=$1',[created.id])).rows[0];
  assert.equal(invoice.due,activationDates.first);assert.equal(invoice.start,activationDates.start);
  assert.equal((await db.query('select private.security_contract_summary($1) summary',[created.id])).rows[0].summary.months_remaining,12,'Future start never displays more than the full initial term');
+ await role('postgres');
+ await db.exec('ALTER TABLE invoice_line_items ENABLE ROW LEVEL SECURITY; GRANT SELECT ON invoice_line_items,invoices,profiles TO authenticated; CREATE POLICY invoice_items_fixture_access ON invoice_line_items FOR SELECT TO authenticated USING(true); ALTER TABLE monitoring_services ENABLE ROW LEVEL SECURITY; GRANT SELECT,UPDATE ON monitoring_services TO authenticated; CREATE POLICY catalog_fixture_access ON monitoring_services TO authenticated USING(true) WITH CHECK(true)');
+ await role('authenticated',id(1));
+ assert.equal((await db.query('select count(*) from monitoring_services')).rows[0].count,0,'Portal cannot query catalog prices');
+ assert.equal((await db.query('update monitoring_services set monthly_price=1 returning id')).rows.length,0,'Portal cannot change service prices');
+ assert.equal((await db.query('select count(*) from invoice_line_items l join security_billing_cycles b on b.invoice_id=l.invoice_id where b.contract_id=$1',[created.id])).rows[0].count,0,'Portal cannot query itemized security pricing directly');
+ await role('authenticated',id(11));
+ assert.ok((await db.query('select count(*) from invoice_line_items l where invoice_id in(select invoice_id from security_billing_cycles where contract_id=$1)',[created.id])).rows[0].count>0,'Staff retains detailed invoice lines');
+ await role('postgres');
  const {testItemizedInvoices}=await import('./itemized-invoices.mjs');
  await testItemizedInvoices(db,created.id,generate);
  await db.query("insert into payments(invoice_id,amount,payment_method) select invoice_id,1,'check' from security_billing_cycles where contract_id=$1",[created.id]);

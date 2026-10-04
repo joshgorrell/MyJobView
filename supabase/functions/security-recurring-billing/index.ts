@@ -1,8 +1,9 @@
+import {resolveSecurityInvoiceItems} from '../_shared/security-invoice-items.ts';
 import {getSupabaseAdmin,getConnection,getValidAccessToken,qboRequest,upsertEntityMapping} from '../_shared/qbo-client.ts';
 import {authorizeSecurityWorker} from '../_shared/security-worker-auth.ts';
 import {securityCharge} from '../_shared/security-charge.ts';
 
-interface Cycle {id:string;contract_id:string;organization_id:string;invoice_id:string;state:string;lease_token:string;amount:number;processor_id:string|null;request_id:string|null}
+interface Cycle {id:string;contract_id:string;organization_id:string;invoice_id:string;billing_mode:string;state:string;lease_token:string;amount:number;processor_id:string|null;request_id:string|null}
 
 Deno.serve(async(req:Request)=>{
   const secret=Deno.env.get('SECURITY_BILLING_CRON_SECRET');
@@ -30,15 +31,16 @@ Deno.serve(async(req:Request)=>{
         const {data:settings}=await admin.from('company_settings').select('company_name,company_email,from_email,from_name').eq('organization_id',cycle.organization_id).single();
         const {data:org}=await admin.from('organizations').select('subdomain').eq('id',cycle.organization_id).single();
         const connection=await getConnection(admin,cycle.organization_id);
-        if(!contract || !invoice || !contact?.qbo_customer_id || !connection?.payments_enabled || !connection.security_monitoring_item_id)
+        if(!contract || !invoice || !contact?.qbo_customer_id || (!connection?.payments_enabled && cycle.billing_mode!=='mail') || !connection.security_monitoring_item_id)
           throw new Error('Configure QuickBooks Payments, the monitoring sales item, and the customer mapping before billing');
         const accessToken=await getValidAccessToken(admin,connection);if(!accessToken) throw new Error('QuickBooks credentials are unavailable');
         // Stable Accounting API requestid prevents duplicate invoices on a retry.
         if(!invoice.qbo_invoice_id) {
+          const itemized=await resolveSecurityInvoiceItems(admin,connection,invoice.invoice_line_items,qboRequest);
           const response=await qboRequest(admin,connection,'POST',`invoice?requestid=sec-${cycle.id}`,{
             AllowOnlineCreditCardPayment:false,AllowOnlineACHPayment:false,CustomerRef:{value:contact.qbo_customer_id},DocNumber:invoice.invoice_number,TxnDate:invoice.invoice_date,DueDate:invoice.due_date,
-            Line:invoice.invoice_line_items.map((line:Record<string,unknown>,index:number)=>({LineNum:index+1,Amount:Number(line.amount),Description:String(line.description),DetailType:'SalesItemLineDetail',
-              SalesItemLineDetail:{ItemRef:{value:connection.security_monitoring_item_id},Qty:Number(line.quantity),UnitPrice:Number(line.unit_price),TaxCodeRef:{value:Number(invoice.tax_amount)>0?'TAX':'NON'}}})),
+            Line:itemized.map((line:Record<string,unknown>,index:number)=>({LineNum:index+1,Amount:Number(line.amount),Description:String(line.description),DetailType:'SalesItemLineDetail',
+              SalesItemLineDetail:{ItemRef:{value:line.qbo_item_id},Qty:Number(line.quantity),UnitPrice:Number(line.unit_price),TaxCodeRef:{value:Number(invoice.tax_amount)>0?'TAX':'NON'}}})),
             TxnTaxDetail:{TotalTax:Number(invoice.tax_amount)},PrivateNote:`MyJobView security billing ${cycle.id}`,
           });
           const qb=response.data?.Invoice;if(!response.ok || !qb?.Id) throw new Error('QuickBooks invoice sync requires review');
@@ -48,6 +50,7 @@ Deno.serve(async(req:Request)=>{
           await upsertEntityMapping(admin,cycle.organization_id,'invoice',invoice.id,String(qb.Id),qb.SyncToken);
           invoice.qbo_invoice_id=String(qb.Id);
         }
+        if(cycle.state==='mail') {await rpc('mail_accounting',cycle);continue;}
         if(cycle.state==='notice') {
           const debitDate=new Date(Math.max(Date.now()+10*86400000,Date.parse(`${invoice.due_date}T12:00:00-05:00`))).toLocaleDateString('en-US',{timeZone:'America/Chicago'});
           const email=contract.email_override||contact.email;
