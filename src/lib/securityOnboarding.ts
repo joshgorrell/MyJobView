@@ -90,7 +90,7 @@ export async function securityOnboardingRequest<T>(
   return data as T;
 }
 
-export async function staffSecurityOnboarding<T>(action: 'print_form' | 'create' | 'edit' | 'get' | 'paper' | 'review' | 'approve' | 'activate' | 'reject', contractId?: string, payload: unknown = {}): Promise<T> {
+export async function staffSecurityOnboarding<T>(action: 'print_form' | 'create' | 'edit' | 'get' | 'paper' | 'review' | 'approve' | 'activate', contractId?: string, payload: unknown = {}): Promise<T> {
   const { data, error } = await supabase.rpc('staff_security_onboarding', { p_action: action, p_id: contractId || null, p_payload: payload });
   if (error) throw new Error(error.message);
   return data as T;

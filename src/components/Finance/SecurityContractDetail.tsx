@@ -29,8 +29,6 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -130,27 +128,6 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
       alert(error instanceof Error ? error.message : 'Failed to approve contract');
     } finally {
       setApproving(false);
-    }
-  }
-
-  async function handleReject() {
-    if (!rejectionReason.trim()) {
-      alert('Please provide a rejection reason');
-      return;
-    }
-
-    setRejecting(true);
-    try {
-      await staffSecurityOnboarding('reject', resolvedContractId, { revision: contractData.onboarding_revision || 0, reason: rejectionReason });
-
-      alert('Contract rejected');
-      onUpdate?.();
-      onClose();
-    } catch (error) {
-      console.error('Error rejecting contract:', error);
-      alert(error instanceof Error ? error.message : 'Failed to reject contract');
-    } finally {
-      setRejecting(false);
     }
   }
 
@@ -416,7 +393,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                   contractData.status === 'pending_approval' ? 'bg-orange-100 text-orange-800' :
                   'bg-green-100 text-green-800'
                 }`}>
-                  {contractData.status.replace('_', ' ').toUpperCase()}
+                  {(contractData.status === 'rejected' ? 'pending approval' : contractData.status.replace(/_/g, ' ')).toUpperCase()}
                 </div>
               </div>
             </div>
@@ -1020,7 +997,6 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
             <div className="space-y-3">
               {canManage && ['pending_approval','customer_completed'].includes(contractData.status) && <>
                 <button type="button" disabled={editingReview || approving} onClick={()=>setConfirmApprove(true)} className="w-full bg-green-700 text-white rounded-lg p-3 disabled:opacity-50">Approve Contract</button>
-                <button type="button" disabled={editingReview} onClick={()=>setRejecting(true)} className="w-full border border-red-300 text-red-700 rounded-lg p-3">Request Corrections</button>
               </>}
               {canManage && contractData.status==='approved' && <SecurityActivationDates startDate={monitoringStartDate} firstPaymentDate={firstPaymentDate} onEditing={setEditingActivationDates} onChange={(start,first)=>{setMonitoringStartDate(start);setFirstPaymentDate(first);}}/>}
               {canManage && contractData.status==='approved' && <button type="button" disabled={editingReview || editingActivationDates || !monitoringStartDate || !firstPaymentDate} onClick={()=>setConfirmActivate(true)} className="w-full bg-blue-700 text-white rounded-lg p-3 disabled:opacity-50">Complete and Activate</button>}
@@ -1048,39 +1024,6 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
           </div>
         </div>
       </div>
-
-      {rejecting && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-full sm:max-w-md p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Reject Contract</h3>
-            <textarea
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Please provide a reason for rejection..."
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
-              autoFocus
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setRejecting(false);
-                  setRejectionReason('');
-                }}
-                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReject}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-              >
-                Reject Contract
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showCancelModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
