@@ -73,9 +73,9 @@ function formatCurrency(value: number): string {
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value && value !== 0) return null;
   return (
-    <div className="flex items-baseline justify-between gap-2 py-0.5">
+    <div className="flex items-baseline justify-between gap-2 py-1">
       <span className="text-xs text-gray-500 shrink-0">{label}</span>
-      <span className="text-xs font-medium text-gray-900 text-right truncate">{value}</span>
+      <span className="text-xs font-medium text-gray-900 text-right min-w-0 break-words">{value}</span>
     </div>
   );
 }
@@ -113,28 +113,28 @@ export default function ProductDetailPanel({
   const marginBg = margin >= 30 ? 'bg-emerald-50 border-emerald-200' : margin >= 15 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[10rem_minmax(0,1fr)] gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[12rem_minmax(0,1fr)] gap-4">
       {isEdit && (
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       )}
 
       {/* TOP / LEFT: Image + Product Identity */}
-      <div className="w-full lg:row-span-2 flex flex-row lg:flex-col gap-3">
+      <div className="w-full lg:row-span-2 flex flex-row lg:flex-col min-w-0 gap-3">
         {/* Image */}
-        <div className="relative group w-28 sm:w-36 lg:w-full shrink-0">
+        <div className="relative group w-24 sm:w-36 lg:w-full shrink-0">
           {displayImage ? (
             <div className="relative">
               <img
                 src={displayImage}
                 alt={data.productName}
-                className={`w-full h-28 sm:h-36 lg:h-36 object-contain bg-white rounded-lg border border-gray-200 shadow-sm ${isEdit && data.productId ? 'cursor-pointer' : ''}`}
+                className={`w-full h-24 sm:h-36 lg:h-44 object-contain bg-white rounded-lg border border-gray-200 shadow-sm ${isEdit && data.productId ? 'cursor-pointer' : ''}`}
                 onClick={() => isEdit && data.productId && fileInputRef.current?.click()}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f3f4f6" width="200" height="200"/%3E%3C/svg%3E';
                 }}
               />
               {previewImageUrl && (
-                <span className="absolute top-1 right-1 text-xs px-1.5 py-0.5 bg-blue-500 text-white rounded font-medium shadow">
+                <span className="absolute top-1 right-1 text-xs px-1.5 py-1 bg-blue-500 text-white rounded font-medium shadow">
                   {imagePasted ? 'Pasted' : 'New'}
                 </span>
               )}
@@ -148,7 +148,7 @@ export default function ProductDetailPanel({
                 </button>
               )}
               {!isEdit && onRequestImage && <button type="button" onClick={onRequestImage}
-                className="absolute bottom-1 right-1 rounded-md bg-white border border-gray-200 shadow px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50">
+                className="absolute bottom-1 right-1 rounded-md bg-white border border-gray-200 shadow px-2 py-1 text-xs font-medium text-gray-500 hover:bg-blue-50">
                 Change photo
               </button>}
             </div>
@@ -158,7 +158,7 @@ export default function ProductDetailPanel({
               tabIndex={onRequestImage || (isEdit && data.productId) ? 0 : undefined}
               onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && (onRequestImage || isEdit)) { e.preventDefault(); if (onRequestImage) onRequestImage(); else fileInputRef.current?.click(); } }}
               onClick={() => onRequestImage ? onRequestImage() : isEdit && data.productId && fileInputRef.current?.click()}
-              className={`w-full h-28 sm:h-36 lg:h-36 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 ${onRequestImage || (isEdit && data.productId) ? 'cursor-pointer hover:border-blue-400 hover:bg-blue-50' : ''} transition-all`}
+              className={`w-full h-24 sm:h-36 lg:h-44 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 ${onRequestImage || (isEdit && data.productId) ? 'cursor-pointer hover:border-blue-400 hover:bg-blue-50' : ''} transition-all`}
             >
               <Upload className="w-6 h-6 mb-1" />
               <span className="text-xs">{onRequestImage ? 'Add photo' : 'No image'}</span>
@@ -169,9 +169,12 @@ export default function ProductDetailPanel({
 
         {/* Product identity info + resources (stacked on mobile, beside image on small, below on lg) */}
         <div className="flex-1 lg:flex-none flex flex-col gap-2 min-w-0">
-          <div className="bg-gray-50 rounded-lg border border-gray-200 p-2 space-y-1">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 space-y-1">
             <div className="text-xs font-semibold text-gray-700 flex items-center gap-1 mb-1">
-              <Package className="w-3 h-3" /> Product Info
+              <Package className="w-4 h-4" /> Product Info
+              {data.inventoryType && <span tabIndex={0} aria-label={`Product type: ${data.inventoryType}`} title={`Product type: ${data.inventoryType}`} className="ml-auto inline-flex p-1 rounded text-gray-500 focus:ring-2 focus:ring-blue-500">
+                {data.inventoryType.toLowerCase() === 'inventory' ? <Package className="w-3.5 h-3.5" /> : <Tag className="w-3.5 h-3.5" />}
+              </span>}
             </div>
             {data.manufacturerName && <InfoRow label="Mfr" value={data.manufacturerName} />}
             {data.modelNumber && <InfoRow label="Model" value={data.modelNumber} />}
@@ -180,42 +183,18 @@ export default function ProductDetailPanel({
             {data.upc && <InfoRow label="UPC" value={data.upc} />}
             {data.msrp && data.msrp > 0 && <InfoRow label="MSRP" value={formatCurrency(data.msrp)} />}
             {data.itemColor && (
-              <div className="flex items-baseline gap-1 py-0.5">
+              <div className="flex items-baseline gap-1 py-1">
                 <Palette className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                 <span className="text-xs text-gray-700 truncate">{data.itemColor}</span>
               </div>
             )}
             {data.itemSize && (
-              <div className="flex items-baseline gap-1 py-0.5">
+              <div className="flex items-baseline gap-1 py-1">
                 <Ruler className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                 <span className="text-xs text-gray-700">{data.itemSize}</span>
               </div>
             )}
-            {data.inventoryType && (
-              <div className="flex items-baseline gap-1 py-0.5">
-                <Tag className="w-2.5 h-2.5 text-gray-400 shrink-0" />
-                <span className="text-xs text-gray-700 capitalize">{data.inventoryType}</span>
-              </div>
-            )}
-            {isEdit ? (
-              <div className="pt-1">
-                <label className="block text-xs text-gray-500 mb-0.5">Description</label>
-                <textarea
-                  value={data.description || ''}
-                  onChange={(e) => onChange?.('description', e.target.value)}
-                  rows={2}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white resize-none"
-                  placeholder="Product description..."
-                />
-              </div>
-            ) : (
-              data.description && (
-                <div className="pt-1">
-                  <span className="text-xs text-gray-500">Description</span>
-                  <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{data.description}</p>
-                </div>
-              )
-            )}
+
           </div>
 
           {(data.manufacturerUrl || data.supplierUrl || data.productSheetUrl || data.installVideoUrl) && (
@@ -224,25 +203,25 @@ export default function ProductDetailPanel({
               <div className="flex flex-wrap gap-1.5">
                 {data.manufacturerUrl && (
                   <a href={data.manufacturerUrl} target="_blank" rel="noopener noreferrer"
-                    title="Manufacturer" className="flex items-center gap-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
+                    title="Manufacturer" className="flex items-center gap-1 px-1.5 py-1 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
                     <Building2 className="w-3 h-3" /> Mfr
                   </a>
                 )}
                 {data.supplierUrl && (
                   <a href={data.supplierUrl} target="_blank" rel="noopener noreferrer"
-                    title="Supplier" className="flex items-center gap-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
+                    title="Supplier" className="flex items-center gap-1 px-1.5 py-1 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
                     <ExternalLink className="w-3 h-3" /> Supplier
                   </a>
                 )}
                 {data.productSheetUrl && (
                   <a href={data.productSheetUrl} target="_blank" rel="noopener noreferrer"
-                    title="Product Sheet" className="flex items-center gap-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
+                    title="Product Sheet" className="flex items-center gap-1 px-1.5 py-1 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
                     <FileText className="w-3 h-3" /> Sheet
                   </a>
                 )}
                 {data.installVideoUrl && (
                   <a href={data.installVideoUrl} target="_blank" rel="noopener noreferrer"
-                    title="Install Video" className="flex items-center gap-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
+                    title="Install Video" className="flex items-center gap-1 px-1.5 py-1 bg-white border border-gray-200 rounded text-xs text-blue-600 hover:bg-blue-50 transition-colors">
                     <Video className="w-3 h-3" /> Video
                   </a>
                 )}
@@ -253,7 +232,7 @@ export default function ProductDetailPanel({
       </div>
 
       {/* CENTER: Product name, description, pricing, labor */}
-      <div className="flex flex-col gap-2 min-w-0 lg:col-start-2">
+      <div className="flex flex-col gap-4 min-w-0 lg:col-start-2">
         {/* Name + category strip */}
         {showIdentity && <div>
           <div className="flex items-start gap-2">
@@ -264,8 +243,30 @@ export default function ProductDetailPanel({
               </div>
             )}
           </div>
-          <h3 className="text-sm font-bold text-gray-900 leading-tight mt-0.5">{data.productName}</h3>
+          <h3 className="text-base font-semibold text-gray-900 leading-tight mt-0.5">{data.productName}</h3>
 
+        </div>}
+
+        {(isEdit || data.description) && <div className="rounded-xl border border-gray-200 bg-white p-4 min-w-0 min-h-[8rem]">
+            {isEdit ? (
+              <div className="pt-1">
+                <label className="block text-xs text-gray-500 mb-0.5">Description</label>
+                <textarea
+                  value={data.description || ''}
+                  onChange={(e) => onChange?.('description', e.target.value)}
+                  rows={5}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 text-gray-900 bg-white resize-y min-h-[8rem]"
+                  placeholder="Product description..."
+                />
+              </div>
+            ) : (
+              data.description && (
+                <div className="pt-1">
+                  <span className="text-xs text-gray-500">Description</span>
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">{data.description}</p>
+                </div>
+              )
+            )}
         </div>}
 
         {/* Qty + Unit (edit only) */}
@@ -295,14 +296,14 @@ export default function ProductDetailPanel({
         )}
 
         {/* Material Pricing */}
-        <div className={`border rounded-lg p-2 ${data.isCustomerSupplied ? 'bg-gray-100 border-gray-300 opacity-60' : 'bg-blue-50 border-blue-200'}`}>
-          <div className="flex items-center gap-1 text-xs font-semibold text-blue-800 mb-1.5">
+        <div className={`border rounded-xl p-4 ${data.isCustomerSupplied ? 'bg-gray-100 border-gray-300 opacity-60' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center gap-1 text-xs font-semibold text-gray-800 mb-1.5">
             <DollarSign className="w-3 h-3" /> Material
             {data.isCustomerSupplied && <span className="text-amber-600 font-normal">(Customer Supplied)</span>}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs text-blue-700 mb-0.5">Cost</label>
+              <label className="block text-xs text-gray-500 mb-0.5">Cost</label>
               {isEdit ? (
                 <div className="relative">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -317,11 +318,11 @@ export default function ProductDetailPanel({
                   />
                 </div>
               ) : (
-                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.cost)}</span>
+                <span className="text-base font-semibold text-gray-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.cost)}</span>
               )}
             </div>
             <div>
-              <label className="block text-xs text-blue-700 mb-0.5">Sales Price</label>
+              <label className="block text-xs text-gray-500 mb-0.5">Sales Price</label>
               {isEdit ? (
                 <div className="relative">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -335,26 +336,26 @@ export default function ProductDetailPanel({
                   />
                 </div>
               ) : (
-                <span className="text-sm font-bold text-blue-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.unitPrice)}</span>
+                <span className="text-base font-semibold text-gray-900">{formatCurrency(data.isCustomerSupplied ? 0 : data.unitPrice)}</span>
               )}
             </div>
           </div>
           {(isEdit || data.quantity > 1) && (
             <div className="text-right mt-1">
-              <span className="text-xs text-blue-700">Total: </span>
-              <span className="text-xs font-bold text-blue-900">{formatCurrency(materialTotal)}</span>
+              <span className="text-xs text-gray-500">Total: </span>
+              <span className="text-xs font-bold text-gray-900">{formatCurrency(materialTotal)}</span>
             </div>
           )}
         </div>
 
         {/* Labor */}
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-2">
-          <div className="flex items-center gap-1 text-xs font-semibold text-orange-800 mb-1.5">
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-1 text-xs font-semibold text-gray-800 mb-1.5">
             <Wrench className="w-3 h-3" /> Labor
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs text-orange-700 mb-0.5">Hours</label>
+              <label className="block text-xs text-gray-500 mb-0.5">Hours</label>
               {isEdit ? (
                 <input
                   type="number"
@@ -365,11 +366,11 @@ export default function ProductDetailPanel({
                   className="w-full px-2 py-1 text-xs border border-orange-300 rounded focus:ring-1 focus:ring-orange-400 text-gray-900 bg-white"
                 />
               ) : (
-                <span className="text-sm font-bold text-orange-900">{data.laborHours || 0} hrs</span>
+                <span className="text-base font-semibold text-gray-900">{data.laborHours || 0} hrs</span>
               )}
             </div>
             <div>
-              <label className="block text-xs text-orange-700 mb-0.5">Rate/hr</label>
+              <label className="block text-xs text-gray-500 mb-0.5">Rate/hr</label>
               {isEdit ? (
                 <div className="relative">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -383,11 +384,11 @@ export default function ProductDetailPanel({
                   />
                 </div>
               ) : (
-                <span className="text-sm font-bold text-orange-900">{formatCurrency(data.laborRate)}/hr</span>
+                <span className="text-base font-semibold text-gray-900">{formatCurrency(data.laborRate)}/hr</span>
               )}
             </div>
             <div>
-              <label className="block text-xs text-orange-700 mb-0.5">Phase</label>
+              <label className="block text-xs text-gray-500 mb-0.5">Phase</label>
               {isEdit ? (
                 <select
                   value={data.laborPhaseId || ''}
@@ -400,14 +401,14 @@ export default function ProductDetailPanel({
                   ))}
                 </select>
               ) : (
-                <span className="text-xs font-medium text-orange-900">{data.laborPhaseName || '—'}</span>
+                <span className="text-xs font-medium text-gray-900">{data.laborPhaseName || '—'}</span>
               )}
             </div>
           </div>
           {(isEdit || data.laborHours > 0) && (
             <div className="text-right mt-1">
-              <span className="text-xs text-orange-700">Total: </span>
-              <span className="text-xs font-bold text-orange-900">{formatCurrency(laborTotal)}</span>
+              <span className="text-xs text-gray-500">Total: </span>
+              <span className="text-xs font-bold text-gray-900">{formatCurrency(laborTotal)}</span>
             </div>
           )}
         </div>
@@ -444,9 +445,9 @@ export default function ProductDetailPanel({
       </div>
 
       {/* RIGHT / BOTTOM: Financials + edit options */}
-      <div className="w-full flex flex-col sm:flex-row gap-2 lg:col-start-2">
+      <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 lg:col-start-2">
         {/* Financial summary */}
-        <div className={`rounded-lg border p-2 flex-1 lg:flex-none ${marginBg}`}>
+        <div className={`rounded-xl border p-4 min-w-0 ${marginBg}`}>
           <div className="text-xs font-semibold text-gray-700 mb-1.5">Financials</div>
           <div className="space-y-1">
             <div className="flex justify-between items-baseline">
@@ -466,7 +467,7 @@ export default function ProductDetailPanel({
               </div>
               <div className="flex justify-between items-baseline mt-0.5">
                 <span className="text-xs text-gray-500">Margin</span>
-                <span className={`text-sm font-bold ${marginColor}`}>{margin.toFixed(1)}%</span>
+                <span className={`text-base font-semibold ${marginColor}`}>{margin.toFixed(1)}%</span>
               </div>
             </div>
           </div>
@@ -474,9 +475,9 @@ export default function ProductDetailPanel({
 
         {/* Total installed (view mode) */}
         {!isEdit && (data.laborHours > 0) && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 flex-1 lg:flex-none">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 min-w-0">
             <div className="text-xs text-gray-500 mb-0.5">Total Installed</div>
-            <div className="text-sm font-bold text-gray-900">{formatCurrency(totalRevenue)}</div>
+            <div className="text-base font-semibold text-gray-900">{formatCurrency(totalRevenue)}</div>
             <div className="text-xs text-gray-400">material + labor</div>
           </div>
         )}
@@ -543,11 +544,10 @@ export default function ProductDetailPanel({
         )}
 
         {/* View mode: additional identifiers */}
-        {!isEdit && (
+        {!isEdit && data.quantity !== 1 && (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 space-y-0.5 flex-1 lg:flex-none">
             {data.quantity !== 1 && <InfoRow label="Qty" value={`${data.quantity} ${data.unit}`} />}
-            {data.msrp && data.msrp > 0 && <InfoRow label="MSRP" value={formatCurrency(data.msrp)} />}
-          </div>
+                      </div>
         )}
       </div>
     </div>

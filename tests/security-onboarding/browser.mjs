@@ -298,6 +298,29 @@ await returnedPage.getByRole('heading',{name:'Agreement submitted'}).waitFor();
 assert.equal(await returnedPage.getByPlaceholder('Enter your full legal name').count(),0);
 await returnedPage.close();
 
-await context.close();await browser.close();
+await context.close();
+// Catalog modal: long content remains readable at phone, tablet and desktop widths.
+const productContext=await browser.newContext();
+const productDescription='(2025) 85" QLED 4K TV Supreme UHD Dimming Quantum HDR+\n'+ 'A complete product description with installation details. '.repeat(30)+'DESCRIPTION END';
+await productContext.route('https://security-test.supabase.co/**',async route=>{
+ if(route.request().url().includes('/rest/v1/products'))return route.fulfill({json:{id:'product-fixture',name:'QN85Q8F',manufacturer_model_number:'QN85Q8F',manufacturers:{name:'Samsung'},catalog_category:{name:"TV's"},default_vendor:{vendor_name:'Pioneer Music with a longer vendor name'},description:productDescription,inventory_type:'Non-Inventory',cost:1235.28,our_price:1999.81,default_labor_hours:2,labor_phases:{name:'Trim',default_price:135},created_at:'2026-10-01',updated_at:'2026-10-01'}});
+ return route.fulfill({json:[]});
+});
+const productPage=await productContext.newPage();
+for(const width of [320,390,768,1440]) {
+ await productPage.setViewportSize({width,height:844});
+ await productPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?product');
+ await productPage.getByRole('heading',{name:'QN85Q8F',exact:true}).waitFor();
+ const description=productPage.getByText(productDescription,{exact:true});
+ assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none');
+ assert.ok(await productPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Product modal fits '+width);
+ assert.equal(await productPage.getByText('Non-Inventory',{exact:true}).count(),0);
+ assert.equal(await productPage.getByLabel('Product type: Non-Inventory',{exact:true}).count(),1);
+ const close=productPage.getByRole('button',{name:'Close',exact:true});
+ const rect=await close.boundingBox();assert.ok(rect.y+rect.height<=844,'Close stays inside visible viewport');
+ await close.click();assert.equal(await productPage.title(),'Product closed');
+}
+await productContext.close();
+await browser.close();
 server.kill();
 console.log('Browser tests passed: all five initial terms saved with monthly renewal, light controls in dark theme, mobile resume, failure/retry, save for later, signature reset, existing/new payment selection, AutoPay consent, signed download and print layout.');

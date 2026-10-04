@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, CreditCard as Edit, Search, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Pencil as Edit, Search, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ProductUsageHistory } from './ProductUsageHistory';
 import { useAuth } from '../../contexts/AuthContext';
@@ -210,40 +210,40 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-screen sm:h-auto sm:max-h-[92vh]">
+      <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92dvh] min-h-0">
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between shrink-0">
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-gray-900 truncate">{panelData.productName}</h2>
+        <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold text-gray-900 break-words">{panelData.productName}</h2>
             {panelData.category && (
               <p className="text-xs text-gray-500 mt-0.5 truncate">
                 {panelData.category}{panelData.subcategory ? ` / ${panelData.subcategory}` : ''}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0 ml-4">
-            <div className="flex gap-1 border border-gray-200 rounded-lg overflow-hidden">
+          <div className="contents">
+            <div className="order-3 w-full sm:w-auto sm:order-none flex bg-gray-100 p-1 rounded-xl">
               <button
                 onClick={() => setActiveTab('details')}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'details' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'details' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
               >
                 Details
               </button>
               <button
                 onClick={() => setActiveTab('history')}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
               >
                 Usage History
               </button>
             </div>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 bg-gray-50/50">
           {activeTab === 'details' ? (
             <>
               <ProductDetailPanel mode="view" data={panelData} showIdentity={false}
@@ -287,7 +287,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
                 </div>
               )}
               {auditInfo && (
-                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-6 text-xs text-gray-400">
+                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
                   <span>Created {new Date(auditInfo.createdAt).toLocaleDateString()} by {auditInfo.createdBy}</span>
                   <span>Updated {new Date(auditInfo.updatedAt).toLocaleDateString()} by {auditInfo.updatedBy}</span>
                 </div>
@@ -299,11 +299,11 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
           {canEdit && onEdit ? (
             <button
               onClick={onEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <Edit className="w-3.5 h-3.5" />
               Edit Product
@@ -311,7 +311,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
           ) : <div />}
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+            className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
           >
             Close
           </button>
