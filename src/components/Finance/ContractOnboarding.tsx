@@ -54,7 +54,6 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   const statusColumns: StatusColumn[] = [
     { key: 'pending_approval', label: 'Awaiting Approval', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
     { key: 'approved', label: 'Approved — Awaiting Activation', icon: Shield, color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
-    { key: 'rejected', label: 'Needs Review', icon: AlertCircle, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
     { key: 'active', label: 'Active', icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
     { key: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' }
   ];
@@ -90,7 +89,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setContracts(data || []);
+      setContracts((data || []).map(c => c.status === 'rejected' ? {...c,status:'pending_approval'} : c));
     } catch (error) {
       console.error('Error loading contracts:', error);
     } finally {

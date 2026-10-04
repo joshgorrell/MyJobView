@@ -242,6 +242,46 @@ await context.addInitScript(()=>{window.__summary={monthly_price:35,amount_due:0
 const summaryPage=await context.newPage();await summaryPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?summary');
 await summaryPage.getByText('First payment scheduled:',{exact:false}).waitFor();assert.ok((await summaryPage.locator('body').innerText()).includes('Not yet confirmed'));
 await summaryPage.close();
+// Staff entry: loading failures cannot expose a partial form; retry restores
+// contractual billing choice and address, with two required contacts ready.
+const manualContext=await browser.newContext({viewport:{width:390,height:844}});
+let manualFail=true,manualSubmitted=false;
+await manualContext.route('https://security-test.supabase.co/**',async route=>{
+ const req=route.request(),body=req.postData()?req.postDataJSON():null;
+ if(req.url().includes('/rest/v1/security_contracts')) return route.fulfill({json:{id:'manual-contract',contact:{full_name:'Paper Customer',email:'paper@example.com',phone:'5551112222',street_address:'10 Paper Lane',city:'Anytown',state:'IL',zip_code:'60001'},account_type:'residential',emergency_contacts:[]}});
+ if(body?.p_action==='get') {
+  if(manualFail)return route.fulfill({status:500,json:{message:'Unable to load agreement terms'}});
+  return route.fulfill({json:{status:'draft',document_version:'paper-version',document:{billing_mode:'mail',billingPreference:'annual',dealer:{annual_billing_enabled:true}}}});
+ }
+ if(body?.p_action==='paper'){manualSubmitted=true;assert.equal(body.p_payload.form_data.billingPreference,'annual');assert.equal(body.p_payload.paper_signed,true);return route.fulfill({json:{success:true}});}
+ return route.fulfill({json:[]});
+});
+const manualPage=await manualContext.newPage();await manualPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?manual');
+await manualPage.getByRole('heading',{name:'Unable to open manual entry'}).waitFor();
+assert.equal(await manualPage.getByRole('button',{name:'Save Contract Information'}).count(),0);
+manualFail=false;await manualPage.getByRole('button',{name:'Retry',exact:true}).click();
+await manualPage.getByRole('heading',{name:'Manual Contract Entry'}).waitFor();
+assert.equal(await manualPage.getByRole('combobox',{name:'Billing preference'}).inputValue(),'annual');
+assert.equal(await manualPage.getByPlaceholder('Full name',{exact:true}).count(),2);
+assert.ok((await manualPage.locator('body').innerText()).includes('Admin-approved mailed invoices'));
+manualPage.once('dialog',dialog=>dialog.dismiss());await manualPage.getByPlaceholder('Full name',{exact:true}).first().fill('First Contact');
+await manualPage.getByRole('button',{name:'Cancel',exact:true}).click();assert.notEqual(await manualPage.title(),'Manual entry closed');
+for(let n=0;n<2;n++){
+ await manualPage.getByPlaceholder('Full name',{exact:true}).nth(n).fill('Contact '+n);
+ await manualPage.getByPlaceholder('Phone number',{exact:true}).nth(n).fill('555111222'+n);
+ await manualPage.getByPlaceholder('Unique password',{exact:true}).nth(n).fill('word-'+n);
+}
+await manualPage.getByRole('checkbox',{name:/I have the customer's signed paper/}).check();
+manualPage.once('dialog',dialog=>dialog.accept());await manualPage.getByRole('button',{name:'Save Contract Information'}).click();
+await manualPage.waitForFunction(()=>document.title==='Manual entry submitted');assert.equal(manualSubmitted,true);
+await manualContext.close();
+// A submitted copy awaiting staff corrections is visible, with no new signing form.
+agreement={...agreement,status:'rejected'};
+const returnedPage=await context.newPage();await returnedPage.goto(url);
+await returnedPage.getByRole('heading',{name:'Agreement submitted'}).waitFor();
+assert.equal(await returnedPage.getByPlaceholder('Enter your full legal name').count(),0);
+await returnedPage.close();
+
 await context.close();await browser.close();
 server.kill();
 console.log('Browser tests passed: all five initial terms saved with monthly renewal, light controls in dark theme, mobile resume, failure/retry, save for later, signature reset, existing/new payment selection, AutoPay consent, signed download and print layout.');

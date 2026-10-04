@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { staffSecurityOnboarding, securityPaymentRequest } from '../../lib/securityOnboarding';
 import SecurityPaymentEnrollment from '../Portal/SecurityPaymentEnrollment';
 import { supabase } from '../../lib/supabase';
@@ -12,6 +12,8 @@ interface ManualContractEntryProps {
 
 export default function ManualContractEntry({ contract, onClose, onComplete }: ManualContractEntryProps) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const baseline = useRef('');
   const [saving, setSaving] = useState(false);
   const [paperSigned, setPaperSigned] = useState(false);
   const [autopayAccepted, setAutopayAccepted] = useState(false);
@@ -25,7 +27,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
     propertyCity: '',
     propertyState: '',
     propertyZip: '',
-    emergencyContacts: [{ name: '', phone: '', password: '', canAuthorize: false }],
+    emergencyContacts: Array.from({ length: 2 }, () => ({ name: '', phone: '', password: '', canAuthorize: false })),
     paymentMethod: 'credit_card' as 'credit_card' | 'ach',
     paymentMethodId: '',
     billingPreference: 'monthly',
@@ -38,60 +40,56 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   }, [contract.id]);
 
   async function loadContractData() {
+    setLoading(true);
+    setLoadError('');
     try {
-      const { data, error } = await supabase
-        .from('security_contracts')
-        .select(`
-          *,
-          contact:contacts(*),
-          template:security_contract_templates(*),
-          emergency_contacts:security_contract_emergency_contacts(*)
-        `)
-        .eq('id', contract.id)
-        .single();
-
+      const { data, error } = await supabase.from('security_contracts')
+        .select('*, contact:contacts(*), template:security_contract_templates(*), emergency_contacts:security_contract_emergency_contacts(*)')
+        .eq('id', contract.id).single();
       if (error) throw error;
-      setContractData(data);
-      setFormData(prev => ({ ...prev, personalInfo: { full_name: data.contact.full_name || `${data.contact.first_name || ''} ${data.contact.last_name || ''}`.trim(), email: data.contact.email || '', phone: data.contact.phone || '' } }));
       const agreement = await staffSecurityOnboarding<any>('get', contract.id);
+      if (agreement.customer_completed_at || !['draft', 'pending_customer', 'rejected'].includes(agreement.status)) {
+        throw new Error('This agreement has already been submitted. Open its review screen to make corrections.');
+      }
+      const annual = agreement.document.dealer?.annual_billing_enabled === true;
+      const next = {
+        personalInfo: { full_name: data.contact.full_name || `${data.contact.first_name || ''} ${data.contact.last_name || ''}`.trim(), email: data.contact.email || '', phone: data.contact.phone || '' },
+        propertyAddress: data.property_address || data.contact.street_address || '',
+        propertyCity: data.property_city || data.contact.city || '',
+        propertyState: data.property_state || data.contact.state || '',
+        propertyZip: data.property_zip || data.contact.zip_code || '',
+        emergencyContacts: data.emergency_contacts?.length ? [...data.emergency_contacts].sort((a, b) => a.priority_order - b.priority_order).map(c => ({ name: c.contact_name, phone: c.phone_number, password: c.password_codeword, canAuthorize: c.can_authorize_entry })) : Array.from({ length: 2 }, () => ({ name: '', phone: '', password: '', canAuthorize: false })),
+        paymentMethod: 'credit_card' as 'credit_card' | 'ach', paymentMethodId: '',
+        billingPreference: annual && agreement.document.billingPreference === 'annual' ? 'annual' : 'monthly',
+        accountType: (data.account_type || '') as 'residential' | 'commercial' | '', accountServices: data.account_services || [],
+      };
+      setContractData(data);
       setDocumentVersion(agreement.document_version);
       setBillingMode(agreement.document.billing_mode);
-      setAnnualAvailable(agreement.document.dealer?.annual_billing_enabled === true);
-
-      if (data.property_address) {
-        setFormData(prev => ({
-          ...prev,
-          propertyAddress: data.property_address || '',
-          propertyCity: data.property_city || '',
-          propertyState: data.property_state || '',
-          propertyZip: data.property_zip || ''
-        }));
-      }
-
-      if (data.emergency_contacts && data.emergency_contacts.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          emergencyContacts: data.emergency_contacts.map((c: any) => ({
-            name: c.contact_name,
-            phone: c.phone_number,
-            password: c.password_codeword,
-            canAuthorize: c.can_authorize_entry
-          }))
-        }));
-      }
-
-      if (data.account_type) {
-        setFormData(prev => ({ ...prev, accountType: data.account_type }));
-      }
-      if (data.account_services) {
-        setFormData(prev => ({ ...prev, accountServices: data.account_services }));
-      }
+      setAnnualAvailable(annual);
+      setFormData(next);
+      setPaperSigned(false); setAutopayAccepted(false);
+      baseline.current = JSON.stringify(next);
     } catch (error) {
-      console.error('Error loading contract:', error);
-      alert('Failed to load contract data');
-    } finally {
-      setLoading(false);
-    }
+      setLoadError(error instanceof Error ? error.message : 'Failed to load contract data');
+    } finally { setLoading(false); }
+  }
+
+  useEffect(() => {
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted) {
+        event.preventDefault(); event.returnValue = '';
+      }
+    };
+    if (!loading && !loadError) window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [formData, paperSigned, autopayAccepted, loading, loadError]);
+
+  function closeEntry() {
+    if (saving) return;
+    if ((JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted) &&
+        !window.confirm('Discard this unsaved manual entry? This information has not been submitted.')) return;
+    onClose();
   }
 
   function addEmergencyContact() {
@@ -115,6 +113,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   }
 
   async function handleSave() {
+    if (saving || loading || loadError || !documentVersion) return;
     if (!paperSigned) {
       alert('Confirm that the customer signed the paper agreement before completing onboarding.');
       return;
@@ -200,6 +199,14 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
     );
   }
 
+  if (loadError) return <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div role="alert" className="bg-white text-gray-900 rounded-lg p-8 space-y-4">
+      <h2 className="font-semibold">Unable to open manual entry</h2><p>{loadError}</p>
+      <button onClick={() => void loadContractData()} className="border rounded px-4 py-2">Retry</button>
+      <button onClick={onClose} className="border rounded px-4 py-2 ml-3">Close</button>
+    </div>
+  </div>;
+
   return (
     <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 overflow-y-auto z-50">
       <div className="min-h-screen px-4 py-8">
@@ -213,7 +220,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
                 </p>
               </div>
               <button
-                onClick={onClose}
+                onClick={closeEntry} disabled={saving}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -221,7 +228,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
+          <fieldset disabled={saving} className="p-6 space-y-6">
             <p className="text-sm text-gray-700">Enter the completed paper form here and keep the signed original with the customer record.</p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -431,7 +438,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
                         </div>
                         <span className="text-sm font-medium text-gray-700">Contact {index + 1}</span>
                       </div>
-                      {formData.emergencyContacts.length > 1 && (
+                      {formData.emergencyContacts.length > 2 && (
                         <button
                           onClick={() => removeEmergencyContact(index)}
                           className="p-1 hover:bg-red-50 rounded text-red-600"
@@ -507,7 +514,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
                 </label>
               </>}
             </div>
-          </div>
+          </fieldset>
 
           <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 space-y-3">
             <label className="flex items-start gap-2 text-sm text-gray-800">
@@ -516,7 +523,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
             </label>
             <div className="flex justify-end gap-3">
             <button
-              onClick={onClose}
+              onClick={closeEntry} disabled={saving}
               className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               Cancel
