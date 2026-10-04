@@ -256,3 +256,27 @@ html {
 [data-theme='mjv'] .theme-header {
   box-shadow: inset 0 -3px 0 #b91c1c;
 }
+
+/* Catalog forms remain readable inside every workspace theme. */
+.product-form-controls { color-scheme: light; }
+.product-form-controls input,
+.product-form-controls select,
+.product-form-controls textarea {
+  color-scheme: light;
+  background-color: #fff;
+  color: #000;
+  accent-color: #1d4ed8;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 16px;
+}
+.product-form-controls textarea { resize: vertical; }
+.product-form-controls input::placeholder,
+.product-form-controls textarea::placeholder { color: #6b7280; opacity: 1; }
+.product-form-controls input:-webkit-autofill {
+  -webkit-text-fill-color: #000;
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+}
+.product-form-controls input:disabled,
+.product-form-controls select:disabled,
+.product-form-controls textarea:disabled { opacity: 1; color: #4b5563; }

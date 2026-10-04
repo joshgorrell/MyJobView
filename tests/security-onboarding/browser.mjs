@@ -320,6 +320,29 @@ for(const width of [320,390,768,1440]) {
  const rect=await close.boundingBox();assert.ok(rect.y+rect.height<=844,'Close stays inside visible viewport');
  await close.click();assert.equal(await productPage.title(),'Product closed');
 }
+
+for(const width of [320,390,768,1440]) {
+ await productPage.setViewportSize({width,height:844});
+ await productPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?add-product');
+ await productPage.getByRole('heading',{name:'New Product',exact:true}).waitFor();
+ await productPage.evaluate(()=>{document.documentElement.style.colorScheme='dark';});
+ const controls=productPage.locator('.product-form-controls input:not([type="hidden"]):not([type="file"]):not(:disabled), .product-form-controls select:not(:disabled), .product-form-controls textarea:not(:disabled)');
+ assert.ok(await controls.count()>10);
+ for(const control of await controls.all()) {
+  assert.deepEqual(await control.evaluate(el=>{const s=getComputedStyle(el);return [s.colorScheme,s.backgroundColor,s.color];}),['light','rgb(255, 255, 255)','rgb(0, 0, 0)']);
+ }
+ const description=productPage.getByPlaceholder('Description that customers will see on proposals');
+ await description.fill('A full product description. '.repeat(20));
+ assert.equal(await description.getAttribute('rows'),'5');
+ await productPage.getByRole('button',{name:'New',exact:true}).first().click();
+ await productPage.getByPlaceholder('Enter manufacturer name').fill('New manufacturer');
+ assert.ok(await productPage.getByRole('dialog',{name:'New Product',exact:true}).evaluate(el=>el.scrollWidth<=el.clientWidth),'Add product dialog fits '+width);
+ assert.ok(await productPage.locator('.product-form-controls .overflow-y-auto').first().evaluate(el=>el.scrollWidth<=el.clientWidth),'Add product content fits '+width);
+ const saveRect=await productPage.getByRole('button',{name:'Save Product',exact:true}).boundingBox();
+ assert.ok(saveRect.y+saveRect.height<=844,'Save stays visible while editing description');
+ await productPage.getByRole('button',{name:'Close product form',exact:true}).click();
+ assert.equal(await productPage.title(),'Product form closed');
+}
 await productContext.close();
 await browser.close();
 server.kill();
