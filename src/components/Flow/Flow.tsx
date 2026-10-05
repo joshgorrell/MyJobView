@@ -12,21 +12,22 @@ import './flow.css';
 
 type Option = { id: string; name: string };
 const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Tasks', activity: 'Other activity' };
-type FlowView = 'all' | 'activity' | 'direct' | 'customers' | 'team';
+type FlowView = 'all' | 'activity' | 'direct' | 'customers' | 'departments' | 'company';
 const FLOW_VIEWS: { id: FlowView; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'activity', label: 'Activity' }, { id: 'direct', label: 'Direct' },
-  { id: 'customers', label: 'Customers' }, { id: 'team', label: 'Team' },
+  { id: 'customers', label: 'Customers' }, { id: 'departments', label: 'Departments' }, { id: 'company', label: 'Company' },
 ];
 function matchesView(event: FlowEvent, view: FlowView) {
   if (view === 'all') return true;
-  if (view === 'direct') return event.source_table === 'messages' && !!event.is_internal;
+  if (view === 'direct') return event.source_table === 'discussion_posts' && event.audience_type === 'direct';
   if (view === 'customers') return event.source_table === 'messages' && !event.is_internal;
-  if (view === 'team') return event.source_table === 'discussion_posts';
+  if (view === 'departments') return event.source_table === 'discussion_posts' && event.audience_type === 'department';
+  if (view === 'company') return event.source_table === 'discussion_posts' && event.audience_type === 'company';
   return event.source_table !== 'messages' && event.source_table !== 'discussion_posts';
 }
 function eventKind(event: FlowEvent): string {
   if (event.source_table === 'messages') return event.is_internal ? 'Internal message' : 'Customer message';
-  if (event.source_table === 'discussion_posts') return 'Team discussion';
+  if (event.source_table === 'discussion_posts') return event.audience_type === 'direct' ? 'Direct message' : event.audience_type === 'department' ? 'Department message' : 'Company message';
   if (event.source_table === 'tasks' || event.source_table === 'task_comments') return 'Task';
   if (event.category === 'update') return 'Update';
   return 'Activity';
