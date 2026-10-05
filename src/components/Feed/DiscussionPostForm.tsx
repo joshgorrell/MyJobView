@@ -18,7 +18,9 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
   const [reminderDate, setReminderDate] = useState('');
   const [showReminder, setShowReminder] = useState(false);
   const [assignedUsername, setAssignedUsername] = useState('');
-  const [isPrivate, setIsPrivate] = useState(false);
+  const [audience, setAudience] = useState<'company' | 'direct' | 'department'>('company');
+  const [departmentId, setDepartmentId] = useState('');
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<Array<{ type: 'user' | 'lead'; username: string; name: string; id: string }>>([]);
@@ -28,6 +30,13 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
   const [highlight, setHighlight] = useState(0);
   const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!profile?.organization_id) return;
+    void supabase.from('departments').select('id,display_name,name').eq('organization_id', profile.organization_id).eq('is_active', true).order('sort_order').then(({ data }) => {
+      setDepartments((data || []).map((d: any) => ({ id: d.id, name: d.display_name || d.name })));
+    });
+  }, [profile?.organization_id]);
 
   useEffect(() => {
     const text = content.slice(0, cursorPosition);
@@ -143,7 +152,10 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         hashtags: hashtags,
         reminder_date: reminderDate ? new Date(reminderDate).toISOString() : null,
         assigned_to: (postType === 'task' || postType === 'question') ? assignedToId : null,
-        is_private: isPrivate,
+        is_private: audience !== 'company',
+        audience_type: audience,
+        audience_department_id: audience === 'department' ? departmentId : null,
+        audience_user_ids: audience === 'direct' ? userMentions : [],
         contact_id: route?.kind === 'contact' ? route.id : null,
         project_id: route?.kind === 'project' ? route.id : null,
         work_order_id: route?.kind === 'work_order' ? route.id : null,
@@ -193,7 +205,8 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
       setReminderDate('');
       setShowReminder(false);
       setAssignedUsername('');
-      setIsPrivate(false);
+      setAudience('company');
+      setDepartmentId('');
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -284,18 +297,16 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
       {tag?.symbol === '#' && <div className="flow flow-tag-results" role="listbox" aria-label="Matching customers and jobs">{choices.filter(c => c.kind !== 'person').map((choice, index) => <button type="button" role="option" aria-selected={index === highlight} key={`${choice.kind}:${choice.id}`} onClick={() => chooseRoute(choice as FlowTarget)}>{choice.label} · {choice.kind.replace('_', ' ')}</button>)}</div>}
       {route && <p className="text-sm text-blue-700 my-2">Posting to {route.label} <button type="button" onClick={() => { setRoute(null); setRouteToken(''); }}>Remove</button></p>}
       <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="private-toggle"
-            checked={isPrivate}
-            onChange={(e) => setIsPrivate(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-          />
-          <label htmlFor="private-toggle" className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <Lock className="w-4 h-4" />
-            <span>Private discussion (only visible to mentioned users)</span>
-          </label>
+        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700"><Lock className="w-4 h-4" /> Send to</label>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={() => setAudience('company')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'company' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>@everyone</button>
+            <button type="button" onClick={() => setAudience('direct')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'direct' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>@user(s)</button>
+            <button type="button" onClick={() => setAudience('department')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'department' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>@department</button>
+          </div>
+          {audience === 'direct' && <p className="text-xs text-gray-600">Mention one or more teammates with @username. Only you and those users can see the message.</p>}
+          {audience === 'department' && <select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">Choose department…</option>{departments.map(d => <option key={d.id} value={d.id}>@{d.name}</option>)}</select>}
+          {audience === 'company' && <p className="text-xs text-gray-600">Visible to everyone in the company with Flow access.</p>}
         </div>
 
         <button
@@ -345,7 +356,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
       <div className="flex justify-end mt-2">
         <button
           type="submit"
-          disabled={loading || !content.trim() || !postType}
+          disabled={loading || !content.trim() || !postType || (audience === 'department' && !departmentId)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           <Send className="w-4 h-4" />

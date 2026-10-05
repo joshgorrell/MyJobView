@@ -8,25 +8,27 @@ import { dayLabel, FLOW_CATEGORIES, FlowEvent, FlowFilters, FlowScope, FlowTarge
 import { PostFlowUpdate } from './PostFlowUpdate';
 import { FlowTargetPicker } from './FlowTargetPicker';
 import { FlowWaveIcon } from './FlowWaveIcon';
+import { DiscussionPostForm } from '../Feed/DiscussionPostForm';
 import './flow.css';
 
 type Option = { id: string; name: string };
 const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Tasks', activity: 'Other activity' };
-type FlowView = 'all' | 'activity' | 'direct' | 'customers' | 'team';
+type FlowView = 'all' | 'activity' | 'direct' | 'customers' | 'departments' | 'company';
 const FLOW_VIEWS: { id: FlowView; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'activity', label: 'Activity' }, { id: 'direct', label: 'Direct' },
-  { id: 'customers', label: 'Customers' }, { id: 'team', label: 'Team' },
+  { id: 'customers', label: 'Customers' }, { id: 'departments', label: 'Departments' }, { id: 'company', label: 'Company' },
 ];
 function matchesView(event: FlowEvent, view: FlowView) {
   if (view === 'all') return true;
-  if (view === 'direct') return event.source_table === 'messages' && !!event.is_internal;
+  if (view === 'direct') return event.source_table === 'discussion_posts' && event.audience_type === 'direct';
   if (view === 'customers') return event.source_table === 'messages' && !event.is_internal;
-  if (view === 'team') return event.source_table === 'discussion_posts';
+  if (view === 'departments') return event.source_table === 'discussion_posts' && event.audience_type === 'department';
+  if (view === 'company') return event.source_table === 'discussion_posts' && event.audience_type === 'company';
   return event.source_table !== 'messages' && event.source_table !== 'discussion_posts';
 }
 function eventKind(event: FlowEvent): string {
   if (event.source_table === 'messages') return event.is_internal ? 'Internal message' : 'Customer message';
-  if (event.source_table === 'discussion_posts') return 'Team discussion';
+  if (event.source_table === 'discussion_posts') return event.audience_type === 'direct' ? 'Direct message' : event.audience_type === 'department' ? 'Department message' : 'Company message';
   if (event.source_table === 'tasks' || event.source_table === 'task_comments') return 'Task';
   if (event.category === 'update') return 'Update';
   return 'Activity';
@@ -67,6 +69,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const [locations, setLocations] = useState<Option[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
+  const [messaging, setMessaging] = useState(false);
   const [marking, setMarking] = useState(false);
   const scope = useMemo(() => ({ contactId, projectId, workOrderId }), [contactId, projectId, workOrderId]);
   const chosenScope = target ? { ...scope, ...targetScope(target) } : scope;
@@ -136,9 +139,10 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   return <section className={`flow ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
-      {canPost && <button className="flow-primary" onClick={() => setComposing(!composing)}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button>}
+      {canPost && <div className="flow-heading-actions"><button onClick={() => { setMessaging(!messaging); setComposing(false); }}><MessageSquare size={15} /> Message</button><button className="flow-primary" onClick={() => { setComposing(!composing); setMessaging(false); }}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button></div>}
     </header>
     {composing && <PostFlowUpdate scope={chosenScope} onClose={() => setComposing(false)} onPosted={() => { setComposing(false); void flow.refresh(); }} />}
+    {messaging && <div className="flow-message-composer"><DiscussionPostForm onSuccess={() => { setMessaging(false); void flow.refresh(); }} /></div>}
     <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{FLOW_VIEWS.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
     <div className={`flow-toolbar ${scoped ? 'flow-toolbar--scoped' : ''}`}>
       {!scoped && <div className="flow-segment" aria-label="Activity scope"><button aria-pressed={myWork} onClick={() => setMyWork(true)}>My Work</button><button aria-pressed={!myWork} onClick={() => setMyWork(false)}>Company</button></div>}
