@@ -20,6 +20,10 @@ This branch carries proposal work instructions into projects and technician visi
 - `npm run test:handoff:browser`: component browser fixtures covering Light/Dark at 320px, 390px, a short viewport and desktop, scopes, offline instructions, persistent task drafts, labor choices and form parity. These use mocked application data and do not establish production sign-in or physical iPhone behavior.
 - `npm run build` passes. Repository-wide TypeScript checking has pre-existing failures; comparison to current main found no additional error signatures in this change.
 
+## Final audit corrections
+
+The final pass checked the connected database's triggers, constraints and policies. Regression fixtures now include automatic proposal-settings creation, settings uniqueness, purchased-part cost validation and labor recalculation on line-item writes. Corrections allow retained labor to have zero equipment cost, replace fresh default settings atomically when copying content, remove the equipment charge from newly added retained-labor records, make retention retries idempotent, and clear hidden labor charges on full removal. Original snapshots include phase instructions; general equipment notes are visible to technicians, deleting a labor phase refreshes automatic estimates, and new projects/sold snapshots exclude fully removed work even when copied from a prior order. The repeat build, handoff and responsive browser checks passed after these corrections.
+
 ## Release and field checks
 
 Review and apply both handoff migrations with the matching UI on a staging database before production. Exercise signed-in role permissions and all creation entry points against real records, large projects, account switching, all-day session refresh, concurrent edits and field connectivity. Older original scopes cannot be reconstructed when no source was recorded; use the explicit legacy review. Native mobile-client parity is a separate delivery if that client is used. No production data migration, merge or deployment has been performed.

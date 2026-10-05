@@ -30,6 +30,10 @@ await db.exec(`ALTER TABLE work_order_tasks ADD CONSTRAINT valid_task_status CHE
  INSERT INTO contacts VALUES('${id(30)}','${id(1)}'),('${id(40)}','${id(2)}');
 `);
 await db.exec(await readFile(new URL('./handoff-change-schema.sql',import.meta.url),'utf8'));
+// Production recalculates standard labor on every line-item write. Retaining
+// work must survive that trigger, and a full removal must not restore a charge.
+await db.exec(`CREATE FUNCTION fixture_compute_labor() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.labor_hours IS NOT NULL AND NEW.labor_rate IS NOT NULL THEN NEW.labor_total:=NEW.labor_hours*coalesce(NEW.quantity,1)*NEW.labor_rate; ELSE NEW.labor_total:=0; END IF; RETURN NEW; END $$; CREATE TRIGGER fixture_compute_labor BEFORE INSERT OR UPDATE ON proposal_line_items FOR EACH ROW EXECUTE FUNCTION fixture_compute_labor();`);
+await db.exec(`ALTER TABLE proposal_settings ADD CONSTRAINT proposal_settings_proposal_id_key UNIQUE(proposal_id); ALTER TABLE proposal_line_items ALTER COLUMN cost SET DEFAULT 50; ALTER TABLE proposal_line_items ADD CONSTRAINT proposal_line_items_cost_positive CHECK(cost>=0 AND (is_customer_supplied=true OR cost>0));`);
 await db.exec(await readFile(new URL('../../supabase/migrations/20261001134611_project_task_visit_handoff.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../../supabase/migrations/20261005192138_project_handoff_changes_and_snapshots.sql',import.meta.url),'utf8'));
 await db.exec(`CREATE FUNCTION get_root_proposal_id(p_id uuid) RETURNS uuid LANGUAGE sql AS $$ SELECT coalesce(parent_proposal_id,id) FROM proposals WHERE id=p_id $$;`);
@@ -60,6 +64,14 @@ await db.query('SELECT seed_proposal_tasks_for_line_item($1)',[id(80)]);
 assert.equal((await query(`SELECT count(*)::int AS n FROM proposal_tasks WHERE line_item_id='${id(80)}'`))[0].n,0);
 await db.exec(`INSERT INTO proposal_line_items(id,proposal_id,organization_id,description,quantity,labor_hours) VALUES('${id(81)}','${id(70)}','${id(1)}','New labor',1,0);UPDATE proposal_line_items SET programming_labor_hours=2 WHERE id='${id(81)}';`);
 assert.equal((await query(`SELECT count(*)::int AS n FROM proposal_tasks WHERE line_item_id='${id(81)}'`))[0].n,1,'Later introduced labor seeds through update trigger');
+await db.exec(`INSERT INTO labor_phases(id,company_id,organization_id,name) VALUES('${id(90)}','${id(1)}','${id(1)}','Rough'); INSERT INTO proposal_line_item_labor_phases(id,line_item_id,labor_phase_id,organization_id,hours,tech_notes) VALUES('${id(91)}','${id(81)}','${id(90)}','${id(1)}',3,'Protect the rack ventilation'); INSERT INTO projects(id,company_id,organization_id,contact_id,project_number,name,created_by,sales_order_id) VALUES('${id(74)}','${id(1)}','${id(1)}','${id(30)}','P4','Phase instructions','${id(10)}','${id(72)}');`);
+assert.equal(Number((await query(`select estimated_hours from proposal_tasks where line_item_id='${id(81)}'`))[0].estimated_hours),3);
+const phaseSnapshot=(await query(`select sold_handoff from projects where id='${id(74)}'`))[0].sold_handoff;
+assert.equal(phaseSnapshot.equipment.find(i=>i.id===id(81)).phase_notes[0].notes,'Protect the rack ventilation','Original handoff includes phase instructions for unassigned equipment');
+await db.exec(`DELETE FROM proposal_line_item_labor_phases WHERE id='${id(91)}';`);
+assert.equal(Number((await query(`select estimated_hours from proposal_tasks where line_item_id='${id(81)}'`))[0].estimated_hours),2,'Deleting a phase refreshes the labor budget');
+assert.equal((await query(`select sold_handoff from projects where id='${id(74)}'`))[0].sold_handoff.equipment.find(i=>i.id===id(81)).phase_notes[0].notes,'Protect the rack ventilation','Later phase changes cannot alter original instructions');
+
 const payload=(tech=11,task=60)=>({work_order:{company_id:id(1),contact_id:id(30),project_id:id(50),assigned_to:id(tech),title:'Visit',type:'project',priority:'medium',start_time:'08:00',end_time:'09:00',customer_contacted:true,is_billable:false},tasks:[{project_task_id:id(task),title:'Copied task',description:'copied',estimated_hours:0,visit_instructions:'Rough-in only'}],parts:[]});
 const create=async (key,assignments)=> (await db.query('SELECT create_work_order_assignments($1,$2) AS result',[id(key),JSON.stringify(assignments)])).rows[0].result;
 
@@ -119,7 +131,7 @@ await assert.rejects(db.query('SELECT record_visit_task_progress($1,$2)',[assign
 
 await as(10);
 await db.exec(`INSERT INTO proposals(id,organization_id,company_id,contact_id,proposal_number,title) VALUES('${id(70)}','${id(1)}','${id(1)}','${id(30)}','P-10','House');
-INSERT INTO proposal_line_items(id,proposal_id,organization_id,room_id,description,quantity,labor_hours,labor_rate,labor_total,unit_price,line_total,programming_labor_hours,programming_notes) VALUES('${id(82)}','${id(70)}','${id(1)}','${id(71)}','Bedroom speakers',2,2,100,400,200,400,1,'Program control'); SELECT seed_proposal_tasks_for_line_item('${id(82)}');
+INSERT INTO proposal_line_items(id,proposal_id,organization_id,room_id,description,quantity,labor_hours,labor_rate,labor_total,unit_price,line_total,programming_labor_hours,programming_notes,cost) VALUES('${id(82)}','${id(70)}','${id(1)}','${id(71)}','Bedroom speakers',2,2,100,400,200,400,1,'Program control',50); UPDATE proposal_line_items SET cost=50,is_customer_supplied=false WHERE id='${id(82)}'; SELECT seed_proposal_tasks_for_line_item('${id(82)}');
 INSERT INTO change_orders(id,organization_id,sales_order_id,title,status) VALUES('${id(800)}','${id(1)}','${id(72)}','Remove parts keep labor','draft');
 INSERT INTO change_order_line_items(id,organization_id,change_order_id,proposal_line_item_id,action_type,remove_scope) VALUES('${id(801)}','${id(1)}','${id(800)}','${id(82)}','remove','parts_only');
 UPDATE change_orders SET status='approved' WHERE id='${id(800)}';`);
@@ -131,24 +143,34 @@ await db.query('select apply_change_order($1)',[id(800)]);assert.equal((await qu
 assert.equal((await query(`select sold_handoff->>'overall_scope' as scope from projects where id='${id(73)}'`))[0].scope,'Original overall');
 await db.exec(`INSERT INTO change_orders(id,organization_id,sales_order_id,title,status) VALUES('${id(802)}','${id(1)}','${id(72)}','Remove work','draft'); INSERT INTO change_order_line_items(id,organization_id,change_order_id,proposal_line_item_id,action_type,remove_scope) VALUES('${id(803)}','${id(1)}','${id(802)}','${id(82)}','remove','parts_and_labor'); UPDATE change_orders SET status='approved' WHERE id='${id(802)}';`);
 assert.equal((await query(`select status from project_tasks where id='${retainedTask.id}'`))[0].status,'cancelled');
+assert.equal(Number((await query(`select labor_total from proposal_line_items where id='${id(82)}'`))[0].labor_total),0,'Removing labor leaves no hidden labor charge');
 await db.exec(`INSERT INTO change_orders(id,organization_id,sales_order_id,title,status) VALUES('${id(804)}','${id(1)}','${id(72)}','Bad change','draft'); INSERT INTO change_order_line_items(id,organization_id,change_order_id,proposal_line_item_id,action_type) VALUES('${id(805)}','${id(1)}','${id(804)}','${id(999)}','remove');`);
 await assert.rejects(db.query("update change_orders set status='approved' where id=$1",[id(804)]),/proposal mismatch/);
 assert.equal((await query(`select status from change_orders where id='${id(804)}'`))[0].status,'draft','Failed handoff rolls back approval');
 await db.exec(`UPDATE proposal_tasks SET estimated_hours=9,estimate_is_manual=true,covered_item_ids=ARRAY['${id(81)}'::uuid] WHERE line_item_id='${id(81)}';`);
+await db.exec(`RESET ROLE; CREATE FUNCTION fixture_default_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$BEGIN INSERT INTO proposal_settings(proposal_id,organization_id,scope_of_work) VALUES(NEW.id,NEW.organization_id,'Default scope'); RETURN NEW; END $$; CREATE TRIGGER fixture_default_settings AFTER INSERT ON proposals FOR EACH ROW EXECUTE FUNCTION fixture_default_settings();`);
+await as(10);
 const revised=(await db.query('select create_proposal_revision($1,$2,$3) as id',[id(70),'Revision',id(10)])).rows[0].id;
 const revisedTask=(await query(`select * from proposal_tasks where proposal_id='${revised}' and title='New labor'`))[0];assert.equal(Number(revisedTask.estimated_hours),9);assert.equal(revisedTask.estimate_is_manual,true);assert.notEqual(revisedTask.covered_item_ids[0],id(81));assert.equal(revisedTask.covered_item_ids[0],revisedTask.line_item_id);
 assert.equal((await query(`select count(*)::int as n from proposal_tasks where proposal_id='${revised}' and title='Install TV'`))[0].n,0,'Revision preserves task deletion');
+
+await db.exec(`INSERT INTO sales_orders(id,company_id,organization_id,proposal_id,contact_id,order_number,created_by) VALUES('${id(75)}','${id(1)}','${id(1)}','${revised}','${id(30)}','SO-revision','${id(10)}'); INSERT INTO projects(id,company_id,organization_id,contact_id,project_number,name,created_by,sales_order_id) VALUES('${id(76)}','${id(1)}','${id(1)}','${id(30)}','P5','Revised scope','${id(10)}','${id(75)}');`);
+assert.equal((await query(`select count(*)::int as n from project_tasks where project_id='${id(76)}' and title='Bedroom speakers'`))[0].n,0,'Selling a copied revision never resurrects removed equipment work');
+assert.equal((await query(`select sold_handoff from projects where id='${id(76)}'`))[0].sold_handoff.tasks.filter(t=>t.title==='Bedroom speakers').length,0,'Sold task snapshot excludes removed work');
 
 const copied=(await db.query('select duplicate_job_proposal($1,$2,$3,true) as id',[id(70),id(30),'Copied job'])).rows[0].id;
 const copiedTask=(await query(`select * from proposal_tasks where proposal_id='${copied}' and title='New labor'`))[0];
 assert.equal(Number(copiedTask.estimated_hours),9);assert.equal(copiedTask.estimate_is_manual,true);assert.notEqual(copiedTask.line_item_id,id(81));assert.equal(copiedTask.covered_item_ids[0],copiedTask.line_item_id);
 assert.equal((await query(`select count(*)::int as n from proposal_tasks where proposal_id='${copied}' and title='Install TV'`))[0].n,0,'Duplication preserves intentional task deletion');
+assert.equal((await query(`select count(*)::int as n from proposal_settings where proposal_id='${copied}'`))[0].n,1,'Copied settings replace automatic defaults once');
+assert.equal((await query(`select scope_of_work from proposal_settings where proposal_id='${copied}'`))[0].scope_of_work,'Later draft text');
 await assert.rejects(db.query('select duplicate_job_proposal($1,$2,$3,true)',[id(70),id(40),'Wrong tenant']),/authorized/);
 
-await db.exec(`INSERT INTO proposal_line_items(id,proposal_id,organization_id,description,quantity,labor_hours,labor_rate,labor_total,unit_price,line_total) VALUES('${id(83)}','${id(70)}','${id(1)}','Added camera',1,2,100,200,300,300); INSERT INTO change_orders(id,organization_id,sales_order_id,title,status) VALUES('${id(806)}','${id(1)}','${id(72)}','Added camera labor','draft'); INSERT INTO change_order_line_items(id,organization_id,change_order_id,proposal_line_item_id,action_type,new_quantity,new_unit_price,product_name,labor_hours,labor_rate,new_labor_total) VALUES('${id(807)}','${id(1)}','${id(806)}','${id(83)}','add',1,300,'Added camera',2,100,200); SELECT keep_added_change_labor('${id(806)}','${id(83)}'); UPDATE change_orders SET status='approved' WHERE id='${id(806)}';`);
+await db.exec(`INSERT INTO proposal_line_items(id,proposal_id,organization_id,description,quantity,labor_hours,labor_rate,labor_total,unit_price,line_total,cost) VALUES('${id(83)}','${id(70)}','${id(1)}','Added camera',1,2,100,200,300,300,60); INSERT INTO change_orders(id,organization_id,sales_order_id,title,status) VALUES('${id(806)}','${id(1)}','${id(72)}','Added camera labor','draft'); INSERT INTO change_order_line_items(id,organization_id,change_order_id,proposal_line_item_id,action_type,new_quantity,new_unit_price,product_name,labor_hours,labor_rate,new_labor_total) VALUES('${id(807)}','${id(1)}','${id(806)}','${id(83)}','add',1,300,'Added camera',2,100,200); UPDATE proposal_line_items SET cost=60,is_customer_supplied=false WHERE id='${id(83)}'; UPDATE change_order_line_items SET change_amount=500,new_total=500 WHERE id='${id(807)}'; SELECT keep_added_change_labor('${id(806)}','${id(83)}'); SELECT keep_added_change_labor('${id(806)}','${id(83)}'); UPDATE change_orders SET status='approved' WHERE id='${id(806)}';`);
+assert.equal(Number((await query(`select change_amount from change_order_line_items where id='${id(807)}'`))[0].change_amount),200,'Keeping added labor removes the equipment charge');
 assert.equal((await query(`select count(*)::int as n from proposal_line_items where proposal_id='${id(70)}' and description='Labor — Added camera'`))[0].n,1,'Added change labor retains one visible line');
-assert.equal((await query(`select count(*)::int as n from project_tasks where source_line_item_id='${id(83)}'`))[0].n,1,'Retained added labor receives one project task');
-await db.exec(`INSERT INTO proposal_line_items(id,proposal_id,organization_id,description,quantity,labor_hours) VALUES('${id(84)}','${id(70)}','${id(1)}','Unseeded legacy work',1,2);`);
+assert.equal((await query(`select count(*)::int as n from project_tasks where project_id='${id(73)}' and source_line_item_id='${id(83)}'`))[0].n,1,'Retained added labor receives one project task');
+await db.exec(`INSERT INTO proposal_line_items(id,proposal_id,organization_id,description,quantity,labor_hours,cost) VALUES('${id(84)}','${id(70)}','${id(1)}','Unseeded legacy work',1,2,50);`);
 const preview=(await db.query('select review_legacy_job_handoff($1) as p',[id(73)])).rows[0].p;assert.ok(preview.candidates.some(i=>i.id===id(84)));
 await db.query('select review_legacy_job_handoff($1,$2,true)',[id(73),[id(84)]]);
 assert.equal((await query(`select count(*)::int as n from project_tasks where source_line_item_id='${id(84)}'`))[0].n,1);

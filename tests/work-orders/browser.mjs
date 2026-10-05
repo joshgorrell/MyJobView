@@ -45,6 +45,10 @@ try {
         .getByText("Original bedroom speakers and controls", { exact: true })
         .waitFor();
       await page.getByText("Other rough work", { exact: true }).waitFor();
+      await page.getByText("Keep rack ventilated", {exact:true}).waitFor();
+      await page.getByText("Back up the processor", {exact:true}).waitFor();
+      await page.getByText("Trim: Record firmware versions", {exact:true}).waitFor();
+      await page.getByText("Rough-in: Label both ends", {exact:true}).waitFor();
       await page.locator("select").first().selectOption("sold");
       await page
         .getByText("Original house installation", { exact: true })

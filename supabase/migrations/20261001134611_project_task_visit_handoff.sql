@@ -220,7 +220,7 @@ BEGIN
  INSERT INTO public.project_tasks(project_id,organization_id,title,description,labor_phase_id,status,sort_order,source_line_item_id,source_proposal_task_id,source,visibility,created_by,estimated_hours,room_name,covered_items)
  SELECT NEW.id,NEW.organization_id,t.title,t.description,t.labor_phase_id,'open',t.sort_order,t.line_item_id,t.id,'proposal','internal',NEW.created_by,COALESCE(t.estimated_hours,0),r.name,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',ci.id,'description',ci.description,'quantity',ci.quantity,'room_id',ci.room_id)) FROM public.proposal_line_items ci WHERE ci.proposal_id=v_proposal AND (ci.id=t.line_item_id OR ci.id=ANY(t.covered_item_ids))),'[]')
  FROM public.proposal_tasks t LEFT JOIN public.proposal_line_items i ON i.id=t.line_item_id LEFT JOIN public.proposal_rooms r ON r.id=i.room_id
- WHERE t.proposal_id=v_proposal AND t.organization_id=NEW.organization_id
+ WHERE t.proposal_id=v_proposal AND t.organization_id=NEW.organization_id AND (t.line_item_id IS NULL OR NOT COALESCE(i.is_hidden,false) OR EXISTS(SELECT 1 FROM public.proposal_line_items ci WHERE ci.proposal_id=v_proposal AND ci.organization_id=NEW.organization_id AND ci.id=ANY(t.covered_item_ids) AND NOT COALESCE(ci.is_hidden,false)))
  ON CONFLICT (project_id,source_proposal_task_id) WHERE source_proposal_task_id IS NOT NULL DO NOTHING;
  RETURN NEW;
 END; $$;

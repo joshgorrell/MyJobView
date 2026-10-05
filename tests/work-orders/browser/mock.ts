@@ -62,7 +62,9 @@ const handoff = {
       quantity: 2,
       unit: "each",
       task_notes: "Test every connection",
+      phase_notes:[{name:"Rough-in",notes:"Label both ends"}],
     },
+    {id:"rack",room_id:null,description:"Rack programming",quantity:1,unit:"each",task_notes:"Keep rack ventilated",programming_notes:"Back up the processor",phase_notes:[{name:"Trim",notes:"Record firmware versions"}]},
   ],
 };
 const packet = {

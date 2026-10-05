@@ -2,6 +2,9 @@
 CREATE SCHEMA IF NOT EXISTS handoff_private;
 REVOKE ALL ON SCHEMA handoff_private FROM PUBLIC,anon,authenticated;
 ALTER TABLE public.proposal_line_items ADD COLUMN equipment_removed boolean NOT NULL DEFAULT false;
+-- Retained labor has no equipment cost; ordinary purchased parts still require one.
+ALTER TABLE public.proposal_line_items DROP CONSTRAINT IF EXISTS proposal_line_items_cost_positive;
+ALTER TABLE public.proposal_line_items ADD CONSTRAINT proposal_line_items_cost_positive CHECK(cost>=0 AND (is_customer_supplied=true OR equipment_removed=true OR cost>0));
 ALTER TABLE public.change_orders ADD COLUMN handoff_applied_at timestamptz;
 ALTER TABLE public.change_order_line_items ADD COLUMN applied_item_id uuid REFERENCES public.proposal_line_items(id);
 CREATE TABLE public.project_scope_changes (
@@ -18,6 +21,18 @@ CREATE FUNCTION handoff_private.scope_packet(p_proposal uuid,p_org uuid) RETURNS
  'rooms',coalesce((SELECT jsonb_agg(jsonb_build_object('id',r.id,'name',r.name,'description',r.description) ORDER BY sort_order) FROM proposal_rooms r WHERE proposal_id=p_proposal AND organization_id=p_org),'[]'),
  'equipment',coalesce((SELECT jsonb_agg(jsonb_build_object('id',i.id,'room_id',i.room_id,'description',i.description,'quantity',i.quantity,'unit',i.unit,'task_notes',i.task_notes,'programming_notes',i.programming_notes,'equipment_removed',i.equipment_removed,'phase_notes',(SELECT coalesce(jsonb_agg(jsonb_build_object('name',ph.name,'notes',lp.tech_notes)),'[]') FROM proposal_line_item_labor_phases lp JOIN labor_phases ph ON ph.id=lp.labor_phase_id WHERE lp.line_item_id=i.id)) ORDER BY sort_order) FROM proposal_line_items i WHERE proposal_id=p_proposal AND organization_id=p_org AND NOT coalesce(is_hidden,false)),'[]'))
 $$;
+-- The original packet includes phase-specific instructions as well as room notes.
+CREATE OR REPLACE FUNCTION public.capture_sold_project_handoff() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE proposal uuid;
+BEGIN
+ IF NEW.sales_order_id IS NULL THEN RETURN NEW; END IF;
+ SELECT proposal_id INTO proposal FROM sales_orders WHERE id=NEW.sales_order_id AND organization_id=NEW.organization_id;
+ IF proposal IS NULL THEN RAISE EXCEPTION 'Sales order proposal missing'; END IF;
+ NEW.sold_handoff:=handoff_private.scope_packet(proposal,NEW.organization_id)||jsonb_build_object('version',1,'tasks',coalesce((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.sort_order) FROM proposal_tasks t LEFT JOIN proposal_line_items i ON i.id=t.line_item_id WHERE t.proposal_id=proposal AND t.organization_id=NEW.organization_id AND (t.line_item_id IS NULL OR NOT coalesce(i.is_hidden,false) OR EXISTS(SELECT 1 FROM proposal_line_items ci WHERE ci.proposal_id=proposal AND ci.organization_id=NEW.organization_id AND ci.id=ANY(t.covered_item_ids) AND NOT coalesce(ci.is_hidden,false)))),'[]'));
+ RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.capture_sold_project_handoff() FROM PUBLIC,anon,authenticated;
+
 CREATE FUNCTION handoff_private.reconcile_tasks(p_project uuid,p_proposal uuid,p_org uuid) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 BEGIN
  INSERT INTO project_tasks(project_id,organization_id,title,description,labor_phase_id,status,sort_order,source_line_item_id,source_proposal_task_id,source,visibility,estimated_hours,room_name,covered_items)
@@ -82,6 +97,8 @@ BEGIN
              item_type = CASE WHEN v_item.remove_scope='parts_only' THEN 'labor' ELSE item_type END,
              cost = CASE WHEN v_item.remove_scope='parts_only' THEN 0 ELSE cost END,
              unit_price = 0, line_total=0,
+             labor_total = CASE WHEN v_item.remove_scope='parts_only' THEN labor_total ELSE 0 END,
+             labor_rate = CASE WHEN v_item.remove_scope='parts_only' THEN labor_rate ELSE 0 END,
              updated_at = now()
       WHERE  id = v_item.proposal_line_item_id AND proposal_id=v_proposal_id;
 
@@ -211,8 +228,8 @@ CREATE FUNCTION handoff_private.refresh_item_tasks() RETURNS trigger LANGUAGE pl
 BEGIN PERFORM seed_proposal_tasks_for_line_item(NEW.id); PERFORM handoff_private.refresh_estimates(NEW.id); RETURN NEW; END $$;
 CREATE TRIGGER refresh_item_task_estimates AFTER UPDATE OF quantity,labor_hours,programming_labor_hours ON public.proposal_line_items FOR EACH ROW EXECUTE FUNCTION handoff_private.refresh_item_tasks();
 CREATE FUNCTION handoff_private.refresh_phase_tasks() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-BEGIN PERFORM seed_proposal_tasks_for_line_item(NEW.line_item_id); PERFORM handoff_private.refresh_estimates(NEW.line_item_id); RETURN NEW; END $$;
-CREATE TRIGGER refresh_phase_task_estimates AFTER INSERT OR UPDATE OF hours ON public.proposal_line_item_labor_phases FOR EACH ROW EXECUTE FUNCTION handoff_private.refresh_phase_tasks();
+BEGIN IF TG_OP='DELETE' THEN PERFORM handoff_private.refresh_estimates(OLD.line_item_id); RETURN OLD; END IF; PERFORM seed_proposal_tasks_for_line_item(NEW.line_item_id); PERFORM handoff_private.refresh_estimates(NEW.line_item_id); RETURN NEW; END $$;
+CREATE TRIGGER refresh_phase_task_estimates AFTER INSERT OR DELETE OR UPDATE OF hours ON public.proposal_line_item_labor_phases FOR EACH ROW EXECUTE FUNCTION handoff_private.refresh_phase_tasks();
 
 -- Clone all job-content columns with fresh IDs. Suppress seeding until the
 -- existing tasks and intentional omissions have been copied verbatim.
@@ -238,6 +255,9 @@ BEGIN
  FOR task IN SELECT * FROM proposal_tasks WHERE proposal_id=p_source ORDER BY sort_order LOOP
   INSERT INTO proposal_tasks SELECT (jsonb_populate_record(NULL::proposal_tasks,to_jsonb(task)||jsonb_build_object('id',gen_random_uuid(),'proposal_id',p_target,'line_item_id',items->>task.line_item_id::text,'covered_item_ids',to_jsonb(ARRAY(SELECT (items->>x::text)::uuid FROM unnest(task.covered_item_ids) x)),'created_at',now(),'updated_at',now()))).*;
  END LOOP;
+ -- Proposal insertion already creates default settings in production. Replace
+ -- only that fresh target row, within this same transaction, with copied content.
+ IF EXISTS(SELECT 1 FROM proposal_settings WHERE proposal_id=p_source) THEN DELETE FROM proposal_settings WHERE proposal_id=p_target; END IF;
  FOR settings IN SELECT * FROM proposal_settings WHERE proposal_id=p_source LOOP
   INSERT INTO proposal_settings SELECT (jsonb_populate_record(NULL::proposal_settings,to_jsonb(settings)||jsonb_build_object('id',gen_random_uuid(),'proposal_id',p_target,'organization_id',org,'created_at',now(),'updated_at',now()))).*;
  END LOOP;
@@ -369,8 +389,9 @@ BEGIN
  SELECT so.proposal_id INTO proposal FROM change_orders co JOIN sales_orders so ON so.id=co.sales_order_id WHERE co.id=p_change AND co.organization_id=org AND co.status<>'approved' AND NOT coalesce(co.is_locked,false) FOR UPDATE OF co;
  SELECT * INTO li FROM proposal_line_items WHERE id=p_item AND proposal_id=proposal AND organization_id=org FOR UPDATE;
  IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM change_order_line_items WHERE change_order_id=p_change AND proposal_line_item_id=p_item AND action_type='add' AND organization_id=org) THEN RAISE EXCEPTION 'Draft added item not found'; END IF;
+ IF li.equipment_removed AND li.item_type='labor' THEN RETURN; END IF;
  UPDATE proposal_line_items SET description='Labor — '||description,product_id=NULL,item_type='labor',unit_price=0,line_total=0,cost=0,equipment_removed=true,is_hidden=false WHERE id=p_item;
- UPDATE change_order_line_items SET product_id=NULL,product_name='Labor — '||li.description,product_description='Labor — '||li.description,item_type='labor',new_unit_price=0,new_labor_total=li.labor_total,labor_hours=li.labor_hours,labor_rate=li.labor_rate,applied_item_id=p_item WHERE change_order_id=p_change AND proposal_line_item_id=p_item AND action_type='add';
+ UPDATE change_order_line_items SET product_id=NULL,product_name='Labor — '||li.description,product_description='Labor — '||li.description,item_type='labor',new_unit_price=0,new_quantity=li.quantity,new_total=coalesce(li.labor_total,0),change_amount=coalesce(li.labor_total,0),new_labor_total=li.labor_total,labor_hours=li.labor_hours,labor_rate=li.labor_rate,applied_item_id=p_item WHERE change_order_id=p_change AND proposal_line_item_id=p_item AND action_type='add';
  PERFORM seed_proposal_tasks_for_line_item(p_item);
 END $$;
 REVOKE ALL ON FUNCTION public.keep_added_change_labor(uuid,uuid) FROM PUBLIC,anon;

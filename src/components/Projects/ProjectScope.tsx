@@ -9,6 +9,8 @@ type Equipment = {
   unit: string;
   task_notes?: string | null;
   programming_notes?: string | null;
+  phase_notes?: {name:string;notes:string|null}[];
+  equipment_removed?:boolean;
 };
 type Scope = {
   overall_scope: string | null;
@@ -151,13 +153,14 @@ export default function ProjectScope({
         .map((item) => (
           <li key={item.id} className="text-sm text-primary">
             <p>
-              {item.quantity} {item.unit} · {item.description}
+              {item.quantity} {item.unit} · {item.description}{item.equipment_removed&&" · Labor only; equipment removed"}
             </p>
             {item.task_notes && (
               <p className="text-secondary whitespace-pre-wrap mt-1">
                 {item.task_notes}
               </p>
             )}
+            {item.phase_notes?.map((phase,index)=>phase.notes&&<p key={index} className="text-secondary whitespace-pre-wrap mt-1">{phase.name}: {phase.notes}</p>)}
             {item.programming_notes && (
               <p className="text-secondary whitespace-pre-wrap mt-1">
                 {item.programming_notes}
