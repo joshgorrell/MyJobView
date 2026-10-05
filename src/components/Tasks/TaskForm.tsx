@@ -584,24 +584,6 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </div>
             )}
 
-            {/* Status (edit only) */}
-            {task && (
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as Task['status'] })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-            )}
           </div>
 
           {/* Footer buttons */}
