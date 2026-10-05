@@ -3,6 +3,13 @@ on:
   pull_request:
     paths:
       - 'src/components/Production/**'
+      - 'src/components/Projects/**'
+      - 'src/components/Proposals/**'
+      - 'src/components/Sales/**'
+      - 'src/components/Shared/TaskGroups.tsx'
+      - 'src/lib/jobOffline.ts'
+      - 'src/lib/useJobDraft.ts'
+      - 'supabase/migrations/*handoff*'
       - 'src/components/Shared/QuickActionModal.tsx'
       - 'tests/work-orders/**'
       - 'tests/program-access/**'
@@ -26,9 +33,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run test:work-orders
+      - run: npm run test:handoff
       - run: npm run test:program-access
       - run: npx eslint src/components/Shared/QuickActionModal.tsx
-      - run: npm install --no-save --package-lock=false playwright@1.55.1
       - run: npx playwright install --with-deps chromium
       - run: node tests/work-orders/browser.mjs
