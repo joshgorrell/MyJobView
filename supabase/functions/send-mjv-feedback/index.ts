@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -241,7 +242,7 @@ Deno.serve(async (req: Request) => {
     const submitter = String(payload.userName || payload.userEmail || 'Unknown user').trim();
     const subject = `[MJV ${subjectType}] ${dealer} — ${submitter}`;
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
+    const emailResponse = await sendSystemEmail({
       method: 'POST',
       headers: {
         Authorization: `Bearer ${resendApiKey}`,

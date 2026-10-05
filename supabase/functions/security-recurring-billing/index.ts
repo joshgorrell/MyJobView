@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import {resolveSecurityInvoiceItems} from '../_shared/security-invoice-items.ts';
 import {getSupabaseAdmin,getConnection,getValidAccessToken,qboRequest,upsertEntityMapping} from '../_shared/qbo-client.ts';
 import {authorizeSecurityWorker} from '../_shared/security-worker-auth.ts';
@@ -96,7 +97,7 @@ Deno.serve(async(req:Request)=>{
 async function sendNotice(to:string,settings:Record<string,string>|null,subject:string,text:string,key:string) {
   const apiKey=Deno.env.get('RESEND_API_KEY');
   if(!to || !apiKey || !settings?.from_email || !settings.company_email) throw new Error('Customer email and company email settings are required before an automatic debit');
-  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json','Idempotency-Key':key},
+  const response=await sendSystemEmail({method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json','Idempotency-Key':key},
     body:JSON.stringify({from:`${settings.from_name||settings.company_name} <${settings.from_email}>`,to:[to],subject,text}),signal:AbortSignal.timeout(20000)});
   if(!response.ok) throw new Error('Advance payment notice could not be delivered; no debit is scheduled');
 }

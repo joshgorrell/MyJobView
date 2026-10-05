@@ -769,10 +769,10 @@ function AppContent() {
     );
   }
 
-  if (!user || !profile) {
+  if (isPasswordRecovery || !user || !profile) {
     // If already logged in on root domain with redirect_to, send to bridge
     const redirectParam = new URLSearchParams(window.location.search).get('redirect_to');
-    if (user && redirectParam && isValidReturnHost(redirectParam)) {
+    if (!isPasswordRecovery && user && redirectParam && isValidReturnHost(redirectParam)) {
       const returnPath = new URLSearchParams(window.location.search).get('return_path') || window.location.pathname;
       const bridgeUrl = new URL('/auth-bridge', window.location.origin);
       bridgeUrl.searchParams.set('return_to', redirectParam);
@@ -784,7 +784,7 @@ function AppContent() {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
           <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-white mb-6">Reset Your Password</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">{new URLSearchParams(window.location.search).get('account_setup') === 'welcome' ? 'Welcome to MyJobView' : 'Reset Your Password'}</h2>
 
             {resetSuccess ? (
               <div className="text-center">

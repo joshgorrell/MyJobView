@@ -23,11 +23,11 @@ const admin={rpc:async(name,args)=>{
  return {data:{success:true},error:null};
 },from:table=>{const query={select:()=>query,update:()=>query,eq:()=>query,single:async()=>({data:rows[table],error:null}),maybeSingle:async()=>({data:null,error:null}),upsert:async()=>({error:null})};return query;}};
 const {resolveSecurityInvoiceItems}=await import(compile(await readFile(new URL('../../supabase/functions/_shared/security-invoice-items.ts',import.meta.url),'utf8')));
-globalThis.__worker={resolveSecurityInvoiceItems,getSupabaseAdmin:()=>admin,getConnection:async()=>({organization_id:'org',realm_id:'realm',environment:'sandbox',payments_enabled:connected,security_monitoring_item_id:'item'}),getValidAccessToken:async()=>'server-token',
+globalThis.__worker={sendSystemEmail:init=>fetch('https://api.resend.com/emails',init),resolveSecurityInvoiceItems,getSupabaseAdmin:()=>admin,getConnection:async()=>({organization_id:'org',realm_id:'realm',environment:'sandbox',payments_enabled:connected,security_monitoring_item_id:'item'}),getValidAccessToken:async()=>'server-token',
  qboRequest:async(_a,_c,method,path,body)=>{qboCalls.push({method,path,body});if(path.startsWith('query?')) { const name=decodeURIComponent(path.split('query=')[1].split('&')[0]).match(/Name = '(.+)'/)[1];return {ok:true,data:{QueryResponse:{Item:[{Id:'qb-'+name,Name:name,Type:'Service',Active:true}]}}}; } return {ok:true,data:path.startsWith('payment?')?{Payment:{Id:'accounting-payment'}}:{Invoice:{Id:'qb-invoice',TotalAmt:invoice.total,Balance:balance}}};},upsertEntityMapping:async()=>{},authorizeSecurityWorker,
  securityCharge:async(...args)=>{chargeCalls.push(args);return {state:args[8]?'paid':'pending',processor_id:'ach-1',processor_status:args[8]?'SETTLED':'PENDING'};}};
 const source=(await readFile(new URL('../../supabase/functions/security-recurring-billing/index.ts',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
-const shim=`const {getSupabaseAdmin,getConnection,getValidAccessToken,qboRequest,upsertEntityMapping,securityCharge,authorizeSecurityWorker,resolveSecurityInvoiceItems}=globalThis.__worker;\nconst Deno={env:{get:key=>({RESEND_API_KEY:'test-mail-key',SECURITY_ACH_SETTLED_STATUS:'SETTLED'}[key])},serve:h=>{globalThis.__workerHandler=h;}};\n`;
+const shim=`const {sendSystemEmail,getSupabaseAdmin,getConnection,getValidAccessToken,qboRequest,upsertEntityMapping,securityCharge,authorizeSecurityWorker,resolveSecurityInvoiceItems}=globalThis.__worker;\nconst Deno={env:{get:key=>({RESEND_API_KEY:'test-mail-key',SECURITY_ACH_SETTLED_STATUS:'SETTLED'}[key])},serve:h=>{globalThis.__workerHandler=h;}};\n`;
 const originalFetch=globalThis.fetch;
 globalThis.fetch=async()=>new Response('{}',{status:noticeOk?200:503});
 await import(compile(shim+source));

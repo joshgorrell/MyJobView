@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -89,7 +90,7 @@ Deno.serve(async (req: Request) => {
     if (RESEND_API_KEY) {
       const fromEmail = companySettings?.email_from_address || "onboarding@resend.dev";
 
-      const res = await fetch("https://api.resend.com/emails", {
+      const res = await sendSystemEmail({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -118,23 +119,7 @@ Deno.serve(async (req: Request) => {
         }
       );
     } else {
-      // No email service configured - just return success
-      console.log("No RESEND_API_KEY configured - skipping email send");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Email would be sent (no API key configured)",
-          preview: {
-            to: email,
-            subject: subject,
-            body: body.substring(0, 200) + "..."
-          }
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
   } catch (error: any) {
     console.error("Error sending kiosk thank you email:", error);

@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
@@ -166,7 +167,7 @@ ${supportEmail ? `Replies go to ${supportEmail}.` : 'This is an automated messag
     });
     if (messageError || !message) throw new Error('Invitation delivery could not be prepared safely.');
 
-    const response = await fetch(`https://api.resend.com/emails`, {
+    const response = await sendSystemEmail({
       method: "POST",
       headers: {
         "Content-Type": "application/json",

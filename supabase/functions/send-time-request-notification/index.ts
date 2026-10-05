@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -156,7 +157,7 @@ Deno.serve(async (req: Request) => {
       let sentCount = 0;
       for (const approver of approvers) {
         if (!approver.email) continue;
-        const response = await fetch('https://api.resend.com/emails', {
+        const response = await sendSystemEmail({
           method: 'POST',
           headers: {
             Authorization: `Bearer ${resendApiKey}`,
@@ -223,7 +224,7 @@ Deno.serve(async (req: Request) => {
           }
         </div>`;
 
-      const response = await fetch('https://api.resend.com/emails', {
+      const response = await sendSystemEmail({
         method: 'POST',
         headers: {
           Authorization: `Bearer ${resendApiKey}`,

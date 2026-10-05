@@ -36,11 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setIsPasswordRecovery(true);
-      setLoading(false);
-      return;
-    }
+    const recoveryLink = new URLSearchParams(hash.replace(/^#/, '')).get('type') === 'recovery';
+    if (recoveryLink) setIsPasswordRecovery(true);
 
     // Wrap getSession in a timeout so a hanging session fetch doesn't
     // leave the app on the loading screen indefinitely.
@@ -58,7 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(sessionTimeout);
         setUser(session?.user ?? null);
         if (session?.user) {
-          loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
+          if (recoveryLink) setLoading(false);
+          else loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
         } else {
           setLoading(false);
         }
@@ -100,6 +98,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (recoveryLink) {
+          setUser(session.user);
+          setIsPasswordRecovery(true);
+          setLoading(false);
+          return;
+        }
         setUser(session.user);
         setIsPasswordRecovery(false);
         setLoading(true);

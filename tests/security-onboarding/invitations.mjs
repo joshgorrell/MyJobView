@@ -14,9 +14,9 @@ const admin={from:table=>{
  if(name==='security_finish_invitation'){finishes++;if(finishFails)return {error:{message:'DB unavailable'}};sent=true;return {};}
  throw new Error('Unexpected RPC');
 }};
-globalThis.__invite={createClient:(_,key)=>key==='service'?admin:caller};
+globalThis.__invite={sendSystemEmail:init=>fetch('https://api.resend.com/emails',init),createClient:(_,key)=>key==='service'?admin:caller};
 const source=(await readFile(new URL('../../supabase/functions/send-contract-invitation/index.ts',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
-const compiled=ts.transpileModule(`const {createClient}=globalThis.__invite;
+const compiled=ts.transpileModule(`const {sendSystemEmail,createClient}=globalThis.__invite;
 const Deno={env:{get:key=>key==='SUPABASE_SERVICE_ROLE_KEY'?'service':key==='RESEND_API_KEY'?'fake-secret':'anon'},serve:h=>{globalThis.__inviteHandler=h}};
 ${source}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));

@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEmailTemplate, getCompanySettings, replacePlaceholders, convertTextToHtml, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
@@ -712,7 +713,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const resendResp = await fetch("https://api.resend.com/emails", {
+      const resendResp = await sendSystemEmail({
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
         body: JSON.stringify({ from: settings.from_address, to: [contact_email], reply_to: settings.reply_to_email, subject, html: emailHtml }),
@@ -875,7 +876,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const resendResponse = await fetch("https://api.resend.com/emails", {
+    const resendResponse = await sendSystemEmail({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
