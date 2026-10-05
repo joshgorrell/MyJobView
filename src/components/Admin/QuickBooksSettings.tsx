@@ -24,6 +24,8 @@ export function QuickBooksSettings() {
   const [loading, setLoading] = useState(true);
   const [monitoringItem, setMonitoringItem] = useState('');
   const [monitoringMessage, setMonitoringMessage] = useState('');
+  const [billingItems, setBillingItems] = useState<Array<{id:string;name:string;income_account:string}>>([]);
+  const [billingBusy, setBillingBusy] = useState(false);
   const [settingsError, setSettingsError] = useState(false);
   const [connectionResult] = useState(() => new URLSearchParams(window.location.search).get('qbo'));
   const [connecting, setConnecting] = useState(false);
@@ -202,12 +204,33 @@ export function QuickBooksSettings() {
       <button type="button" disabled={loading} onClick={() => { if (profile?.organization_id) void loadSettings(profile.organization_id); }} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"><RefreshCw className="h-4 w-4" />Refresh connection status</button>
       {settings?.is_connected && <div className="rounded-lg border p-4 space-y-3">
         <label className="block font-medium" htmlFor="security-qbo-item">QuickBooks reference item for monitoring/service income</label>
-        <input id="security-qbo-item" value={monitoringItem} onChange={e => setMonitoringItem(e.target.value)} className="border rounded p-2 w-full" />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select id="security-qbo-item" value={monitoringItem} onChange={e => setMonitoringItem(e.target.value)} disabled={billingBusy || profile?.role !== 'admin'} className="min-w-0 w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 [color-scheme:light]">
+            <option value="">Choose the income reference service item</option>
+            {monitoringItem && !billingItems.some(i=>i.id===monitoringItem) && <option value={monitoringItem}>Saved reference item ({monitoringItem}) — load items to view its account</option>}
+            {billingItems.map(item=><option key={item.id} value={item.id}>{item.name} · {item.income_account}</option>)}
+          </select>
+          <button type="button" disabled={billingBusy || profile?.role !== 'admin'} className="shrink-0 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 disabled:opacity-50" onClick={async()=>{
+            setBillingBusy(true);setMonitoringMessage('');
+            try {
+              const {data,error}=await supabase.functions.invoke('security-qbo-billing-setup',{body:{action:'list'}});
+              if(error || data?.error) throw new Error(data?.error || 'QuickBooks service items could not be loaded. Please retry.');
+              setBillingItems(data.items);
+              if(!data.items.length) setMonitoringMessage('No eligible service items found. Create a service item with the correct income account in QuickBooks, then load items again.');
+            } catch(e) {setMonitoringMessage(e instanceof Error?e.message:'Items could not be loaded.');}
+            finally {setBillingBusy(false);}
+          }}>{billingBusy ? 'Loading…' : 'Load QuickBooks items'}</button>
+        </div>
         <p className="text-sm text-gray-600">Select an existing QuickBooks service item whose income account should be used for new monitoring and additional service items. Invoice lines use separate items matching the services selected on the agreement; this reference item is not used to combine them. Payments access and tax classification must also be configured before billing.</p>
-        <button type="button" className="rounded bg-blue-700 text-white px-4 py-2" onClick={async () => {
+        <button type="button" disabled={billingBusy || !billingItems.some(i=>i.id===monitoringItem) || profile?.role !== 'admin'} className="rounded bg-blue-700 text-white px-4 py-2 disabled:opacity-50" onClick={async () => {
           if (profile?.role !== 'admin') { setMonitoringMessage('Only Admin can configure monitoring billing.'); return; }
-          const { error } = await supabase.from('quickbooks_settings').update({ security_monitoring_item_id: monitoringItem.trim() || null }).eq('id', settings.id).eq('organization_id', profile.organization_id);
-          setMonitoringMessage(error ? error.message : 'Monitoring sales item saved.');
+          setBillingBusy(true);
+          try {
+            const {data,error}=await supabase.functions.invoke('security-qbo-billing-setup',{body:{action:'save',itemId:monitoringItem}});
+            if(error || data?.error) throw new Error(data?.error || 'Billing setup could not be saved. Please retry.');
+            setMonitoringMessage(`Saved: ${data.item.name} · ${data.item.income_account}`);
+          } catch(e) {setMonitoringMessage(e instanceof Error?e.message:'Billing setup could not be saved.');}
+          finally {setBillingBusy(false);}
         }}>Save monitoring item</button>
         {monitoringMessage && <p role="status">{monitoringMessage}</p>}
       </div>}
