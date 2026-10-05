@@ -89,7 +89,7 @@ LANGUAGE sql
 STABLE
 SECURITY INVOKER
 SET search_path = public, private
-AS $
+AS $$
   SELECT d.id
   FROM departments d
   WHERE d.is_active = true
