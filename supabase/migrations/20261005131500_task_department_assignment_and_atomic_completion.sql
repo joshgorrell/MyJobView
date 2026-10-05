@@ -95,6 +95,22 @@ $$;
 REVOKE ALL ON FUNCTION public.get_my_task_department_ids() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_my_task_department_ids() TO authenticated;
 
+DROP POLICY IF EXISTS "Internal users can view open team tasks" ON public.tasks;
+CREATE POLICY "Internal users can view open team tasks"
+  ON public.tasks FOR SELECT
+  TO authenticated
+  USING (
+    assigned_to IS NULL
+    AND assigned_department_id IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM profiles p
+      WHERE p.id = auth.uid()
+        AND COALESCE(p.is_active, true) = true
+        AND COALESCE(p.role, '') <> 'portal_user'
+    )
+  );
+
 DROP POLICY IF EXISTS "Department members can view department tasks" ON public.tasks;
 CREATE POLICY "Department members can view department tasks"
   ON public.tasks FOR SELECT
