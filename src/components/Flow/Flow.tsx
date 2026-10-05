@@ -11,7 +11,19 @@ import { FlowWaveIcon } from './FlowWaveIcon';
 import './flow.css';
 
 type Option = { id: string; name: string };
-const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team discussions', updates: 'Updates', tasks: 'Tasks', activity: 'Other activity' };
+const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Tasks', activity: 'Other activity' };
+type FlowView = 'all' | 'activity' | 'direct' | 'customers' | 'team';
+const FLOW_VIEWS: { id: FlowView; label: string }[] = [
+  { id: 'all', label: 'All' }, { id: 'activity', label: 'Activity' }, { id: 'direct', label: 'Direct' },
+  { id: 'customers', label: 'Customers' }, { id: 'team', label: 'Team' },
+];
+function matchesView(event: FlowEvent, view: FlowView) {
+  if (view === 'all') return true;
+  if (view === 'direct') return event.source_table === 'messages' && !!event.is_internal;
+  if (view === 'customers') return event.source_table === 'messages' && !event.is_internal;
+  if (view === 'team') return event.source_table === 'discussion_posts';
+  return event.source_table !== 'messages' && event.source_table !== 'discussion_posts';
+}
 function eventKind(event: FlowEvent): string {
   if (event.source_table === 'messages') return event.is_internal ? 'Internal message' : 'Customer message';
   if (event.source_table === 'discussion_posts') return 'Team discussion';
@@ -30,6 +42,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const scoped = !!(contactId || projectId || workOrderId);
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
   const [myWork, setMyWork] = useState(!scoped);
+  const [view, setView] = useState<FlowView>('all');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(false);
@@ -117,16 +130,18 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
     return result;
   }
   async function markShown() {
-    setMarking(true); await flow.markViewed(flow.events.filter(e => !e.viewed).map(e => e.id)); setMarking(false);
+    setMarking(true); await flow.markViewed(visibleEvents.filter(e => !e.viewed).map(e => e.id)); setMarking(false);
   }
-  const newShown = flow.events.filter(e => !e.viewed).length;
+  const visibleEvents = flow.events.filter(event => matchesView(event, view));
+  const newShown = visibleEvents.filter(e => !e.viewed).length;
   return <section className={`flow ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
-    <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'Activity and conversations for this record' : 'Customer conversations, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
+    <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
       {canPost && <button className="flow-primary" onClick={() => setComposing(!composing)}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button>}
     </header>
     {composing && <PostFlowUpdate scope={chosenScope} onClose={() => setComposing(false)} onPosted={() => { setComposing(false); void flow.refresh(); }} />}
+    <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{FLOW_VIEWS.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
     <div className={`flow-toolbar ${scoped ? 'flow-toolbar--scoped' : ''}`}>
-      {!scoped && <div className="flow-segment" aria-label="Activity scope"><button aria-pressed={myWork} onClick={() => setMyWork(true)}>My Work</button><button aria-pressed={!myWork} onClick={() => setMyWork(false)}>All Activity</button></div>}
+      {!scoped && <div className="flow-segment" aria-label="Activity scope"><button aria-pressed={myWork} onClick={() => setMyWork(true)}>My Work</button><button aria-pressed={!myWork} onClick={() => setMyWork(false)}>Company</button></div>}
       <label className="flow-kind flow-desktop-control"><span className="sr-only">Show</span><select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">Everything</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
       <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
@@ -149,12 +164,12 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
     {!!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
     {flow.error && <div className="flow-error" role="alert">{flow.error} <button onClick={() => void flow.refresh()}>Retry</button></div>}
     {flow.pending > 0 && <button className="flow-new-banner" onClick={() => void flow.refresh()}>{flow.pending === 50 ? '50+' : flow.pending} new {flow.pending === 1 ? 'activity' : 'activities'} — show updates</button>}
-    <div className="flow-list-meta"><span>{flow.events.length} shown · {newShown} new</span><div className="flow-meta-actions"><button aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={14} /><span className="flow-desktop-label">{marking ? 'Saving…' : 'Mark shown viewed'}</span><span className="flow-mobile-label">{marking ? 'Saving…' : 'Viewed'}</span></button><button className="flow-help-toggle" aria-label="About Flow unread indicators" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}><HelpCircle size={15} /></button></div></div>
+    <div className="flow-list-meta"><span>{visibleEvents.length} shown · {newShown} new</span><div className="flow-meta-actions"><button aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={14} /><span className="flow-desktop-label">{marking ? 'Saving…' : 'Mark shown viewed'}</span><span className="flow-mobile-label">{marking ? 'Saving…' : 'Viewed'}</span></button><button className="flow-help-toggle" aria-label="About Flow unread indicators" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}><HelpCircle size={15} /></button></div></div>
     <div className="flow-column-head" aria-hidden="true"><span /><span>Time</span><span>Customer / job</span><span>Activity</span><span>By</span><span /></div>
     <div aria-busy={flow.loading}>
-      {flow.loading ? <div className="flow-empty">Loading activity…</div> : !flow.events.length ? <div className="flow-empty"><Activity size={24} /><strong>{newOnly ? 'You’re caught up for these filters.' : 'No activity to show yet.'}</strong><span>{myWork ? 'Try All Activity or change your filters.' : 'New customer and job actions will appear here.'}</span></div> : flow.events.map((event, index) => {
+      {flow.loading ? <div className="flow-empty">Loading activity…</div> : !visibleEvents.length ? <div className="flow-empty"><Activity size={24} /><strong>{newOnly ? 'You’re caught up for these filters.' : 'No activity to show yet.'}</strong><span>{myWork ? 'Try All Activity or change your filters.' : 'New customer and job actions will appear here.'}</span></div> : visibleEvents.map((event, index) => {
         const group = dayLabel(event.created_at);
-        const showDay = index === 0 || group !== dayLabel(flow.events[index - 1].created_at);
+        const showDay = index === 0 || group !== dayLabel(visibleEvents[index - 1].created_at);
         const Icon = ICONS[event.category as keyof typeof ICONS] || Activity;
         const open = expanded === event.id;
         const job = event.work_order_number ? `WO ${event.work_order_number}` : event.project_name;
