@@ -1,5 +1,6 @@
+import { ensureSecurityQboCustomer } from '../_shared/security-qbo-customer.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { corsHeaders, getSupabaseAdmin, getConnection, getValidAccessToken, getQboIdByLocalId } from '../_shared/qbo-client.ts';
+import { corsHeaders, getSupabaseAdmin, getConnection, getValidAccessToken, getQboIdByLocalId, qboRequest } from '../_shared/qbo-client.ts';
 import { maskedPayment, paymentsOrigin, vaultRequest } from '../_shared/security-payment-vault.ts';
 
 Deno.serve(async (req: Request) => {
@@ -36,7 +37,7 @@ Deno.serve(async (req: Request) => {
     if (organization?.payment_processor!=='quickbooks' || !connection || !connection.payments_enabled)
       return respond({error:'QuickBooks Payments enrollment is not enabled. Your progress is saved; contact your provider.'},409);
     const {data:contact} = await admin.from('contacts').select('qbo_customer_id').eq('id',contract.contact_id).eq('organization_id',contract.organization_id).single();
-    const customerId = contact?.qbo_customer_id || await getQboIdByLocalId(admin,contract.organization_id,'customer',contract.contact_id);
+    const customerId = contact?.qbo_customer_id || await getQboIdByLocalId(admin,contract.organization_id,'customer',contract.contact_id) || await ensureSecurityQboCustomer(admin,connection,contract.contact_id,qboRequest);
     if (!customerId) return respond({error:'Your provider needs to sync your customer account with QuickBooks before payment enrollment. Your progress is saved.'},409);
     const accessToken = await getValidAccessToken(admin,connection);
     if (!accessToken) return respond({error:'QuickBooks needs to be reconnected by your provider'},409);

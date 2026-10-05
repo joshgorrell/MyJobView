@@ -395,6 +395,7 @@ await qbContext.route('https://security-test.supabase.co/**',async route=>{
  let data=[];
  if(path.endsWith('/auth/v1/user')) data={id:'qb-admin'};
  else if(path.endsWith('/profiles')) data={id:'qb-admin',organization_id:'org-1',role:'admin',is_active:true};
+ else if(path.endsWith('/security-qbo-billing-setup')) { const body=route.request().postDataJSON(); data=body.action==='list'?{items:[{id:'12',name:'Monitoring',income_account:'Monitoring income'}]}:{success:true,item:{id:'12',name:'Monitoring',income_account:'Monitoring income'}}; }
  else if(path.endsWith('/quickbooks_settings')) data={id:'settings',is_connected:true,payments_enabled:paymentsConnected,environment:'sandbox'};
  else if(one) data={};
  await route.fulfill({json:data});
@@ -406,6 +407,11 @@ await qbPage.getByRole('heading',{name:'QuickBooks Payments: Connected',exact:tr
 assert.ok(await qbPage.getByRole('status').getByText('QuickBooks authorization saved.',{exact:false}).count());
 assert.ok(await qbPage.getByRole('button',{name:'Reconnect QuickBooks Payments',exact:true}).count());
 assert.ok(await qbPage.getByText('This connection uses the QuickBooks sandbox.',{exact:false}).count());
+await qbPage.getByRole('button',{name:'Load QuickBooks items',exact:true}).click();
+await qbPage.getByLabel('QuickBooks reference item for monitoring/service income').selectOption('12');
+await qbPage.getByRole('button',{name:'Save monitoring item',exact:true}).click();
+await qbPage.getByText('Saved: Monitoring · Monitoring income',{exact:true}).waitFor();
+assert.ok(await qbPage.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Billing setup fits mobile');
 paymentsConnected=false;
 await qbPage.getByRole('button',{name:'Refresh connection status',exact:true}).click();
 await qbPage.getByRole('heading',{name:'QuickBooks Payments: Not connected',exact:true}).waitFor();

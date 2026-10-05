@@ -24,6 +24,7 @@ export default function SecurityPaymentEnrollment({contractId,token,selectedId,o
   useEffect(()=>{void load();},[load]);
   return <div className="space-y-4">
     <p className="text-sm text-gray-700">A payment method on file and automatic recurring payments are required for security monitoring. Select an existing method or securely add a card or bank account.</p>
+    {environment === 'sandbox' && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Test mode: use QuickBooks sandbox card or bank details. This does not enroll a live payment method.</p>}
     {loading && <p role="status">Loading payment methods…</p>}
     {error && <div role="alert" className="bg-red-50 text-red-800 rounded-xl p-4">{error}<button onClick={()=>void load()} className="underline ml-3">Retry payment methods</button></div>}
     {methods.map(method=><button key={method.id} onClick={()=>onSelect(method)} className={`block w-full text-left border-2 p-4 rounded-xl ${selectedId===method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
