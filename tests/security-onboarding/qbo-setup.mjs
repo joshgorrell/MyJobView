@@ -14,6 +14,7 @@ assert.equal(await ensureSecurityQboCustomer(admin,connection,'contact',request)
 assert.equal(requests.filter(r=>r.method==='POST').length,1);const key=requests.find(r=>r.method==='POST').path;
 requests=[];failSave=true;await assert.rejects(ensureSecurityQboCustomer(admin,connection,'contact',request),/link could not be saved/);failSave=false;
 assert.equal(requests.find(r=>r.method==='POST').path,key,'Retries use the same provider request ID');
+requests=[];await ensureSecurityQboCustomer(admin,{...connection,environment:'production'},'contact',request);assert.notEqual(requests.find(r=>r.method==='POST').path,key,'Sandbox and production cannot share a customer creation retry key');
 matches=[{Id:'existing',PrimaryEmailAddr:{Address:'TEST@example.com'},Active:true}];requests=[];
 assert.equal(await ensureSecurityQboCustomer(admin,connection,'contact',request),'existing');assert.equal(requests.some(r=>r.method==='POST'),false);
 matches[0].PrimaryEmailAddr.Address='other@example.com';await assert.rejects(ensureSecurityQboCustomer(admin,connection,'contact',request),/review an existing/);
