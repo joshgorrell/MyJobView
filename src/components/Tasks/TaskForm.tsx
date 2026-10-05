@@ -411,88 +411,21 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowDetails(!showDetails)}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
-            >
-              <span>{showDetails ? 'Hide details' : '+ Details'}</span>
-              <span className="text-xs text-muted">description, priority, due date, reminder, contact</span>
-            </button>
-
-            {showDetails && (
-              <div className="space-y-4">
-                            {/* Description */}
-                            <div>
-                              <label className="block text-sm font-medium text-secondary mb-1.5">
-                                Description
-                              </label>
-                              <textarea
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                rows={2}
-                                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
-                                placeholder="Add any additional details..."
-                              />
-                            </div>
-                
-                
-            {/* Priority + Due Date side by side */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                  <Flag className="w-4 h-4 text-muted" />
-                  Priority
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                >
-                  {priorities.length === 0 ? (
-                    <option value="medium">Medium</option>
-                  ) : (
-                    priorities.map((priority) => (
-                      <option key={priority.id} value={priority.slug}>
-                        {priority.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-muted" />
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Reminder */}
+            {/* Description - always visible */}
             <div>
-              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-muted" />
-                Reminder
+              <label className="block text-sm font-medium text-secondary mb-1.5">
+                Description
               </label>
-              <input
-                type="datetime-local"
-                value={formData.reminder_date}
-                onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
+                placeholder="Add any additional details..."
               />
-              <p className="text-xs text-muted mt-1">
-                Creates a Google Calendar reminder if connected
-              </p>
             </div>
 
-            {/* Contact */}
+            {/* Contact - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Contact <span className="text-muted font-normal">(optional)</span>
@@ -581,6 +514,71 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </div>
             )}
 
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
+            >
+              <span>{showDetails ? 'Hide details' : '+ Details'}</span>
+              <span className="text-xs text-muted">priority, due date, reminder</span>
+            </button>
+
+            {showDetails && (
+              <div className="space-y-4">
+            {/* Priority + Due Date side by side */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Flag className="w-4 h-4 text-muted" />
+                  Priority
+                </label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  {priorities.length === 0 ? (
+                    <option value="medium">Medium</option>
+                  ) : (
+                    priorities.map((priority) => (
+                      <option key={priority.id} value={priority.slug}>
+                        {priority.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-muted" />
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.due_date}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Reminder */}
+            <div>
+              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-muted" />
+                Reminder
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.reminder_date}
+                onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              />
+              <p className="text-xs text-muted mt-1">
+                Creates a Google Calendar reminder if connected
+              </p>
+            </div>
               </div>
             )}
 
