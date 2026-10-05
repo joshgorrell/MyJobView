@@ -19,6 +19,8 @@ export function UserBusinessCardEditor() {
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [subdomain, setSubdomain] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [brandingError, setBrandingError] = useState('');
+  const [brandingAttempt, setBrandingAttempt] = useState(0);
 
   const [fullName, setFullName] = useState('');
   const [title, setTitle] = useState('');
@@ -33,26 +35,53 @@ export function UserBusinessCardEditor() {
   }, [user?.id]);
 
   useEffect(() => {
-    loadOrganizationSubdomain();
-  }, [profile?.organization_id]);
+    const organizationId = profile?.organization_id;
+    let cancelled = false;
+    setCompany(null);
+    setSubdomain(null);
+    setBrandingError('');
+    if (!organizationId) return;
 
-  async function loadOrganizationSubdomain() {
-    if (!profile?.organization_id) return;
+    // A failed organization lookup must not prevent the card's branding load.
+    async function loadSubdomain() {
+      try {
+        const { data, error } = await supabase.from('organizations')
+          .select('subdomain').eq('id', organizationId).maybeSingle();
+        if (error) throw error;
+        if (!cancelled) setSubdomain(data?.subdomain || null);
+      } catch (error) {
+        console.error('Error loading business card subdomain:', error);
+      }
+    }
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('subdomain')
-      .eq('id', profile.organization_id)
-      .maybeSingle();
+    async function loadBranding() {
+      try {
+        let { data, error } = await supabase.from('company_settings')
+          .select('company_name, website, company_logo_url, business_card_banner_url')
+          .eq('organization_id', organizationId).maybeSingle();
 
-    if (!error) setSubdomain(data?.subdomain || null);
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('company_name, website, company_logo_url, business_card_banner_url')
-      .eq('organization_id', profile.organization_id)
-      .maybeSingle();
-    setCompany(settings);
-  }
+        // The artwork column is additive. Older schemas or column grants can
+        // reject that projection; still load the core logo/name/website fields.
+        if (error && ['42703', 'PGRST204', '42501'].includes(error.code)) {
+          const fallback = await supabase.from('company_settings')
+            .select('company_name, website, company_logo_url')
+            .eq('organization_id', organizationId).maybeSingle();
+          data = fallback.data ? { ...fallback.data, business_card_banner_url: null } : null;
+          error = fallback.error;
+        }
+        if (error) throw error;
+        if (!data) throw new Error('Company branding not found');
+        if (!cancelled) setCompany(data);
+      } catch (error) {
+        console.error('Error loading business card branding:', error);
+        if (!cancelled) setBrandingError('Company logo and artwork could not load.');
+      }
+    }
+
+    void loadSubdomain();
+    void loadBranding();
+    return () => { cancelled = true; };
+  }, [profile?.organization_id, brandingAttempt]);
 
   function getCardUrl(): string {
     return getBusinessCardUrl(card?.slug || '', subdomain);
@@ -240,6 +269,9 @@ export function UserBusinessCardEditor() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {brandingError && <div role="alert" className="rounded-lg border border-subtle bg-surface p-3 text-sm text-primary">
+        {brandingError} <button type="button" onClick={() => setBrandingAttempt(value => value + 1)} className="ml-2 font-medium text-brand underline">Retry</button>
+      </div>}
       {!editing ? (
         <section className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm" aria-label="Your business card">
           <div className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d]">

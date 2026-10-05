@@ -20,7 +20,7 @@ export function BusinessCardIdentity({ fullName, title, email, phone, linkedinUr
   fullName: string; title: string; email: string; phone: string;
   linkedinUrl?: string | null; photoUrl?: string | null; company?: CardBranding | null;
 }) {
-  const electronicLife = company?.company_name.trim().toLowerCase() === 'electronic life';
+  const electronicLife = company?.company_name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'electronic life';
   const banner = company?.business_card_banner_url ?? (electronicLife ? '/images/electronic-life-card-banner.webp' : null);
   const logo = company?.company_logo_url || (electronicLife ? '/el_logo_color_(2).png' : null);
   const names = fullName.trim().split(/\s+/);
@@ -59,7 +59,7 @@ export function BusinessCardIdentity({ fullName, title, email, phone, linkedinUr
 }
 
 export function BusinessCardFooter({ company }: { company?: CardBranding | null }) {
-  const electronicLife = company?.company_name.trim().toLowerCase() === 'electronic life';
+  const electronicLife = company?.company_name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'electronic life';
   const logo = electronicLife ? '/el_logo_color_(2).png' : company?.company_logo_url;
   return <div className="flex items-center gap-4 px-6 sm:px-8 pb-7" aria-hidden="true"><div className="h-px flex-1 bg-gradient-to-r from-cyan-400 to-blue-500" />{logo && (electronicLife ? <span className="block h-10 w-7 overflow-hidden"><img src={logo} alt="" className="h-10 w-auto max-w-none" /></span> : <img src={logo} alt="" className="h-7 max-w-[110px] object-contain" />)}<div className="h-px flex-1 bg-gradient-to-r from-blue-500 to-fuchsia-500" /></div>;
 }
