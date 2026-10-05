@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(sessionTimeout);
         setUser(session?.user ?? null);
         if (session?.user) {
-          loadProfile(session.user.id);
+          loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
         } else {
           setLoading(false);
         }
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session.user);
         setIsPasswordRecovery(false);
         setLoading(true);
-        loadProfile(session.user.id);
+        loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
         if (window.location.hash) {
           window.history.replaceState(null, '', window.location.pathname);
         }
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function loadProfile(userId: string) {
+  async function loadProfile(userId: string, portalUser: boolean) {
     if (loadingProfile) return;
 
     setLoadingProfile(true);
@@ -127,9 +127,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 10000);
 
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const portalUser = currentUser?.user_metadata?.is_portal_user === true;
-
       setIsPortalUser(portalUser);
 
       const { data, error } = await supabase
