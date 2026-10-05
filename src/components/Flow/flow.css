@@ -149,3 +149,9 @@
   .flow-view-tabs { gap: .1rem; padding-bottom: .45rem; }
   .flow-view-tabs button { padding: .4rem .55rem; font-size: .78rem; }
 }
+
+.flow-heading-actions { display:flex; align-items:center; gap:.45rem; }
+.flow-heading-actions > button { display:inline-flex; align-items:center; gap:.35rem; border:1px solid var(--border-subtle,#e5e7eb); border-radius:.55rem; padding:.48rem .7rem; font-size:.82rem; font-weight:650; background:var(--bg-canvas,#fff); color:var(--text-primary,#0f172a); cursor:pointer; }
+.flow-heading-actions > .flow-primary { background:var(--color-primary,#2563eb); color:#fff; border-color:transparent; }
+.flow-message-composer { margin-bottom:.75rem; }
+@media (max-width:640px) { .flow-heading-actions { gap:.25rem; } .flow-heading-actions > button { padding:.42rem .55rem; } }
