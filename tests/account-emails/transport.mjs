@@ -6,7 +6,7 @@ const env = { RESEND_API_KEY: 'test-key', SUPABASE_URL: 'https://test.supabase.c
 globalThis.Deno = { env: { get: key => env[key] }, serve() {} };
 let actor = { role: 'admin', is_active: true, organization_id: 'org-1' };
 let target = { id: 'employee', email: 'employee@example.com', full_name: '<Employee>', is_active: true };
-let settings = { company_name: 'Company', company_logo_url: 'https://dealer.example.com/logo.png', app_url: 'https://app.example.com', from_email: 'verified@example.com', from_name: 'Company', reply_to_email: 'help@example.com' };
+let settings = { company_name: 'Company', company_logo_url: 'https://dealer.example.com/logo.png', app_url: 'https://app.example.com', from_email: 'verified@example.com', from_name: 'Company', reply_to_email: 'help@example.com', company_email: 'office@example.com', welcome_support_email: 'welcome-help@example.com' };
 let providerStatus = 200;
 let redirectAllowed = true;
 let updateFailure = false;
@@ -61,10 +61,10 @@ providerStatus=403; assert.equal((await handleAccountEmail(req(),'welcome')).sta
 providerStatus=200;
 let response=await handleAccountEmail(req(),'welcome'); assert.equal(response.status,200); assert.equal((await response.json()).success,true);
 assert.ok(tracked.welcome_sent_at); assert.equal(tracked.welcome_email_id,'email-123'); assert.equal(tracked.welcome_error,null);
-assert.equal(sent.at(-1).payload.from,'Company <verified@example.com>'); assert.equal(sent.at(-1).payload.reply_to,'help@example.com');
-assert.ok(sent.at(-1).payload.html.includes('Set Up My Account'));assert.ok(sent.at(-1).payload.html.includes('https://dealer.example.com/logo.png'));assert.ok(sent.at(-1).payload.html.includes('Powered by MyJobView'));assert.ok(sent.at(-1).payload.html.includes('mailto:help@example.com')); assert.ok(sent.at(-1).payload.html.includes('&lt;Employee&gt;'));
+assert.equal(sent.at(-1).payload.from,'Company <verified@example.com>'); assert.equal(sent.at(-1).payload.reply_to,'welcome-help@example.com');
+assert.ok(sent.at(-1).payload.html.includes('Set Up My Account'));assert.ok(sent.at(-1).payload.html.includes('https://dealer.example.com/logo.png'));assert.ok(sent.at(-1).payload.html.includes('Powered by MyJobView'));assert.ok(sent.at(-1).payload.html.includes('mailto:welcome-help@example.com'));assert.ok(sent.at(-1).payload.html.includes('https://app.example.com/MJV_icon.PNG')); assert.ok(sent.at(-1).payload.html.includes('&lt;Employee&gt;'));
 assert.ok(!sent.at(-1).payload.html.includes('<Employee>'));
-response=await handleAccountEmail(req(),'reset'); assert.equal(response.status,200); assert.ok(sent.at(-1).payload.html.includes('Reset My Password'));
+response=await handleAccountEmail(req(),'reset'); assert.equal(response.status,200); assert.ok(sent.at(-1).payload.html.includes('Reset My Password')); assert.equal(sent.at(-1).payload.reply_to,'help@example.com');
 const count=sent.length; redirectAllowed=false; assert.equal((await handleAccountEmail(req(),'welcome')).status,400); assert.equal(sent.length,count); redirectAllowed=true;
 await handleAccountEmail(req({email:target.email,password:'secure-password'}),'reset'); assert.equal(directChanges,1); assert.equal(sent.length,count);
 updateFailure=true;response=await handleAccountEmail(req(),'welcome');const result=await response.json();assert.equal(result.success,true);assert.match(result.warning,/status could not be saved/);updateFailure=false;
@@ -97,7 +97,7 @@ assert.deepEqual(sent.at(-1).payload.to,['new@example.com']);assert.ok(sent.at(-
 providerStatus=403;assert.equal((await handleAuthEmail(authReq(recovery))).status,502);
 console.log('Signed Auth hook recovery, replay-window rejection, provider failure and secure email-change token mapping passed.');
 
-const fixture={kind:'welcome',companyName:'Other Dealer',companyLogoUrl:'https://other.example.com/logo.png',fullName:'Employee',email:'user@example.com',actionUrl:'https://app.example.com/setup',loginUrl:'https://app.example.com',supportEmail:'support@example.com'};
+const fixture={kind:'welcome',companyName:'Other Dealer',companyLogoUrl:'https://other.example.com/logo.png',fullName:'Employee',email:'user@example.com',actionUrl:'https://app.example.com/setup',loginUrl:'https://app.example.com',supportEmail:'support@example.com',mjvLogoUrl:'https://app.example.com/MJV_icon.PNG'};
 assert.ok(renderAccountEmail(fixture).html.includes('https://other.example.com/logo.png'));
 const noLogo=renderAccountEmail({...fixture,companyLogoUrl:null}).html;assert.ok(noLogo.includes('Other Dealer'));assert.ok(!noLogo.includes('<img'));
 assert.ok(!renderAccountEmail({...fixture,companyLogoUrl:'javascript:alert(1)'}).html.includes('<img'));
