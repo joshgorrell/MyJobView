@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Bug, CheckCircle2, FileText, Image, Lightbulb, Loader2, MessageSquare, Paperclip, Video, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -86,6 +86,8 @@ async function fileToBase64(file: File): Promise<string> {
 
 export default function TellUsModal({ isOpen, onClose }: TellUsModalProps) {
   const { user, profile, companySettings } = useAuth();
+  const [mobileViewport, setMobileViewport] = useState<{ height: number; top: number } | null>(null);
+  const messageRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('bug');
   const [message, setMessage] = useState('');
@@ -95,6 +97,43 @@ export default function TellUsModal({ isOpen, onClose }: TellUsModalProps) {
   const [success, setSuccess] = useState(false);
 
   const totalSize = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      setMobileViewport(window.innerWidth < 640 ? {
+        height: viewport?.height ?? window.innerHeight,
+        top: viewport?.offsetTop ?? 0,
+      } : null);
+      if (document.activeElement === messageRef.current) {
+        requestAnimationFrame(() => messageRef.current?.scrollIntoView({ block: 'nearest' }));
+      }
+    };
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const textarea = messageRef.current;
+    if (!isOpen || !textarea) return;
+    if (window.innerWidth >= 640) {
+      textarea.style.height = '';
+      return;
+    }
+    textarea.style.height = '160px';
+    textarea.style.height = `${Math.min(320, Math.max(160, textarea.scrollHeight))}px`;
+  }, [isOpen, message, success, mobileViewport === null]);
 
   if (!isOpen) return null;
 
@@ -194,9 +233,9 @@ export default function TellUsModal({ isOpen, onClose }: TellUsModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="tell-us-title">
-      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4 sm:px-6">
+    <div className="fixed inset-x-0 top-0 z-[70] flex h-[100dvh] items-center justify-center bg-black/65 backdrop-blur-sm sm:inset-0 sm:h-auto sm:p-4" style={mobileViewport ? { height: mobileViewport.height, top: mobileViewport.top } : undefined} role="dialog" aria-modal="true" aria-labelledby="tell-us-title">
+      <div className="flex h-full min-h-0 w-full max-w-2xl flex-col overflow-hidden bg-gray-900 shadow-2xl sm:h-auto sm:max-h-full sm:rounded-2xl sm:border sm:border-gray-700">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <div>
             <h2 id="tell-us-title" className="text-xl font-bold text-white">Tell Us</h2>
             <p className="mt-1 text-sm text-gray-400">Found a problem? Have an idea? Tell the MyJobView team.</p>
@@ -205,7 +244,7 @@ export default function TellUsModal({ isOpen, onClose }: TellUsModalProps) {
             type="button"
             onClick={handleClose}
             disabled={isSubmitting}
-            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white disabled:opacity-50"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-white disabled:opacity-50"
             aria-label="Close Tell Us"
           >
             <X className="h-5 w-5" />
@@ -213,7 +252,7 @@ export default function TellUsModal({ isOpen, onClose }: TellUsModalProps) {
         </div>
 
         {success ? (
-          <div className="p-6 sm:p-8">
+          <div className="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-8">
             <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-6 text-center">
               <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-green-400" />
               <h3 className="text-lg font-semibold text-white">Thanks!</h3>
@@ -228,121 +267,125 @@ export default function TellUsModal({ isOpen, onClose }: TellUsModalProps) {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
-            <div>
-              <span className="mb-2 block text-sm font-medium text-gray-300">What are you telling us about?</span>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {TYPE_OPTIONS.map(option => {
-                  const Icon = option.icon;
-                  const selected = feedbackType === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setFeedbackType(option.value)}
-                      className={`rounded-xl border p-3 text-left transition-all ${selected ? option.selectedClass : 'border-gray-700 bg-gray-800/60 hover:border-gray-600 hover:bg-gray-800'}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className={`h-5 w-5 ${option.iconClass}`} />
-                        <span className="text-sm font-semibold text-white">{option.label}</span>
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-gray-400">{option.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="tell-us-message" className="mb-2 block text-sm font-medium text-gray-300">Message</label>
-              <textarea
-                id="tell-us-message"
-                value={message}
-                onChange={event => setMessage(event.target.value)}
-                rows={7}
-                maxLength={10000}
-                placeholder="Tell us what's on your mind..."
-                className="w-full resize-y rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-white placeholder-gray-500 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-                disabled={isSubmitting}
-                autoFocus
-                required
-              />
-              <div className="mt-1 text-right text-xs text-gray-500">{message.length.toLocaleString()} / 10,000</div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <span className="block text-sm font-medium text-gray-300">Add media <span className="font-normal text-gray-500">(optional)</span></span>
-                  <span className="text-xs text-gray-500">Screenshots, photos, short videos, PDF or text files · up to 5 files</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isSubmitting || files.length >= MAX_FILES}
-                  className="inline-flex flex-shrink-0 items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Paperclip className="h-4 w-4" />
-                  Add Media
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,application/pdf,text/plain"
-                  className="hidden"
-                  onChange={event => addFiles(event.target.files)}
-                />
-              </div>
-
-              {files.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {files.map((file, index) => {
-                    const FileIcon = getFileIcon(file);
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:space-y-5 sm:p-6">
+              <div>
+                <span className="mb-2 block text-sm font-medium text-gray-300">What are you telling us about?</span>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {TYPE_OPTIONS.map(option => {
+                    const Icon = option.icon;
+                    const selected = feedbackType === option.value;
                     return (
-                      <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center gap-3 rounded-lg border border-gray-800 bg-gray-950/70 px-3 py-2.5">
-                        <FileIcon className="h-5 w-5 flex-shrink-0 text-gray-400" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm text-gray-200">{file.name}</p>
-                          <p className="text-xs text-gray-500">{formatBytes(file.size)}</p>
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setFeedbackType(option.value)}
+                        aria-pressed={selected}
+                        disabled={isSubmitting}
+                        className={`min-h-11 rounded-xl border px-3 py-2 text-left transition-all sm:p-3 ${selected ? option.selectedClass : 'border-gray-700 bg-gray-800/60 hover:border-gray-600 hover:bg-gray-800'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className={`h-5 w-5 ${option.iconClass}`} />
+                          <span className="text-sm font-semibold text-white">{option.label}</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setFiles(current => current.filter((_, currentIndex) => currentIndex !== index))}
-                          disabled={isSubmitting}
-                          className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-white disabled:opacity-50"
-                          aria-label={`Remove ${file.name}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
+                        <p className="hidden text-xs leading-5 text-gray-400 sm:mt-1 sm:block">{option.description}</p>
+                      </button>
                     );
                   })}
-                  <p className="text-right text-xs text-gray-500">{formatBytes(totalSize)} total</p>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="tell-us-message" className="mb-2 block text-sm font-medium text-gray-300">Message</label>
+                <textarea
+                  ref={messageRef}
+                  id="tell-us-message"
+                  value={message}
+                  onChange={event => setMessage(event.target.value)}
+                  rows={7}
+                  maxLength={10000}
+                  placeholder="Tell us what's on your mind..."
+                  className="min-h-[160px] w-full resize-none rounded-xl sm:resize-y border border-gray-700 bg-gray-950 px-4 py-3 text-base text-white placeholder-gray-500 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                  disabled={isSubmitting}
+                  required
+                />
+                <div className="mt-1 text-right text-xs text-gray-500">{message.length.toLocaleString()} / 10,000</div>
+              </div>
+
+              <div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <div>
+                    <span className="block text-sm font-medium text-gray-300">Add media <span className="font-normal text-gray-500">(optional)</span></span>
+                    <span className="text-xs text-gray-500">Screenshots, photos, short videos, PDF or text files · up to 5 files</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isSubmitting || files.length >= MAX_FILES}
+                    className="inline-flex min-h-11 w-full flex-shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm sm:w-auto font-medium text-gray-200 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    Add Media
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,application/pdf,text/plain"
+                    className="hidden"
+                    onChange={event => addFiles(event.target.files)}
+                  />
+                </div>
+
+                {files.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {files.map((file, index) => {
+                      const FileIcon = getFileIcon(file);
+                      return (
+                        <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center gap-3 rounded-lg border border-gray-800 bg-gray-950/70 px-3 py-2.5">
+                          <FileIcon className="h-5 w-5 flex-shrink-0 text-gray-400" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm text-gray-200">{file.name}</p>
+                            <p className="text-xs text-gray-500">{formatBytes(file.size)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFiles(current => current.filter((_, currentIndex) => currentIndex !== index))}
+                            disabled={isSubmitting}
+                            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-white disabled:opacity-50"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <p className="text-right text-xs text-gray-500">{formatBytes(totalSize)} total</p>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-sm text-red-300">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{error}</span>
                 </div>
               )}
+
             </div>
-
-            {error && (
-              <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-sm text-red-300">
-                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-3 border-t border-gray-800 pt-4">
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-800 bg-gray-900 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className="rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-700 disabled:opacity-50"
+                className="min-h-11 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-700 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !message.trim()}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 sm:flex-none px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
                 {isSubmitting ? 'Sending...' : 'Send to MyJobView'}
