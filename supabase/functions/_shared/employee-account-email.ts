@@ -39,7 +39,7 @@ export async function handleAccountEmail(req: Request, kind: 'welcome' | 'reset'
     tracked = true;
     const key = Deno.env.get('RESEND_API_KEY');
     if (!key) throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
-    const { data: settings, error: settingsError } = await db.from('company_settings').select('company_name,company_logo_url,app_url,from_email,from_name,reply_to_email').eq('organization_id', admin.organization_id).single();
+    const { data: settings, error: settingsError } = await db.from('company_settings').select('company_name,company_logo_url,app_url,from_email,from_name,reply_to_email,company_email,welcome_support_email').eq('organization_id', admin.organization_id).single();
     if (settingsError) throw settingsError;
     const from = settings?.from_email;
     if (!from || from.endsWith('@resend.dev')) throw new Error('Configure a verified email sender in company settings.');
@@ -55,14 +55,18 @@ export async function handleAccountEmail(req: Request, kind: 'welcome' | 'reset'
     const actualRedirect = new URL(link.properties.action_link).searchParams.get('redirect_to');
     if (!actualRedirect || new URL(actualRedirect).origin !== login.origin || (kind === 'welcome' && new URL(actualRedirect).searchParams.get('account_setup') !== 'welcome')) throw new Error('Add the application URL and welcome URL to Supabase Auth redirect URLs.');
     const company = settings.company_name || 'Your company';
+    const welcomeSupport = settings.welcome_support_email || settings.company_email || settings.reply_to_email || from;
+    const supportEmail = kind === 'welcome' ? welcomeSupport : (settings.reply_to_email || settings.company_email || from);
+    const mjvLogoUrl = new URL('/MJV_icon.PNG', login.origin).toString();
     const subject = kind === 'welcome' ? `Welcome to MyJobView — ${company}` : 'Reset your MyJobView password';
     const { html, text } = renderAccountEmail({
       kind, companyName: company, companyLogoUrl: settings.company_logo_url,
       fullName: target.full_name, email: target.email,
       actionUrl: link.properties.action_link, loginUrl: login.origin,
-      supportEmail: settings.reply_to_email || from,
+      supportEmail,
+      mjvLogoUrl,
     });
-    const response = await sendSystemEmail({ method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: `${(settings.from_name || settings.company_name || 'MyJobView').replace(/[<>\r\n]/g, '')} <${from}>`, to: [target.email], reply_to: settings.reply_to_email || from, subject, text, html }) });
+    const response = await sendSystemEmail({ method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: `${(settings.from_name || settings.company_name || 'MyJobView').replace(/[<>\r\n]/g, '')} <${from}>`, to: [target.email], reply_to: supportEmail, subject, text, html }) });
     const result = await response.json();
     if (!response.ok || !result.id) throw new Error(`Email provider rejected the message: ${result.message || 'Unknown error'}`);
     accepted = true;

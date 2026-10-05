@@ -31,6 +31,7 @@ export function CompanySettings() {
   const [fromEmail, setFromEmail] = useState('');
   const [fromName, setFromName] = useState('');
   const [replyToEmail, setReplyToEmail] = useState('');
+  const [welcomeSupportEmail, setWelcomeSupportEmail] = useState('');
   const [photographerEmail, setPhotographerEmail] = useState('');
   const [ccFeeEnabled, setCcFeeEnabled] = useState(false);
   const [ccFeeType, setCcFeeType] = useState<'percentage' | 'flat'>('percentage');
@@ -115,6 +116,7 @@ export function CompanySettings() {
         setFromEmail(data.from_email || '');
         setFromName(data.from_name || '');
         setReplyToEmail(data.reply_to_email || '');
+        setWelcomeSupportEmail(data.welcome_support_email || '');
         setPhotographerEmail(data.photographer_email || '');
         setCcFeeEnabled(data.cc_convenience_fee_enabled || false);
         setCcFeeType(data.cc_convenience_fee_type || 'percentage');
@@ -428,6 +430,7 @@ export function CompanySettings() {
             from_email: fromEmail?.trim() || null,
             from_name: fromName?.trim() || null,
             reply_to_email: replyToEmail?.trim() || null,
+            welcome_support_email: welcomeSupportEmail?.trim() || null,
             photographer_email: photographerEmail?.trim() || null,
             cc_convenience_fee_enabled: ccFeeEnabled,
             cc_convenience_fee_type: ccFeeType,
@@ -1055,6 +1058,22 @@ export function CompanySettings() {
             />
             <p className="text-xs text-gray-500 mt-1">
               Where customers should reply (optional, defaults to From Email)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Welcome Email Support Address
+            </label>
+            <input
+              type="email"
+              value={welcomeSupportEmail}
+              onChange={(e) => setWelcomeSupportEmail(e.target.value)}
+              placeholder="admin@yourdomain.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Shown to employees in Welcome emails when they need help. If blank, MyJobView uses the company email, then Reply-To/From Email.
             </p>
           </div>
 

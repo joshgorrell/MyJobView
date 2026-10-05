@@ -7,6 +7,7 @@ export interface AccountEmailTemplate {
   actionUrl: string;
   loginUrl: string;
   supportEmail?: string | null;
+  mjvLogoUrl?: string | null;
 }
 const escape = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
@@ -48,7 +49,9 @@ ${steps}
 </td></tr>
 <tr><td align="center" style="background:#f8fafc;padding:22px 24px;border-top:1px solid #e2e8f0;border-radius:0 0 14px 14px;">
 <p style="margin:0 0 9px;font-size:14px;font-weight:700;color:#0f172a;">${escape(p.companyName)}</p>${support}
-<p style="margin:0;font-size:12px;color:#64748b;"><a href="${escape(p.loginUrl)}" style="color:#163d7a;text-decoration:underline;">MyJobView sign in</a> &nbsp;·&nbsp; Powered by MyJobView</p>
+<p style="margin:0 0 12px;font-size:12px;color:#64748b;"><a href="${escape(p.loginUrl)}" style="color:#163d7a;text-decoration:underline;">MyJobView sign in</a></p>
+${p.mjvLogoUrl ? `<img src="${escape(p.mjvLogoUrl)}" alt="MyJobView" width="54" style="display:block;width:54px;height:auto;margin:0 auto 6px;border:0;" />` : ''}
+<p style="margin:0;font-size:11px;color:#94a3b8;">Powered by MyJobView</p>
 </td></tr></table></td></tr></table></body></html>`;
   const text = `Hello ${p.fullName},\n\n${introduction}\n\nYour login email: ${p.email}\n\n${button}: ${p.actionUrl}\n\nThis one-time link expires. Ask your administrator for a new email if needed.\n\nLogin: ${p.loginUrl}\n\n${p.supportEmail ? `Questions? Reply to this email or contact ${p.supportEmail}.\n\n` : ''}${p.companyName}\nPowered by MyJobView`;
   return { html, text };
