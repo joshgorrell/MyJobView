@@ -50,7 +50,7 @@ export default function PrintSecurityOnboardingForm({ onClose }: { onClose: () =
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 security-onboarding-controls">
     <form onSubmit={print} role="dialog" aria-modal="true" aria-label="Print blank onboarding form" className="bg-white text-black rounded-xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4">
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Print Blank Onboarding Form</h2><button type="button" onClick={onClose} aria-label="Close print form"><X /></button></div>
-      <p className="text-sm">The customer fills this out by hand. After they return it, choose Enter Completed Paper Form to enter their information online. Printing creates no customer or contract record.</p>
+      <p className="text-sm">The customer fills this out by hand. After they return it, choose New to create an agreement, then enter their completed information online. Printing creates no customer or contract record.</p>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {loading ? <p role="status">Loading form options...</p> : <>
         <label className="block">Agreement template<select aria-label="Agreement template" required value={template} onChange={e => setTemplate(e.target.value)} className="block w-full border rounded p-2"><option value="">Choose a template</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>

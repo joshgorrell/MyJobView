@@ -48,7 +48,7 @@ interface SecurityOnboardingProps {
 
 type DialogState =
   | { type: 'none' }
-  | { type: 'confirm_send'; contract: Contract; isResend: boolean }
+  | { type: 'confirm_send'; contract: Contract; isResend: boolean; justCreated?: boolean }
   | { type: 'confirm_delete'; contract: Contract }
   | { type: 'sending'; action: 'send' | 'delete' }
   | { type: 'success'; message: string; action: 'send' | 'delete' }
@@ -81,7 +81,7 @@ function SendAgreementDialog({
       }}
     >
       <div
-        className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-md transition-all duration-300 ${
+        role="dialog" aria-modal="true" aria-label="Agreement action" className={`relative bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90dvh] overflow-y-auto transition-all duration-300 ${
           isVisible ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4'
         }`}
       >
@@ -161,9 +161,9 @@ function SendAgreementDialog({
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-gray-900">
-                      {state.isResend ? 'Re-send Agreement' : 'Send Agreement'}
+                      {state.justCreated ? 'Agreement Created' : state.isResend ? 'Re-send Agreement' : 'Send Agreement'}
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Security Monitoring Contract</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{state.justCreated ? 'Send it to the customer to sign?' : 'Security Monitoring Contract'}</p>
                   </div>
                 </div>
                 <button
@@ -224,16 +224,18 @@ function SendAgreementDialog({
                   : 'A secure link will be emailed to the customer. The link will be valid for 30 days.'}
               </p>
 
+              {!(state.contract.email_override || state.contract.contact?.email) && <p className="text-sm text-amber-800 mb-4">Add a customer email before sending. This agreement is saved and can be completed manually.</p>}
               <div className="flex gap-3">
                 <button
                   onClick={onCancel}
                   className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  {state.justCreated ? 'Not now' : 'Cancel'}
                 </button>
                 <button
                   onClick={onConfirm}
-                  className={`flex-1 py-2.5 text-white text-sm font-semibold rounded-xl transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 ${
+                  disabled={!(state.contract.email_override || state.contract.contact?.email)}
+                  className={`flex-1 py-2.5 text-white text-sm font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 ${
                     state.isResend
                       ? 'bg-orange-500 hover:bg-orange-600'
                       : 'bg-blue-600 hover:bg-blue-700'
@@ -318,7 +320,6 @@ function SendAgreementDialog({
 export default function SecurityOnboarding({ onNavigateToContracts, canAccessContractManagement }: SecurityOnboardingProps = {}) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPrintForm, setShowPrintForm] = useState(false);
-  const [createPaperOnboarding, setCreatePaperOnboarding] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -389,6 +390,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
       });
 
       if (mountedRef.current) setContracts(processedContracts);
+      return processedContracts;
     } catch (error) {
       console.error('Error loading contracts:', error);
     } finally {
@@ -396,15 +398,15 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
     }
   }
 
-  function promptSendInvitation(contract: Contract, isResend = false) {
-    if (!(contract.email_override || contract.contact?.email)) {
+  function promptSendInvitation(contract: Contract, isResend = false, justCreated = false) {
+    if (!justCreated && !(contract.email_override || contract.contact?.email)) {
       setDialog({
         type: 'error',
         message: 'Customer contact information is missing. Please ensure the agreement has a valid customer assigned.'
       });
       return;
     }
-    setDialog({ type: 'confirm_send', contract, isResend });
+    setDialog({ type: 'confirm_send', contract, isResend, justCreated });
   }
 
   async function executeSendInvitation(contract: Contract, isResend: boolean) {
@@ -433,30 +435,6 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
     setDialog({ type: 'confirm_delete', contract });
   }
 
-  async function printBlankForm(contract: Contract) {
-    // Open the tab during the click so browser popup blocking does not prevent printing.
-    const printTab = window.open('', '_blank');
-    if (!printTab) {
-      setDialog({ type: 'error', message: 'Please allow popups to print this form.' });
-      return;
-    }
-    printTab.document.write('<p>Preparing printable onboarding form...</p>');
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Please sign in to print this form.');
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-blank-contract-form?contractId=${encodeURIComponent(contract.id)}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (!response.ok) throw new Error('The printable form could not be loaded.');
-      const html = await response.text();
-      printTab.document.open();
-      printTab.document.write(html);
-      printTab.document.close();
-    } catch (error) {
-      printTab.close();
-      setDialog({ type: 'error', message: error instanceof Error ? error.message : 'Could not print the form.' });
-    }
-  }
 
   async function executeDelete(contract: Contract) {
     setDialog({ type: 'sending', action: 'delete' });
@@ -559,6 +537,16 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           <p className="text-sm sm:text-base text-gray-300">Track pending and in-progress customer agreement onboarding</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            aria-label="New agreement"
+            title="New agreement"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span>New</span>
+          </button>
           {onNavigateToContracts && canAccessContractManagement !== false && (
             <button
               type="button"
@@ -568,7 +556,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
               className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/25 px-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
             >
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Agreements</span>
+              <span>Agreements</span>
             </button>
           )}
           <button
@@ -576,21 +564,9 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
             onClick={() => setShowPrintForm(true)}
             aria-label="Print blank onboarding form"
             title="Print blank onboarding form"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-blue-700 transition-colors hover:bg-blue-50"
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Print Paper Form</span>
-          </button>
-          <button type="button" onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }} aria-label="Enter completed paper form" title="Enter completed paper form" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 hover:bg-blue-50"><FileText className="h-4 w-4" /><span className="hidden sm:inline">Enter Completed Paper Form</span></button>
-          <button
-            type="button"
-            onClick={() => { setCreatePaperOnboarding(false); setShowCreateModal(true); }}
-            aria-label="New online agreement"
-            title="New online agreement"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">New Online</span>
           </button>
         </div>
       </div>
@@ -763,12 +739,6 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
                             </div>
                           )}
 
-                          <button
-                            onClick={() => printBlankForm(contract)}
-                            className="w-full px-2 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded hover:bg-blue-100 flex items-center justify-center gap-1"
-                          >
-                            <Printer className="w-3 h-3" /> Print blank onboarding form
-                          </button>
                           <div className="grid grid-cols-3 gap-1.5">
                             <button
                               onClick={() => {
@@ -820,15 +790,12 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
       {showCreateModal && (
         <CreateSecurityContractModal
           onClose={() => setShowCreateModal(false)}
-          onPaperCreated={createPaperOnboarding ? (contract) => {
+          onSuccess={async (created) => {
             setShowCreateModal(false);
-            setContractForManualEntry(contract as Contract);
-            setShowManualEntry(true);
-            loadContracts(false);
-          } : undefined}
-          onSuccess={() => {
-            setShowCreateModal(false);
-            loadContracts(false);
+            const pending = await loadContracts(false);
+            const agreement = pending?.find(contract => contract.id === created.id);
+            if (agreement) promptSendInvitation(agreement as Contract, false, true);
+            else setDialog({ type: 'error', message: 'Your agreement was created, but its delivery details could not be loaded. Refresh the pending agreements to send or complete it.' });
           }}
         />
       )}

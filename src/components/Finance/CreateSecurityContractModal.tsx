@@ -52,7 +52,7 @@ interface AIPrefill {
 
 interface CreateSecurityContractModalProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (contract: { id: string }) => void;
   onPaperCreated?: (contract: { id: string }) => void;
   prefill?: AIPrefill;
 }
@@ -268,7 +268,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
       creationRequest.current = crypto.randomUUID();
       if (onPaperCreated) onPaperCreated(contractData);
-      else onSuccess();
+      else onSuccess(contractData);
     } catch (error: any) {
       console.error('Error creating contract:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
@@ -841,7 +841,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                   <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers <SecurityFieldVisibility internal /></label>
                   {accountServices.includes('dial_up') && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number <SecurityFieldVisibility internal /></label>
+                      <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
                       <input
                         type="text"
                         value={serviceAccountNumbers.dial_up || ''}
@@ -853,7 +853,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                   )}
                   {accountServices.includes('telguard') && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number <SecurityFieldVisibility internal /></label>
+                      <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number</label>
                       <input
                         type="text"
                         value={serviceAccountNumbers.telguard || ''}
@@ -865,7 +865,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                   )}
                   {accountServices.includes('alarmnet') && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number <SecurityFieldVisibility internal /></label>
+                      <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number</label>
                       <input
                         type="text"
                         value={serviceAccountNumbers.alarmnet || ''}
@@ -877,7 +877,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                   )}
                   {accountServices.includes('alarm_com') && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number <SecurityFieldVisibility internal /></label>
+                      <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number</label>
                       <input
                         type="text"
                         value={serviceAccountNumbers.alarm_com || ''}
