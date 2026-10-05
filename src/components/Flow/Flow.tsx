@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, MessageSquare, Package, Plus, RefreshCw, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, HelpCircle, MessageSquare, Package, Plus, RefreshCw, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDepartments } from '../../contexts/DepartmentContext';
@@ -22,6 +22,9 @@ function eventKind(event: FlowEvent): string {
 const ICONS = { work: Wrench, service: Wrench, sales: FileText, materials: Package, scheduling: Calendar, customer: User, financial: DollarSign, update: MessageSquare, communication: MessageSquare };
 
 export default function Flow({ contactId, projectId, workOrderId, dark = false }: FlowScope & { dark?: boolean }) {
+  const controlId = useId();
+  const searchId = `${controlId}-search`;
+  const filtersId = `${controlId}-filters`;
   const { profile } = useAuth();
   const { hasModuleAccess } = useDepartments();
   const scoped = !!(contactId || projectId || workOrderId);
@@ -33,6 +36,10 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const [mentionsOnly, setMentionsOnly] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (showSearch) searchInput.current?.focus(); }, [showSearch]);
   const [category, setCategory] = useState('');
   const [kind, setKind] = useState('');
   const [office, setOffice] = useState('');
@@ -115,20 +122,22 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
   const newShown = flow.events.filter(e => !e.viewed).length;
   return <section className={`flow ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'Activity and conversations for this record' : 'Customer conversations, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
-      {canPost && <button className="flow-primary" onClick={() => setComposing(!composing)}><Plus size={15} />Post update</button>}
+      {canPost && <button className="flow-primary" onClick={() => setComposing(!composing)}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button>}
     </header>
     {composing && <PostFlowUpdate scope={chosenScope} onClose={() => setComposing(false)} onPosted={() => { setComposing(false); void flow.refresh(); }} />}
-    <div className="flow-toolbar">
+    <div className={`flow-toolbar ${scoped ? 'flow-toolbar--scoped' : ''}`}>
       {!scoped && <div className="flow-segment" aria-label="Activity scope"><button aria-pressed={myWork} onClick={() => setMyWork(true)}>My Work</button><button aria-pressed={!myWork} onClick={() => setMyWork(false)}>All Activity</button></div>}
-      <label className="flow-kind"><span className="sr-only">Show</span><select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">Everything</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-      <button className={todayOnly ? 'flow-selected' : ''} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
-      <button className={mentionsOnly ? 'flow-selected' : ''} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
-      <label className="flow-search"><Search size={16} /><input aria-label="Search activity" placeholder="Search customer, job or activity…" value={search} onChange={e => setSearch(e.target.value)} />{search && <button onClick={() => setSearch('')} aria-label="Clear search"><X size={14} /></button>}</label>
-      <button className={newOnly ? 'flow-selected' : ''} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" />New only</button>
-      <button aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}><Filter size={14} />Filters{chips.length ? ` (${chips.length})` : ''}</button>
-      <button aria-label="Refresh Flow" title="Refresh Flow" onClick={() => void flow.refresh()} disabled={flow.loading}><RefreshCw size={15} /></button>
+      <label className="flow-kind flow-desktop-control"><span className="sr-only">Show</span><select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">Everything</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+      <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
+      <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
+      <label className={`flow-search ${showSearch || search ? 'flow-search--open' : ''}`} id={searchId}><Search size={16} /><input ref={searchInput} aria-label="Search activity" placeholder="Search customer, job or activity…" value={search} onChange={e => setSearch(e.target.value)} />{search && <button onClick={() => setSearch('')} aria-label="Clear search"><X size={14} /></button>}</label>
+      <button className={`flow-unread ${newOnly ? 'flow-selected' : ''}`} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" /><span className="flow-desktop-label">New only</span><span className="flow-mobile-label">New</span></button>
+      <button className="flow-filter-toggle" aria-controls={filtersId} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}><Filter size={14} />Filters{chips.length ? ` (${chips.length})` : ''}</button>
+      <button className={`flow-search-toggle ${search ? 'flow-selected' : ''}`} aria-label={showSearch ? 'Hide activity search' : 'Search activity'} aria-expanded={showSearch || !!search} aria-controls={searchId} onClick={() => { if (showSearch || search) { setSearch(''); setShowSearch(false); } else setShowSearch(true); }}><Search size={16} /></button>
+      <button className="flow-refresh" aria-label="Refresh Flow" title="Refresh Flow" onClick={() => void flow.refresh()} disabled={flow.loading}><RefreshCw size={15} /></button>
     </div>
-    {showFilters && <div className="flow-filters">
+    {showFilters && <div className="flow-filters" id={filtersId}>
+      <label className="flow-mobile-control">Show<select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">Everything</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <label>Activity<select value={category} onChange={e => setCategory(e.target.value)}><option value="">All types</option>{Object.entries(FLOW_CATEGORIES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <label>Office<select value={office} onChange={e => setOffice(e.target.value)}><option value="">All offices</option>{offices.map(o => <option value={o.id} key={o.id}>{o.name}</option>)}</select></label>
       <label>By<select value={actor} onChange={e => setActor(e.target.value)}><option value="">Anyone</option>{people.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
@@ -140,7 +149,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
     {!!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
     {flow.error && <div className="flow-error" role="alert">{flow.error} <button onClick={() => void flow.refresh()}>Retry</button></div>}
     {flow.pending > 0 && <button className="flow-new-banner" onClick={() => void flow.refresh()}>{flow.pending === 50 ? '50+' : flow.pending} new {flow.pending === 1 ? 'activity' : 'activities'} — show updates</button>}
-    <div className="flow-list-meta"><span>{flow.events.length} shown · {newShown} new</span><button onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={14} />{marking ? 'Saving…' : 'Mark shown viewed'}</button></div>
+    <div className="flow-list-meta"><span>{flow.events.length} shown · {newShown} new</span><div className="flow-meta-actions"><button aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={14} /><span className="flow-desktop-label">{marking ? 'Saving…' : 'Mark shown viewed'}</span><span className="flow-mobile-label">{marking ? 'Saving…' : 'Viewed'}</span></button><button className="flow-help-toggle" aria-label="About Flow unread indicators" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}><HelpCircle size={15} /></button></div></div>
     <div className="flow-column-head" aria-hidden="true"><span /><span>Time</span><span>Customer / job</span><span>Activity</span><span>By</span><span /></div>
     <div aria-busy={flow.loading}>
       {flow.loading ? <div className="flow-empty">Loading activity…</div> : !flow.events.length ? <div className="flow-empty"><Activity size={24} /><strong>{newOnly ? 'You’re caught up for these filters.' : 'No activity to show yet.'}</strong><span>{myWork ? 'Try All Activity or change your filters.' : 'New customer and job actions will appear here.'}</span></div> : flow.events.map((event, index) => {
@@ -166,6 +175,6 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false }
       })}
     </div>
     {flow.hasMore && !flow.loading && <button className="flow-load-more" disabled={flow.loadingMore} onClick={() => void flow.loadMore()}>{flow.loadingMore ? 'Loading…' : 'Load older activity'}</button>}
-    <p className="flow-footnote">Blue dot = new to you. Hover for a preview; open an entry or use its dot to mark it viewed.</p>
+    <p className={`flow-footnote ${showHelp ? 'flow-footnote--open' : ''}`}>Blue dot = new to you. Hover for a preview; open an entry or use its dot to mark it viewed.</p>
   </section>;
 }
