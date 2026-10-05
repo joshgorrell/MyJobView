@@ -319,10 +319,18 @@ BEGIN
 
   IF v_task.status <> 'completed' THEN RETURN; END IF;
 
-  DELETE FROM points_transactions
-  WHERE user_id = v_task.completed_by
-    AND reference_id = p_task_id
-    AND transaction_type = 'task_completion';
+  IF v_task.completed_by IS NOT NULL AND COALESCE(v_task.points, 0) > 0 THEN
+    INSERT INTO points_transactions (
+      user_id, points_amount, transaction_type, reference_id, description
+    )
+    VALUES (
+      v_task.completed_by,
+      -COALESCE(v_task.points, 0),
+      'admin_adjustment',
+      p_task_id,
+      'Points reversed — task reopened: ' || v_task.title
+    );
+  END IF;
 
   UPDATE tasks
   SET status = 'pending',
@@ -335,3 +343,27 @@ $$;
 
 REVOKE ALL ON FUNCTION public.reopen_task_atomic(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reopen_task_atomic(uuid) TO authenticated;
+
+
+-- Force completion through the atomic RPC so points/claiming cannot be bypassed
+-- by a direct client-side status update.
+CREATE OR REPLACE FUNCTION public.enforce_atomic_task_completion()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF OLD.status IS DISTINCT FROM 'completed'
+     AND NEW.status = 'completed'
+     AND NEW.completed_by IS NULL THEN
+    RAISE EXCEPTION 'Use complete_task_atomic() to complete tasks';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trigger_enforce_atomic_task_completion ON public.tasks;
+CREATE TRIGGER trigger_enforce_atomic_task_completion
+  BEFORE UPDATE OF status ON public.tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION public.enforce_atomic_task_completion();
