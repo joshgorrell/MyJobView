@@ -43,12 +43,15 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
     assigned_to: '',
   });
   const [showRawEmail, setShowRawEmail] = useState(false);
+  const [vipOrigin, setVipOrigin] = useState<{ work_order_id: string; work_order_number?: string | null; completed_at?: string | null } | null>(null);
+  const [vipSalesPhotos, setVipSalesPhotos] = useState<{id:string;photo_url:string;caption?:string|null}[]>([]);
 
   useEffect(() => {
     loadLead();
     loadMessages();
     loadTags();
     loadSalesReps();
+    loadVipOrigin();
 
     const messagesChannel = supabase
       .channel(`lead_messages:${leadId}`)
@@ -65,6 +68,29 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       supabase.removeChannel(messagesChannel);
     };
   }, [leadId]);
+
+  async function loadVipOrigin() {
+    try {
+      const { data, error } = await supabase
+        .from('vip_maintenance_visits')
+        .select('completed_at, work_orders!inner(id, work_order_number)')
+        .eq('sales_lead_id', leadId)
+        .maybeSingle();
+      if (error) throw error;
+      const wo = Array.isArray(data?.work_orders) ? data?.work_orders[0] : data?.work_orders;
+      const origin = data && wo ? { work_order_id: wo.id, work_order_number: wo.work_order_number, completed_at: data.completed_at } : null;
+      setVipOrigin(origin);
+      if (origin) {
+        const { data: photos, error: photosError } = await supabase.from('job_photos').select('id, photo_url, caption, metadata').eq('work_order_id', origin.work_order_id).order('taken_at', { ascending: true });
+        if (photosError) throw photosError;
+        setVipSalesPhotos((photos || []).filter((photo:any) => photo.metadata?.context === 'vip_sales_lead'));
+      } else setVipSalesPhotos([]);
+    } catch (error) {
+      console.error('Error loading VIP lead origin:', error);
+      setVipOrigin(null);
+      setVipSalesPhotos([]);
+    }
+  }
 
   async function loadSalesReps() {
     try {
@@ -1034,6 +1060,25 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Opportunity</h3>
               <p className="text-gray-600 text-sm leading-relaxed">{lead.opportunity_description}</p>
+            </div>
+          )}
+
+          {vipOrigin && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Source: VIP Maintenance</div>
+                <div className="text-sm text-gray-700 mt-1">Created from {vipOrigin.work_order_number ? `Work Order ${vipOrigin.work_order_number}` : 'a completed VIP visit'}.</div>
+              </div>
+              <button type="button" onClick={() => { window.location.href = `/?tab=work_orders&workOrderId=${vipOrigin.work_order_id}&subtab=vip`; }} className="min-h-11 px-4 py-2 rounded-lg bg-white border border-blue-300 text-blue-700 font-medium text-sm touch-manipulation hover:bg-blue-100">View VIP Visit</button>
+            </div>
+          )}
+
+          {vipOrigin && vipSalesPhotos.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Sales Lead Photos</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {vipSalesPhotos.map(photo => <a key={photo.id} href={photo.photo_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-gray-50 overflow-hidden"><img src={photo.photo_url} alt={photo.caption || 'VIP sales lead photo'} className="w-full aspect-square object-cover" />{photo.caption && <div className="p-2 text-xs text-gray-600">{photo.caption}</div>}</a>)}
+              </div>
             </div>
           )}
 

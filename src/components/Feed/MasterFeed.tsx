@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Flow from '../Flow/Flow';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
-import { AtSign, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { AtSign, Search, ChevronDown, ChevronUp, Hash, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { DiscussionFeed } from './DiscussionFeed';
 import { DiscussionPostForm } from './DiscussionPostForm';
@@ -189,10 +189,10 @@ function LegacyDiscussionFeed({ onLeadClick, focusPostId }: MasterFeedProps & { 
 export function MasterFeed({ onLeadClick }: MasterFeedProps) {
   const focusPostId = new URLSearchParams(window.location.search).get('postId');
   const [view, setView] = useState<'flow' | 'discussions'>(focusPostId ? 'discussions' : 'flow');
-  return <div className="space-y-3">
+  return <div className="space-y-2 sm:space-y-3">
     <div className="flex gap-2" aria-label="Feed view">
-      <button onClick={() => setView('flow')} aria-pressed={view === 'flow'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'flow' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'} flex items-center gap-2`}><FlowWaveIcon className="text-base" />Flow</button>
-      <button onClick={() => setView('discussions')} aria-pressed={view === 'discussions'} className={`px-4 py-2 rounded-lg text-sm font-medium ${view === 'discussions' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>Discussions</button>
+      <button onClick={() => setView('flow')} aria-pressed={view === 'flow'} className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm font-medium ${view === 'flow' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'} flex items-center gap-2`}><FlowWaveIcon className="text-base" />Flow</button>
+      <button onClick={() => setView('discussions')} aria-pressed={view === 'discussions'} className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm font-medium ${view === 'discussions' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>Discussions</button>
     </div>
     {view === 'flow' ? <Flow /> : <LegacyDiscussionFeed onLeadClick={onLeadClick} focusPostId={focusPostId} />}
   </div>;

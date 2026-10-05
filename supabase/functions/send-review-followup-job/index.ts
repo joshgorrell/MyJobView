@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings } from '../_shared/emailTemplates.ts';
 
@@ -234,7 +235,7 @@ Deno.serve(async (req: Request) => {
             : `One last ask — we'd love your review`;
 
           if (resendApiKey) {
-            const emailResponse = await fetch('https://api.resend.com/emails', {
+            const emailResponse = await sendSystemEmail({
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${resendApiKey}`,
@@ -256,7 +257,7 @@ Deno.serve(async (req: Request) => {
               continue;
             }
           } else {
-            console.log('[demo] Would send follow-up review email to', recipientEmail, 'for record', row.id);
+            throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
           }
 
           await supabaseAdmin
@@ -308,7 +309,7 @@ Deno.serve(async (req: Request) => {
             : 'Still waiting to hear from you!';
 
           if (resendApiKey) {
-            const emailResponse = await fetch('https://api.resend.com/emails', {
+            const emailResponse = await sendSystemEmail({
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${resendApiKey}`,
@@ -330,7 +331,7 @@ Deno.serve(async (req: Request) => {
               continue;
             }
           } else {
-            console.log('[demo] Would send follow-up satisfaction email to', row.customer_email, 'for record', row.id);
+            throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
           }
 
           await supabaseAdmin

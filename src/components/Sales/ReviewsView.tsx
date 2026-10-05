@@ -260,7 +260,21 @@ export default function ReviewsView() {
   const canViewCustomerFeedback = isAdmin || ((profile as any)?.can_view_customer_feedback ?? canSeeAllRequests);
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'send' | 'lost'>(new URLSearchParams(window.location.search).get('reviewType') === 'lost' ? 'lost' : 'dashboard');
+  type ReviewTab = 'dashboard' | 'send' | 'lost';
+  const getReviewTabFromUrl = (): ReviewTab => {
+    const tab = new URLSearchParams(window.location.search).get('reviewType');
+    return tab === 'send' || tab === 'lost' || tab === 'dashboard' ? tab : 'dashboard';
+  };
+  const [activeTab, setActiveTabState] = useState<ReviewTab>(getReviewTabFromUrl);
+  const setActiveTab = useCallback((tab: ReviewTab, options?: { replace?: boolean }) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'dashboard') url.searchParams.delete('reviewType');
+    else url.searchParams.set('reviewType', tab);
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    if (options?.replace) window.history.replaceState(window.history.state, '', nextUrl);
+    else window.history.pushState(window.history.state, '', nextUrl);
+  }, []);
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [satisfactionHistory, setSatisfactionHistory] = useState<SatisfactionRecord[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -282,7 +296,7 @@ export default function ReviewsView() {
   const [manualPhone, setManualPhone] = useState('');
   const [sendMethod, setSendMethod] = useState<'email' | 'satisfaction' | 'sms'>('email');
   const [googleOnlyMode, setGoogleOnlyMode] = useState(false);
-  const [lifecycleType, setLifecycleType] = useState<'job_completion' | 'test_tune_welcome' | 'post_test_tune' | 'one_year' | 'manual'>('job_completion');
+  const [lifecycleType, setLifecycleType] = useState<'job_completion' | 'test_tune_welcome' | 'post_test_tune' | 'one_year' | 'manual'>('manual');
 
   // Customer Satisfaction form state
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
@@ -322,8 +336,14 @@ export default function ReviewsView() {
   const [editedSubject, setEditedSubject] = useState('');
 
   useEffect(() => {
-    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }
-  }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab]);
+    const handlePopState = () => setActiveTabState(getReviewTabFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (profile && !canViewCustomerFeedback && canRequestGoogleReviews && activeTab === 'dashboard') { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send', { replace: true }); }
+  }, [profile?.id, canViewCustomerFeedback, canRequestGoogleReviews, activeTab, setActiveTab]);
 
   useEffect(() => {
     loadReviewRequests();
@@ -369,6 +389,7 @@ export default function ReviewsView() {
         const result = await response.json().catch(() => ({}));
         if (!response.ok || result.success === false) throw new Error(result.error || 'Failed to send Test & Tune Welcome');
         showSuccessAnimation(name || email, 'Test & Tune Welcome');
+        return true;
       } catch (error: any) {
         toast.error(`Failed to send: ${error.message || 'Please try again.'}`);
       } finally { setSatSending(false); }
@@ -425,6 +446,7 @@ export default function ReviewsView() {
       setTimeout(() => setSatSuccess(false), 4000);
       const lifecycleLabels = { job_completion: 'Job Completion Feedback', post_test_tune: 'Post-Test & Tune Feedback', one_year: '1-Year Check-In', manual: 'Customer Feedback' };
       showSuccessAnimation(sentName || 'Customer', lifecycleLabels[lifecycleType]);
+      return true;
     } catch (error: any) {
       toast.error(`Failed to send: ${error.message || 'Please try again.'}`);
     } finally {
@@ -961,7 +983,7 @@ export default function ReviewsView() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6 [overflow-wrap:anywhere]">
 
       {/* Success Overlay */}
       {sendSuccessOverlay && (
@@ -1062,10 +1084,10 @@ export default function ReviewsView() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-700 overflow-x-auto">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(90px,1fr))] gap-1 border-b border-gray-700">
         {canViewCustomerFeedback && <button
           onClick={() => setActiveTab('dashboard')}
-          className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
+          className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium [overflow-wrap:normal] transition-colors ${
             activeTab === 'dashboard'
               ? 'text-yellow-400 border-b-2 border-yellow-400'
               : 'text-gray-400 hover:text-gray-300'
@@ -1074,9 +1096,9 @@ export default function ReviewsView() {
           <TrendingUp className="w-4 h-4 inline mr-2" />
           Customer Feedback
         </button>}
-        {canRequestGoogleReviews && <button
-          onClick={() => { setGoogleOnlyMode(!canManageCustomerFeedback); setSendMethod('email'); setActiveTab('send'); }}
-          className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
+        {(canRequestGoogleReviews || canManageCustomerFeedback) && <button
+          onClick={() => { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }}
+          className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium [overflow-wrap:normal] transition-colors ${
             activeTab === 'send'
               ? 'text-yellow-400 border-b-2 border-yellow-400'
               : 'text-gray-400 hover:text-gray-300'
@@ -1085,7 +1107,7 @@ export default function ReviewsView() {
           <Send className="w-4 h-4 inline mr-2" />
           Ask / Send
         </button>}
-        {canViewLostOpportunities && <button onClick={() => setActiveTab('lost')} className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>}
+        {canViewLostOpportunities && <button onClick={() => setActiveTab('lost')} className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium [overflow-wrap:normal] ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>}
       </div>
 
       {activeTab === 'lost' && canViewLostOpportunities && <LostOpportunityReviews />}
@@ -1125,51 +1147,32 @@ export default function ReviewsView() {
           <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
               <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Send a customer directly to your Google review page.' : 'Preview or manually send an authorized customer lifecycle communication.'}</p></div>
-              {canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3 lg:shrink-0"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 shrink-0 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Customer scans this from your screen.</div></div></div>}
+              {googleOnlyMode && canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3 lg:shrink-0"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 shrink-0 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Customer scans this from your screen.</div></div></div>}
             </div>
             {!googleOnlyMode && canManageCustomerFeedback && (
-              <div className="mb-6 rounded-xl border border-blue-700/50 bg-blue-950/20 p-5">
-                <div className="mb-4">
-                  <h3 className="text-base font-bold text-white">Customer Lifecycle</h3>
-                  <p className="mt-1 text-xs text-gray-400">These emails normally send automatically. Choose one communication to preview or manually resend. Selecting another replaces your current selection.</p>
-                </div>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-                  {[
-                    ['job_completion', '1', 'Job Completion', 'Day 0', 'Feedback at substantial completion'],
-                    ['test_tune_welcome', '2', 'Test & Tune Welcome', 'Day 7', 'Opens the Test & Tune period'],
-                    ['post_test_tune', '3', 'Post-Test & Tune', 'When T&T ends', 'Feedback after the configured period'],
-                    ['one_year', '4', '1-Year Check-In', '1 year', 'Long-term satisfaction and service check-in'],
-                  ].map(([value, step, label, timing, description], index) => (
-                    <button key={value} type="button" onClick={() => { setLifecycleType(value as typeof lifecycleType); setSendMethod('satisfaction'); }}
-                      className={`relative rounded-xl border p-4 text-left transition-colors ${sendMethod === 'satisfaction' && lifecycleType === value ? 'border-blue-400 bg-blue-900/40' : 'border-gray-700 bg-gray-900/70 hover:border-blue-600'}`}>
-                      <div className="flex items-center gap-2">
-                        <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${sendMethod === 'satisfaction' && lifecycleType === value ? 'border-blue-300 bg-blue-400' : 'border-gray-500 bg-transparent'}`}>
-                          {sendMethod === 'satisfaction' && lifecycleType === value && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                        </span>
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">{step}</span>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-blue-300">{timing}</span>
-                      </div>
-                      <div className="mt-3 text-sm font-semibold text-white">{label}</div>
-                      <div className="mt-1 text-xs leading-relaxed text-gray-400">{description}</div>
-                      {index < 3 && <span className="absolute -right-2 top-1/2 hidden text-gray-600 md:block">→</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!googleOnlyMode && canManageCustomerFeedback && (
-              <div className="mb-6">
-                <button type="button" onClick={() => { setLifecycleType('manual'); setSendMethod('satisfaction'); }}
-                  className={`w-full rounded-xl border p-4 text-left transition-colors ${sendMethod === 'satisfaction' && lifecycleType === 'manual' ? 'border-indigo-500 bg-indigo-950/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'}`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${sendMethod === 'satisfaction' && lifecycleType === 'manual' ? 'border-indigo-300 bg-indigo-400' : 'border-gray-500 bg-transparent'}`}>
-                      {sendMethod === 'satisfaction' && lifecycleType === 'manual' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                    </span>
-                    <div className="font-semibold text-white">General Customer Feedback</div>
-                  </div>
-                  <div className="mt-1 text-xs text-gray-400">Manual feedback request outside the automated customer lifecycle.</div>
-                </button>
+              <div className="mb-6 rounded-xl border border-gray-700 bg-gray-900/50 p-4">
+                <label htmlFor="feedback-email-type" className="block text-sm font-semibold text-white mb-2">Email type</label>
+                <select id="feedback-email-type" value={lifecycleType}
+                  onChange={e => { setLifecycleType(e.target.value as typeof lifecycleType); setSendMethod('satisfaction'); }}
+                  className="min-h-11 w-full min-w-0 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-base text-white">
+                  <option value="manual">General Customer Feedback</option>
+                  <option value="job_completion">Job Completion Feedback · Day 0</option>
+                  <option value="test_tune_welcome">Test &amp; Tune Welcome · Day 7</option>
+                  <option value="post_test_tune">Post-Test &amp; Tune Feedback</option>
+                  <option value="one_year">1-Year Check-In</option>
+                </select>
+                <p className="mt-2 text-sm leading-relaxed text-gray-400">
+                  {lifecycleType === 'manual'
+                    ? 'Ask for feedback at any time. Choose a customer below, preview the email, then send.'
+                    : lifecycleType === 'test_tune_welcome'
+                    ? 'Invite the customer to Test & Tune. Normally sent automatically 7 days after substantial completion.'
+                    : lifecycleType === 'job_completion'
+                    ? 'Ask how the job went at substantial completion. Normally sent automatically on Day 0.'
+                    : lifecycleType === 'post_test_tune'
+                    ? 'Ask how things are working after the configured Test & Tune period ends.'
+                    : 'Check in on long-term satisfaction and service needs one year later.'}
+                </p>
+                {lifecycleType !== 'manual' && <p className="mt-2 text-xs text-blue-300">Lifecycle emails normally send automatically. Use this form for a manual request or resend.</p>}
               </div>
             )}
 
@@ -1195,7 +1198,7 @@ export default function ReviewsView() {
                 </div>
 
                 {/* Contact toggle */}
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button
                     onClick={() => { setSatUseManual(false); setSatContact(null); setSatSearchQuery(''); }}
                     className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${!satUseManual ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
@@ -1273,7 +1276,7 @@ export default function ReviewsView() {
                 )}
 
                 {/* Sales Rep + Lead Tech */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">Sales Rep (Optional)</label>
                     <select
@@ -1451,6 +1454,12 @@ export default function ReviewsView() {
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
+                  {sendMethod === 'email' && (
+                    <button type="button" onClick={fetchEmailPreview} disabled={isPreviewDisabled}
+                      className="min-h-11 w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-600 px-4 py-3 text-sm text-gray-200 hover:border-cyan-500 disabled:opacity-50">
+                      <Eye className="w-4 h-4" /> {loadingPreview ? 'Loading Preview…' : 'Preview Email'}
+                    </button>
+                  )}
                   <button
                     onClick={sendReviewRequest}
                     disabled={isSendDisabled}
@@ -1503,7 +1512,7 @@ export default function ReviewsView() {
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input value={activitySearch} onChange={e => setActivitySearch(e.target.value)} placeholder="Search customer or email..." className="w-full sm:w-72 rounded-lg border border-gray-600 bg-gray-950 py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none" />
+                  <input value={activitySearch} onChange={e => setActivitySearch(e.target.value)} placeholder="Search customer or email..." className="w-full min-w-0 sm:w-64 rounded-lg border border-gray-600 bg-gray-950 py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none" />
                 </div>
                 <select value={activityType} onChange={e => setActivityType(e.target.value as 'all' | 'google' | 'feedback')} className="rounded-lg border border-gray-600 bg-gray-950 px-3 py-2 text-sm text-white">
                   <option value="all">All request types</option>
@@ -1514,8 +1523,8 @@ export default function ReviewsView() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-900">
+            <table aria-label="Feedback request history" className="block w-full lg:table">
+              <thead className="hidden bg-gray-900 lg:table-header-group">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Contact
@@ -1537,7 +1546,7 @@ export default function ReviewsView() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="block divide-y divide-gray-700 lg:table-row-group">
                 {requests.filter(request => {
                   if (activityType === 'feedback') return false;
                   const haystack = `${request.contacts?.contact_name || ''} ${request.contacts?.email || ''} ${request.recipient_name || ''} ${request.recipient_email || ''}`.toLowerCase();
@@ -1547,8 +1556,8 @@ export default function ReviewsView() {
                   const daysSince = Math.floor((Date.now() - sentMs) / (1000 * 60 * 60 * 24));
                   const isFollowUpDue = !request.review_completed && daysSince >= 14;
                   return (
-                  <tr key={`review-${request.id}`} className={`hover:bg-gray-750 ${isFollowUpDue ? 'bg-amber-950/20' : ''}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={`review-${request.id}`} className={`grid grid-cols-1 sm:grid-cols-2 gap-x-4 px-4 py-3 lg:table-row lg:p-0 hover:bg-gray-750 ${isFollowUpDue ? 'bg-amber-950/20' : ''}`}>
+                    <td data-label="Customer" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                       <div className="text-sm font-medium text-white">
                         {request.contacts?.contact_name || request.recipient_name || 'Unknown'}
                       </div>
@@ -1558,7 +1567,7 @@ export default function ReviewsView() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td data-label="Method" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                       {request.method === 'survey' ? (
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-900/40 text-amber-300 border border-amber-700/50">
                           Completion Survey
@@ -1581,10 +1590,10 @@ export default function ReviewsView() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <td data-label="Sent by" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                       {request.profiles?.full_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td data-label="Sent" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                       <div className="text-sm text-gray-300">{new Date(request.sent_at).toLocaleDateString()}</div>
                       <div className="text-xs text-gray-500">{new Date(request.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                       {isFollowUpDue && (
@@ -1596,7 +1605,7 @@ export default function ReviewsView() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td data-label="Status / Submitted" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                       <div className="flex flex-col gap-1">
                         {request.review_completed && (
                           <span className="flex items-center gap-1 text-green-400 text-xs font-medium">
@@ -1630,10 +1639,10 @@ export default function ReviewsView() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                    <td data-label="Actions" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
+                      <div className="flex flex-wrap items-center gap-2">
                         {!request.review_completed && request.link_clicked && (
-                          <button onClick={() => markReviewReceived(request)} className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded text-green-400 hover:text-green-300 hover:bg-green-900/20" title="Confirm that this customer posted a Google review">
+                          <button onClick={() => markReviewReceived(request)} className="flex items-center gap-1 min-h-11 px-3 py-2 text-xs font-medium rounded text-green-400 hover:text-green-300 hover:bg-green-900/20" title="Confirm that this customer posted a Google review">
                             <CheckCircle className="w-3 h-3" /> Mark Review Received
                           </button>
                         )}
@@ -1641,7 +1650,7 @@ export default function ReviewsView() {
                           <button
                             onClick={() => resendReviewRequest(request)}
                             disabled={sending}
-                            className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                            className={`flex items-center gap-1 min-h-11 px-3 py-2 text-xs font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                               isFollowUpDue
                                 ? 'bg-amber-700/30 text-amber-300 border border-amber-600/50 hover:bg-amber-700/50 hover:text-amber-200'
                                 : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20'
@@ -1654,7 +1663,7 @@ export default function ReviewsView() {
                         )}
                         <button
                           onClick={() => deleteReviewRequest(request.id)}
-                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
+                          className="flex items-center gap-1 min-h-11 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
                           title="Delete from history"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -1686,22 +1695,22 @@ export default function ReviewsView() {
                   const satDaysSince = Math.floor((Date.now() - satSentMs) / (1000 * 60 * 60 * 24));
                   const isSatFollowUpDue = !record.rating && satDaysSince >= 14;
                   return (
-                    <tr key={`sat-${record.id}`} className={`hover:bg-gray-750 ${isSatFollowUpDue ? 'bg-amber-950/20' : 'bg-blue-950/10'}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                    <tr key={`sat-${record.id}`} className={`grid grid-cols-1 sm:grid-cols-2 gap-x-4 px-4 py-3 lg:table-row lg:p-0 hover:bg-gray-750 ${isSatFollowUpDue ? 'bg-amber-950/20' : 'bg-blue-950/10'}`}>
+                      <td data-label="Customer" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                         <div className="text-sm font-medium text-white">{record.customer_name || 'Unknown'}</div>
                         {record.customer_email && (
                           <div className="text-sm text-gray-400">{record.customer_email}</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td data-label="Method" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-900/40 text-blue-300 border border-blue-700/50">
                           Lifecycle Email
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td data-label="Sent by" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                         {record.profiles?.full_name || record.sales_rep_name || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td data-label="Sent" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                         <div className="text-sm text-gray-300">{new Date(record.sent_at).toLocaleDateString()}</div>
                         <div className="text-xs text-gray-500">{new Date(record.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                         {isSatFollowUpDue && (
@@ -1713,7 +1722,7 @@ export default function ReviewsView() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td data-label="Status / Submitted" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                         <div className="flex flex-col gap-1">
                           {record.rating ? (
                             <span className={`flex items-center gap-1 text-xs font-medium ${ratingColors[record.rating] || 'text-gray-400'}`}>
@@ -1737,7 +1746,7 @@ export default function ReviewsView() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td data-label="Actions" className="min-w-0 px-0 py-2 lg:px-6 lg:py-4 break-words text-sm text-gray-300 before:mb-1 before:block before:text-xs before:font-medium before:text-gray-400 before:content-[attr(data-label)] lg:before:hidden">
                         <div className="flex flex-col gap-1">
                           {isAdmin && record.comment && (
                             <span className="text-gray-400 max-w-[140px] truncate block text-xs" title={record.comment}>
@@ -1753,7 +1762,7 @@ export default function ReviewsView() {
                             <button
                               onClick={() => resendSatisfactionSurvey(record)}
                               disabled={sending}
-                              className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded transition-colors w-fit disabled:opacity-50 disabled:cursor-not-allowed ${
+                              className={`flex items-center gap-1 min-h-11 px-3 py-2 text-xs font-medium rounded transition-colors w-fit disabled:opacity-50 disabled:cursor-not-allowed ${
                                 isSatFollowUpDue
                                   ? 'bg-amber-700/30 text-amber-300 border border-amber-600/50 hover:bg-amber-700/50 hover:text-amber-200'
                                   : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20'
@@ -1766,7 +1775,7 @@ export default function ReviewsView() {
                           )}
                           <button
                             onClick={() => deleteSatisfactionRecord(record.id)}
-                            className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors w-fit"
+                            className="flex items-center gap-1 min-h-11 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors w-fit"
                             title="Delete from history"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -1792,14 +1801,14 @@ export default function ReviewsView() {
 
       {/* Email Preview Modal */}
       {showPreview && previewData && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-2 sm:p-4">
           <div
             className="bg-gray-900 rounded-xl border border-gray-700 shadow-2xl flex flex-col w-full transition-all duration-300"
-            style={{ height: '90vh', maxWidth: editMode ? '1100px' : '680px' }}
+            style={{ height: '92dvh', maxHeight: '92dvh', maxWidth: editMode ? '1100px' : '680px' }}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 shrink-0 gap-4">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="flex flex-wrap items-center justify-between px-3 sm:px-6 py-3 border-b border-gray-700 shrink-0 gap-2">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="w-8 h-8 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0">
                   <Mail className="w-4 h-4 text-cyan-400" />
                 </div>
@@ -1808,7 +1817,7 @@ export default function ReviewsView() {
                     <input
                       value={editedSubject}
                       onChange={e => setEditedSubject(e.target.value)}
-                      className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm font-medium w-72 focus:outline-none focus:border-cyan-500 transition-colors"
+                      className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-base sm:text-sm font-medium w-full min-w-0 focus:outline-none focus:border-cyan-500 transition-colors"
                       placeholder="Email subject..."
                     />
                   ) : (
@@ -1821,6 +1830,7 @@ export default function ReviewsView() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {sendMethod !== 'satisfaction' && (
                 <button
                   onClick={() => setEditMode(v => !v)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
@@ -1832,6 +1842,7 @@ export default function ReviewsView() {
                   <MessageSquare className="w-3.5 h-3.5" />
                   {editMode ? 'Hide Editor' : 'Edit / Add Note'}
                 </button>
+                )}
                 <button
                   onClick={() => { setShowPreview(false); setPreviewData(null); setEditMode(false); setPersonalNote(''); }}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
@@ -1842,11 +1853,11 @@ export default function ReviewsView() {
             </div>
 
             {/* Body: split when editing */}
-            <div className="flex-1 flex overflow-hidden min-h-0">
+            <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto min-h-0">
 
               {/* Edit panel */}
               {editMode && (
-                <div className="w-80 shrink-0 border-r border-gray-700 flex flex-col bg-gray-950 overflow-y-auto">
+                <div className="w-full lg:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-gray-700 flex flex-col bg-gray-950 lg:overflow-y-auto">
                   <div className="p-5 border-b border-gray-800">
                     <h3 className="text-white font-semibold text-sm mb-1">Personalize this email</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
@@ -1893,7 +1904,7 @@ export default function ReviewsView() {
               )}
 
               {/* Preview iframe */}
-              <div className="flex-1 bg-white overflow-hidden">
+              <div className="min-h-[280px] lg:min-h-0 flex-1 shrink-0 min-w-0 bg-white overflow-hidden">
                 <iframe
                   srcDoc={injectNoteIntoHtml(previewData.html, personalNote)}
                   title="Email preview"
@@ -1904,9 +1915,9 @@ export default function ReviewsView() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700 shrink-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-3 sm:px-6 py-3 border-t border-gray-700 shrink-0">
               <p className="text-xs text-gray-500">Preview only — the review link will be personalized when sent.</p>
-              <div className="flex items-center gap-3">
+              <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
                 <button
                   onClick={() => { setShowPreview(false); setPreviewData(null); setEditMode(false); setPersonalNote(''); }}
                   className="px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-600 font-medium text-sm transition-colors"
@@ -1914,11 +1925,20 @@ export default function ReviewsView() {
                   Close
                 </button>
                 <button
-                  onClick={sendReviewRequest}
-                  disabled={sending}
+                  onClick={async () => {
+                    if (sendMethod === 'satisfaction') {
+                      if (await sendSatisfactionSurvey()) {
+                        setShowPreview(false);
+                        setPreviewData(null);
+                      }
+                    } else {
+                      await sendReviewRequest();
+                    }
+                  }}
+                  disabled={sending || satSending || (sendMethod === 'satisfaction' && !(satUseManual ? satManualEmail : satContact?.email))}
                   className="px-6 py-2 rounded-lg text-white font-medium text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/30"
                 >
-                  {sending ? (
+                  {sending || satSending ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Sending...

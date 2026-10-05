@@ -273,7 +273,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   // Prevent body scrolling when modal is open (mobile fix)
   useEffect(() => {
     // Store original body overflow style
-    const originalStyle = window.getComputedStyle(document.body).overflow;
+    const originalStyle = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
 
     // Prevent body scrolling
     document.body.style.overflow = 'hidden';
@@ -282,7 +283,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     // Restore on cleanup
     return () => {
       document.body.style.overflow = originalStyle;
-      document.body.style.touchAction = 'auto';
+      document.body.style.touchAction = originalTouchAction;
     };
   }, []);
 
@@ -1236,16 +1237,16 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
+    <div className="product-form-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-hidden">
       <div
-        ref={scrollContainerRef}
-        className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto overscroll-contain touch-pan-y"
+        role="dialog" aria-modal="true" aria-labelledby="product-form-title"
+        className="bg-white text-gray-900 rounded-none sm:rounded-2xl shadow-2xl max-w-5xl w-full h-[100dvh] sm:h-auto sm:max-h-[92dvh] flex flex-col min-h-0 overflow-hidden"
       >
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
+        <div className="shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Package className="w-6 h-6 text-blue-600" />
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold text-gray-900">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h2 id="product-form-title" className="text-lg sm:text-xl font-semibold text-gray-900">
                 {readOnly ? 'View Product' : productId ? 'Edit Product' : 'New Product'}
               </h2>
               {hasSavedDraft && !readOnly && (
@@ -1255,17 +1256,17 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               )}
             </div>
           </div>
-          <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg">
+          <button onClick={handleClose} aria-label="Close product form" className="p-3 shrink-0 hover:bg-gray-100 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 bg-gray-50 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           {/* AUTO-SAVE INFO */}
           {!readOnly && (
-            <div className="bg-blue-50 border border-blue-200 rounded p-2 flex items-center gap-2">
+            <div className="lg:col-span-2 flex items-center gap-2 text-gray-500">
               <Save className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-              <p className="text-xs text-blue-700">
+              <p className="text-xs text-gray-500">
                 Auto-saves as you type. Safe to navigate away.
               </p>
             </div>
@@ -1273,7 +1274,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           {/* ADD FROM WEB */}
           {!readOnly && !productId && showAddFromWeb && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+            <div className="lg:col-span-2 bg-white border border-blue-200 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Globe className="w-4 h-4 text-blue-600 flex-shrink-0" />
                 <span className="text-xs font-medium text-gray-700">Import from URL</span>
@@ -1286,7 +1287,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 </button>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="url"
                   value={productUrl}
@@ -1295,7 +1296,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     setExtractError('');
                   }}
                   placeholder="Paste product URL..."
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   disabled={extracting}
                 />
                 <button
@@ -1336,7 +1337,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           {!showAddFromWeb && !readOnly && !productId && (
             <button
               onClick={() => setShowAddFromWeb(true)}
-              className="w-full p-2 border border-dashed border-gray-300 rounded hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1.5 text-gray-600 hover:text-blue-600"
+              className="lg:col-span-2 w-full p-3 border border-dashed border-gray-300 rounded hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1.5 text-gray-600 hover:text-blue-600"
             >
               <Globe className="w-4 h-4" />
               <span className="text-xs font-medium">Import from URL</span>
@@ -1344,8 +1345,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           )}
 
           {/* BASIC INFO */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Basic Information</h3>
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="sm:col-span-2 text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Basic Information</h3>
 
             {/* Manufacturer */}
             <div>
@@ -1353,12 +1354,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 Manufacturer <span className="text-red-500">*</span>
               </label>
               {showNewManufacturer ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter manufacturer name"
                     autoFocus
                   />
@@ -1379,11 +1380,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.manufacturer_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, manufacturer_id: e.target.value }))}
-                    className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                       errors.manufacturer ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
@@ -1426,7 +1427,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
 
             {/* Product Image */}
-            <div ref={imageSectionRef}>
+            <div ref={imageSectionRef} className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product Image
               </label>
@@ -1459,11 +1460,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                       className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">Use photo</button>
                   </div>;
                 })()}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={handleImageSearch}
                     disabled={!formData.manufacturer_id || !formData.manufacturer_model_number}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                    className="flex-1 min-w-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
                   >
                     <Search className="w-4 h-4" />
                     Search Image
@@ -1471,7 +1472,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingImage}
-                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
+                    className="flex-1 min-w-0 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
                   >
                     <Upload className="w-4 h-4" />
                     {uploadingImage ? 'Uploading...' : 'Upload Image'}
@@ -1547,12 +1548,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 Color/Finish
               </label>
               {showNewColor ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter color/finish name"
                     autoFocus
                   />
@@ -1573,11 +1574,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.item_color}
                     onChange={(e) => setFormData(prev => ({ ...prev, item_color: e.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Color/Finish</option>
                     {colors.map(c => (
@@ -1601,12 +1602,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 Category <span className="text-red-500">*</span>
               </label>
               {showNewCategory ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter category name"
                     autoFocus
                   />
@@ -1627,11 +1628,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.category_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value, subcategory_id: '' }))}
-                    className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                       errors.category ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
@@ -1661,12 +1662,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   Subcategory
                 </label>
                 {showNewSubcategory ? (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <input
                       type="text"
                       value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter subcategory name"
                       autoFocus
                     />
@@ -1687,11 +1688,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <select
                       value={formData.subcategory_id}
                       onChange={(e) => setFormData(prev => ({ ...prev, subcategory_id: e.target.value }))}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Subcategory</option>
                       {filteredSubcategories.map(s => (
@@ -1713,13 +1714,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </div>
 
           {/* PRICING */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 flex items-center gap-2">
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
               <DollarSign className="w-5 h-5" />
               Pricing
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Cost */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1863,11 +1864,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </div>
 
           {/* INVENTORY & LABOR */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Inventory & Labor</h3>
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Inventory & Labor</h3>
 
             {/* Inventory Type and Item Type */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Inventory Type
@@ -1907,12 +1908,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 Default Vendor
               </label>
               {showNewVendor ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter vendor name"
                     autoFocus
                   />
@@ -1933,11 +1934,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.default_vendor_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, default_vendor_id: e.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Vendor</option>
                     {vendors.map(v => (
@@ -1976,7 +1977,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
 
             {/* Labor Hours and Cost */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Default Labor Hours
@@ -2006,8 +2007,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </div>
 
           {/* DESCRIPTIONS */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Descriptions & Instructions</h3>
+          <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Descriptions & Instructions</h3>
 
             {/* Sales Description */}
             <div>
@@ -2017,7 +2018,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               <textarea
                 value={formData.sales_description}
                 onChange={(e) => setFormData(prev => ({ ...prev, sales_description: e.target.value }))}
-                rows={3}
+                rows={5}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Description that customers will see on proposals"
               />
@@ -2034,7 +2035,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   setFormData(prev => ({ ...prev, purchase_description: e.target.value }));
                   setUserEditedPurchaseDesc(true);
                 }}
-                rows={3}
+                rows={5}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Auto-copied from sales description, edit if needed"
               />
@@ -2076,8 +2077,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </div>
 
           {/* RESOURCES */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 flex items-center gap-2">
+          <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
               <Link2 className="w-5 h-5" />
               Resources & Links
             </h3>
@@ -2172,11 +2173,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         </div>
 
         {/* Footer Actions */}
-        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
-          <div></div>
-          <div className="flex items-center gap-3 flex-wrap">
+        <div className="shrink-0 bg-white border-t border-gray-200 px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
             {saveSuccess && (
-              <div className="text-green-600 font-medium flex items-center gap-2">
+              <div className="w-full text-green-600 text-sm font-medium flex items-center gap-2">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
@@ -2184,21 +2184,21 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               </div>
             )}
             {Object.keys(errors).length > 0 && (
-              <div className="text-red-600 text-sm font-medium flex items-center gap-1.5">
+              <div className="w-full text-red-600 text-sm font-medium flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 {Object.keys(errors).length} field{Object.keys(errors).length !== 1 ? 's' : ''} require attention
               </div>
             )}
             <button
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
+              className="px-4 sm:px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
             >
               Cancel
             </button>
             <button
               onClick={requestSave}
               disabled={saving}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
+              className="px-4 sm:px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Product'}
@@ -2361,7 +2361,7 @@ function AccessoriesSection({ productId }: { productId: string }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Accessories & Packages</h3>
+      <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Accessories & Packages</h3>
 
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -2609,7 +2609,7 @@ function DefaultTasksSection({
             rows={2}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={newDefaultTaskPhase}
               onChange={e => setNewDefaultTaskPhase(e.target.value)}

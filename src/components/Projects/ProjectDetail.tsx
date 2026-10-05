@@ -1,5 +1,5 @@
 import Flow from '../Flow/Flow';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, FileText, Calendar, DollarSign, MessageSquare, Settings, CheckSquare, Clock, ClipboardList } from 'lucide-react';
@@ -23,11 +23,29 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
   const { profile } = useAuth();
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const validTabs: TabType[] = ['overview', 'scope', 'tasks', 'appointments', 'invoices', 'communication', 'history', 'activity_log', 'flow'];
+  const getTabFromUrl = (): TabType => {
+    const tab = new URLSearchParams(window.location.search).get('projectTab') as TabType | null;
+    return tab && validTabs.includes(tab) ? tab : 'overview';
+  };
+  const [activeTab, setActiveTabState] = useState<TabType>(getTabFromUrl);
+  const setActiveTab = useCallback((tab: TabType) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'overview') url.searchParams.delete('projectTab');
+    else url.searchParams.set('projectTab', tab);
+    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   useEffect(() => {
     loadProject();
   }, [projectId]);
+
+  useEffect(() => {
+    const handlePopState = () => setActiveTabState(getTabFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   async function loadProject() {
     try {

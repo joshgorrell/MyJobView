@@ -1,5 +1,5 @@
 import { WorkOrderSettings } from './WorkOrderSettings';
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon, Users, Building2, CreditCard, Plug, Lightbulb, Package, Award, Flag, Mail, Shield, Menu, Lock, Receipt, Layers, FileText, Clock, Wrench, Tags, AlertCircle, Activity, Megaphone, MapPin, Target, Monitor, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -41,7 +41,26 @@ function SettingsLoadingFallback() {
 export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNavigate?: (tab: string) => void } = {}) {
   const { jobModuleEnabled, profile } = useAuth();
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
-  const [activeTab, setActiveTab] = useState<'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders'>((initialTab as any) || 'users');
+  type SettingsTab = 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders';
+  const validTabs: SettingsTab[] = ['users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders'];
+  const getTabFromUrl = (): SettingsTab => {
+    const tab = new URLSearchParams(window.location.search).get('settingsTab') as SettingsTab | null;
+    return tab && validTabs.includes(tab) ? tab : ((initialTab as SettingsTab) || 'users');
+  };
+  const [activeTab, setActiveTabState] = useState<SettingsTab>(getTabFromUrl);
+  const setActiveTab = useCallback((tab: SettingsTab) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'users') url.searchParams.delete('settingsTab');
+    else url.searchParams.set('settingsTab', tab);
+    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => setActiveTabState(getTabFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [initialTab]);
 
   return (
     <div className="space-y-6">

@@ -122,7 +122,8 @@ export function SalesTargetManagement() {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, email, role, sales_rep_start_date, quota_mode, custom_base_quota, custom_escalation_percentage, current_annual_quota, quota_last_calculated_at')
-      .in('role', ['sales', 'admin', 'manager', 'sales_manager'])
+      .eq('is_sales_rep', true)
+      .eq('is_active', true)
       .eq('is_active', true)
       .order('full_name');
     if (error) { console.error(error); return; }

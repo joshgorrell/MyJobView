@@ -1,5 +1,8 @@
 export interface Profile {
   id: string;
+  employment_type?: 'hourly' | 'job_time' | 'salary' | null;
+  requires_daily_clock?: boolean;
+  points_earned?: number;
   email: string;
   full_name: string;
   first_name?: string;
@@ -27,7 +30,7 @@ export interface Profile {
   last_seen_fishbowl_at: string | null;
   last_seen_punchlist_at: string | null;
   default_calendar_view: string | null;
-  ui_theme?: 'light' | 'dark' | 'system';
+  ui_theme?: 'light' | 'dark' | 'classic' | 'mjv' | 'system';
   created_at: string;
   updated_at: string;
 }
@@ -221,11 +224,13 @@ export interface CompanySettings {
   id: string;
   company_name: string;
   company_logo_url: string | null;
+  business_card_banner_url?: string | null;
   website: string | null;
   portal_url?: string | null;
   from_email?: string | null;
   from_name?: string | null;
   reply_to_email?: string | null;
+  welcome_support_email?: string | null;
   job_module_enabled?: boolean;
   job_module_settings?: {
     commission_defaults?: {

@@ -427,7 +427,7 @@ export default function ProposalLineItemModal({
   const currentImageUrl = form.image_url || masterProduct?.image_url || null;
 
   const modal = (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+    <div className="theme-workspace fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
 
         {/* Header */}
@@ -980,7 +980,7 @@ export default function ProposalLineItemModal({
       )}
 
       {showSubstituteConfirmation && selectedReplacementProduct && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+        <div className="theme-workspace fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-white mb-5">Confirm Substitution</h3>
             <div className="space-y-3 mb-6">

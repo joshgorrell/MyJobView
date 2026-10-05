@@ -44,6 +44,7 @@ serve(async (req) => {
       role,
       role_id,
       email_leads,
+      is_sales_rep,
       can_view_prospects,
       can_create_purchase_orders,
       can_view_all_tasks,
@@ -132,6 +133,7 @@ serve(async (req) => {
       role_id: role_id || null,
       is_active: true,
       email_leads: email_leads || false,
+      is_sales_rep: is_sales_rep ?? false,
       can_view_prospects: can_view_prospects ?? false,
       can_create_purchase_orders: can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(role || 'sales'),
       can_view_all_tasks: can_view_all_tasks ?? true,
@@ -207,24 +209,8 @@ serve(async (req) => {
       console.error("Starred modules exception:", starredErr);
     }
 
-    try {
-      await fetch(
-        `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": authHeader,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: newUser.user.email,
-            full_name,
-          }),
-        }
-      );
-    } catch (emailError) {
-      console.error("Welcome email exception:", emailError);
-    }
+    // Welcome sending is an explicit next step in UserCreatedConfirmation.
+    // Do not silently send a second welcome or swallow provider failures here.
 
     return new Response(
       JSON.stringify({ 

@@ -890,7 +890,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-label="Create work order" className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">
             {serviceRequest ? 'Convert to Work Order' : 'Create Work Order'}
@@ -948,7 +948,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             <select className="w-full p-3 border rounded-lg" value={workOrderTypeId || workOrderOptions.find(option=>option.kind==='type'&&option.system_key===formData.type)?.id || ''}
               onChange={e=>{const option=workOrderOptions.find(o=>o.id===e.target.value);if(option){setWorkOrderTypeId(option.id);setFormData({...formData,type:option.behavior as typeof formData.type});}}}>
               {!workOrderOptions.length && <option value="">{formData.type.replace(/_/g,' ')}</option>}
-              {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active&&(!projectId||o.behavior==='project')).map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
+              {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active).map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
             </select>
           </div>
 
@@ -1501,7 +1501,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
 
             {/* Labor Category - hidden when in project context, required for Test & Tune */}
-            {!projectId && (
+            {(
               <div className={salesOrderInTestTune ? 'p-4 bg-purple-50 border-2 border-purple-300 rounded-lg' : ''}>
                 {salesOrderInTestTune && (
                   <div className="flex items-start gap-2 mb-3 text-sm text-purple-800">

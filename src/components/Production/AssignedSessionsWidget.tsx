@@ -1,3 +1,4 @@
+import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -99,7 +100,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
   async function loadSessions() {
     setLoading(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const twoDaysAhead = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -150,7 +151,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
       const { error } = await supabase.from('time_entries').insert({
         company_id: companyData?.id,
         technician_id: profile!.id,
-        entry_date: now.toISOString().split('T')[0],
+        entry_date: formatDateInTimezone(now.toISOString(), await getOrganizationTimezone()),
         clock_in: now.toISOString(),
         clock_out: null,
         total_hours: 0,

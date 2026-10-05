@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { supabase } from '../../lib/supabase';
 import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload, Shield, ArrowRight } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
@@ -10,6 +11,7 @@ interface Contract {
   contact: any;
   template: any;
   status: string;
+  onboarding_revision?: number;
   created_at: string;
   customer_completed_at: string;
   approved_at: string;
@@ -51,6 +53,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
 
   const statusColumns: StatusColumn[] = [
     { key: 'pending_approval', label: 'Awaiting Approval', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
+    { key: 'approved', label: 'Approved — Awaiting Activation', icon: Shield, color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
     { key: 'active', label: 'Active', icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
     { key: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' }
   ];
@@ -82,11 +85,11 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
           template:security_contract_templates(*),
           cancelled_by_profile:profiles!cancelled_by_user_id(full_name, first_name, last_name)
         `)
-        .in('status', ['pending_approval', 'active', 'cancelled'])
+        .in('status', ['pending_approval', 'customer_completed', 'approved', 'rejected', 'active', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setContracts(data || []);
+      setContracts((data || []).map(c => c.status === 'rejected' ? {...c,status:'pending_approval'} : c));
     } catch (error) {
       console.error('Error loading contracts:', error);
     } finally {
@@ -135,13 +138,14 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
 
   function getContractsByStatus(status: string) {
     return contracts.filter(c => {
+      const effectiveStatus = c.status === 'customer_completed' ? 'pending_approval' : c.status;
       const matchesSearch = searchTerm === '' ||
         c.contact?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.contact?.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesUnclassified = !showUnclassifiedOnly || !c.account_type;
 
-      return c.status === status && matchesSearch && matchesUnclassified;
+      return effectiveStatus === status && matchesSearch && matchesUnclassified;
     });
   }
 
@@ -171,18 +175,9 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
 
   async function handleApproveContract(contract: Contract) {
     try {
-      const { error } = await supabase
-        .from('security_contracts')
-        .update({
-          status: 'active',
-          approved_at: new Date().toISOString(),
-          activated_at: new Date().toISOString()
-        })
-        .eq('id', contract.id);
+      await staffSecurityOnboarding('approve', contract.id, { revision: contract.onboarding_revision || 0 });
 
-      if (error) throw error;
-
-      alert('Security contract approved and activated successfully!');
+      alert('Security contract approved. Open it to complete activation.');
       loadContracts();
       loadCancellationStats();
     } catch (error) {
@@ -237,7 +232,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   }
 
   return (
-    <div className="p-8">
+    <div className="security-onboarding-controls p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -354,7 +349,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {statusColumns.map((column) => {
           const Icon = column.icon;
           const columnContracts = getContractsByStatus(column.key);

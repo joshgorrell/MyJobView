@@ -1,34 +1,36 @@
-import { format, parse, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { supabase } from './supabase';
 
-let cachedTimezone: string | null = null;
+const timezoneCache = new Map<string, string>();
 
-export async function getOrganizationTimezone(): Promise<string> {
-  if (cachedTimezone) {
-    return cachedTimezone;
-  }
-
+export async function getOrganizationTimezone(organizationId?: string): Promise<string> {
   try {
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('timezone')
-      .limit(1)
-      .single();
-
+    let orgId = organizationId;
+    if (!orgId) {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      if (!session?.user.id) return 'America/Chicago';
+      const { data: profile, error: profileError } = await supabase.from('profiles')
+        .select('organization_id').eq('id',session.user.id).single();
+      if (profileError) throw profileError;
+      orgId = profile?.organization_id;
+    }
+    if (!orgId) return 'America/Chicago';
+    const cached = timezoneCache.get(orgId);
+    if (cached) return cached;
+    const { data, error } = await supabase.from('organizations').select('timezone').eq('id',orgId).single();
     if (error) throw error;
-
-    cachedTimezone = data?.timezone || 'America/Chicago';
-    return cachedTimezone;
+    const timezone = data?.timezone || 'America/Chicago';
+    timezoneCache.set(orgId,timezone);
+    return timezone;
   } catch (error) {
     console.error('Error fetching organization timezone:', error);
     return 'America/Chicago';
   }
 }
 
-export function clearTimezoneCache() {
-  cachedTimezone = null;
-}
+export function clearTimezoneCache() { timezoneCache.clear(); }
 
 export function normalizeDateString(date: string): string {
   if (!date) return '';
@@ -181,4 +183,9 @@ export const TIMEZONE_OPTIONS = [
 export function getTimezoneLabel(timezone: string): string {
   const option = TIMEZONE_OPTIONS.find(opt => opt.value === timezone);
   return option?.label || timezone;
+}
+
+/** A calendar selection is a civil day, not a UTC timestamp. */
+export function calendarDateKey(date:Date):string {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }

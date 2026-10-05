@@ -1,3 +1,4 @@
+import { DailyLaunchpad, DailyLaunchpadButton } from './DailyLaunchpad';
 import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
@@ -34,6 +35,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
   const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
+  const [commandCenterOpen,setCommandCenterOpen] = useState(()=>new URLSearchParams(window.location.search).get('commandCenter')==='1');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMobileItems, setExpandedMobileItems] = useState<Set<string>>(new Set());
   const [showCreateMenu, setShowCreateMenu] = useState(false);
@@ -144,18 +146,19 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
   if (loading) {
     return (
-      <header className="bg-canvas border-b border-subtle">
+      <header className="theme-chrome theme-header bg-canvas border-b border-subtle">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="text-muted">Loading...</div>
           </div>
         </div>
-      </header>
+        {commandCenterOpen && <DailyLaunchpad onClose={()=>setCommandCenterOpen(false)} onNavigate={onNavigate} />}
+    </header>
     );
   }
 
   return (
-    <header className="bg-canvas border-b border-subtle">
+    <header className="theme-chrome theme-header bg-canvas border-b border-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 gap-0 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}
@@ -186,7 +189,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
-            <TimeButton onNavigate={onNavigate} />
+            <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} /><TimeButton onNavigate={onNavigate} />
 
             <div className="relative" ref={createMenuRef}>
               <button
@@ -341,7 +344,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
 
           {/* Mobile Actions */}
           <div className="md:hidden flex items-center gap-0.5 sm:gap-2">
-            <TimeButton onNavigate={onNavigate} />
+            <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} /><TimeButton onNavigate={onNavigate} />
             <NotificationBell
               onLeadClick={(leadId) => {
                 onLeadClick(leadId);
@@ -528,6 +531,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
           </div>
         )}
       </div>
+      {commandCenterOpen && <DailyLaunchpad onClose={()=>setCommandCenterOpen(false)} onNavigate={onNavigate} />}
     </header>
   );
 }

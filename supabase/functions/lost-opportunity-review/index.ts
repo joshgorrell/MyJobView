@@ -1,4 +1,8 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
+import { validateAssessment } from "./adminReview.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { bidFileFormat, bidFileHelp, validBidFile } from "./bidFileTypes.ts";
+import { bidEmailBatches } from "./bidEmailBatches.ts";
 import { wrapInEmailLayout } from "../_shared/emailTemplates.ts";
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -30,7 +34,6 @@ const reasonLabels: Record<string, string> = {
   cancelled: "Project cancelled",
   other: "Something else",
 };
-const types = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 const escape = (v: string) =>
   v.replace(
     /[&<>"']/g,
@@ -135,6 +138,16 @@ Deno.serve(async (req) => {
           await admin.from("organizations").select("subdomain")
             .eq("id", detail.organization_id).single(),
         );
+        // Preserve the first successful form load, including concurrent opens.
+        if (!detail.opened_at) {
+          await checked(
+            await admin.from("lost_review_details")
+              .update({ opened_at: new Date().toISOString() })
+              .eq("request_id", detail.request_id)
+              .eq("organization_id", detail.organization_id)
+              .is("opened_at", null),
+          );
+        }
         return json({
           personal_contact_email: organization.subdomain === "elife"
             ? "josh@electroniclife.com"
@@ -171,31 +184,23 @@ Deno.serve(async (req) => {
       const decoded = [];
       for (const f of files) {
         if (
-          !types.includes(f.type) || typeof f.name !== "string" ||
+          typeof f.name !== "string" || !bidFileFormat(f.name) ||
           f.name.length > 200 || typeof f.data !== "string" ||
           f.data.length > 14000000
         ) {
           return json({
-            error: "Use PDF, JPG, PNG or WebP files, up to 10 MB each.",
+            error: `Use ${bidFileHelp} files, up to 10 MB each.`,
           }, 400);
         }
         const bytes = Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0));
         if (bytes.length > 10485760) {
           return json({ error: "File exceeds 10 MB." }, 400);
         }
-        const valid = f.type === "application/pdf"
-          ? new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-"
-          : f.type === "image/jpeg"
-          ? bytes[0] === 255 && bytes[1] === 216
-          : f.type === "image/png"
-          ? bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 &&
-            bytes[3] === 71
-          : new TextDecoder().decode(bytes.slice(0, 4)) === "RIFF" &&
-            new TextDecoder().decode(bytes.slice(8, 12)) === "WEBP";
+        const valid = validBidFile(f.name, bytes);
         if (!valid) {
-          return json({ error: "File contents do not match its type." }, 400);
+          return json({ error: "File contents do not match its format. Use an unencrypted PDF, Word, Excel or image file." }, 400);
         }
-        decoded.push({ f, bytes });
+        decoded.push({ f: { ...f, type: bidFileFormat(f.name)!.mime }, bytes });
       }
       const attachments = [];
       try {
@@ -265,62 +270,67 @@ Deno.serve(async (req) => {
           : settings?.app_url;
         const key = Deno.env.get("RESEND_API_KEY");
         if (key && base) {
+          const batches = bidEmailBatches(decoded.map(({ f }) => ({ filename: f.name, content: f.data })));
           for (const viewer of viewers) {
             if (!viewer.email) continue;
             const link = new URL("/?tab=reviews&reviewType=lost", base)
               .toString();
-            const body =
-              `<h2>Lost Opportunity feedback received</h2><p><strong>Customer:</strong> ${
-                escape(
-                  request.recipient_name || request.recipient_email ||
-                    "Customer",
-                )
-              }</p><p><strong>Project:</strong> ${
-                escape(detail.opportunity_name)
-              }</p><p><strong>Reasons:</strong> ${
-                escape(
-                  selected.map((r) => reasonLabels[String(r)] || String(r))
-                    .join(", ") || "Comment only",
-                )
-              }</p><p><strong>Another chance:</strong> ${
-                escape(b.recoverable)
-              }</p><p style="white-space:pre-wrap">${
-                escape(b.message)
-              }</p><p style="white-space:pre-wrap">${
-                escape(b.recovery_message)
-              }</p><p><strong>Competing bid files:</strong> ${attachments.length}</p><p><a href="${
-                escape(link)
-              }">View the private response and attachments in MJV</a></p>`;
-            const sent = await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${key}`,
-                "Content-Type": "application/json",
-                "Idempotency-Key":
-                  `lost-review-${detail.request_id}-${viewer.email}`,
-              },
-              body: JSON.stringify({
-                from: `${
-                  settings?.from_name || settings?.company_name || "MJV"
-                } <${settings?.from_email || settings?.company_email}>`,
-                to: viewer.email,
-                reply_to: settings?.reply_to_email || settings?.company_email,
-                subject:
-                  `Lost Opportunity feedback: ${detail.opportunity_name}`,
-                html: wrapInEmailLayout(
-                  body,
-                  escape(settings?.company_name || "MJV"),
-                  escape(settings?.company_email || ""),
-                  "#0e7490",
-                  settings?.company_logo_url || "",
-                ),
-              }),
-            });
-            if (!sent.ok) {
-              console.error(
-                "Lost review notification email failed",
-                sent.status,
-              );
+            for (const [batchIndex, emailAttachments] of batches.entries()) {
+              const part = batches.length > 1 ? ` (part ${batchIndex + 1} of ${batches.length})` : "";
+              const body =
+                `<h2>Lost Opportunity feedback received</h2><p><strong>Customer:</strong> ${
+                  escape(
+                    request.recipient_name || request.recipient_email ||
+                      "Customer",
+                  )
+                }</p><p><strong>Project:</strong> ${
+                  escape(detail.opportunity_name)
+                }</p><p><strong>Reasons:</strong> ${
+                  escape(
+                    selected.map((r) => reasonLabels[String(r)] || String(r))
+                      .join(", ") || "Comment only",
+                  )
+                }</p><p><strong>Another chance:</strong> ${
+                  escape(b.recoverable)
+                }</p><p style="white-space:pre-wrap">${
+                  escape(b.message)
+                }</p><p style="white-space:pre-wrap">${
+                  escape(b.recovery_message)
+                }</p><p><strong>Competing bid files:</strong> ${attachments.length}</p>${emailAttachments.length ? `<p>Attached to this email${part}: ${emailAttachments.map(a => escape(a.filename)).join(", ")}</p>` : ""}<p><a href="${
+                  escape(link)
+                }">View the private response and attachments in MJV</a></p>`;
+              const sent = await sendSystemEmail({
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${key}`,
+                  "Content-Type": "application/json",
+                  "Idempotency-Key":
+                    `lost-review-${detail.request_id}-${viewer.email}-part-${batchIndex + 1}`,
+                },
+                body: JSON.stringify({
+                  from: `${
+                    settings?.from_name || settings?.company_name || "MJV"
+                  } <${settings?.from_email || settings?.company_email}>`,
+                  to: viewer.email,
+                  reply_to: settings?.reply_to_email || settings?.company_email,
+                  subject:
+                    `Lost Opportunity feedback: ${detail.opportunity_name}${part}`,
+                  attachments: emailAttachments,
+                  html: wrapInEmailLayout(
+                    body,
+                    escape(settings?.company_name || "MJV"),
+                    escape(settings?.company_email || ""),
+                    "#0e7490",
+                    settings?.company_logo_url || "",
+                  ),
+                }),
+              });
+              if (!sent.ok) {
+                console.error(
+                  "Lost review notification email failed",
+                  sent.status,
+                );
+              }
             }
           }
         }
@@ -460,7 +470,7 @@ Deno.serve(async (req) => {
         b.title,
         url,
       );
-      const result = await fetch("https://api.resend.com/emails", {
+      const result = await sendSystemEmail({
         method: "POST",
         headers: {
           Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`,
@@ -495,6 +505,45 @@ Deno.serve(async (req) => {
         b.request_id,
       ).eq("organization_id", org).single(),
     );
+    if (["assessment_load", "assessment_save"].includes(b.action)) {
+      if (profile.role !== "admin" || !profile.can_view_lost_opportunity_submissions) {
+        return json({ error: "Admin submission access required." }, 403);
+      }
+      if (!detail.responded_at) return json({ error: "There is no response yet." }, 400);
+      const existing = await checked(await admin.from("lost_review_assessments").select("*")
+        .eq("request_id", detail.request_id).eq("organization_id", org).maybeSingle());
+      if (b.action === "assessment_load") {
+        const reps = await checked(await admin.from("profiles").select("id,first_name,last_name,is_active")
+          .eq("organization_id", org).eq("is_sales_rep", true).order("first_name"));
+        const proposal = detail.proposal_id ? await checked(await admin.from("proposals").select("created_by")
+          .eq("id", detail.proposal_id).eq("organization_id", org).maybeSingle()) : null;
+        return json({ assessment: existing, reps, default_rep_id: proposal?.created_by || null });
+      }
+      let values;
+      try { values = validateAssessment(b.assessment || {}); }
+      catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid assessment." }, 400); }
+      if (values.sales_rep_id) {
+        const rep = await checked(await admin.from("profiles").select("id").eq("id", values.sales_rep_id)
+          .eq("organization_id", org).eq("is_sales_rep", true).maybeSingle());
+        if (!rep) return json({ error: "Choose a sales rep in this company." }, 400);
+      }
+      const now = new Date().toISOString();
+      const row = { ...values, request_id: detail.request_id, organization_id: org,
+        updated_by: user.id, updated_at: now };
+      // Compare the revision displayed in the modal to avoid overwriting another admin's work.
+      if (existing) {
+        if (b.expected_updated_at !== existing.updated_at) return json({ error: "Another admin updated this review. Close and reopen it to load their changes." }, 409);
+        const saved = await checked(await admin.from("lost_review_assessments").update(row)
+          .eq("request_id", detail.request_id).eq("organization_id", org)
+          .eq("updated_at", b.expected_updated_at).select("*").maybeSingle());
+        if (!saved) return json({ error: "Another admin updated this review. Close and reopen it to load their changes." }, 409);
+        return json({ assessment: saved });
+      }
+      if (b.expected_updated_at) return json({ error: "This review changed. Close and reopen it." }, 409);
+      const result = await admin.from("lost_review_assessments").insert({ ...row, created_by: user.id, created_at: now }).select("*").single();
+      if (result.error?.code === "23505") return json({ error: "Another admin saved this review. Close and reopen it." }, 409);
+      return json({ assessment: await checked(result) });
+    }
     if (["review", "outcome"].includes(b.action)) {
       if (!profile.can_view_lost_opportunity_submissions) {
         return json({
@@ -505,9 +554,20 @@ Deno.serve(async (req) => {
         return json({ error: "There is no response yet." }, 400);
       }
       const now = new Date().toISOString();
-      const update = b.action === "review"
-        ? { reviewed_at: now }
-        : { recovery_outcome: b.outcome };
+      if (b.action === "review") {
+        // The first viewer wins, even when multiple employees open it together.
+        if (!detail.reviewed_at) {
+          await checked(await admin.from("lost_review_details")
+            .update({ reviewed_at: now, reviewed_by: user.id })
+            .eq("request_id", detail.request_id).eq("organization_id", org)
+            .is("reviewed_at", null));
+        }
+        const reviewed = await checked(await admin.from("lost_review_details")
+          .select("reviewed_at,reviewed_by")
+          .eq("request_id", detail.request_id).eq("organization_id", org).single());
+        return json({ success: true, ...reviewed });
+      }
+      const update = { recovery_outcome: b.outcome };
       if (
         b.action === "outcome" &&
         !["following_up", "recovered", "closed"].includes(b.outcome)

@@ -101,13 +101,13 @@ export function MyCardView() {
         const oldFileName = photoUrl.split('/').pop();
         if (oldFileName) {
           await supabase.storage
-            .from('business_card_photos')
+            .from('business-card-photos')
             .remove([`${user.id}/${oldFileName}`]);
         }
       }
 
       const { error: uploadError } = await supabase.storage
-        .from('business_card_photos')
+        .from('business-card-photos')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -116,7 +116,7 @@ export function MyCardView() {
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('business_card_photos')
+        .from('business-card-photos')
         .getPublicUrl(fileName);
 
       setPhotoUrl(publicUrl);
@@ -138,7 +138,7 @@ export function MyCardView() {
       const fileName = photoUrl.split('/').pop();
       if (fileName) {
         await supabase.storage
-          .from('business_card_photos')
+          .from('business-card-photos')
           .remove([`${user.id}/${fileName}`]);
       }
       setPhotoUrl('');

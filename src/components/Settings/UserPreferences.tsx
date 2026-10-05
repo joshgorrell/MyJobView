@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Bell, Save, Calendar, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award, FileText } from 'lucide-react';
+import { Bell, Save, Calendar, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToPushNotifications, unsubscribeFromPushNotifications, checkPushSubscription } from '../../lib/pushNotifications';
 import { UserBusinessCardEditor } from '../BusinessCard/UserBusinessCardEditor';
 import { RewardsDashboard } from '../Rewards/RewardsDashboard';
 import ConfirmModal from '../ui/ConfirmModal';
-import { useTheme, type ThemePreference } from '../../contexts/ThemeContext';
+import { ThemeSelector } from './ThemeSelector';
 
 export function UserPreferences() {
   const { profile } = useAuth();
-  const { preference, setPreference } = useTheme();
-  const [themeError, setThemeError] = useState('');
-  const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards' | 'proposals'>(() => {
+  const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards'>(() => {
     const target = sessionStorage.getItem('mjv-preferences-tab');
     sessionStorage.removeItem('mjv-preferences-tab');
     return target === 'business-card' ? 'business-card' : 'notifications';
@@ -37,9 +35,6 @@ export function UserPreferences() {
     notify_on_lead_status: true,
     notify_on_product_requests: true,
   });
-  const [proposalTemplates, setProposalTemplates] = useState<any[]>([]);
-  const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
-  const [savingTemplate, setSavingTemplate] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
@@ -53,7 +48,6 @@ export function UserPreferences() {
     loadOffices();
     loadVisibilitySettings();
     checkPushStatus();
-    loadProposalTemplates();
   }, [profile?.id]);
 
   async function checkPushStatus() {
@@ -141,49 +135,6 @@ export function UserPreferences() {
       }
     } catch (error) {
       console.error('Error loading visibility settings:', error);
-    }
-  }
-
-  async function loadProposalTemplates() {
-    if (!profile?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('proposal_report_templates')
-        .select('*')
-        .or(`is_personal.eq.false,created_by.eq.${profile.id}`)
-        .order('is_default', { ascending: false })
-        .order('name');
-
-      if (error) throw error;
-      setProposalTemplates(data || []);
-
-      // Load user's default template preference
-      if (profile.default_proposal_report_template_id) {
-        setDefaultTemplateId(profile.default_proposal_report_template_id);
-      }
-    } catch (error) {
-      console.error('Error loading proposal templates:', error);
-    }
-  }
-
-  async function saveDefaultTemplate() {
-    if (!profile?.id) return;
-
-    setSavingTemplate(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ default_proposal_report_template_id: defaultTemplateId || null })
-        .eq('id', profile.id);
-
-      if (error) throw error;
-      alert('Default proposal template saved!');
-    } catch (error) {
-      console.error('Error saving template preference:', error);
-      alert('Failed to save template preference');
-    } finally {
-      setSavingTemplate(false);
     }
   }
 
@@ -387,72 +338,46 @@ export function UserPreferences() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-subtle bg-canvas p-4 text-primary">
-        <h2 className="font-semibold">Appearance</h2>
-        <p className="mt-1 text-sm text-muted">Choose how MyJobView appears. Your choice is saved to your account after the theme update is released.</p>
-        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Color theme">
-          {(['classic', 'light', 'dark', 'system'] as ThemePreference[]).map(option => (
-            <button key={option} type="button" aria-pressed={preference === option}
-              onClick={async () => { setThemeError(''); try { await setPreference(option); } catch { setThemeError('Could not save your theme. Please try again.'); } }}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium ${preference === option ? 'border-blue-500 bg-blue-600 text-white' : 'border-subtle bg-surface text-primary hover:bg-elevated'}`}>
-              {option === 'classic' ? 'Classic Gradient' : option[0].toUpperCase() + option.slice(1)}
-            </button>
-          ))}
-        </div>
-        {themeError && <p role="alert" className="mt-2 text-sm text-red-500">{themeError}</p>}
-      </section>
+      <ThemeSelector />
       <div className="border-b border-subtle">
-        <nav className="flex gap-4 overflow-x-auto">
+        <nav className="grid grid-cols-3 sm:flex gap-1 sm:gap-4 overflow-x-auto" aria-label="Preferences sections">
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+            className={`min-w-0 shrink-0 whitespace-nowrap px-1 sm:px-4 py-3 text-xs sm:text-base font-medium transition-colors border-b-2 ${
               activeTab === 'notifications'
                 ? 'border-blue-500 text-brand'
                 : 'border-transparent text-muted hover:text-primary'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              Notifications & Settings
+            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
+              <Bell className="w-5 h-5 shrink-0" />
+              <span className="sm:hidden">Settings</span><span className="hidden sm:inline">Notifications & Settings</span>
             </div>
           </button>
           <button
             onClick={() => setActiveTab('business-card')}
-            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+            className={`min-w-0 shrink-0 whitespace-nowrap px-1 sm:px-4 py-3 text-xs sm:text-base font-medium transition-colors border-b-2 ${
               activeTab === 'business-card'
                 ? 'border-blue-500 text-brand'
                 : 'border-transparent text-muted hover:text-primary'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              My Business Card
+            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
+              <CreditCard className="w-5 h-5 shrink-0" />
+              <span className="sm:hidden">Business Card</span><span className="hidden sm:inline">My Business Card</span>
             </div>
           </button>
           <button
             onClick={() => setActiveTab('rewards')}
-            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+            className={`min-w-0 shrink-0 whitespace-nowrap px-1 sm:px-4 py-3 text-xs sm:text-base font-medium transition-colors border-b-2 ${
               activeTab === 'rewards'
                 ? 'border-blue-500 text-brand'
                 : 'border-transparent text-muted hover:text-primary'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5" />
-              My Rewards
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab('proposals')}
-            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
-              activeTab === 'proposals'
-                ? 'border-blue-500 text-brand'
-                : 'border-transparent text-muted hover:text-primary'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Proposals
+            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
+              <Award className="w-5 h-5 shrink-0" />
+              <span className="sm:hidden">Rewards</span><span className="hidden sm:inline">My Rewards</span>
             </div>
           </button>
         </nav>
@@ -464,90 +389,6 @@ export function UserPreferences() {
 
       {activeTab === 'rewards' && (
         <RewardsDashboard />
-      )}
-
-      {activeTab === 'proposals' && (
-        <div className="max-w-2xl space-y-8">
-          <div className="bg-canvas rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
-              <FileText className="w-6 h-6 text-brand" />
-              Default Proposal Template
-            </h3>
-            <p className="text-secondary mb-6">
-              Choose your preferred template layout for new proposals. This will be automatically
-              selected when you review proposals before sending to customers.
-            </p>
-
-            {proposalTemplates.length === 0 ? (
-              <div className="bg-surface border border-subtle rounded-lg p-6 text-center">
-                <FileText className="w-12 h-12 mx-auto mb-3 text-muted" />
-                <p className="text-secondary">No proposal templates available</p>
-                <p className="text-sm text-muted mt-2">
-                  Contact your administrator to create proposal templates
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3 mb-6">
-                  {proposalTemplates.map((template) => (
-                    <label
-                      key={template.id}
-                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        defaultTemplateId === template.id
-                          ? 'border-blue-500 bg-infoSoft'
-                          : 'border-subtle hover:border-strong'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        value={template.id}
-                        checked={defaultTemplateId === template.id}
-                        onChange={(e) => setDefaultTemplateId(e.target.value)}
-                        className="mt-1 w-4 h-4 text-brand"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-primary">{template.name}</span>
-                          {template.is_personal && (
-                            <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">
-                              Personal
-                            </span>
-                          )}
-                          {template.is_default && !template.is_personal && (
-                            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
-                              Company Default
-                            </span>
-                          )}
-                        </div>
-                        {template.description && (
-                          <p className="text-sm text-secondary">{template.description}</p>
-                        )}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-subtle">
-                  <button
-                    onClick={() => setDefaultTemplateId('')}
-                    disabled={!defaultTemplateId}
-                    className="text-sm text-secondary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Clear Selection
-                  </button>
-                  <button
-                    onClick={saveDefaultTemplate}
-                    disabled={savingTemplate}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Save className="w-4 h-4" />
-                    {savingTemplate ? 'Saving...' : 'Save Default Template'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
       )}
 
       {activeTab === 'notifications' && (
@@ -564,7 +405,7 @@ export function UserPreferences() {
         <div className="bg-canvas border border-subtle rounded-lg p-6">
           {pushEnabled ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-green-600">
+              <div className="flex items-center gap-3 text-success">
                 <CheckCircle className="w-6 h-6" />
                 <div>
                   <div className="font-semibold">Push Notifications Enabled</div>
@@ -755,7 +596,7 @@ export function UserPreferences() {
         <div className="bg-canvas border border-subtle rounded-lg p-6">
           {calendarConnected ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-green-600">
+              <div className="flex items-center gap-3 text-success">
                 <CheckCircle className="w-6 h-6" />
                 <div>
                   <div className="font-semibold">Connected</div>
@@ -812,7 +653,7 @@ export function UserPreferences() {
               type="checkbox"
               checked={preferences.notify_on_mention}
               onChange={(e) => setPreferences({ ...preferences, notify_on_mention: e.target.checked })}
-              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
               <div className="font-semibold text-primary">Mention Notifications</div>
@@ -829,7 +670,7 @@ export function UserPreferences() {
               type="checkbox"
               checked={preferences.notify_on_lead_assigned}
               onChange={(e) => setPreferences({ ...preferences, notify_on_lead_assigned: e.target.checked })}
-              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
               <div className="font-semibold text-primary">Lead Assignment Notifications</div>
@@ -846,7 +687,7 @@ export function UserPreferences() {
               type="checkbox"
               checked={preferences.notify_on_fishbowl}
               onChange={(e) => setPreferences({ ...preferences, notify_on_fishbowl: e.target.checked })}
-              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
               <div className="font-semibold text-primary">Fishbowl Lead Notifications</div>
@@ -863,7 +704,7 @@ export function UserPreferences() {
               type="checkbox"
               checked={preferences.notify_on_escalated}
               onChange={(e) => setPreferences({ ...preferences, notify_on_escalated: e.target.checked })}
-              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
               <div className="font-semibold text-primary">Lead Escalation Notifications</div>
@@ -880,7 +721,7 @@ export function UserPreferences() {
               type="checkbox"
               checked={preferences.notify_on_lead_status}
               onChange={(e) => setPreferences({ ...preferences, notify_on_lead_status: e.target.checked })}
-              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
               <div className="font-semibold text-primary">Priority Lead Status Updates</div>
@@ -897,7 +738,7 @@ export function UserPreferences() {
               type="checkbox"
               checked={preferences.notify_on_product_requests}
               onChange={(e) => setPreferences({ ...preferences, notify_on_product_requests: e.target.checked })}
-              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex-1">
               <div className="font-semibold text-primary">Product Request Notifications</div>

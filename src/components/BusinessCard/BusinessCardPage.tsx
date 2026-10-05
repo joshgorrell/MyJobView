@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Mail, Phone, Linkedin, Globe, Send, User, Building2, Check, MapPin, Edit3, Download, QrCode, X } from 'lucide-react';
+import { Send, Check, MapPin, Edit3, Download, QrCode, X, Copy, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { BusinessCard, CompanySettings, CompanyOffice } from '../../lib/types';
+import { BusinessCard, CompanyOffice } from '../../lib/types';
 import { UserBusinessCardEditor } from './UserBusinessCardEditor';
+import { getBusinessCardUrl } from '../../lib/businessCardLinks';
+import { BusinessCardIdentity, BusinessCardFooter, CardBranding } from './BusinessCardIdentity';
 
 interface BusinessCardPageProps {
   slug: string;
@@ -14,8 +16,8 @@ interface BusinessCardPageProps {
 export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: BusinessCardPageProps) {
   const { profile } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
-  const [offices, setOffices] = useState<CompanyOffice[]>([]);
+  const [companySettings, setCompanySettings] = useState<CardBranding | null>(null);
+  const [offices, setOffices] = useState<Pick<CompanyOffice, 'id' | 'office_name' | 'phone' | 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactPhone, setContactPhone] = useState('');
   const [contactName, setContactName] = useState('');
@@ -25,6 +27,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loadingQR, setLoadingQR] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (slug === 'temp' && isOwnCard) {
@@ -59,14 +62,18 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   }
 
   async function loadCompanyInfo() {
+    setCompanySettings(null);
+    setOffices([]);
     try {
-      const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('*').eq('organization_id', profile?.organization_id).maybeSingle(),
-        supabase.from('company_offices').select('*').order('display_order', { ascending: true })
-      ]);
-
-      if (settingsResult.data) setCompanySettings(settingsResult.data);
-      if (officesResult.data) setOffices(officesResult.data);
+      // Resolve branding from the card owner, including for signed-out visitors.
+      const { data, error } = await supabase.rpc('get_business_card_branding', { p_slug: slug });
+      if (error) throw error;
+      if (!data) return;
+      setCompanySettings(data);
+      const { data: locations } = await supabase.from('company_offices')
+        .select('id, office_name, phone, address_line1, address_line2, city, state, zip')
+        .eq('organization_id', data.organization_id).order('display_order', { ascending: true });
+      setOffices(locations || []);
     } catch (error) {
       console.error('Error loading company info:', error);
     }
@@ -118,6 +125,8 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   async function generateQRCode() {
     if (!card) return;
 
+    const cardUrl = getBusinessCardUrl(card.slug, getSubdomainFromCurrentHost());
+
     setLoadingQR(true);
 
     try {
@@ -130,6 +139,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            url: cardUrl,
             fullName: card.full_name,
             title: card.title,
             email: card.email,
@@ -208,6 +218,31 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
     }
   }
 
+  function getSubdomainFromCurrentHost(): string | null {
+    const host = window.location.hostname.toLowerCase();
+    const match = host.match(/^([a-z0-9-]+)\.myjobview\.com$/);
+    return match ? match[1] : null;
+  }
+
+  function getCardUrl(): string {
+    return getBusinessCardUrl(card?.slug || slug, getSubdomainFromCurrentHost());
+  }
+
+  async function copyCardLink() {
+    await navigator.clipboard.writeText(getCardUrl());
+    setShareMessage('Link copied');
+    window.setTimeout(() => setShareMessage(null), 2500);
+  }
+
+  async function shareCardLink() {
+    const url = getCardUrl();
+    if (navigator.share) {
+      await navigator.share({ title: card?.full_name || 'Digital business card', url });
+      return;
+    }
+    await copyCardLink();
+  }
+
   if (loading) {
     return (
       <div className={isOwnCard ? "text-center py-12" : "min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center"}>
@@ -264,117 +299,14 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
     );
   }
 
+  if (!card) return null;
+
   return (
     <div className={isOwnCard ? "p-0" : "min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 py-12"}>
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 overflow-hidden">
-          {companySettings?.company_logo_url && (
-            <div className="bg-white py-6 px-4 sm:py-8 sm:px-8 flex justify-center border-b border-gray-700">
-              <img
-                src={companySettings.company_logo_url}
-                alt={companySettings.company_name}
-                className="h-12 sm:h-16 w-auto object-contain max-w-[200px] sm:max-w-md"
-              />
-            </div>
-          )}
-
-          <div className="relative h-24 sm:h-32 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600">
-            <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-8">
-              {card.photo_url ? (
-                <img
-                  src={card.photo_url}
-                  alt={card.full_name}
-                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-gray-900 object-cover shadow-lg shadow-purple-500/50"
-                />
-              ) : (
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-gray-900 bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/50">
-                  <User className="w-12 h-12 sm:w-16 sm:h-16 text-white" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="pt-16 sm:pt-20 px-4 sm:px-8 pb-6 sm:pb-8">
-            <div className="mb-6">
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                {card.full_name}
-              </h1>
-              <p className="text-lg sm:text-xl text-gray-300">{card.title}</p>
-              {companySettings?.company_name && (
-                <p className="text-base sm:text-lg text-gray-400 mt-1">{companySettings.company_name}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <a
-                href={`mailto:${card.email}`}
-                className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-              >
-                <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
-                  <Mail className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-400">Email</p>
-                  <p className="text-sm text-white truncate group-hover:text-cyan-400 transition-colors">
-                    {card.email}
-                  </p>
-                </div>
-              </a>
-
-              <a
-                href={`tel:${card.phone}`}
-                className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-              >
-                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg">
-                  <Phone className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-400">Phone</p>
-                  <p className="text-sm text-white truncate group-hover:text-purple-400 transition-colors">
-                    {card.phone}
-                  </p>
-                </div>
-              </a>
-
-              {card.linkedin_url && (
-                <a
-                  href={card.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-                >
-                  <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg">
-                    <Linkedin className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400">LinkedIn</p>
-                    <p className="text-sm text-white truncate group-hover:text-blue-400 transition-colors">
-                      View Profile
-                    </p>
-                  </div>
-                </a>
-              )}
-
-              {companySettings?.website && (
-                <a
-                  href={companySettings.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group"
-                >
-                  <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
-                    <Globe className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400">Website</p>
-                    <p className="text-sm text-white truncate group-hover:text-green-400 transition-colors">
-                      {companySettings.website.replace(/^https?:\/\/(www\.)?/, '')}
-                    </p>
-                  </div>
-                </a>
-              )}
-            </div>
-
+      <div className="max-w-lg mx-auto">
+        <div data-theme-fixed className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d] rounded-3xl shadow-2xl border border-purple-400/30 overflow-hidden">
+          <BusinessCardIdentity fullName={card.full_name} title={card.title} email={card.email} phone={card.phone} linkedinUrl={card.linkedin_url} photoUrl={card.photo_url} company={companySettings} />
+          <div className="px-6 sm:px-8 pb-6">
             {card.bio && (
               <div className="mb-6 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-300 mb-2">About</h3>
@@ -435,10 +367,23 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
                 </button>
               </div>
             )}
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <button onClick={copyCardLink} className="flex items-center justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg hover:bg-white/15 transition-all font-medium">
+                <Copy className="w-4 h-4" />
+                {shareMessage || 'Copy Link'}
+              </button>
+              <button onClick={shareCardLink} className="flex items-center justify-center gap-2 px-4 py-3 bg-white/10 text-white rounded-lg hover:bg-white/15 transition-all font-medium">
+                <Share2 className="w-4 h-4" />
+                Share
+              </button>
+            </div>
           </div>
+          <BusinessCardFooter company={companySettings} />
         </div>
 
-        <div className="mt-8 bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-8">
+        {profile && (
+          <div className="mt-8 bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-8">
           <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Share This Card</h2>
           <p className="text-gray-400 mb-6">
             Send this digital business card directly to a contact's phone via SMS
@@ -502,7 +447,8 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
               </button>
             </form>
           )}
-        </div>
+          </div>
+        )}
 
         {isOwnCard && (
           <div className="mt-4 text-center">
@@ -521,7 +467,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-6 sm:p-8 max-w-md w-full">
             <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h3 className="text-lg sm:text-xl font-bold text-white">Scan to Save Contact</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white">Scan to Open Card</h3>
               <button
                 onClick={() => setShowQRModal(false)}
                 className="text-gray-400 hover:text-white transition-colors"
@@ -533,7 +479,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
               <img src={qrCode} alt="QR Code" className="w-full h-auto" />
             </div>
             <p className="text-gray-400 text-xs sm:text-sm text-center mb-4">
-              Scan this QR code with your phone camera to save the contact information
+              Scan this QR code with your phone camera to open this business card
             </p>
             <button
               onClick={() => {
@@ -544,7 +490,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
                 link.click();
                 document.body.removeChild(link);
               }}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <Download className="w-4 h-4" />
               Download QR Code

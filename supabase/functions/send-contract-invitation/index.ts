@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
@@ -16,9 +17,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { contractId, token, appOrigin } = await req.json();
+    const { contractId, requestId, appOrigin } = await req.json();
 
-    if (!contractId || !token) {
+    if (!contractId || !requestId) {
       throw new Error("Missing required fields");
     }
 
@@ -34,21 +35,19 @@ Deno.serve(async (req: Request) => {
     });
     const { data: { user }, error: userError } = await caller.auth.getUser();
     if (userError || !user) throw new Error('Authentication required');
-    const { data: profile } = await supabase.from('profiles').select('organization_id, role').eq('id', user.id).maybeSingle();
+    const { data: attempt, error: prepareError } = await caller.rpc('security_prepare_invitation', { p_id: contractId, p_request: requestId });
+    if (prepareError || !attempt) throw new Error(prepareError?.message || 'Invitation could not be prepared');
+    if (attempt.sent_at) return new Response(JSON.stringify({ success: true, emailId: attempt.provider_id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const token = attempt.token;
     const { data: contract } = await supabase.from('security_contracts')
-      .select('organization_id, contact_id, magic_link_token, magic_link_expires_at, email_override')
-      .eq('id', contractId).maybeSingle();
-    if (!profile || !contract || profile.organization_id !== contract.organization_id || profile.role === 'portal'
-      || user.app_metadata?.is_portal_user || contract.magic_link_token !== token
-      || !contract.magic_link_expires_at || new Date(contract.magic_link_expires_at) <= new Date()) {
-      throw new Error('You do not have access to send this invitation');
-    }
+      .select('organization_id, contact_id, email_override').eq('id', contractId).single();
+    if (!contract || contract.organization_id !== attempt.organization_id) throw new Error('Agreement not found');
     const { data: contact } = await supabase.from('contacts').select('email, full_name')
       .eq('id', contract.contact_id).eq('organization_id', contract.organization_id).maybeSingle();
-    const customerEmail = contract.email_override || contact?.email;
+    const customerEmail = attempt.recipient;
     const customerName = contact?.full_name || 'Customer';
     if (!customerEmail) throw new Error('Customer email is required');
-    const expirationDays = Math.max(1, Math.ceil((new Date(contract.magic_link_expires_at).getTime() - Date.now()) / 86400000));
+    const expirationDays = Math.max(1, Math.ceil((new Date(attempt.expires_at).getTime() - Date.now()) / 86400000));
 
     // Fetch email template from database
     const { data: template, error: templateError } = await supabase
@@ -84,9 +83,17 @@ Deno.serve(async (req: Request) => {
     const companyName = settings?.company_name || "Your Company";
     const fromEmail = settings?.from_email || "noreply@yourdomain.com";
     const fromName = settings?.from_name || companyName;
-    const portalUrl = settings?.portal_url || Deno.env.get("SUPABASE_URL");
+    const portalUrl = settings?.portal_url || "https://myjobview.com/portal";
     const companyLogoUrl = settings?.company_logo_url || "";
     const companyEmail = settings?.company_email || "";
+    // Use the prepared attempt's staff sender so retries retain the same identity.
+    const { data: sender } = await supabase.from('profiles').select('full_name, email')
+      .eq('id', attempt.actor_id).eq('organization_id', contract.organization_id)
+      .eq('is_active', true).neq('role', 'portal').maybeSingle();
+    const validEmail = (value: unknown) => typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? value.trim() : '';
+    const supportEmail = validEmail(sender?.email) || validEmail(companyEmail);
+    const supportName = validEmail(sender?.email) ? (sender?.full_name || companyName) : companyName;
+
 
     // Use appOrigin (sent by the frontend) if available, otherwise fall back to subdomain or portal_url
     const subdomain = orgData?.subdomain || null;
@@ -95,10 +102,11 @@ Deno.serve(async (req: Request) => {
     const baseUrl = typeof appOrigin === 'string' && allowedOrigins.has(appOrigin) ? appOrigin : defaultOrigin;
     const onboardingUrl = `${baseUrl}/portal/security?token=${encodeURIComponent(token)}`;
 
+    const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
     // Build logo block for the template
     const logoBlock = companyLogoUrl
-      ? `<img src="${companyLogoUrl}" alt="${companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
-      : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${companyName}</span>`;
+      ? `<img src="${escapeHtml(companyLogoUrl)}" alt="${escapeHtml(companyName)}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
+      : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${escapeHtml(companyName)}</span>`;
 
     // Validate email configuration
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -108,13 +116,18 @@ Deno.serve(async (req: Request) => {
 
     // Replace placeholders in template
     let emailHtml = template.body
-      .replace(/\{\{customer_name\}\}/g, customerName)
-      .replace(/\{\{onboarding_url\}\}/g, onboardingUrl)
+      .replace(/\{\{customer_name\}\}/g, () => escapeHtml(customerName))
+      .replace(/\{\{onboarding_url\}\}/g, () => escapeHtml(onboardingUrl))
       .replace(/\{\{expiration_days\}\}/g, expirationDays.toString())
-      .replace(/\{\{company_name\}\}/g, companyName)
-      .replace(/\{\{portal_url\}\}/g, portalUrl)
+      .replace(/\{\{company_name\}\}/g, () => escapeHtml(companyName))
+      .replace(/\{\{portal_url\}\}/g, () => escapeHtml(portalUrl))
       .replace(/\{\{logo_block\}\}/g, logoBlock)
-      .replace(/\{\{company_email\}\}/g, companyEmail);
+      .replace(/\{\{company_email\}\}/g, () => escapeHtml(companyEmail));
+
+    if (supportEmail) {
+      const footer = `<div style="padding:24px;text-align:center;font-size:14px;color:#374151"><p>Questions about your agreement?</p><a style="color:#1e40af" href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportName)} · ${escapeHtml(supportEmail)}</a></div>`;
+      emailHtml = /<\/body>/i.test(emailHtml) ? emailHtml.replace(/<\/body>/i, footer + '</body>') : emailHtml + footer;
+    }
 
     let emailSubject = template.subject
       .replace(/\{\{customer_name\}\}/g, customerName)
@@ -135,32 +148,33 @@ What's Next:
 - Review your agreement details
 - Complete any required fields
 - Review terms and conditions
-- Provide your digital signature
 - Add or select a payment method and authorize automatic recurring payments
+- Choose your billing preference
+- Provide your digital signature
 
 IMPORTANT: This link will expire in ${expirationDays} days.
 
-If you have any questions, please contact us.
+${supportEmail ? `Questions about your agreement? Contact ${supportName} at ${supportEmail}.` : 'If you have any questions, please contact us.'}
 
 Best regards,
 ${companyName}
 
-This is an automated message. Please do not reply to this email.
+${supportEmail ? `Replies go to ${supportEmail}.` : 'This is an automated message. Please contact your provider with questions.'}
     `;
 
-    const response = await fetch(`https://api.resend.com/emails`, {
+    const { data: message, error: messageError } = await supabase.rpc('security_invitation_message', {
+      p_attempt: attempt.id, p_message: { from: `${fromName} <${fromEmail}>`, to: [customerEmail], subject: emailSubject, html: emailHtml, text: emailText, ...(supportEmail ? { reply_to: supportEmail } : {}) },
+    });
+    if (messageError || !message) throw new Error('Invitation delivery could not be prepared safely.');
+
+    const response = await sendSystemEmail({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${resendApiKey}`,
+        "Idempotency-Key": `security-invitation-${attempt.id}`,
       },
-      body: JSON.stringify({
-        from: `${fromName} <${fromEmail}>`,
-        to: [customerEmail],
-        subject: emailSubject,
-        html: emailHtml,
-        text: emailText,
-      }),
+      body: JSON.stringify(message),
     });
 
     if (!response.ok) {
@@ -177,6 +191,8 @@ This is an automated message. Please do not reply to this email.
     }
 
     const data = await response.json();
+    const { error: finishError } = await supabase.rpc('security_finish_invitation', { p_attempt: attempt.id, p_provider_id: data.id });
+    if (finishError) throw new Error('Email was accepted, but delivery recording needs retry. Retry this invitation to reconcile it safely.');
 
     return new Response(
       JSON.stringify({ success: true, emailId: data.id }),

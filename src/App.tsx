@@ -1,3 +1,4 @@
+import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
@@ -10,21 +11,21 @@ import { MessageTicker } from './components/Layout/MessageTicker';
 import { DepartmentSidebar } from './components/Layout/DepartmentSidebar';
 import { PlatformFooter } from './components/Layout/PlatformFooter';
 import { OfflineIndicator } from './components/Offline/OfflineIndicator';
-import BugReportModal from './components/Shared/BugReportModal';
+import TellUsModal from './components/Shared/TellUsModal';
 import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
-import { getIcon } from './lib/iconMap';
-import { X, LogOut, FileText, Bug, TrendingUp } from 'lucide-react';
+import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { supabase } from './lib/supabase';
 import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
+import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
@@ -139,11 +140,8 @@ const AddProjectTimeModal = lazy(() => import('./components/Projects/AddProjectT
 // Loading component
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-3"></div>
-        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-      </div>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="inline-block animate-spin rounded-full h-8 w-8 border-[3px] border-blue-500 border-t-transparent"></div>
     </div>
   );
 }
@@ -181,7 +179,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
-  const { footerDepartments, getUserModules, starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
+  const { starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -193,7 +191,7 @@ function AppContent() {
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
-  const [showBugReportModal, setShowBugReportModal] = useState(false);
+  const [showTellUsModal, setShowTellUsModal] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
@@ -292,6 +290,8 @@ function AppContent() {
   // Check if we're in standalone/popout mode (no header/nav)
   const isStandalone = new URLSearchParams(window.location.search).get('standalone') === 'true';
 
+  useEffect(()=>{if(!profile?.id)return;const sync=()=>{syncVisitEvents(profile.id).catch(console.error);};sync();window.addEventListener('online',sync);return()=>window.removeEventListener('online',sync);},[profile?.id]);
+
   // Initialize state from URL on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -310,10 +310,6 @@ function AppContent() {
     if (urlSalesOrderId) setOpenSalesOrderId(urlSalesOrderId);
   }, []);
 
-  const renderIcon = (iconName: string, className: string = "w-4 h-4") => {
-    const IconComponent = getIcon(iconName);
-    return IconComponent ? <IconComponent className={className} /> : null;
-  };
 
   useEffect(() => {
     offlineStorage.init();
@@ -388,6 +384,7 @@ function AppContent() {
 
   // Save active tab to localStorage and update URL whenever state changes
   useEffect(() => {
+    if(['/proposals-fullscreen','/sales-order-fullscreen'].includes(currentPath))return;
     localStorage.setItem('activeTab', activeTab);
 
     // Skip URL manipulation for standalone routes that don't use tab-based navigation
@@ -633,17 +630,16 @@ function AppContent() {
     return null;
   }
 
-  // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
-
-  const cardMatch = currentPath.match(/^\/card\/(.+)$/);
-  if (cardMatch) {
-    if (!user || !profile) return <LoginForm />;
+  const publicCardSlug = getBusinessCardSlugFromLocation(currentPath, window.location.hostname);
+  if (publicCardSlug) {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <BusinessCardPage slug={cardMatch[1]} isOwnCard={false} />
+        <BusinessCardPage slug={publicCardSlug} isOwnCard={false} />
       </Suspense>
     );
   }
+
+  // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
 
   if (currentPath === '/calendar') {
     if (!user || !profile) return <LoginForm />;
@@ -700,11 +696,11 @@ function AppContent() {
     if (!user || !profile) return <LoginForm />;
     if (!['admin', 'manager', 'sales_manager'].includes(profile.role)) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
-            <TrendingUp size={64} className="mx-auto text-gray-600 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-gray-400">You don't have permission to access the Sales TV Dashboard.</p>
+            <TrendingUp size={64} className="mx-auto text-muted mb-4" />
+            <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
+            <p className="text-muted">You don't have permission to access the Sales TV Dashboard.</p>
           </div>
         </div>
       );
@@ -723,18 +719,18 @@ function AppContent() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const soId = urlParams.get('id');
-    const soActiveTab = urlParams.get('activeTab') as 'scope' | 'primary_scope' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions' | null;
+    const soActiveTab = urlParams.get('activeTab') as 'tasks' | 'scope' | 'primary_scope' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions' | null;
 
     if (!soId) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
-          <p className="text-gray-400">No sales order specified.</p>
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
+          <p className="text-muted">No sales order specified.</p>
         </div>
       );
     }
 
     return (
-      <div className="h-screen bg-gray-900 flex flex-col overflow-auto p-6">
+      <div className="theme-workspace h-screen bg-workspace flex flex-col overflow-auto p-3 sm:p-6">
         <Suspense fallback={<LoadingFallback />}>
           <SalesOrderDetail orderId={soId} onBack={() => window.close()} isStandalone={true} initialTab={soActiveTab ?? undefined} />
         </Suspense>
@@ -754,11 +750,11 @@ function AppContent() {
 
     if (!checkModuleAccess('proposals')) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
-            <FileText size={64} className="mx-auto text-gray-600 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-gray-400">You don't have permission to access Proposals.</p>
+            <FileText size={64} className="mx-auto text-muted mb-4" />
+            <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
+            <p className="text-muted">You don't have permission to access Proposals.</p>
           </div>
         </div>
       );
@@ -769,7 +765,7 @@ function AppContent() {
     const proposalId = urlParams.get('id');
 
     return (
-      <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
+      <div className="theme-workspace h-screen bg-workspace flex flex-col overflow-hidden">
         <Suspense fallback={<LoadingFallback />}>
           <ProposalsView isStandalone={!!proposalId} openProposalId={proposalId} />
         </Suspense>
@@ -777,10 +773,10 @@ function AppContent() {
     );
   }
 
-  if (!user || !profile) {
+  if (isPasswordRecovery || !user || !profile) {
     // If already logged in on root domain with redirect_to, send to bridge
     const redirectParam = new URLSearchParams(window.location.search).get('redirect_to');
-    if (user && redirectParam && isValidReturnHost(redirectParam)) {
+    if (!isPasswordRecovery && user && redirectParam && isValidReturnHost(redirectParam)) {
       const returnPath = new URLSearchParams(window.location.search).get('return_path') || window.location.pathname;
       const bridgeUrl = new URL('/auth-bridge', window.location.origin);
       bridgeUrl.searchParams.set('return_to', redirectParam);
@@ -792,7 +788,7 @@ function AppContent() {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
           <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-white mb-6">Reset Your Password</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">{new URLSearchParams(window.location.search).get('account_setup') === 'welcome' ? 'Welcome to MyJobView' : 'Reset Your Password'}</h2>
 
             {resetSuccess ? (
               <div className="text-center">
@@ -871,7 +867,7 @@ function AppContent() {
   }
 
   return (
-    <div className="workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
+    <div className="theme-workspace workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>
@@ -956,13 +952,7 @@ function AppContent() {
           {activeTab === 'feed' && checkModuleAccess('feed') && <MasterFeed key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
           {activeTab === 'fishbowl' && checkModuleAccess('fishbowl') && <FishbowlView key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
           {activeTab === 'connections' && checkModuleAccess('connections') && <ConnectionsView key={activeTab} />}
-          {(activeTab === 'proposals' || activeTab === 'sales') && (() => {
-            // Show loading while departments are still loading
-            if (departmentsLoading) {
-              return false;
-            }
-            return checkModuleAccess('proposals');
-          })() && (
+          {(activeTab === 'proposals' || activeTab === 'sales') && checkModuleAccess('proposals') && (
             <ProposalsView
               key={activeTab}
               openProposalId={openProposalId}
@@ -1205,34 +1195,13 @@ function AppContent() {
       </div>
 
       {!isStandalone && (
-        <footer className="bg-gray-900/50 border-t border-purple-500/30 mt-8 sm:mt-12 py-4 sm:py-6">
+        <footer className="bg-canvas/50 border-t border-subtle mt-8 sm:mt-12 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4">
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
-              {footerDepartments.map((dept) => {
-                const modules = getUserModules(dept.id);
-                // Only show sort_order = 1 in footer (Feature Suggestions)
-                return modules.filter(m => m.sort_order === 1).map((module) => (
-                  <button
-                    key={module.module_key}
-                    onClick={() => setActiveTab(module.module_key)}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors justify-center"
-                  >
-                    {renderIcon(module.icon, "w-4 h-4 flex-shrink-0")}
-                    <span className="text-sm whitespace-nowrap">{module.display_name}</span>
-                  </button>
-                ));
-              })}
-              <button
-                onClick={() => setShowBugReportModal(true)}
-                className="p-2 text-green-500 hover:text-green-400 hover:bg-gray-800 rounded-lg transition-colors"
-                title="Report a bug"
-              >
-                <Bug className="w-5 h-5" />
-              </button>
               <button
                 onClick={signOut}
-                className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors justify-center"
+                className="inline-flex items-center gap-2 px-4 py-2 text-secondary hover:text-primary hover:bg-elevated rounded-lg transition-colors justify-center"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4 flex-shrink-0" />
@@ -1245,7 +1214,7 @@ function AppContent() {
       )}
 
       {!isStandalone && (
-        <PlatformFooter />
+        <PlatformFooter onTellUs={() => setShowTellUsModal(true)} />
       )}
 
       {showJobMediaUpload && (
@@ -1328,9 +1297,9 @@ function AppContent() {
         </Suspense>
       )}
 
-      <BugReportModal
-        isOpen={showBugReportModal}
-        onClose={() => setShowBugReportModal(false)}
+      <TellUsModal
+        isOpen={showTellUsModal}
+        onClose={() => setShowTellUsModal(false)}
       />
 
       {showDesignBriefModal && (

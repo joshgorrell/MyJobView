@@ -1,3 +1,4 @@
+import {useJobDraft} from '../../lib/useJobDraft';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { TaskGroups, ScopeTask } from '../Shared/TaskGroups';
@@ -10,7 +11,7 @@ export default function ProposalTasksPanel({ proposalId, onClose }: { proposalId
   const [items, setItems] = useState<Item[]>([]);
   const [phases, setPhases] = useState<Array<{ id: string; name: string }>>([]);
   const [rooms, setRooms] = useState<Array<{ id: string; name: string }>>([]);
-  const [editing, setEditing] = useState<Task | null>(null);
+  const [editing, setEditing] = useJobDraft<Task>(`mjv-proposal-task-draft:${proposalId}`);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,7 +35,7 @@ export default function ProposalTasksPanel({ proposalId, onClose }: { proposalId
   useEffect(() => { load(); }, [proposalId]);
   async function save(event: React.FormEvent) {
     event.preventDefault(); if (!editing || saving) return; setSaving(true);
-    const values = { title: editing.title.trim(), description: editing.description || null, estimated_hours: editing.estimated_hours, line_item_id: editing.line_item_id || null, labor_phase_id: editing.labor_phase_id || null, covered_item_ids: editing.covered_item_ids || [] };
+    const values = {estimate_is_manual:true, title: editing.title.trim(), description: editing.description || null, estimated_hours: editing.estimated_hours, line_item_id: editing.line_item_id || null, labor_phase_id: editing.labor_phase_id || null, covered_item_ids: editing.covered_item_ids || [] };
     const result = editing.id ? await supabase.from('proposal_tasks').update(values).eq('id',editing.id) : await supabase.from('proposal_tasks').insert({ ...values, proposal_id: proposalId, sort_order: tasks.length });
     setSaving(false); if(result.error) { setError(result.error.message); return; } setEditing(null); await load();
   }

@@ -179,7 +179,11 @@ export function SalesOrderStatsTab({ order, changeOrders }: SalesOrderStatsTabPr
   const approvedCOs = changeOrders.filter(co => co.status === 'approved');
   const totalChangeAmount = approvedCOs.reduce((sum, co) => sum + (co.change_amount || 0), 0);
 
-  const totalContractRevenue = (order.contract_total || 0) + totalChangeAmount;
+  // Use the proposal total as the baseline, NOT order.contract_total — the stored
+  // contract_total already includes approved COs, so adding totalChangeAmount on top
+  // would double-count every change order.
+  const originalTotal = order.proposal?.total ?? order.original_contract_total ?? order.contract_total ?? 0;
+  const totalContractRevenue = originalTotal + totalChangeAmount;
   const totalCost = productCost + laborCost;
   const overallProfit = totalContractRevenue - totalCost;
   const overallMargin = totalContractRevenue > 0 ? (overallProfit / totalContractRevenue) * 100 : 0;

@@ -7,7 +7,7 @@ import { formatCurrency } from '../../lib/utils';
 import {
   ArrowRight, ArrowLeft, Check, User, Shield, Phone, CreditCard,
   Ligature as FileSignature, HelpCircle, Mail, Plus, Trash2, Lock,
-  Loader2, AlertCircle, Receipt, Printer, Download, Save
+  Loader2, AlertCircle, Receipt, Printer, Download, Save, MoreHorizontal
 } from 'lucide-react';
 import { SignaturePad } from '../Production/SignaturePad';
 import { calculateAnnualDiscount, type BillingPreference } from '../../lib/types';
@@ -18,7 +18,7 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-const inputClass = 'w-full px-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400 text-sm';
+const inputClass = 'w-full px-4 py-3.5 border border-gray-200 rounded-xl bg-white focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400 text-sm';
 const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5';
 
 export default function OnboardingWizard({ contract, token, onComplete }: OnboardingWizardProps) {
@@ -32,6 +32,9 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
   const [saveError, setSaveError] = useState('');
   const [paused, setPaused] = useState(false);
+  const [showDocumentTools, setShowDocumentTools] = useState(false);
+  const documentTools = useRef<HTMLDivElement>(null);
+  const documentToolsButton = useRef<HTMLButtonElement>(null);
   const [accepted, setAccepted] = useState(false);
   const [autopayAccepted, setAutopayAccepted] = useState(false);
   const revision = useRef(contract.draft?.revision || 0);
@@ -94,6 +97,25 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   persist.current = saveProgress;
 
   useEffect(() => {
+    if (!showDocumentTools) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!documentTools.current?.contains(event.target as Node)) setShowDocumentTools(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowDocumentTools(false);
+        documentToolsButton.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showDocumentTools]);
+
+  useEffect(() => {
     if (draftJson === lastSaved.current || submitted.current) return;
     setSaveStatus('unsaved'); setPaused(false);
     const timer = window.setTimeout(() => { void persist.current(); }, 700);
@@ -124,20 +146,20 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
       case 1:
         return !!(
           formData.personalInfo.full_name?.trim() &&
-          formData.personalInfo.email?.trim() &&
-          formData.personalInfo.phone?.trim()
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.personalInfo.email || '') &&
+          /^[0-9]{10,15}$/.test((formData.personalInfo.phone || '').replace(/\D/g, ''))
         );
       case 2:
         return !!(
           formData.propertyInfo.address_line1?.trim() &&
           formData.propertyInfo.city?.trim() &&
-          formData.propertyInfo.state?.trim() &&
-          formData.propertyInfo.zip_code?.trim()
+          /^[A-Za-z]{2}$/.test(formData.propertyInfo.state || '') &&
+          /^[0-9]{5}(-[0-9]{4})?$/.test(formData.propertyInfo.zip_code || '')
         );
       case 3:
-        if (formData.emergencyContacts.length < 2) return false;
+        if (formData.emergencyContacts.length < 2 || formData.emergencyContacts.length > 10) return false;
         return formData.emergencyContacts.every(
-          c => c.name?.trim() && c.phone?.trim() && c.password?.trim()
+          c => c.name?.trim() && /^[0-9]{10,15}$/.test((c.phone || '').replace(/\D/g, '')) && c.password?.trim()
         );
       case 4:
         return contract.billing_mode === 'mail' || !!formData.paymentMethodId;
@@ -153,11 +175,11 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   async function handleNext() {
     if (!isStepComplete()) {
       const messages: Record<number, string> = {
-        1: 'Please complete all required fields: Full Name, Email, and Phone Number.',
-        2: 'Please complete all required fields: Service Address, City, State, and ZIP Code.',
+        1: 'Enter your full name, a valid email, and a phone number with 10–15 digits.',
+        2: 'Enter the service address, city, two-letter state, and a valid ZIP code.',
         3: formData.emergencyContacts.length < 2
           ? 'Please add at least 2 emergency contacts.'
-          : 'Please complete all fields for each emergency contact.',
+          : 'Enter a name, phone with 10–15 digits, and codeword for each of 2–10 emergency contacts.',
         4: 'Please add or select a saved payment method for AutoPay.',
         5: 'Please select a billing preference.',
         6: 'Please review the terms, acknowledge your agreement, and provide your signature.'
@@ -216,35 +238,50 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
     setFormData({ ...formData, emergencyContacts: updated });
   }
 
+  if (paused) return (
+    <div className="security-onboarding-controls p-6 sm:p-8 text-gray-900 space-y-4">
+      <Check className="w-8 h-8 text-green-700" aria-hidden="true" />
+      <h2 className="text-xl font-bold" tabIndex={-1} ref={element => element?.focus()}>Your progress is saved</h2>
+      <p className="text-sm text-gray-700">Agreement {contract.contract_number}. You can close this page and return using your invitation link or the Security section of your customer portal. You will review and sign again when you return.</p>
+      <button onClick={() => setPaused(false)} className="min-h-[44px] px-4 py-2 bg-[#0f2347] text-white rounded-lg text-sm font-semibold">Resume agreement</button>
+    </div>
+  );
+
   return (
-    <div className="relative">
-      <div className="px-4 sm:px-8 py-5 bg-blue-50 border-b border-blue-100 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><p className="font-semibold text-gray-900">Agreement {contract.contract_number}</p>
-            <p className="text-sm text-gray-700">{formatCurrency(Number(contract.monthly_price) || 0)}/month · {contract.term_months} month initial term</p></div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => { try { printSecurityAgreement(agreementHtml()); } catch (e) { setSaveError(e instanceof Error ? e.message : 'Printing failed.'); } }}
-              className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium"><Printer className="w-4 h-4" />Print / Save PDF</button>
-            <button onClick={() => downloadSecurityAgreement(agreementHtml(), contract.contract_number)}
-              className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium"><Download className="w-4 h-4" />Download agreement</button>
+    <div className="security-onboarding-controls relative text-gray-900">
+      <div className="px-4 sm:px-8 py-3 sm:py-4 bg-blue-50 border-b border-blue-100 space-y-2">
+        <div><p className="font-semibold text-gray-900 break-words">{contract.contract_number}</p>
+          <p className="text-sm text-gray-700">{formatCurrency(Number(contract.monthly_price) || 0)}/mo · {contract.term_months}-month term</p></div>
+        <div className="flex items-center gap-2">
+          <p role="status" aria-live="polite" className="flex min-w-0 flex-1 items-center gap-1.5 text-xs sm:text-sm text-gray-700">
+            {saveStatus === 'saved' && <Check className="w-4 h-4 shrink-0 text-green-700" aria-hidden="true" />}
+            {saveStatus === 'saving' && <Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden="true" />}
+            {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : 'Unsaved changes'}
+          </p>
+          <button onClick={async () => {
+            if (await saveProgress()) {
+              setFormData(previous => ({ ...previous, signature: '' }));
+              setAccepted(false); setAutopayAccepted(false); setShowDocumentTools(false); setPaused(true);
+            }
+          }} disabled={saving || saveStatus === 'saving'}
+            className="flex shrink-0 items-center gap-1.5 min-h-[44px] px-3 py-2 text-sm font-semibold text-blue-900 border border-blue-200 bg-white rounded-lg disabled:opacity-50"><Save className="w-4 h-4" aria-hidden="true" />Save &amp; exit</button>
+          <div className="relative shrink-0" ref={documentTools}>
+            <button ref={documentToolsButton} type="button" aria-label="Agreement document tools" aria-expanded={showDocumentTools} aria-controls="agreement-document-tools" onClick={() => setShowDocumentTools(!showDocumentTools)}
+              className="flex items-center justify-center w-11 h-11 text-blue-900 rounded-lg hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-600"><MoreHorizontal className="w-5 h-5" aria-hidden="true" /></button>
+            {showDocumentTools && <div id="agreement-document-tools" className="absolute right-0 top-full mt-1 w-60 max-w-[calc(100vw-4rem)] bg-white border border-gray-200 rounded-xl shadow-lg p-1 z-30">
+              <button onClick={() => { setShowDocumentTools(false); documentToolsButton.current?.focus(); try { printSecurityAgreement(agreementHtml()); } catch (e) { setSaveError(e instanceof Error ? e.message : 'Printing failed.'); } }}
+                className="flex items-center gap-2 w-full min-h-[44px] px-3 py-2 text-sm text-gray-900 rounded-lg hover:bg-gray-50"><Printer className="w-4 h-4 shrink-0" aria-hidden="true" />Print / Save PDF</button>
+              <button onClick={() => { setShowDocumentTools(false); documentToolsButton.current?.focus(); try { downloadSecurityAgreement(agreementHtml(), contract.contract_number); } catch (e) { setSaveError(e instanceof Error ? e.message : 'Download failed.'); } }}
+                className="flex items-center gap-2 w-full min-h-[44px] px-3 py-2 text-sm text-gray-900 rounded-lg hover:bg-gray-50"><Download className="w-4 h-4 shrink-0" aria-hidden="true" />Download agreement</button>
+            </div>}
           </div>
         </div>
-        <details className="bg-white border border-gray-200 rounded-xl p-4">
-          <summary className="font-semibold text-blue-900 cursor-pointer">Review terms and conditions</summary>
-          <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{terms || 'Terms are unavailable. Contact your provider before signing.'}</div>
-        </details>
-        <div className="flex flex-wrap justify-between items-center gap-3">
-          <p role="status" aria-live="polite" className="text-sm text-gray-700">{saveStatus === 'saved' ? 'All changes saved' : saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Changes could not be saved' : 'Unsaved changes'}</p>
-          <button onClick={async () => { if (await saveProgress()) setPaused(true); }} disabled={saving || saveStatus === 'saving'}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-blue-900 border border-blue-200 bg-white rounded-lg disabled:opacity-50"><Save className="w-4 h-4" />Save and finish later</button>
-        </div>
-        {paused && <p role="status" className="text-sm text-green-800">Your place is saved. You can close this page and return using your invitation link or the Security section of your customer portal. You will review and sign again when you return.</p>}
         {saveError && <div role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 p-3 rounded-lg">{saveError}<button onClick={() => void saveProgress()} className="ml-3 underline font-semibold">Retry save</button></div>}
       </div>
       {/* Step Progress Header */}
-      <div className="px-4 sm:px-8 pt-6 pb-4 border-b border-gray-100 bg-white">
+      <div className="px-4 sm:px-8 py-3 sm:pt-6 sm:pb-4 border-b border-gray-100 bg-white">
         {/* Mobile step indicator */}
-        <div className="flex items-center justify-between mb-4 sm:hidden">
+        <div className="flex items-center justify-between mb-2 sm:hidden">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Step {currentStep} of {steps.length}
           </span>
@@ -263,7 +300,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               <React.Fragment key={step.id}>
                 <div className="flex flex-col items-center">
                   <div
-                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 border-2 ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 border-2 ${
                       isCompleted
                         ? 'bg-green-500 border-green-500 text-white shadow-sm'
                         : isActive
@@ -558,7 +595,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         {currentStep === 4 && (
           <div className="space-y-5">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Payment Method</h2>
-            {contract.billing_mode === 'mail' ? <p className="text-gray-700 bg-blue-50 p-4 rounded-xl">Your Admin has authorized mailed invoices for this agreement. The monthly price includes a $7 mailed-invoice fee.</p> :
+            {contract.billing_mode === 'mail' ? <p className="text-gray-700 bg-blue-50 p-4 rounded-xl">Your Admin has authorized mailed invoices for this agreement. Mailed billing is included in the overall account price.</p> :
               <SecurityPaymentEnrollment contractId={contract.id} token={token} selectedId={formData.paymentMethodId}
                 onSelect={method => { setFormData(previous => ({...previous,paymentMethodId:method.id,paymentMethod:method.payment_type === 'card' ? 'credit_card' : 'ach',signature:''})); setAccepted(false);setAutopayAccepted(false); }} />}
           </div>

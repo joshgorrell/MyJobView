@@ -47,12 +47,12 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
     const doc = agreement.document;
     const terms = readableAgreementTerms(doc.template?.contract_terms || '').replace(/\[term\]/g, `${doc.term_months || '__'} months`);
     return securityAgreementHtml(doc, terms, { personalInfo: agreement.contact, propertyInfo: agreement.contact },
-      agreement.customer_signature, agreement.signed_snapshot_available ? agreement.customer_signature_date : null);
+      agreement.customer_signature, agreement.signed_snapshot_available ? agreement.customer_signature_date : null, undefined, agreement.summary || undefined);
   }
 
-  const completed = agreement && (!!agreement.customer_completed_at || ['pending_approval', 'approved', 'active', 'cancelled'].includes(agreement.status));
+  const completed = agreement && (!!agreement.customer_completed_at || ['pending_approval', 'approved', 'active', 'cancelled', 'rejected'].includes(agreement.status));
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="security-onboarding-controls min-h-screen bg-slate-50 text-gray-900">
       <header className="bg-[#0f2347] text-white px-4 sm:px-6 py-4">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -78,8 +78,8 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
           <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 space-y-5">
             <CheckCircle className="w-10 h-10 text-green-600" />
             <h1 className="text-2xl font-bold text-gray-900">{agreement.status === 'active' ? 'Security agreement' : agreement.status === 'cancelled' ? 'Cancelled agreement' : 'Agreement submitted'}</h1>
-            <p className="text-gray-700">Agreement {agreement.document.contract_number} · {agreement.status.replace(/_/g, ' ')}</p>
-            {agreement.status === 'pending_approval' && <p className="text-gray-700">Your agreement is awaiting review. Our team will confirm monitoring activation separately.</p>}
+            <p className="text-gray-700">Agreement {agreement.document.contract_number} · {(agreement.status === 'rejected' ? 'pending approval' : agreement.status.replace(/_/g, ' '))}</p>
+            {['pending_approval', 'rejected'].includes(agreement.status) && <p className="text-gray-700">Your agreement is awaiting review. Our team will confirm monitoring activation separately.</p>}
             {agreement.summary && <SecurityContractSummary summary={agreement.summary} />}
             {agreement.summary?.billing_mode === 'autopay' && !agreement.summary.autopay_revoked_at && <div className="text-sm text-gray-600 space-y-2">
               <p>You can revoke future automatic payments. Amounts owed and your monitoring agreement remain in effect. Contact your provider to arrange payment; a debit already submitted requires provider follow-up.</p>
@@ -110,13 +110,19 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
             {agreements.length === 0 && <div className="bg-white border border-gray-200 rounded-xl p-6 text-gray-700">No security agreements are available yet. Contact your provider if you were expecting an invitation.</div>}
             {agreements.map(item => <a key={item.id} href={`/portal/security?contract=${encodeURIComponent(item.id)}`} className="block bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-400">
               <div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-gray-900">Agreement {item.contract_number}</p>
-                <p className="text-sm text-gray-600 mt-1">{formatCurrency(Number(item.monthly_price))}/month · {item.status.replace(/_/g, ' ')}</p>
+                <p className="text-sm text-gray-600 mt-1">{formatCurrency(Number(item.monthly_price))}/month · {(item.status === 'rejected' ? 'pending approval' : item.status.replace(/_/g, ' '))}</p>
                 {item.summary && <p className="text-sm text-gray-600 mt-1">Balance: {item.summary.amount_due === null ? 'Awaiting reconciliation' : formatCurrency(Number(item.summary.amount_due))} · Initial term: {item.summary.months_remaining === null ? 'Awaiting activation' : `${item.summary.months_remaining} months remaining`}</p>}
                 {!item.customer_completed_at && item.saved_at && <p className="text-sm text-green-800 mt-2">Saved at step {item.current_step} of 6 · {new Date(item.saved_at).toLocaleString()}</p>}
               </div><span className="flex items-center gap-2 text-blue-800 font-semibold text-sm">{item.customer_completed_at || ['active','cancelled'].includes(item.status) ? 'View agreement' : item.saved_at ? 'Resume' : 'Start'}<ArrowRight className="w-4 h-4" /></span></div>
             </a>)}
           </div>
         )}
+        {agreement?.support_contact?.email && <footer className="mt-6 border-t border-gray-200 pt-5 text-center text-sm text-gray-700">
+          <p>Questions about your agreement?</p>
+          <a className="mt-1 inline-block font-medium text-blue-800 underline break-all" href={`mailto:${agreement.support_contact.email}`}>
+            {agreement.support_contact.name ? `${agreement.support_contact.name} · ` : ''}{agreement.support_contact.email}
+          </a>
+        </footer>}
       </main>
     </div>
   );

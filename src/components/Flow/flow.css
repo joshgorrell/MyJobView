@@ -65,3 +65,53 @@
 /* Quick actions follow the application theme, including light and classic. */
 .flow.flow-quick-composer{--flow-bg:rgb(var(--canvas));--flow-muted:rgb(var(--surface));--flow-text:rgb(var(--text-primary));--flow-secondary:rgb(var(--text-secondary));--flow-line:rgb(var(--border-subtle));--flow-hover:rgb(var(--surface));--flow-accent:rgb(var(--brand-text));min-width:0}
 @media(max-width:640px){.flow-quick-composer .flow-composer{padding:16px}.flow-quick-composer .flow-composer-footer{flex-direction:column;align-items:stretch}.flow-quick-composer .flow-composer-footer button{min-height:44px}.flow-quick-composer .flow-kind select{max-width:100%}}
+
+/* Keep mobile controls in two predictable rows; reveal search and details on demand. */
+.flow-mobile-label,.flow .flow-search-toggle,.flow .flow-help-toggle,.flow-filters .flow-mobile-control{display:none}
+.flow-meta-actions{display:flex;align-items:center;gap:2px}
+.flow{color-scheme:light}
+.flow--dark{color-scheme:dark}
+/* Application theme rules also style native fields. Keep these fields on their Flow surface. */
+.flow input,.flow select,.flow textarea{background-color:var(--flow-bg)!important;color:var(--flow-text)!important;border-color:var(--flow-line)!important}
+.flow input::placeholder,.flow textarea::placeholder{color:var(--flow-secondary)!important}
+.flow .flow-search input{background:transparent!important;border:0!important;border-radius:0}
+@media(max-width:640px){
+  .flow-heading{padding:10px 10px 6px;gap:8px}
+  .flow-heading>div{min-width:0}
+  .flow-heading h2{margin:0;font-size:16px;line-height:24px}
+  .flow-subtitle,.flow-desktop-label,.flow-desktop-control{display:none}
+  .flow-mobile-label{display:inline}
+  .flow-heading .flow-primary{min-height:36px;padding:6px 10px}
+  .flow-toolbar{display:grid;grid-template-columns:auto auto minmax(0,1fr) 36px 36px;grid-template-areas:"scope scope scope filters filters" "today mentions unread search refresh";gap:4px;padding:0 10px 6px}
+  .flow-toolbar--scoped{grid-template-areas:"filters filters filters search refresh" "today mentions unread . ."}
+  .flow-segment{grid-area:scope;padding:2px;justify-self:start;max-width:100%;font-size:12px}
+  .flow-segment button{min-height:34px;padding:5px 8px}
+  .flow .flow-filter-toggle{grid-area:filters;justify-self:end;min-height:38px;padding:4px 6px;font-size:12px;white-space:nowrap}
+  .flow .flow-today{grid-area:today}
+  .flow .flow-mentions{grid-area:mentions}
+  .flow .flow-unread{grid-area:unread;justify-self:start}
+  .flow .flow-today,.flow .flow-mentions,.flow .flow-unread{min-height:36px;padding:4px 5px;font-size:12px;gap:4px;white-space:nowrap}
+  .flow .flow-search-toggle{display:inline-flex;grid-area:search;min-height:36px;padding:4px}
+  .flow .flow-refresh{grid-area:refresh;min-height:36px;padding:4px}
+  .flow-search{display:none;min-width:0;grid-column:1/-1;order:initial}
+  .flow-search--open{display:flex}
+  .flow .flow-search input{font-size:16px;min-height:40px;padding:8px 0}
+  .flow-search>svg{flex-shrink:0}
+  .flow-filters .flow-mobile-control{display:flex}
+  .flow-filters{gap:8px;padding:8px 10px}
+  .flow-filters input,.flow-filters select{font-size:16px;width:100%}
+  .flow-chips{padding:0 10px 6px}
+  .flow-chips button{overflow-wrap:anywhere}
+  .flow-list-meta{padding:0 10px;min-height:32px;font-size:11px}
+  .flow-list-meta button{min-height:32px}
+  .flow .flow-help-toggle{display:inline-flex;padding:4px}
+  .flow-day{padding:4px 10px;line-height:16px}
+  .flow .flow-row-main{grid-template-columns:minmax(0,1fr) 60px 14px;grid-template-rows:16px 20px;gap:2px 5px;padding:6px 0;line-height:20px}
+  .flow-summary{gap:5px;font-size:12px}
+  .flow-kind-label{font-size:10px;margin-right:5px}
+  .flow .flow-read-toggle{width:26px}
+  .flow-row{padding-inline:6px;gap:4px}
+  .flow-mention{margin-left:0;padding:1px 4px;font-size:10px}
+  .flow-footnote{display:none}
+  .flow-footnote--open{display:block;padding:8px 10px}
+}

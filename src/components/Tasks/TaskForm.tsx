@@ -39,9 +39,12 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     contact_id: (task as any)?.contact_id || contactId || '',
     reminder_date: task?.reminder_date ? new Date(task.reminder_date).toISOString().slice(0, 16) : '',
     assigned_to: task?.assigned_to || '',
+    assigned_department_id: (task as any)?.assigned_department_id || '',
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [departments, setDepartments] = useState<Array<{ id: string; display_name: string }>>([]);
+  const [showDetails, setShowDetails] = useState(!!task);
   const [priorities, setPriorities] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +72,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   useEffect(() => {
     loadContacts();
     loadUsers();
+    loadDepartments();
     loadPriorities();
 
     if (!task) {
@@ -116,6 +120,21 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       setUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
+    }
+  }
+
+  async function loadDepartments() {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, display_name')
+        .eq('is_active', true)
+        .order('sort_order');
+
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error loading departments:', error);
     }
   }
 
@@ -199,6 +218,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
         completed_at: formData.status === 'completed' && !task?.completed_at ? new Date().toISOString() : task?.completed_at || null,
         reminder_date: formData.reminder_date ? new Date(formData.reminder_date).toISOString() : null,
         assigned_to: formData.assigned_to || null,
+        assigned_department_id: formData.assigned_department_id || null,
         points: taskPoints,
       };
 
@@ -349,7 +369,49 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               />
             </div>
 
-            {/* Description */}
+            {/* Assign To */}
+            <div>
+              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-muted" />
+                Assign To
+              </label>
+              <select
+                value={formData.assigned_department_id ? `dept:${formData.assigned_department_id}` : formData.assigned_to}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.startsWith('dept:')) {
+                    setFormData({ ...formData, assigned_to: '', assigned_department_id: value.slice(5) });
+                  } else {
+                    setFormData({ ...formData, assigned_to: value, assigned_department_id: '' });
+                  }
+                }}
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              >
+                <option value="">Anyone — open to the team</option>
+                <optgroup label="Departments">
+                  {departments.map((department) => (
+                    <option key={department.id} value={`dept:${department.id}`}>
+                      {department.display_name}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="People">
+                  {profile && (
+                    <option value={profile.id}>Me ({profile.full_name})</option>
+                  )}
+                  {otherUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <p className="text-xs text-muted mt-1">
+                Anyone is the default. Department tasks notify that department; the first person to complete one earns the points.
+              </p>
+            </div>
+
+            {/* Description - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Description
@@ -363,85 +425,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               />
             </div>
 
-            {/* Assign To */}
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-muted" />
-                Assign To
-              </label>
-              <select
-                value={formData.assigned_to}
-                onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              >
-                <option value="">Anyone (claimable by team)</option>
-                {profile && (
-                  <option value={profile.id}>Me ({profile.full_name})</option>
-                )}
-                {otherUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Priority + Due Date side by side */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                  <Flag className="w-4 h-4 text-muted" />
-                  Priority
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                >
-                  {priorities.length === 0 ? (
-                    <option value="medium">Medium</option>
-                  ) : (
-                    priorities.map((priority) => (
-                      <option key={priority.id} value={priority.slug}>
-                        {priority.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-muted" />
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Reminder */}
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-muted" />
-                Reminder
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.reminder_date}
-                onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              />
-              <p className="text-xs text-muted mt-1">
-                Creates a Google Calendar reminder if connected
-              </p>
-            </div>
-
-            {/* Contact */}
+            {/* Contact - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Contact <span className="text-muted font-normal">(optional)</span>
@@ -530,24 +514,74 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </div>
             )}
 
-            {/* Status (edit only) */}
-            {task && (
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
+            >
+              <span>{showDetails ? 'Hide details' : '+ Details'}</span>
+              <span className="text-xs text-muted">priority, due date, reminder</span>
+            </button>
+
+            {showDetails && (
+              <div className="space-y-4">
+            {/* Priority + Due Date side by side */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5">
-                  Status
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Flag className="w-4 h-4 text-muted" />
+                  Priority
                 </label>
                 <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as Task['status'] })}
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                   className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 >
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
+                  {priorities.length === 0 ? (
+                    <option value="medium">Medium</option>
+                  ) : (
+                    priorities.map((priority) => (
+                      <option key={priority.id} value={priority.slug}>
+                        {priority.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-muted" />
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.due_date}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Reminder */}
+            <div>
+              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-muted" />
+                Reminder
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.reminder_date}
+                onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              />
+              <p className="text-xs text-muted mt-1">
+                Creates a Google Calendar reminder if connected
+              </p>
+            </div>
+              </div>
             )}
+
           </div>
 
           {/* Footer buttons */}

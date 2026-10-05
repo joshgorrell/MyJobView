@@ -1,32 +1,25 @@
 # Project handoff implementation
 
-This branch implements the coordinated task authoring, sold snapshot, shared work-order form and visit progress foundation from the September 30 audit. It is not deployed. Keep this PR draft until the remaining integration and field checks below are finished.
+This branch carries proposal work instructions into projects and technician visits, including approved changes. It has not been deployed. The database migrations and matching UI must be released together.
 
-## Implemented
+## Implemented behavior
 
-- Proposal editors write `proposal_tasks`. Labor updates seed never-seeded items; row locking prevents duplicate seeding. Intentional task removal/consolidation remains excluded. Tasks carry quantity-adjusted allocated estimates, instructions and explicit covered item IDs.
-- One task list layout groups by room by default, with phase grouping and group/overall estimates. Tasks missing hours or phases remain visible.
-- New projects capture immutable overall and room scopes, equipment notes and task definitions. Old jobs are not automatically labeled as original scope. Proposal tasks copy estimates, coverage and sold room names into stable project tasks.
-- The project-specific form is an adapter to the universal work-order form. Project selection loads its customer/site for linked project/service/warranty orders. Phase is optional. Multiple technicians independently select tasks, copy selections, and add their own visit instructions. Master task text is retained separately from visit instructions.
-- Work orders, tasks, parts and linked service request scheduling commit atomically with retry protection. Server checks task/project/customer/technician/organization relationships. Approved-project creation failures no longer commit just a warning.
-- Today's Work contains only explicit visit assignments. Full Project shows original sold scopes, equipment, all statuses, room/phase/status filters and permanent cross-visit history. Earlier completion notes remain visible; no time/payroll totals are changed.
-- Progress distinguishes partial, blocked, finished portion and explicit entire-task completion. Project status retains the existing open/completed/cancelled vocabulary for portal compatibility, with a separate progress status. Final completion never falsely completes other technician visits. Reopening preserves activity; cancelling work visibly cancels outstanding assignments.
-- Progress retries are idempotent and stale assignment versions are rejected. Visit close-out requires task outcomes and atomically saves the visit status and completion record.
-- CO application failures are surfaced instead of reporting success.
-
-## Remaining before ready-to-merge / rollout
-
-1. Stage 5: approved change-order task/scope reconciliation, parts-only removal semantics, approval transaction coverage, and proposal duplication/revision mapping of new estimate/coverage fields. Existing CO code does not yet publish a full current-approved scope packet. This is a release blocker for projects using changes.
-2. Stage 5: separately reviewed legacy data repair and verified original-scope recovery. No automatic backfill runs in this branch.
-3. Stage 6: authorized iPhone/browser checks across all six creation entry points, large-project loading and Light/Dark appearance. Runtime component tests do not establish visual or signed-in permission parity.
-4. Stage 6: full offline job packets, durable queued progress and conflict review after reconnect. This branch rejects stale online saves; it does not claim completed offline sync.
-5. Whole-record pop-out routes remain in place. Verify all-day authentication refresh, unsaved-edit protection and concurrent edits on a second monitor. No new task/scope/work-order pop-outs were added.
-6. Verify every target deployment against the connected schema before applying this migration. Native mobile parity remains a separate delivery if that client is used.
+- Labor-bearing items create editable tasks by default, including programming and phase labor. Intentional deletion or consolidation does not reseed tasks. One shared layout groups by room by default or labor phase, and shows task, group and overall estimates. Manual estimates remain manual.
+- New projects retain an immutable sold snapshot of overall scope, room scope, equipment instructions and task definitions. Approved changes publish separate immutable scope versions and reconcile project tasks in the same approval transaction. Project managers and technicians can read the original and approved versions.
+- Removing an item in a change order offers keep labor or remove labor, including added items and bulk removal. Keeping labor converts the source into a visible labor-only line with its labor and tasks retained; removing both cancels outstanding work without erasing completed history. Application retries do not duplicate lines or snapshots.
+- Duplication and revision copy rooms, items, phase labor, task instructions, estimates and coverage using new mapped IDs. Intentional task deletion remains respected. Legacy recovery is an explicit preview and selected-item repair; a reviewed snapshot is honestly labelled and never presented as a recovered original sold scope.
+- Every creation entry point uses the universal work-order form, including service work. Selecting a project loads its customer/site and selectable tasks. Work-order types and scheduling fields are identical across origins. Each technician gets a separate visit and independent task choices/instructions.
+- Work orders, tasks, parts and linked service scheduling commit atomically. The server validates organization, project, customer and technician relationships. Today's Work shows visit assignments; Full Project includes scopes, equipment, all tasks and cross-visit history.
+- Partial, blocked and finished portion are distinct from completing the entire project task. Retry IDs and expected versions protect progress updates; stale updates require explicit review. Close-out saves the visit outcome and completion record atomically.
+- Opening a visit online saves its full instructions locally. Offline progress is durably queued per account with its original retry ID and version. Reconnect retries are serialized; conflicts retain the notes for review instead of silently overwriting newer work.
+- The existing single whole-record pop-out remains the proposal/sales-order workspace, including related tabs. It does not overwrite the main site's navigation state. Task and sales-order scope drafts survive refresh in that tab; unsaved editors warn before closing.
 
 ## Verification
 
-`npm run test:handoff` exercises PostgreSQL functions against column definitions from the connected MJV database in PGlite, plus the runtime React harness. It covers atomic batch failure/retry, project and tenant mismatches, distinct/shared assignments, partial versus final completion, cross-visit history, reopened history, immutable original scope, labor-update seeding/deletion, stale progress and atomic close-out.
+- `npm run test:handoff`: PGlite PostgreSQL checks against connected schema column definitions, React runtime tests and offline queue tests. Covers atomic failure/retry, tenant boundaries, shared/distinct assignments, progress/history/reopening, close-out, deletion exclusions, retained labor, approved snapshot rollback, revision and duplication mapping, reviewed legacy repair, account isolation and conflicts.
+- `npm run test:handoff:browser`: component browser fixtures covering Light/Dark at 320px, 390px, a short viewport and desktop, scopes, offline instructions, persistent task drafts, labor choices and form parity. These use mocked application data and do not establish production sign-in or physical iPhone behavior.
+- `npm run build` passes. Repository-wide TypeScript checking has pre-existing failures; comparison to current main found no additional error signatures in this change.
 
-`npm run build` passes. Repository-wide TypeScript checking has existing failures outside this feature; the detailed check output must be reviewed for changed-file regressions. No production migration or deployment has been performed.
+## Release and field checks
 
-The staged schema and UI must be reviewed and released together. Do not apply the migration independently of its matching UI.
+Review and apply both handoff migrations with the matching UI on a staging database before production. Exercise signed-in role permissions and all creation entry points against real records, large projects, account switching, all-day session refresh, concurrent edits and field connectivity. Older original scopes cannot be reconstructed when no source was recorded; use the explicit legacy review. Native mobile-client parity is a separate delivery if that client is used. No production data migration, merge or deployment has been performed.

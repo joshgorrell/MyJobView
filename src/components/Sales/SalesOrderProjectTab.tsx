@@ -1,6 +1,7 @@
+import ProjectTasksList from '../Projects/ProjectTasksList';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Wrench, Clock, CheckCircle, User, AlertTriangle, ChevronDown, ChevronUp, Briefcase, ListChecks, Timer, CalendarDays, Plus, MapPin, CreditCard as Edit3, Save, X, FileText, Flag, Circle, Package, StickyNote, GitBranch, Target, TrendingUp, Info, Trash2, Pencil, DollarSign, ShieldOff, GitMerge, CheckSquare, AlertCircle, ChevronRight, Search } from 'lucide-react';
+import { Wrench, Clock, User, AlertTriangle, ChevronDown, ChevronUp, Briefcase, ListChecks, Timer, CalendarDays, Plus, MapPin, CreditCard as Edit3, Save, X, FileText, Flag, Package, StickyNote, GitBranch, Target, TrendingUp, Info, DollarSign, ShieldOff, GitMerge, CheckSquare, AlertCircle, ChevronRight, Search } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
 import { CreateProjectWorkOrderModal } from '../Production/CreateProjectWorkOrderModal';
 import { AddProjectTimeModal } from '../Projects/AddProjectTimeModal';
@@ -22,17 +23,6 @@ interface WorkOrder {
   description: string | null;
   technician?: { full_name: string } | null;
   labor_phase?: { name: string; id: string } | null;
-}
-
-interface ProjectTask {
-  id: string;
-  title: string;
-  description: string | null;
-  estimated_hours: number;
-  status: string;
-  sort_order: number;
-  labor_phase?: { name: string } | null;
-  actual_hours: number;
 }
 
 interface LaborPhase {
@@ -103,7 +93,6 @@ const PM_ALLOWANCE_PCT = 0.05;
 
 export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabProps) {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [laborBreakdown, setLaborBreakdown] = useState<LaborPhaseBreakdown[]>([]);
   const [soldLaborHours, setSoldLaborHours] = useState(0);
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
@@ -113,16 +102,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
-  const [togglingTask, setTogglingTask] = useState<string | null>(null);
   const [showAllParts, setShowAllParts] = useState(false);
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDescription, setNewTaskDescription] = useState('');
-  const [savingTask, setSavingTask] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editTaskTitle, setEditTaskTitle] = useState('');
-  const [editTaskDescription, setEditTaskDescription] = useState('');
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [totalClockedHours, setTotalClockedHours] = useState(0);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
@@ -180,7 +160,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   async function loadProjectData() {
     if (!project?.id) return;
     try {
-      const [woResult, taskResult, soldResult] = await Promise.all([
+      const [woResult, _taskResult, soldResult] = await Promise.all([
         supabase
           .from('work_orders')
           .select(`
@@ -264,43 +244,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         buildLaborBreakdown(wos, soldItems, [], projectTimeEntries);
       }
 
-      const rawTasks = taskResult.data || [];
-      if (rawTasks.length > 0) {
-        const taskIds = rawTasks.map((t: any) => t.id);
-        const { data: woTasks } = await supabase
-          .from('work_order_tasks')
-          .select('id, project_task_id')
-          .in('project_task_id', taskIds);
-
-        const woTaskIds = (woTasks || []).map((t: any) => t.id);
-        const completionsByProjectTask: Record<string, number> = {};
-
-        if (woTaskIds.length > 0) {
-          const { data: comps } = await supabase
-            .from('work_order_task_completions')
-            .select('work_order_task_id, actual_hours')
-            .in('work_order_task_id', woTaskIds);
-
-          const woTaskToProjectTask: Record<string, string> = {};
-          (woTasks || []).forEach((wt: any) => {
-            if (wt.project_task_id) woTaskToProjectTask[wt.id] = wt.project_task_id;
-          });
-
-          (comps || []).forEach((c: any) => {
-            const ptId = woTaskToProjectTask[c.work_order_task_id];
-            if (ptId) {
-              completionsByProjectTask[ptId] = (completionsByProjectTask[ptId] || 0) + (c.actual_hours || 0);
-            }
-          });
-        }
-
-        setTasks(rawTasks.map((t: any) => ({
-          ...t,
-          actual_hours: completionsByProjectTask[t.id] || 0
-        })));
-      } else {
-        setTasks([]);
-      }
     } catch (error) {
       console.error('Error loading project data:', error);
     } finally {
@@ -445,24 +388,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     }
   }
 
-  async function toggleTaskStatus(task: ProjectTask) {
-    if (togglingTask) return;
-    setTogglingTask(task.id);
-    const newStatus = task.status === 'completed' ? 'open' : 'completed';
-    try {
-      const { error } = await supabase
-        .from('project_tasks')
-        .update({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null })
-        .eq('id', task.id);
-      if (error) throw error;
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
-    } catch (error) {
-      console.error('Error toggling task:', error);
-    } finally {
-      setTogglingTask(null);
-    }
-  }
-
   async function saveNotes() {
     if (!project?.id) return;
     setSavingNotes(true);
@@ -478,70 +403,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
       console.error('Error saving notes:', error);
     } finally {
       setSavingNotes(false);
-    }
-  }
-
-  async function addTask() {
-    if (!project?.id || !newTaskTitle.trim()) return;
-    setSavingTask(true);
-    try {
-      const maxSort = tasks.length > 0 ? Math.max(...tasks.map(t => t.sort_order)) + 1 : 0;
-      const { error } = await supabase
-        .from('project_tasks')
-        .insert({
-          project_id: project.id,
-          title: newTaskTitle.trim(),
-          description: newTaskDescription.trim() || null,
-          status: 'open',
-          sort_order: maxSort,
-          estimated_hours: 0,
-        });
-      if (error) throw error;
-      setNewTaskTitle('');
-      setNewTaskDescription('');
-      setShowAddTask(false);
-      await loadProjectData();
-    } catch (error) {
-      console.error('Error adding task:', error);
-    } finally {
-      setSavingTask(false);
-    }
-  }
-
-  async function saveEditTask(taskId: string) {
-    if (!editTaskTitle.trim()) return;
-    setSavingTask(true);
-    try {
-      const { error } = await supabase
-        .from('project_tasks')
-        .update({ title: editTaskTitle.trim(), description: editTaskDescription.trim() || null })
-        .eq('id', taskId);
-      if (error) throw error;
-      setEditingTaskId(null);
-      setTasks(prev => prev.map(t => t.id === taskId
-        ? { ...t, title: editTaskTitle.trim(), description: editTaskDescription.trim() || null }
-        : t
-      ));
-    } catch (error) {
-      console.error('Error saving task:', error);
-    } finally {
-      setSavingTask(false);
-    }
-  }
-
-  async function deleteTask(taskId: string) {
-    setDeletingTaskId(taskId);
-    try {
-      const { error } = await supabase
-        .from('project_tasks')
-        .delete()
-        .eq('id', taskId);
-      if (error) throw error;
-      setTasks(prev => prev.filter(t => t.id !== taskId));
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    } finally {
-      setDeletingTaskId(null);
     }
   }
 
@@ -754,7 +615,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
 
   const completedWOs = workOrders.filter(w => w.status === 'completed').length;
   const inProgressWOs = workOrders.filter(w => w.status === 'in_progress').length;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
 
   const visibleWOs = showAllWOs ? workOrders : workOrders.slice(0, 5);
   const visibleParts = showAllParts ? partsUsed : partsUsed.slice(0, 6);
@@ -1372,188 +1232,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         )}
       </div>
 
-      {/* Project Task Checklist */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Task Checklist</h3>
-            {tasks.length > 0 && (
-              <span className="text-xs text-gray-600">{completedTasks} of {tasks.length} completed</span>
-            )}
-          </div>
-          {!showAddTask && (
-            <button
-              onClick={() => setShowAddTask(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Task
-            </button>
-          )}
-        </div>
-
-        {tasks.length === 0 && !showAddTask ? (
-          <div className="bg-gray-900/40 rounded-xl border border-gray-700/40 border-dashed p-8 text-center">
-            <ListChecks className="w-9 h-9 text-gray-700 mx-auto mb-2" />
-            <p className="text-gray-400 text-sm font-medium">No tasks yet</p>
-            <p className="text-gray-500 text-xs mt-1">Add checklist tasks to track installation milestones. Labor costs are already included in the sales order — add a change order if extra work arises.</p>
-            <button
-              onClick={() => setShowAddTask(true)}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add First Task
-            </button>
-          </div>
-        ) : (
-          <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 divide-y divide-gray-700/50 overflow-hidden">
-            {tasks.map(task => (
-              <div key={task.id}>
-                {editingTaskId === task.id ? (
-                  <div className="px-4 py-3 bg-gray-800/40">
-                    <input
-                      type="text"
-                      value={editTaskTitle}
-                      onChange={e => setEditTaskTitle(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-                      placeholder="Task title"
-                      autoFocus
-                    />
-                    <input
-                      type="text"
-                      value={editTaskDescription}
-                      onChange={e => setEditTaskDescription(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-                      placeholder="Description (optional)"
-                    />
-                    <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => setEditingTaskId(null)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 rounded-lg transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => saveEditTask(task.id)}
-                        disabled={savingTask || !editTaskTitle.trim()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors"
-                      >
-                        {savingTask
-                          ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          : <Save className="w-3.5 h-3.5" />
-                        }
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800/30 transition-colors group">
-                    <button
-                      onClick={() => toggleTaskStatus(task)}
-                      disabled={togglingTask === task.id}
-                      className="shrink-0 transition-transform active:scale-90"
-                      title={task.status === 'completed' ? 'Mark incomplete — task will reappear on work orders' : 'Mark complete'}
-                    >
-                      {togglingTask === task.id ? (
-                        <div className="w-5 h-5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-                      ) : task.status === 'completed' ? (
-                        <CheckCircle className="w-5 h-5 text-green-400" />
-                      ) : (
-                        <Circle className="w-5 h-5 text-gray-600 group-hover:text-gray-400 transition-colors" />
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-sm font-medium ${task.status === 'completed' ? 'text-gray-500 line-through' : 'text-white'}`}>
-                          {task.title}
-                        </span>
-                        {task.labor_phase?.name && (
-                          <span className="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded text-xs border border-gray-700">{task.labor_phase.name}</span>
-                        )}
-                      </div>
-                      {task.description && (
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{task.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => {
-                          setEditingTaskId(task.id);
-                          setEditTaskTitle(task.title);
-                          setEditTaskDescription(task.description || '');
-                        }}
-                        className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-gray-700 rounded-lg transition-colors"
-                        title="Edit task"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        disabled={deletingTaskId === task.id}
-                        className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
-                        title="Delete task"
-                      >
-                        {deletingTaskId === task.id
-                          ? <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                          : <Trash2 className="w-3.5 h-3.5" />
-                        }
-                      </button>
-                    </div>
-                    {task.estimated_hours > 0 && (
-                      <div className="text-right text-xs shrink-0 tabular-nums text-gray-500">
-                        {task.estimated_hours.toFixed(1)}h est.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Add Task Inline Form */}
-            {showAddTask && (
-              <div className="px-4 py-3 bg-gray-800/40">
-                <input
-                  type="text"
-                  value={newTaskTitle}
-                  onChange={e => setNewTaskTitle(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') { setShowAddTask(false); setNewTaskTitle(''); setNewTaskDescription(''); } }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-                  placeholder="Task title (no labor cost — sold hours already included)"
-                  autoFocus
-                />
-                <input
-                  type="text"
-                  value={newTaskDescription}
-                  onChange={e => setNewTaskDescription(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-                  placeholder="Description (optional)"
-                />
-                <div className="flex items-center gap-2 justify-end">
-                  <button
-                    onClick={() => { setShowAddTask(false); setNewTaskTitle(''); setNewTaskDescription(''); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 rounded-lg transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Cancel
-                  </button>
-                  <button
-                    onClick={addTask}
-                    disabled={savingTask || !newTaskTitle.trim()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors"
-                  >
-                    {savingTask
-                      ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : <Plus className="w-3.5 h-3.5" />
-                    }
-                    Add Task
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <ProjectTasksList projectId={project.id} canEdit />
 
       {/* Work Order Notes */}
       {workOrders.some(w => w.notes || w.description) && (

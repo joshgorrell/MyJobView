@@ -123,9 +123,27 @@ export function ContactHistory({ contactId, onNavigateToProposal }: ContactHisto
             iconColor: 'text-orange-600',
             bgColor: 'bg-orange-50',
             status: wo.status,
-            link: `/dispatch?workorder=${wo.id}`
+            link: `/?tab=work_orders&workOrderId=${wo.id}`
           });
         });
+      }
+
+      // Load completed VIP Maintenance visits and keep their completed forms in customer history.
+      const { data: vipVisits } = await supabase
+        .from('vip_maintenance_visits')
+        .select('id, completed_at, sales_lead_id, work_orders!inner(id, work_order_number, contact_id)')
+        .eq('work_orders.contact_id', contactId)
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false });
+
+      if (vipVisits) {
+        vipVisits.forEach((visit: any) => items.push({
+          id: `vip-visit-${visit.id}`, type: 'vip_maintenance',
+          title: `VIP Maintenance Visit • ${visit.work_orders?.work_order_number || 'Completed'}`,
+          description: visit.sales_lead_id ? 'Completed VIP form • Sales lead created' : 'Completed VIP form',
+          date: visit.completed_at, icon: ClipboardList, iconColor: 'text-blue-600', bgColor: 'bg-blue-50',
+          status: 'completed', link: `/?tab=work_orders&workOrderId=${visit.work_orders?.id}&subtab=vip`
+        }));
       }
 
       // Load appointments
@@ -383,6 +401,7 @@ export function ContactHistory({ contactId, onNavigateToProposal }: ContactHisto
     { value: 'sales_order', label: 'Sales Orders' },
     { value: 'project', label: 'Projects' },
     { value: 'work_order', label: 'Work Orders' },
+    { value: 'vip_maintenance', label: 'VIP Maintenance' },
     { value: 'appointment', label: 'Appointments' },
     { value: 'invoice', label: 'Invoices' },
     { value: 'task', label: 'Tasks' },

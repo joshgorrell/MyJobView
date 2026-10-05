@@ -135,6 +135,8 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name')
+        .eq('is_sales_rep', true)
+        .eq('is_active', true)
         .order('full_name');
 
       if (data) {

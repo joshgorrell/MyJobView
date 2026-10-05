@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -140,7 +141,7 @@ Deno.serve(async (req: Request) => {
       </html>
     `;
 
-    const resendResponse = await fetch("https://api.resend.com/emails", {
+    const resendResponse = await sendSystemEmail({
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings } from '../_shared/emailTemplates.ts';
 
@@ -176,9 +177,9 @@ Deno.serve(async (req: Request) => {
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
     if (!resendApiKey) {
-      console.log('Demo mode: satisfaction alert would be sent to', alertEmail);
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     } else {
-      const emailResponse = await fetch('https://api.resend.com/emails', {
+      const emailResponse = await sendSystemEmail({
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${resendApiKey}`,

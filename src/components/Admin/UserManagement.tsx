@@ -1,3 +1,4 @@
+import { setupSections } from './UserSetup';
 import { useEffect, useState } from 'react';
 import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, AlertCircle, UserCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -9,15 +10,29 @@ import { EditUserForm } from './EditUserForm';
 import { UserCreatedConfirmation } from './UserCreatedConfirmation';
 import { useToast } from '../Shared/Toast';
 
+interface AccountEmailStatus {
+  user_id: string;
+  welcome_sent_at: string | null;
+  welcome_error: string | null;
+  reset_sent_at: string | null;
+  reset_error: string | null;
+  activated_at: string | null;
+}
+
 interface EmployeeInfo {
   user_id: string;
-  employee_id: string;
+  id: string;
   employment_status: string;
   hire_date: string;
 }
 
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
+  const [setupReviews,setSetupReviews] = useState<Map<string,string[]>>(new Map());
+  const [setupReviewError,setSetupReviewError] = useState(false);
+  const [accountStatuses, setAccountStatuses] = useState<Map<string, AccountEmailStatus>>(new Map());
+  const [accountStatusError, setAccountStatusError] = useState(false);
+  const [sendingAccountEmail, setSendingAccountEmail] = useState<string | null>(null);
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -57,6 +72,12 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
 
       console.log('Users loaded:', data?.length || 0);
       setUsers(data || []);
+      const { data: statuses, error: statusError } = await supabase.from('user_account_email_status').select('*');
+      setAccountStatusError(!!statusError);
+      setAccountStatuses(new Map((statuses || []).map(s => [s.user_id, s])));
+      const {data:reviews,error:reviewError}=await supabase.from('user_setup_reviews').select('user_id,reviewed_sections');
+      setSetupReviewError(!!reviewError);
+      setSetupReviews(new Map((reviews||[]).map(r=>[r.user_id,r.reviewed_sections])));
 
       // Load employee records
       const { data: empData } = await supabase
@@ -103,36 +124,28 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
     }
   }
 
-  async function sendPasswordResetEmail(email: string, userName: string) {
-    toast.confirm(`Send password reset email to ${userName} (${email})?`, async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email }),
-          }
-        );
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to send reset email');
-        }
-
-        toast.success('Password reset email sent successfully');
-      } catch (error: any) {
-        console.error('Error sending reset email:', error);
-        toast.error(error.message || 'Failed to send reset email');
+  async function sendAccountEmail(user: Profile, kind: 'welcome' | 'reset') {
+    if (sendingAccountEmail) return;
+    setSendingAccountEmail(user.id);
+    try {
+      const { data, error } = await supabase.functions.invoke(kind === 'welcome' ? 'send-welcome-email' : 'reset-user-password', {
+        body: { email: user.email },
+      });
+      if (error) {
+        let message = error.message;
+        try { message = (await error.context?.json())?.error || message; } catch { /* Keep invocation error. */ }
+        throw new Error(message);
       }
-    }, 'Send password reset?');
+      if (!data?.success) throw new Error(data?.error || 'Email was not sent');
+      if (data.warning) toast.error(data.warning);
+      else toast.success(`${kind === 'welcome' ? 'Welcome' : 'Password reset'} email accepted by provider`);
+      await loadUsers();
+    } catch (error: any) {
+      toast.error(error.message || 'Could not send email');
+      await loadUsers();
+    } finally {
+      setSendingAccountEmail(null);
+    }
   }
 
   async function deleteUser(userId: string, userName: string) {
@@ -327,6 +340,12 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                         }`}>
                           {user.email}
                         </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {accountStatusError ? 'Welcome status unavailable' : accountStatuses.get(user.id)?.activated_at ? 'Account Activated' : accountStatuses.get(user.id)?.welcome_sent_at ? `Welcome sent ${new Date(accountStatuses.get(user.id)!.welcome_sent_at!).toLocaleString()}` : 'Welcome: Never Sent'}
+                        </div>
+                        {(accountStatuses.get(user.id)?.welcome_error || accountStatuses.get(user.id)?.reset_error) && (
+                          <div className="text-xs text-red-600 mt-1">{accountStatuses.get(user.id)?.welcome_error || accountStatuses.get(user.id)?.reset_error}</div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -335,9 +354,9 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       user.role === 'admin' ? 'bg-blue-100 text-blue-700' :
                       user.role === 'finance' ? 'bg-purple-100 text-purple-700' :
                       user.role === 'manager' ? 'bg-orange-100 text-orange-700' :
-                      user.role === 'service_manager' ? 'bg-teal-100 text-teal-700' :
-                      user.role === 'office_manager' ? 'bg-indigo-100 text-indigo-700' :
-                      user.role === 'project_manager' ? 'bg-cyan-100 text-cyan-700' :
+                      String(user.role) === 'service_manager' ? 'bg-teal-100 text-teal-700' :
+                      String(user.role) === 'office_manager' ? 'bg-indigo-100 text-indigo-700' :
+                      String(user.role) === 'project_manager' ? 'bg-cyan-100 text-cyan-700' :
                       user.role === 'sales' ? 'bg-green-100 text-green-700' :
                       user.role === 'tech' ? 'bg-yellow-100 text-yellow-700' :
                       'bg-gray-100 text-gray-700'
@@ -352,6 +371,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       }`}>
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
+                      <button type="button" onClick={()=>setEditingUser(user)} className="text-xs text-cyan-700 underline" title={setupSections.filter(s=>!(setupReviews.get(user.id)||[]).includes(s.key)).map(s=>s.label).join(', ')}>{setupReviewError?'Setup status unavailable':setupSections.every(s=>(setupReviews.get(user.id)||[]).includes(s.key))?'Setup complete':'Needs setup review'}</button>
                       {(user as any).employment_classification === 'employee' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <UserCircle className="w-3 h-3" />
@@ -392,7 +412,16 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => sendPasswordResetEmail(user.email, user.full_name)}
+                        onClick={() => sendAccountEmail(user, 'welcome')}
+                        disabled={!!sendingAccountEmail || !user.is_active}
+                        className="px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded disabled:opacity-50"
+                        title="Send a secure password setup link"
+                      >
+                        {sendingAccountEmail === user.id ? 'Sending…' : accountStatuses.get(user.id)?.welcome_sent_at ? 'Resend Welcome' : 'Send Welcome'}
+                      </button>
+                      <button
+                        disabled={!!sendingAccountEmail || !user.is_active}
+                        onClick={() => sendAccountEmail(user, 'reset')}
                         className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
                         title="Reset password"
                       >

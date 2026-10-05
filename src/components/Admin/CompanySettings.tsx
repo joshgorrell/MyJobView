@@ -6,6 +6,7 @@ import { CompanySettings as CompanySettingsType, CompanyOffice } from '../../lib
 import { TIMEZONE_OPTIONS, clearTimezoneCache } from '../../lib/timezoneUtils';
 import { validateSubdomain } from '../../lib/subdomainConfig';
 import ConfirmModal from '../ui/ConfirmModal';
+import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCardIdentity';
 
 export function CompanySettings() {
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
@@ -22,11 +23,15 @@ export function CompanySettings() {
   const [portalUrl, setPortalUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [footerLogoUrl, setFooterLogoUrl] = useState('');
+  const [cardBannerUrl, setCardBannerUrl] = useState<string | null>(null);
+  const [uploadingCardBanner, setUploadingCardBanner] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState('');
   const [orgId, setOrgId] = useState<string | null>(null);
   const [timezone, setTimezone] = useState('America/Chicago');
   const [fromEmail, setFromEmail] = useState('');
   const [fromName, setFromName] = useState('');
   const [replyToEmail, setReplyToEmail] = useState('');
+  const [welcomeSupportEmail, setWelcomeSupportEmail] = useState('');
   const [photographerEmail, setPhotographerEmail] = useState('');
   const [ccFeeEnabled, setCcFeeEnabled] = useState(false);
   const [ccFeeType, setCcFeeType] = useState<'percentage' | 'flat'>('percentage');
@@ -84,6 +89,7 @@ export function CompanySettings() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const footerLogoInputRef = useRef<HTMLInputElement>(null);
+  const cardBannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSettings();
@@ -106,9 +112,11 @@ export function CompanySettings() {
         setWebsite(data.website || '');
         setPortalUrl(data.portal_url || '');
         setLogoUrl(data.company_logo_url || '');
+        setCardBannerUrl(data.business_card_banner_url ?? null);
         setFromEmail(data.from_email || '');
         setFromName(data.from_name || '');
         setReplyToEmail(data.reply_to_email || '');
+        setWelcomeSupportEmail(data.welcome_support_email || '');
         setPhotographerEmail(data.photographer_email || '');
         setCcFeeEnabled(data.cc_convenience_fee_enabled || false);
         setCcFeeType(data.cc_convenience_fee_type || 'percentage');
@@ -362,6 +370,52 @@ export function CompanySettings() {
     });
   }
 
+  async function saveCardBanner(nextUrl: string | null) {
+    const { error } = await supabase.rpc('set_business_card_banner', { p_url: nextUrl });
+    if (error) throw error;
+    setCardBannerUrl(nextUrl);
+    setBannerMessage('Business card artwork saved');
+  }
+
+  async function uploadCardBanner(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setBannerMessage('Choose a JPG, PNG, or WebP image under 5MB.');
+      event.target.value = '';
+      return;
+    }
+    setUploadingCardBanner(true);
+    setBannerMessage('');
+    let uploadedPath: string | null = null;
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw authError || new Error('Please sign in');
+      const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
+      const path = `${user.id}/dealer-banner-${crypto.randomUUID()}.${extension}`;
+      const { error } = await supabase.storage.from('business-card-photos').upload(path, file, { upsert: false });
+      if (error) throw error;
+      uploadedPath = path;
+      const { data: { publicUrl } } = supabase.storage.from('business-card-photos').getPublicUrl(path);
+      await saveCardBanner(publicUrl);
+      // Keep the previous saved image intact until the new artwork is persisted.
+    } catch (error) {
+      if (uploadedPath) await supabase.storage.from('business-card-photos').remove([uploadedPath]);
+      console.error('Error uploading business card artwork:', error);
+      setBannerMessage('Unable to save artwork. Your previous artwork is unchanged.');
+    } finally {
+      setUploadingCardBanner(false);
+      if (cardBannerInputRef.current) cardBannerInputRef.current.value = '';
+    }
+  }
+
+  async function resetCardBanner(nextUrl: string | null) {
+    setUploadingCardBanner(true);
+    try { await saveCardBanner(nextUrl); }
+    catch (error) { console.error('Error saving card artwork:', error); setBannerMessage('Unable to save artwork. Please try again.'); }
+    finally { setUploadingCardBanner(false); }
+  }
+
   async function saveSettings() {
     setSaving(true);
     try {
@@ -376,6 +430,7 @@ export function CompanySettings() {
             from_email: fromEmail?.trim() || null,
             from_name: fromName?.trim() || null,
             reply_to_email: replyToEmail?.trim() || null,
+            welcome_support_email: welcomeSupportEmail?.trim() || null,
             photographer_email: photographerEmail?.trim() || null,
             cc_convenience_fee_enabled: ccFeeEnabled,
             cc_convenience_fee_type: ccFeeType,
@@ -1008,6 +1063,22 @@ export function CompanySettings() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Welcome Email Support Address
+            </label>
+            <input
+              type="email"
+              value={welcomeSupportEmail}
+              onChange={(e) => setWelcomeSupportEmail(e.target.value)}
+              placeholder="admin@yourdomain.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Shown to employees in Welcome emails when they need help. If blank, MyJobView uses the company email, then Reply-To/From Email.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Photographer Email
             </label>
             <input
@@ -1082,6 +1153,22 @@ export function CompanySettings() {
             The header automatically uses your Company Logo above. Upload a separate footer logo
             here only if you want a different image in the bottom footer strip.
           </p>
+
+          <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+            <h4 className="font-semibold text-gray-900">Business Card Artwork</h4>
+            <p className="text-sm text-gray-600">A separate banner beneath your logo and behind each employee's profile photo. Applies to all your dealer's business cards.</p>
+            <div className="max-w-sm overflow-hidden rounded-2xl bg-[#111729]" aria-label="Business card artwork preview">
+              <BusinessCardIdentity fullName="Your Team" title="Business Card Preview" email="" phone="" company={{ company_name: companyName, company_logo_url: logoUrl, website: null, business_card_banner_url: cardBannerUrl } satisfies CardBranding} />
+            </div>
+            <input ref={cardBannerInputRef} id="business-card-artwork" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadCardBanner} disabled={uploadingCardBanner} className="hidden" />
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => cardBannerInputRef.current?.click()} disabled={uploadingCardBanner} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"><Upload className="h-4 w-4" />{uploadingCardBanner ? 'Saving...' : 'Upload Card Artwork'}</button>
+              <button type="button" onClick={() => resetCardBanner('')} disabled={uploadingCardBanner} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50">Remove Artwork</button>
+              {companyName.trim().toLowerCase() === 'electronic life' && <button type="button" onClick={() => resetCardBanner(null)} disabled={uploadingCardBanner} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50">Use Electronic Life Artwork</button>}
+            </div>
+            <p className="text-xs text-gray-500">Wide landscape image recommended (3:1). JPG, PNG, or WebP, up to 5MB. Artwork saves immediately.</p>
+            {bannerMessage && <p role="status" className="text-sm text-blue-700">{bannerMessage}</p>}
+          </div>
 
           {/* Footer Logo */}
           <div className="space-y-2">

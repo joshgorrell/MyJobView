@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Proposal } from '../../lib/types';
-import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film } from 'lucide-react';
+import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, ChevronDown } from 'lucide-react';
 import { ProposalActivityPanel } from './ProposalActivityPanel';
 import { DuplicateProposalModal } from './DuplicateProposalModal';
 import { CreateRevisionModal } from './CreateRevisionModal';
@@ -53,13 +53,14 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [pendingDepositSalesOrders, setPendingDepositSalesOrders] = useState<Record<string, string>>({});
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineModalMode, setDeclineModalMode] = useState<'decline' | 'cancel'>('decline');
+  const [expandedProposalId, setExpandedProposalId] = useState<string | null>(null);
+  const [showMobileTools, setShowMobileTools] = useState(false);
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   // Rep selector — visible to admin / manager / sales_manager
@@ -72,7 +73,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     if (profile) {
       loadPreferences().catch(err => {
         console.error('Failed to load preferences:', err);
-        setPreferencesLoaded(true);
       });
     }
   }, [profile]);
@@ -85,21 +85,17 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load proposals after preferences are ready so the first request uses the saved filters.
+  // Load proposals immediately — preferences load in parallel and re-trigger this effect
+  // if they change any filter values, so the user sees content sooner on first visit.
   useEffect(() => {
     if (authLoading || !profile) {
       setLoading(false);
       return;
     }
 
-    if (!preferencesLoaded) {
-      setLoading(true);
-      return;
-    }
-
     setLoading(true);
     loadProposals().catch(err => console.error('Failed to load proposals:', err));
-  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, selectedRepId, preferencesLoaded]);
+  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, selectedRepId]);
 
   // Reset to page 1 when filter/sort criteria change (but not when currentPage itself changes).
   // Load pending deposits only when profile or rep filter changes (not on every page/sort change)
@@ -133,16 +129,17 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       if (!target.closest('.menu-dropdown') && !target.closest('.menu-button')) {
         setOpenMenuId(null);
       }
+      if (!target.closest('.mobile-tools')) setShowMobileTools(false);
       if (!target.closest('.filter-panel') && !target.closest('.filter-button')) {
         setShowFilterPanel(false);
       }
     }
 
-    if (openMenuId || showFilterPanel) {
+    if (openMenuId || showFilterPanel || showMobileTools) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [openMenuId, showFilterPanel]);
+  }, [openMenuId, showFilterPanel, showMobileTools]);
 
   async function loadPreferences() {
     try {
@@ -163,8 +160,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
-    } finally {
-      setPreferencesLoaded(true);
     }
   }
 
@@ -205,7 +200,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           created_by, created_at, sent_at, viewed_at, approved_at, declined_at,
           expires_at, is_revision, is_active_revision, revision_number,
           parent_proposal_id, sales_order_id, bill_to_contact_id,
-          po_pending, deposit_paid, require_deposit, deposit_request_sent,
+          po_pending, deposit_paid, require_deposit, deposit_request_sent, deposit_amount_due, is_portal_visible,
           unread_customer_messages_count, archived_at, auto_archived,
           organization_id, is_locked, last_emailed_at,
           revision_count, has_recent_activity, unread_messages_count,
@@ -320,7 +315,8 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         .from('proposals')
         .select(`
           *,
-          contacts:contacts!proposals_contact_id_fkey(id, full_name, email, phone)
+          contacts:contacts!proposals_contact_id_fkey(id, full_name, email, phone),
+          profiles!created_by(id, full_name)
         `)
         .eq('status', 'approved')
         .eq('deposit_paid', false)
@@ -694,6 +690,20 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     return proposal.has_recent_activity || false;
   }
 
+  // Pending deposits use the same mobile rows, including proposals that have
+  // transitioned to sales orders. Keep desktop pagination and alerts unchanged.
+  const pendingDepositIds = new Set(pendingDeposits.map(proposal => proposal.id));
+  const extraPendingDeposits = pendingDeposits.filter(proposal => !proposals.some(item => item.id === proposal.id));
+  const listProposals = [...proposals.map(proposal => {
+    const pending = pendingDeposits.find(item => item.id === proposal.id);
+    return pending ? { ...proposal, deposit_amount_due: pending.deposit_amount_due } : proposal;
+  }), ...extraPendingDeposits];
+
+  useEffect(() => {
+    setExpandedProposalId(null);
+    setOpenMenuId(null);
+  }, [currentPage, debouncedSearch, filterStatus, showExpired, selectedRepId]);
+
   // Pagination calculations
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -767,33 +777,34 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     <div className="h-full flex flex-col bg-canvas">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-subtle bg-surface">
-        <div className="px-4 sm:px-6 py-4">
-          {/* Mobile: Title on first row, everything else below */}
-          <div className="sm:hidden space-y-2.5">
+        <div className="px-3 sm:px-6 py-2 sm:py-4">
+          {/* Mobile: one compact toolbar and search row */}
+          <div className="sm:hidden space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <h1 className="text-lg font-bold text-primary">Proposals</h1>
               <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => onNavigateToSalesOrders?.()}
-                  className="p-2.5 min-h-[44px] min-w-[44px] bg-elevated hover:bg-strong/25 active:bg-strong/30 text-primary rounded-lg flex items-center justify-center transition-colors"
-                  title="Sales Orders"
-                >
-                  <ShoppingCart size={16} />
-                </button>
-                <button
-                  onClick={() => onNavigateToSalesStats?.()}
-                  className="p-2.5 min-h-[44px] min-w-[44px] bg-elevated hover:bg-strong/25 active:bg-strong/30 text-primary rounded-lg flex items-center justify-center transition-colors"
-                  title="My Sales Stats"
-                >
-                  <BarChart2 size={16} />
-                </button>
-                <button
-                  onClick={() => onOpenVideoLibrary?.()}
-                  className="p-2.5 min-h-[44px] min-w-[44px] bg-elevated hover:bg-strong/25 active:bg-strong/30 text-primary rounded-lg flex items-center justify-center transition-colors"
-                  title="Video Library"
-                >
-                  <Film size={16} />
-                </button>
+                <div className="relative mobile-tools">
+                  <button type="button" aria-label="Proposal tools" aria-expanded={showMobileTools}
+                    onClick={() => setShowMobileTools(!showMobileTools)}
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted hover:bg-elevated">
+                    <MoreVertical size={18} />
+                  </button>
+                  {showMobileTools && (
+                    <div className="absolute right-0 top-full w-48 bg-surface border border-subtle rounded-lg shadow-xl z-50">
+                      {[
+                        { label: 'Sales Orders', action: onNavigateToSalesOrders },
+                        { label: 'My Sales Stats', action: onNavigateToSalesStats },
+                        { label: 'Video Library', action: onOpenVideoLibrary },
+                        { label: 'Pop out proposals', action: () => window.open('/proposals-fullscreen', '_blank', 'width=1400,height=900') },
+                      ].map(tool => (
+                        <button key={tool.label} type="button" onClick={() => { setShowMobileTools(false); tool.action?.(); }}
+                          className="w-full min-h-[44px] px-4 text-left text-sm text-primary hover:bg-elevated">
+                          {tool.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={onCreateNew}
                   className="px-3 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
@@ -810,13 +821,16 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Search proposals"
                   placeholder="Search..."
-                  className="w-full pl-9 pr-3 py-2.5 bg-canvas border border-subtle rounded-lg text-primary text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+                  className="w-full pl-9 pr-3 py-2.5 bg-canvas border border-subtle rounded-lg text-primary text-base placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                 />
               </div>
               <div className="relative">
                 <button
                   onClick={() => setShowFilterPanel(!showFilterPanel)}
+                  aria-label="Filter proposals"
+                  aria-expanded={showFilterPanel}
                   className="filter-button px-3 py-2.5 bg-canvas border border-subtle hover:bg-surface active:bg-elevated text-primary rounded-lg text-sm font-medium transition-colors flex items-center gap-2 min-h-[44px]"
                 >
                   <Filter size={16} />
@@ -995,43 +1009,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   </div>
                 )}
               </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => window.open('/proposals-fullscreen', '_blank', 'width=1400,height=900')}
-                className="px-2 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
-                title="Pop out proposals"
-              >
-                <Maximize2 size={16} />
-              </button>
-              <button
-                onClick={() => onNavigateToSalesOrders?.()}
-                className="px-3 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
-                title="Sales Orders"
-              >
-                <ShoppingCart size={16} />
-              </button>
-              <button
-                onClick={() => onNavigateToSalesStats?.()}
-                className="px-3 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
-                title="My Sales Stats"
-              >
-                <BarChart2 size={16} />
-              </button>
-              <button
-                onClick={() => onOpenVideoLibrary?.()}
-                className="px-3 py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
-                title="Video Library"
-              >
-                <Film size={16} />
-              </button>
-              <button
-                onClick={onCreateNew}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
-              >
-                <Plus size={16} />
-                <span>New</span>
-              </button>
             </div>
           </div>
 
@@ -1283,14 +1260,20 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         <div className="flex-shrink-0 px-3 sm:px-6 py-1.5 bg-canvas border-b border-subtle flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
             <span className="text-xs text-muted whitespace-nowrap">
-              Showing {totalCount > 0 ? startIndex + 1 : 0}-{endIndex} of {totalCount} {totalCount === 1 ? 'proposal' : 'proposals'}
-              {searchQuery && ` matching "${searchQuery}"`}
+              <span className="sm:hidden">{totalCount} {totalCount === 1 ? 'proposal' : 'proposals'}</span>
+              <span className="hidden sm:inline">Showing {totalCount > 0 ? startIndex + 1 : 0}-{endIndex} of {totalCount} {totalCount === 1 ? 'proposal' : 'proposals'}
+              {searchQuery && ` matching "${searchQuery}"`}</span>
             </span>
             {pendingDeposits.length > 0 && (
               <button
                 type="button"
-                aria-expanded={showPendingDeposits}
-                onClick={() => setShowPendingDeposits(!showPendingDeposits)}
+                onClick={() => {
+                  if (window.matchMedia('(max-width: 639px)').matches) {
+                    const id = pendingDeposits[0]?.id;
+                    setExpandedProposalId(id || null);
+                    requestAnimationFrame(() => document.getElementById(`proposal-row-${id}`)?.scrollIntoView({ block: 'nearest' }));
+                  } else setShowPendingDeposits(!showPendingDeposits);
+                }}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-warning hover:underline whitespace-nowrap"
               >
                 <AlertCircle className="w-3.5 h-3.5" />
@@ -1298,8 +1281,8 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline text-xs text-muted">Per page:</span>
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="text-xs text-muted">Per page:</span>
             <select
               value={itemsPerPage}
               onChange={(e) => {
@@ -1318,7 +1301,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       {/* Pending Deposits Alert Section */}
       {showPendingDeposits && pendingDeposits.length > 0 && (
-        <div className="flex-shrink-0 px-3 sm:px-6 bg-warningSoft border-b border-warningLine/60">
+        <div className="hidden sm:block flex-shrink-0 px-3 sm:px-6 bg-warningSoft border-b border-warningLine/60">
           <div className="space-y-0">
               {pendingDeposits.map(proposal => (
                 <div key={proposal.id} className="py-2 border-t border-warningLine/60 first:border-t-0">
@@ -1362,7 +1345,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       <div className="flex-1 px-3 sm:px-6 py-2">
         {loading ? (
           <LoadingSkeleton />
-        ) : totalCount === 0 ? (
+        ) : totalCount === 0 && pendingDeposits.length === 0 ? (
           <div className="text-center py-12">
             <FileText size={48} className="mx-auto text-gray-600 mb-4" />
             <p className="text-muted mb-4">
@@ -1385,10 +1368,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           </div>
         ) : (
           <div className="space-y-1">
-            {proposals.map(proposal => (
+            {listProposals.map(proposal => (
             <div
               key={proposal.id}
-              className={`relative p-3 sm:p-3.5 bg-surface border rounded-lg hover:bg-elevated transition-colors overflow-visible ${
+              id={`proposal-row-${proposal.id}`}
+              className={`${extraPendingDeposits.some(item => item.id === proposal.id) ? 'sm:hidden' : ''} relative p-0 sm:p-3.5 bg-surface border rounded-lg hover:bg-elevated transition-colors overflow-visible ${
                 isExpired(proposal)
                   ? 'border-red-900/50 bg-red-950/5'
                   : isStale(proposal)
@@ -1396,83 +1380,53 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                   : 'border-subtle'
               } ${openMenuId === proposal.id ? 'z-[100]' : 'z-0'}`}
             >
-              {/* Mobile: Stacked Layout */}
+              {/* Mobile: dense summary, details and actions expand in place */}
               <div className="sm:hidden">
-                <button
-                  onClick={() => onSelectProposal(proposal.id)}
-                  className="w-full text-left"
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5 flex-shrink-0">{getStatusIcon(proposal.status)}</div>
-                    <div className="flex-1 min-w-0">
-                      {/* Customer name row */}
-                      <div className="flex items-center gap-1.5 mb-0 min-w-0">
-                        {(proposal.contacts as any)?.id ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setQuickViewContactId((proposal.contacts as any).id); }}
-                            className="text-sm font-bold customer-link leading-snug truncate min-w-0 flex-1 text-left transition-colors"
-                          >
-                            {(proposal.contacts as any).full_name || (proposal.contacts as any).contact_name || 'No Customer'}
-                          </button>
-                        ) : (
-                          <p className="text-sm font-bold text-primary leading-snug truncate min-w-0 flex-1">
-                            {proposal.contacts?.full_name || (proposal.contacts as any)?.contact_name || 'No Customer'}
-                          </p>
-                        )}
-                        {(proposal.revision_count && proposal.revision_count > 1) && (
-                          <span className="flex-shrink-0 px-1.5 h-4 bg-infoSoft text-info text-[10px] font-medium rounded flex items-center">
-                            R:{proposal.revision_count}
-                          </span>
-                        )}
-                        {getUnreadCustomerMessageCount(proposal) > 0 && (
-                          <span className="flex-shrink-0 px-1.5 h-4 bg-red-600 text-white text-[10px] font-bold rounded flex items-center gap-0.5 animate-pulse">
-                            <MessageSquare size={9} />
-                            {getUnreadCustomerMessageCount(proposal)}
-                          </span>
-                        )}
-                        {hasRecentActivity(proposal) && getUnreadCustomerMessageCount(proposal) === 0 && (
-                          <span className="flex-shrink-0 px-1.5 h-4 bg-amber-600 text-white text-[10px] font-medium rounded flex items-center gap-0.5">
-                            <Bell size={9} />
-                            New
-                          </span>
-                        )}
-                      </div>
-                      {/* Title row */}
-                      <div className="min-w-0 mb-0.5">
-                        <p className="text-xs text-secondary truncate leading-snug">{getDisplayTitle(proposal)}</p>
-                      </div>
-                      {/* Bill-To badge */}
-                      {proposal.bill_to_contact_id && proposal.bill_to_contact && (
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <span className="text-[10px] text-warning font-medium truncate max-w-[200px] flex items-center gap-1">
-                            <Receipt size={9} className="flex-shrink-0" />
-                            Billed to: {(proposal.bill_to_contact as any).company_name || (proposal.bill_to_contact as any).full_name}
-                          </span>
-                        </div>
-                      )}
-                      {/* Meta row */}
-                      <div className="text-xs text-muted flex items-center flex-wrap gap-x-2 gap-y-0.5">
-                        <span className="font-mono">{proposal.proposal_number}</span>
-                        {proposal.profiles?.full_name && (
-                          <span className="truncate max-w-[120px]">{proposal.profiles.full_name}</span>
-                        )}
-                        <span>{formatDate(proposal.created_at)}</span>
-                        {proposal.sent_at && (
-                          <span className="flex items-center gap-0.5">
-                            <Send size={9} className="flex-shrink-0" />
-                            {formatDate(proposal.sent_at)}
-                          </span>
-                        )}
-                        {proposal.expires_at && (proposal.status === 'sent' || proposal.status === 'portal' || proposal.status === 'approved' || proposal.status === 'declined' || proposal.status === 'expired') && (
-                          <span className={`flex items-center gap-0.5 ${isExpired(proposal) ? 'text-danger' : ''}`}>
-                            <Clock size={9} className="flex-shrink-0" />
-                            {formatDate(proposal.expires_at)}
-                          </span>
-                        )}
-                      </div>
+                <button type="button"
+                  aria-expanded={expandedProposalId === proposal.id}
+                  aria-controls={`proposal-details-${proposal.id}`}
+                  onClick={() => {
+                    setExpandedProposalId(expandedProposalId === proposal.id ? null : proposal.id);
+                    setOpenMenuId(null);
+                  }}
+                  className="w-full h-[76px] px-3 py-2 text-left flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 text-sm leading-5">
+                      <span className="font-bold text-primary truncate">{proposal.contacts?.full_name || (proposal.contacts as any)?.contact_name || 'No Customer'}</span>
+                      <span className="font-bold text-primary whitespace-nowrap">${proposal.total.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                    </div>
+                    <p className="text-xs text-secondary truncate leading-4">{getDisplayTitle(proposal)}</p>
+                    <div className="flex items-center gap-1.5 text-[10px] leading-4 min-w-0">
+                      <span className={`px-1 rounded whitespace-nowrap ${pendingDepositIds.has(proposal.id) ? 'bg-warningSoft text-warning' : getStatusColor(proposal.status)}`}>
+                        {pendingDepositIds.has(proposal.id) ? 'Awaiting Deposit' : formatStatusText(proposal.status)}
+                      </span>
+                      {getAgingBadge(proposal) && <span className="text-muted">{getAgingBadge(proposal)?.label}</span>}
+                      <span className="text-muted truncate">{formatDate(proposal.sent_at || proposal.created_at)}</span>
+                      {getUnreadCustomerMessageCount(proposal) > 0 && <span className="text-danger flex items-center gap-0.5"><MessageSquare size={10} />{getUnreadCustomerMessageCount(proposal)}</span>}
+                      {hasRecentActivity(proposal) && getUnreadCustomerMessageCount(proposal) === 0 && <Bell size={10} className="text-warning" aria-label="New activity" />}
                     </div>
                   </div>
+                  <ChevronDown size={16} className={`shrink-0 text-muted transition-transform ${expandedProposalId === proposal.id ? 'rotate-180' : ''}`} />
                 </button>
+                {expandedProposalId === proposal.id && (
+                  <div id={`proposal-details-${proposal.id}`} className="px-3 pb-2 border-t border-subtle">
+                    <div className="text-xs text-muted space-y-1 pt-2">
+                      <p className="font-mono text-primary">{proposal.proposal_number}</p>
+                      <p className="text-secondary break-words">{getDisplayTitle(proposal)}</p>
+                      <p>Salesperson: {proposal.profiles?.full_name || '—'}</p>
+                      <p>Portal: {proposal.is_portal_visible ? 'Visible' : 'Hidden'}</p>
+                      <p>Created: {formatDate(proposal.created_at)}</p>
+                      {proposal.sent_at && <p>Sent: {formatDate(proposal.sent_at)}</p>}
+                      {proposal.expires_at && <p>Expires: {formatDate(proposal.expires_at)}</p>}
+                      {proposal.revision_count > 1 && <p>Revision: {proposal.revision_count}</p>}
+                      {proposal.bill_to_contact && <p>Billed to: {(proposal.bill_to_contact as any).company_name || (proposal.bill_to_contact as any).full_name}</p>}
+                      {proposal.require_deposit && <p>Deposit: {proposal.deposit_paid ? 'Paid' : `Awaiting payment — $${(proposal.deposit_amount_due ?? proposal.deposit_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</p>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <button type="button" onClick={() => onSelectProposal(proposal.id)} className="min-h-[44px] px-3 bg-blue-600 text-white rounded-lg text-xs font-medium">Open Proposal</button>
+                      {pendingDepositSalesOrders[proposal.id] && onSelectSalesOrder && <button type="button" onClick={() => onSelectSalesOrder(pendingDepositSalesOrders[proposal.id])} className="min-h-[44px] px-3 bg-elevated text-primary rounded-lg text-xs">Open Sales Order</button>}
+                      {(proposal.contacts as any)?.id && <button type="button" onClick={() => setQuickViewContactId((proposal.contacts as any).id)} className="min-h-[44px] px-3 text-info text-xs">View Customer</button>}
+                    </div>
                 <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-subtle/60 min-w-0">
                   <div className="flex items-center gap-1 flex-wrap min-w-0 flex-1">
                     {/* Portal visibility pill */}
@@ -1520,6 +1474,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           setMenuOpenAbove(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 320);
                           setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
                         }}
+                        aria-label="Proposal actions"
                         className="menu-button p-2.5 min-w-[44px] min-h-[44px] text-muted hover:text-primary hover:bg-elevated active:bg-strong/30 rounded-lg transition-colors flex items-center justify-center"
                         data-menu-id={proposal.id}
                       >
@@ -1694,6 +1649,8 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     </div>
                   </div>
                 </div>
+                  </div>
+                )}
               </div>
 
               {/* Desktop: Horizontal Layout */}

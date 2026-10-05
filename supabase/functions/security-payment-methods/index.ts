@@ -1,5 +1,6 @@
+import { ensureSecurityQboCustomer } from '../_shared/security-qbo-customer.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { corsHeaders, getSupabaseAdmin, getConnection, getValidAccessToken, getQboIdByLocalId } from '../_shared/qbo-client.ts';
+import { corsHeaders, getSupabaseAdmin, getConnection, getValidAccessToken, getQboIdByLocalId, qboRequest } from '../_shared/qbo-client.ts';
 import { maskedPayment, paymentsOrigin, vaultRequest } from '../_shared/security-payment-vault.ts';
 
 Deno.serve(async (req: Request) => {
@@ -16,20 +17,27 @@ Deno.serve(async (req: Request) => {
       global:{headers:{Authorization:req.headers.get('Authorization') || ''}}, auth:{persistSession:false},
     });
     // Same contract-scoped invitation/portal ownership check as drafts. No service-role bypass.
-    const {data:agreement,error:accessError} = await caller.rpc('portal_security_onboarding',{
+    let access = await caller.rpc('portal_security_onboarding', {
       p_action:'get',p_contract_id:contractId,p_token:token || null,
     });
-    if (accessError || !agreement || agreement.customer_completed_at || !['pending_customer','customer_completed'].includes(agreement.status))
+    let staffReview = false;
+    if (!token && (access.error || access.data?.customer_completed_at)) {
+      const review = await caller.rpc('staff_security_onboarding', { p_action:'review', p_id:contractId });
+      staffReview = !review.error && !!review.data;
+      access = staffReview ? review : await caller.rpc('staff_security_onboarding', { p_action:'get', p_id:contractId });
+    }
+    const agreement = access.data;
+    if (access.error || !agreement || (agreement.customer_completed_at && !staffReview) || !(staffReview ? ['draft','pending_customer','customer_completed','pending_approval','approved','rejected'] : ['draft','pending_customer','customer_completed','rejected']).includes(agreement.status))
       return respond({error:'Your invitation has expired or this agreement is no longer editable'},403);
     const admin = getSupabaseAdmin();
     const {data:contract} = await admin.from('security_contracts').select('contact_id,organization_id,security_billing_mode').eq('id',contractId).single();
-    if (!contract || contract.security_billing_mode!=='autopay') return respond({error:'Payment enrollment is not available for this agreement'},400);
+    if (!contract || (contract.security_billing_mode!=='autopay' && !staffReview)) return respond({error:'Payment enrollment is not available for this agreement'},400);
     const {data:organization} = await admin.from('organizations').select('payment_processor').eq('id',contract.organization_id).single();
     const connection = await getConnection(admin,contract.organization_id);
     if (organization?.payment_processor!=='quickbooks' || !connection || !connection.payments_enabled)
       return respond({error:'QuickBooks Payments enrollment is not enabled. Your progress is saved; contact your provider.'},409);
     const {data:contact} = await admin.from('contacts').select('qbo_customer_id').eq('id',contract.contact_id).eq('organization_id',contract.organization_id).single();
-    const customerId = contact?.qbo_customer_id || await getQboIdByLocalId(admin,contract.organization_id,'customer',contract.contact_id);
+    const customerId = contact?.qbo_customer_id || await getQboIdByLocalId(admin,contract.organization_id,'customer',contract.contact_id) || await ensureSecurityQboCustomer(admin,connection,contract.contact_id,qboRequest);
     if (!customerId) return respond({error:'Your provider needs to sync your customer account with QuickBooks before payment enrollment. Your progress is saved.'},409);
     const accessToken = await getValidAccessToken(admin,connection);
     if (!accessToken) return respond({error:'QuickBooks needs to be reconnected by your provider'},409);

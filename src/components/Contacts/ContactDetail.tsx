@@ -1310,58 +1310,49 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
             <div className="space-y-4">
               {/* Quick Actions */}
               <div className="pb-3 border-b border-gray-200">
-                <h3 className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-2">Quick Actions</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                  <button
-                    onClick={() => setShowCreateProposal(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span className="truncate">Proposal</span>
-                  </button>
-                  <button
-                    onClick={() => setShowDesignBrief(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-blue-200 text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors touch-manipulation"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span className="truncate">Design Brief</span>
-                  </button>
-                  <button
-                    onClick={handleCreateInvoiceClick}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <Receipt className="w-3.5 h-3.5" />
-                    <span className="truncate">Invoice</span>
-                  </button>
-                  <button
-                    onClick={() => setShowCreateWorkOrder(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <Wrench className="w-3.5 h-3.5" />
-                    <span className="truncate">Work Order</span>
-                  </button>
-                  <button
-                    onClick={() => setShowCreateAppointment(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-blue-300 text-blue-700 rounded-md hover:bg-blue-50 hover:border-blue-400 transition-colors touch-manipulation"
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span className="truncate">Appointment</span>
-                  </button>
-                  <button
-                    onClick={() => setShowCreateTask(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <ListTodo className="w-3.5 h-3.5" />
-                    <span className="truncate">Task</span>
-                  </button>
-                  <button
-                    onClick={() => setShowConvertForm(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="truncate">Lead</span>
-                  </button>
-                </div>
+                <label htmlFor="contact-quick-actions" className="sr-only">Quick Actions</label>
+                <select
+                  id="contact-quick-actions"
+                  defaultValue=""
+                  onChange={(event) => {
+                    const action = event.currentTarget.value;
+                    event.currentTarget.value = '';
+
+                    switch (action) {
+                      case 'proposal':
+                        setShowCreateProposal(true);
+                        break;
+                      case 'design-brief':
+                        setShowDesignBrief(true);
+                        break;
+                      case 'invoice':
+                        handleCreateInvoiceClick();
+                        break;
+                      case 'work-order':
+                        setShowCreateWorkOrder(true);
+                        break;
+                      case 'appointment':
+                        setShowCreateAppointment(true);
+                        break;
+                      case 'task':
+                        setShowCreateTask(true);
+                        break;
+                      case 'lead':
+                        setShowConvertForm(true);
+                        break;
+                    }
+                  }}
+                  className="w-full sm:w-auto min-w-48 px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 bg-white rounded-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 touch-manipulation"
+                >
+                  <option value="" disabled>Quick Actions…</option>
+                  <option value="proposal">Create Proposal</option>
+                  <option value="design-brief">Create Design Brief</option>
+                  <option value="invoice">Create Invoice</option>
+                  <option value="work-order">Create Work Order</option>
+                  <option value="appointment">Schedule Appointment</option>
+                  <option value="task">Create Task</option>
+                  <option value="lead">Create Lead</option>
+                </select>
               </div>
 
               {/* Prospect Statistics */}

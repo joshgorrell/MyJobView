@@ -1,0 +1,33 @@
+name: Lost review checks
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/Reviews/**'
+      - 'supabase/functions/lost-opportunity-review/**'
+      - 'supabase/migrations/*lost_review*'
+      - 'tests/reviews/**'
+      - '.github/workflows/lost-review-checks.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:reviews
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://test.supabase.co
+          VITE_SUPABASE_ANON_KEY: test-key
+      - run: npm install --no-save --package-lock=false playwright@1.55.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/reviews/browser.mjs

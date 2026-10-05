@@ -11,7 +11,10 @@ interface CreateTaskFromWorkOrderModalProps {
   contactName: string;
   customerSalesRepId?: string | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (taskId?: string) => void;
+  initialTitle?: string;
+  initialDescription?: string;
+  compact?: boolean;
 }
 
 interface Profile {
@@ -28,7 +31,10 @@ export function CreateTaskFromWorkOrderModal({
   contactName,
   customerSalesRepId,
   onClose,
-  onSuccess
+  onSuccess,
+  initialTitle,
+  initialDescription,
+  compact = false
 }: CreateTaskFromWorkOrderModalProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -36,9 +42,9 @@ export function CreateTaskFromWorkOrderModal({
   const [salesReps, setSalesReps] = useState<Profile[]>([]);
 
   const [formData, setFormData] = useState({
-    title: '',
-    description: `Related to Work Order #${workOrderNumber} - ${workOrderTitle}\n\nCustomer: ${contactName}\n\n`,
-    assigned_to: customerSalesRepId || '',
+    title: initialTitle || '',
+    description: initialDescription || `Related to Work Order #${workOrderNumber} - ${workOrderTitle}\n\nCustomer: ${contactName}\n\n`,
+    assigned_to: compact ? '' : (customerSalesRepId || ''),
     due_date: '',
     priority: 'normal',
     tags: [] as string[],
@@ -193,8 +199,7 @@ export function CreateTaskFromWorkOrderModal({
 
       if (commentError) console.error('Error adding comment:', commentError);
 
-      onSuccess();
-      onClose();
+      onSuccess(task.id);
     } catch (error: any) {
       console.error('Error creating task:', error);
       alert(`Failed to create task: ${error?.message || 'Unknown error'}`);
@@ -209,7 +214,7 @@ export function CreateTaskFromWorkOrderModal({
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <CheckSquare className="w-6 h-6 text-blue-600" />
-            Create Task from Work Order
+            {compact ? 'Create Task' : 'Create Task from Work Order'}
           </h2>
           <button
             onClick={onClose}
@@ -221,7 +226,7 @@ export function CreateTaskFromWorkOrderModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Quick Templates */}
-          <div className="space-y-3">
+          {!compact && <div className="space-y-3">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <CheckSquare className="w-5 h-5" />
               Quick Templates
@@ -245,7 +250,7 @@ export function CreateTaskFromWorkOrderModal({
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* Assign To */}
           <div className="space-y-3">
@@ -254,7 +259,7 @@ export function CreateTaskFromWorkOrderModal({
               Assign To *
             </h3>
 
-            {customerSalesRepId && (
+            {!compact && customerSalesRepId && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-sm text-blue-800">
                   <AlertCircle className="w-4 h-4 inline mr-1" />
@@ -263,8 +268,8 @@ export function CreateTaskFromWorkOrderModal({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
+            <div className={compact ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2"}>
+              {!compact && <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Sales Team {customerSalesRepId && '(Recommended)'}
                 </label>
@@ -281,11 +286,11 @@ export function CreateTaskFromWorkOrderModal({
                     </option>
                   ))}
                 </select>
-              </div>
+              </div>}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Or Any Team Member
+                  {compact ? 'Team Member' : 'Or Any Team Member'}
                 </label>
                 <select
                   value={formData.assigned_to}
@@ -335,21 +340,22 @@ export function CreateTaskFromWorkOrderModal({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={compact ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Calendar className="w-4 h-4 inline mr-1" />
-                  Due Date
+                  Due Date {compact && '*'}
                 </label>
                 <input
                   type="date"
+                  required={compact}
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
-              <div>
+              {!compact && <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Priority
                 </label>
@@ -363,12 +369,12 @@ export function CreateTaskFromWorkOrderModal({
                   <option value="high">High</option>
                   <option value="urgent">Urgent</option>
                 </select>
-              </div>
+              </div>}
             </div>
           </div>
 
           {/* Tags */}
-          <div className="space-y-3">
+          {!compact && <div className="space-y-3">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Tag className="w-5 h-5" />
               Tags (Optional)
@@ -430,10 +436,10 @@ export function CreateTaskFromWorkOrderModal({
                 </button>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Watchers */}
-          <div className="space-y-3">
+          {!compact && <div className="space-y-3">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <User className="w-5 h-5" />
               CC / Watchers (Optional)
@@ -460,7 +466,7 @@ export function CreateTaskFromWorkOrderModal({
                 </label>
               ))}
             </div>
-          </div>
+          </div>}
 
           <div className="flex gap-3 pt-4 border-t">
             <button
@@ -472,7 +478,7 @@ export function CreateTaskFromWorkOrderModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !formData.assigned_to}
+              disabled={loading || !formData.assigned_to || (compact && !formData.due_date)}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {loading ? 'Creating Task...' : 'Create Task'}

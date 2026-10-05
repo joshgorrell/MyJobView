@@ -1,3 +1,5 @@
+import { SecurityFieldVisibility, SecurityVisibilityGuide } from './SecurityFieldVisibility';
+import { staffSecurityOnboarding, SECURITY_INITIAL_TERMS } from '../../lib/securityOnboarding';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -33,7 +35,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   const [monitoringServices, setMonitoringServices] = useState<MonitoringService[]>([]);
   const [selectedContact, setSelectedContact] = useState(contract.contact_id || '');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [priceOverride, setPriceOverride] = useState(contract.monthly_price?.toString() || '');
+  const [priceOverride, setPriceOverride] = useState(contract.price_override?.toString() || '');
   const [termMonths, setTermMonths] = useState<number>(contract.term_months || 36);
   const [renewalTermMonths, setRenewalTermMonths] = useState<number>(contract.renewal_term_months || 1);
   const [accountType, setAccountType] = useState<'residential' | 'commercial' | ''>(contract.account_type || '');
@@ -152,56 +154,14 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
 
     setSaving(true);
     try {
-      const monthlyPrice = calculateMonthlyPrice();
-
-      // Update the contract
-      const { error: updateError } = await supabase
-        .from('security_contracts')
-        .update({
-          contact_id: selectedContact,
-          email_override: emailOverride.trim() || null,
-          monthly_price: monthlyPrice,
-          term_months: termMonths,
-          renewal_term_months: renewalTermMonths,
-          ...(renewalTermMonths === 1 ? { cancellation_notice_days: 30 } : {}),
-          account_type: accountType || null,
-          account_services: accountServices,
-          is_monitoring: isMonitoring,
-          account_number: isMonitoring ? (monitoringAccountNumber.trim() || null) : null,
-          installation_date: installationDate || null,
-          service_account_numbers: serviceAccountNumbers,
-          notes: notes.trim() || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', contract.id);
-
-      if (updateError) throw updateError;
-
-      // Delete existing services
-      const { error: deleteError } = await supabase
-        .from('security_contract_services')
-        .delete()
-        .eq('contract_id', contract.id);
-
-      if (deleteError) throw deleteError;
-
-      // Insert new services
-      if (selectedServices.length > 0) {
-        const serviceInserts = selectedServices.map(serviceId => {
-          const service = monitoringServices.find(s => s.id === serviceId);
-          return {
-            contract_id: contract.id,
-            service_id: serviceId,
-            monthly_price: service?.monthly_price || 0
-          };
-        });
-
-        const { error: insertError } = await supabase
-          .from('security_contract_services')
-          .insert(serviceInserts);
-
-        if (insertError) throw insertError;
-      }
+      await staffSecurityOnboarding('edit', contract.id, {
+        contact_id: selectedContact, service_ids: selectedServices,
+        price_override: priceOverride || null, term_months: termMonths,
+        email_override: emailOverride.trim() || null, account_type: accountType || null,
+        account_services: accountServices, is_monitoring: isMonitoring,
+        account_number: isMonitoring ? monitoringAccountNumber.trim() || null : null,
+        installation_date: installationDate || null, service_account_numbers: serviceAccountNumbers, notes: notes.trim(),
+      });
 
       alert('Contract updated successfully!');
       onSuccess();
@@ -219,7 +179,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg p-6">
           <div className="text-center">Loading...</div>
         </div>
@@ -228,7 +188,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+    <div className="security-onboarding-controls fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl my-4 sm:my-8 max-h-[calc(100vh-2rem)]">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 gap-3">
           <div className="min-w-0 flex-1">
@@ -246,11 +206,11 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto max-h-[calc(100vh-8rem)]">
+          <SecurityVisibilityGuide />
           {/* Customer Selection */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-              Customer *
-            </label>
+              Customer * <SecurityFieldVisibility /></label>
             <div className="relative mb-2">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <input
@@ -316,8 +276,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           {/* Email Override */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-              Email Override (Optional)
-            </label>
+              Email Override (Optional) <SecurityFieldVisibility internal /></label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <input
@@ -329,7 +288,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Leave blank to use contact's email ({selectedContactData?.email || 'none'})
+              Delivery address only; this override is not displayed on the customer form. Leave blank to use contact's email ({selectedContactData?.email || 'none'})
             </p>
           </div>
 
@@ -338,6 +297,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
               Monitoring Services
             </label>
+            <p className="text-xs text-gray-600 mb-2">Service names: Customer-visible. Individual prices and catalog descriptions: Internal only.</p>
             <div className="space-y-2 max-h-40 sm:max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 sm:p-3">
               {monitoringServices.length === 0 ? (
                 <div className="text-center text-gray-500 py-4">
@@ -361,7 +321,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
                         <div className="text-sm text-gray-600">{service.description}</div>
                       )}
                       <div className="text-sm font-semibold text-blue-600 mt-1">
-                        ${service.monthly_price.toFixed(2)}/month
+                        ${service.monthly_price.toFixed(2)}/month <SecurityFieldVisibility internal />
                       </div>
                     </div>
                   </label>
@@ -374,7 +334,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                Monthly Price Override
+                Monthly Price Override <SecurityFieldVisibility />
               </label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -393,18 +353,12 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
 
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                Contract Term (Months)
-              </label>
+                Contract Term (Months) <SecurityFieldVisibility /></label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={termMonths}
-                  onChange={(e) => setTermMonths(parseInt(e.target.value) || 12)}
-                  className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <select value={termMonths} onChange={e => setTermMonths(Number(e.target.value))} className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 border border-gray-300 rounded-lg">
+                  {SECURITY_INITIAL_TERMS.map(months => <option key={months} value={months}>{months} months</option>)}
+                </select>
               </div>
             </div>
           </div>
@@ -414,7 +368,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             <h3 className="text-xs sm:text-sm font-semibold text-gray-800">Account Classification</h3>
 
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Account Type</label>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Account Type <SecurityFieldVisibility internal /></label>
               <div className="flex gap-3">
                 {(['residential', 'commercial'] as const).map(type => (
                   <button
@@ -434,7 +388,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             </div>
 
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Monitoring</label>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Monitoring <SecurityFieldVisibility internal /></label>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -446,7 +400,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
               </label>
               {isMonitoring && (
                 <div className="mt-2">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Monitoring Account Number <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Monitoring Account Number <span className="text-gray-400 font-normal">(optional)</span> <SecurityFieldVisibility internal /></label>
                   <input
                     type="text"
                     value={monitoringAccountNumber}
@@ -459,7 +413,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             </div>
 
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Account Services</label>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Account Services <SecurityFieldVisibility internal /></label>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { value: 'dial_up', label: 'Dial-Up' },
@@ -489,7 +443,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             </div>
 
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Account Number (Optional)</label>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Account Number (Optional) <SecurityFieldVisibility internal /></label>
               <input
                 type="text"
                 value={accountNumber}
@@ -509,7 +463,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
             </div>
 
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Installation Date</label>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Installation Date <SecurityFieldVisibility internal /></label>
               <input
                 type="date"
                 value={installationDate}
@@ -520,7 +474,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
 
             {accountServices.filter(s => ['dial_up', 'telguard', 'alarmnet', 'alarm_com'].includes(s)).length > 0 && (
               <div className="space-y-2">
-                <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers</label>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers <SecurityFieldVisibility internal /></label>
                 {accountServices.includes('dial_up') && (
                   <div>
                     <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
@@ -576,8 +530,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           {/* Renewal Term */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-              Renewal Term
-            </label>
+              Renewal Term <SecurityFieldVisibility /></label>
             <p className="text-sm text-gray-700">
               {renewalTermMonths === 1
                 ? "Automatically renews month-to-month after the initial term; 30 days' notice to cancel."
@@ -593,8 +546,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           {/* Notes */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-              Internal Notes
-            </label>
+              Internal Notes <SecurityFieldVisibility internal /></label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -608,20 +560,20 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4">
             <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3">Contract Summary</h3>
             <div className="space-y-2 text-xs sm:text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Monthly Price:</span>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-gray-600">Monthly Price: <SecurityFieldVisibility /></span>
                 <span className="font-semibold text-gray-900">{formatCurrency(monthlyPrice)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Initial Term:</span>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-gray-600">Initial Term: <SecurityFieldVisibility /></span>
                 <span className="font-semibold text-gray-900">{termMonths} months</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Renewal Term:</span>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-gray-600">Renewal Term: <SecurityFieldVisibility /></span>
                 <span className="font-semibold text-gray-900">{renewalTermMonths === 1 ? 'Month-to-month' : `${renewalTermMonths} months`}</span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-gray-300">
-                <span className="text-gray-600">Total Contract Value:</span>
+              <div className="flex flex-wrap justify-between gap-2 pt-2 border-t border-gray-300">
+                <span className="text-gray-600">Total Contract Value: <SecurityFieldVisibility internal /></span>
                 <span className="font-semibold text-gray-900">
                   ${(monthlyPrice * termMonths).toFixed(2)}
                 </span>

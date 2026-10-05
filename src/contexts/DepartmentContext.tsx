@@ -149,7 +149,12 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       if (modsResult.error) throw modsResult.error;
 
       const depts = deptsResult.data || [];
-      const mods = modsResult.data || [];
+      // Keep navigation consistent with the Feedback page even before its label
+      // migration is applied. Module keys/IDs continue to preserve saved bookmarks.
+      const mods = (modsResult.data || []).map(module => ({
+        ...module,
+        display_name: module.module_key === 'reviews' ? 'Feedback' : module.display_name,
+      }));
 
       setDepartments(depts);
       setModules(mods);
@@ -239,6 +244,8 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
         .slice(0, 6)
         .map(s => ({
           ...(s.module as any),
+          display_name: (s.module as any).module_key === 'reviews'
+            ? 'Feedback' : (s.module as any).display_name,
           star_order: (s as any).star_order || (s as any).default_order,
           department_name: (s.module as any).department.name,
           department_color: (s.module as any).department.color,

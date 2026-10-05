@@ -1,3 +1,4 @@
+import LaborRemovalChoice, { itemHasLabor, RemovalScope } from './LaborRemovalChoice';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -65,6 +66,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
   const [collapsedParentIds, setCollapsedParentIds] = useState<Set<string>>(new Set());
   const [showCOSummary, setShowCOSummary] = useState(false);
   const [restoringItemId, setRestoringItemId] = useState<string | null>(null);
+  const [laborChoice,setLaborChoice]=useState<((scope:RemovalScope)=>void)|null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   function getDisplayTitle(title: string) {
@@ -588,14 +590,16 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
             console.error('Error removing CO-added item:', err);
           }
         }
-        setConfirmModal({ title: 'Remove Item', message: 'Remove this newly-added item from the change order?', onConfirm: doRemoveCOAddedItem });
+        if(await itemHasLabor(item))setLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){alert(result.error.message);return;}await updateCOTotals(changeOrderId!,onCORefresh);await refreshCOLineItems();await loadProposal();}else await doRemoveCOAddedItem();});
+        else setConfirmModal({ title: 'Remove Item', message: 'Remove this newly-added item from the change order?', onConfirm: doRemoveCOAddedItem });
         return;
       }
-      async function doRemoveCOScopeItem() {
+      async function doRemoveCOScopeItem(scope:RemovalScope='parts_and_labor') {
         try {
           const roomName = rooms.find(r => r.line_items.some(i => i.id === itemId))?.name || '';
           const freshRecords = await loadCOLineItems(changeOrderId!);
           await recordCOAction(changeOrderId!, itemId, 'remove', {
+            remove_scope:scope,
             description: item!.description,
             quantity: item!.quantity,
             unit_price: item!.unit_price,
@@ -615,7 +619,8 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
           console.error('Error recording CO removal:', err);
         }
       }
-      setConfirmModal({ title: 'Remove Item', message: 'Remove this item from the scope? It will be tracked as a removal in the change order.', onConfirm: doRemoveCOScopeItem });
+      if(await itemHasLabor(item)){setLaborChoice(()=>(scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);void doRemoveCOScopeItem(scope);});}
+      else setConfirmModal({ title: 'Remove Item', message: 'Remove this item from the scope? It will be tracked as a removal in the change order.', onConfirm: doRemoveCOScopeItem });
       return;
     }
 
@@ -1800,6 +1805,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
         />
       )}
 
+      {laborChoice&&<LaborRemovalChoice onChoose={laborChoice} onCancel={()=>setLaborChoice(null)}/>}
       <ConfirmModal
         isOpen={confirmModal !== null}
         title={confirmModal?.title ?? ''}

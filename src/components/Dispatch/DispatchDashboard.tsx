@@ -154,8 +154,8 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
       title: 'Available Techs',
       value: stats.availableTechs,
       icon: Users,
-      color: 'text-green-700',
-      bgColor: 'bg-green-50',
+      color: 'text-success',
+      bgColor: 'bg-successSoft',
       borderColor: 'border-green-200',
       subtitle: `${stats.clockedInTechs} clocked in today`,
       alert: false
@@ -164,8 +164,8 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
       title: 'Active Work Orders',
       value: stats.activeJobs,
       icon: ClipboardList,
-      color: 'text-blue-700',
-      bgColor: 'bg-blue-50',
+      color: 'text-info',
+      bgColor: 'bg-infoSoft',
       borderColor: 'border-blue-200',
       subtitle: `${stats.inProgressJobs} in progress`,
       alert: false
@@ -174,9 +174,9 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
       title: 'Unassigned Jobs',
       value: stats.unassignedJobs,
       icon: AlertCircle,
-      color: stats.unassignedJobs > 0 ? 'text-red-700' : 'text-gray-600',
-      bgColor: stats.unassignedJobs > 0 ? 'bg-red-50' : 'bg-gray-50',
-      borderColor: stats.unassignedJobs > 0 ? 'border-red-300' : 'border-gray-200',
+      color: stats.unassignedJobs > 0 ? 'text-danger' : 'text-muted',
+      bgColor: stats.unassignedJobs > 0 ? 'bg-dangerSoft' : 'bg-surface',
+      borderColor: stats.unassignedJobs > 0 ? 'border-red-300' : 'border-subtle',
       subtitle: 'Needs assignment',
       alert: stats.unassignedJobs > 0
     },
@@ -184,9 +184,9 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
       title: 'Travel Bonus Queue',
       value: stats.travelBonusQueue,
       icon: DollarSign,
-      color: stats.travelBonusQueue > 0 ? 'text-orange-700' : 'text-gray-600',
-      bgColor: stats.travelBonusQueue > 0 ? 'bg-orange-50' : 'bg-gray-50',
-      borderColor: stats.travelBonusQueue > 0 ? 'border-orange-300' : 'border-gray-200',
+      color: stats.travelBonusQueue > 0 ? 'text-attention' : 'text-muted',
+      bgColor: stats.travelBonusQueue > 0 ? 'bg-attentionSoft' : 'bg-surface',
+      borderColor: stats.travelBonusQueue > 0 ? 'border-orange-300' : 'border-subtle',
       subtitle: 'Pending approval',
       alert: false
     },
@@ -194,8 +194,8 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
       title: "Today's Completions",
       value: stats.todayCompletions,
       icon: CheckCircle,
-      color: 'text-emerald-700',
-      bgColor: 'bg-emerald-50',
+      color: 'text-success',
+      bgColor: 'bg-successSoft',
       borderColor: 'border-emerald-200',
       subtitle: 'Completed today',
       alert: false
@@ -204,9 +204,9 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
       title: 'Tech Utilization',
       value: `${stats.utilization}%`,
       icon: TrendingUp,
-      color: stats.utilization >= 80 ? 'text-green-700' : stats.utilization >= 50 ? 'text-amber-700' : 'text-gray-600',
-      bgColor: stats.utilization >= 80 ? 'bg-green-50' : stats.utilization >= 50 ? 'bg-amber-50' : 'bg-gray-50',
-      borderColor: stats.utilization >= 80 ? 'border-green-200' : stats.utilization >= 50 ? 'border-amber-200' : 'border-gray-200',
+      color: stats.utilization >= 80 ? 'text-success' : stats.utilization >= 50 ? 'text-warning' : 'text-muted',
+      bgColor: stats.utilization >= 80 ? 'bg-successSoft' : stats.utilization >= 50 ? 'bg-warningSoft' : 'bg-surface',
+      borderColor: stats.utilization >= 80 ? 'border-green-200' : stats.utilization >= 50 ? 'border-amber-200' : 'border-subtle',
       subtitle: `${stats.inProgressJobs} of ${stats.clockedInTechs} on jobs`,
       alert: false
     }
@@ -215,7 +215,7 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400 text-sm">Loading dispatch dashboard...</div>
+        <div className="text-muted text-sm">Loading dispatch dashboard...</div>
       </div>
     );
   }
@@ -223,8 +223,8 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Dispatch Dashboard</h2>
-        <p className="text-gray-400 text-sm">Real-time field operations overview</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-primary mb-1">Dispatch Dashboard</h2>
+        <p className="text-muted text-sm">Real-time field operations overview</p>
       </div>
 
       {/* Stat Cards */}
@@ -234,7 +234,7 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
           return (
             <div
               key={card.title}
-              className={`bg-white rounded-xl border-2 ${card.borderColor} p-4 transition-all hover:shadow-md ${
+              className={`bg-canvas rounded-xl border-2 ${card.borderColor} p-4 transition-all hover:shadow-md ${
                 card.alert ? 'ring-2 ring-red-400 ring-opacity-60 shadow-sm' : 'shadow-sm'
               }`}
             >
@@ -249,8 +249,8 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
               <p className={`text-2xl font-bold ${card.color} leading-none mb-1`}>
                 {card.value}
               </p>
-              <p className="text-xs font-medium text-gray-700 leading-tight">{card.title}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{card.subtitle}</p>
+              <p className="text-xs font-medium text-secondary leading-tight">{card.title}</p>
+              <p className="text-xs text-muted mt-0.5">{card.subtitle}</p>
             </div>
           );
         })}
@@ -258,12 +258,12 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
 
       {/* Alert Banner */}
       {(stats.unassignedJobs > 0 || stats.travelBonusQueue > 0) && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div className="bg-warningSoft border border-amber-200 rounded-xl p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-900 mb-1">Action Required</p>
-              <div className="text-sm text-amber-800 space-y-0.5">
+              <p className="text-sm font-semibold text-warning mb-1">Action Required</p>
+              <div className="text-sm text-warning space-y-0.5">
                 {stats.unassignedJobs > 0 && (
                   <p>{stats.unassignedJobs} job{stats.unassignedJobs !== 1 ? 's' : ''} waiting for assignment</p>
                 )}
@@ -278,8 +278,8 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="bg-canvas rounded-xl border border-subtle shadow-sm p-6">
+          <h3 className="text-base font-semibold text-primary mb-4">Quick Actions</h3>
           <div className="space-y-2">
             <button
               onClick={() => onNavigate?.('schedule_board')}
@@ -290,18 +290,18 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
             </button>
             <button
               onClick={() => onNavigate?.('travel_bonus')}
-              className="w-full flex items-center justify-between px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm"
+              className="w-full flex items-center justify-between px-4 py-3 bg-orange-700 text-white rounded-lg hover:bg-orange-800 transition-colors font-medium text-sm"
             >
               <span>Approve Travel Bonuses</span>
               {stats.travelBonusQueue > 0 && (
-                <span className="bg-white text-orange-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                <span className="bg-canvas text-attention text-xs font-bold px-2 py-0.5 rounded-full">
                   {stats.travelBonusQueue}
                 </span>
               )}
             </button>
             <button
               onClick={() => onNavigate?.('daily_clock')}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+              className="w-full flex items-center justify-between px-4 py-3 bg-elevated text-primary rounded-lg hover:bg-surface transition-colors font-medium text-sm"
             >
               <span>Time Clock History</span>
               <ArrowRight className="w-4 h-4" />
@@ -310,16 +310,16 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
         </div>
 
         {/* Today's Breakdown */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Today at a Glance</h3>
+        <div className="bg-canvas rounded-xl border border-subtle shadow-sm p-6">
+          <h3 className="text-base font-semibold text-primary mb-4">Today at a Glance</h3>
 
           {/* Utilization Bar */}
           <div className="mb-5">
-            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+            <div className="flex justify-between text-xs text-muted mb-1.5">
               <span>Tech Utilization</span>
-              <span className="font-medium text-gray-700">{stats.utilization}%</span>
+              <span className="font-medium text-secondary">{stats.utilization}%</span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2.5">
+            <div className="w-full bg-surface rounded-full h-2.5">
               <div
                 className={`h-2.5 rounded-full transition-all ${
                   stats.utilization >= 80 ? 'bg-green-500' :
@@ -328,25 +328,25 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
                 style={{ width: `${Math.min(stats.utilization, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-muted mt-1">
               {stats.inProgressJobs} of {stats.clockedInTechs} clocked-in techs currently on a job
             </p>
           </div>
 
           {/* Work Order Status Breakdown */}
           <div className="mb-5">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Work Order Status</p>
+            <p className="text-xs font-medium text-muted uppercase tracking-wide mb-2">Work Order Status</p>
             <div className="space-y-1.5">
               {[
                 { label: 'In Progress', value: stats.inProgressJobs, color: 'bg-blue-500' },
                 { label: 'Assigned', value: stats.assignedJobs, color: 'bg-sky-400' },
                 { label: 'Pending / Unassigned', value: stats.pendingJobs, color: 'bg-amber-400' },
-                { label: 'Completed Today', value: stats.todayCompletions, color: 'bg-emerald-500' }
+                { label: 'Completed Today', value: stats.todayCompletions, color: 'bg-successSoft0' }
               ].map(row => (
                 <div key={row.label} className="flex items-center gap-2">
                   <div className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${row.color}`} />
-                  <span className="text-xs text-gray-600 flex-1">{row.label}</span>
-                  <span className="text-xs font-semibold text-gray-800">{row.value}</span>
+                  <span className="text-xs text-muted flex-1">{row.label}</span>
+                  <span className="text-xs font-semibold text-primary">{row.value}</span>
                 </div>
               ))}
             </div>
@@ -354,11 +354,11 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
 
           {/* Who is clocked in */}
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-medium text-muted uppercase tracking-wide mb-2">
               Clocked In ({stats.clockedInTechs})
             </p>
             {stats.clockedInNames.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No techs clocked in</p>
+              <p className="text-xs text-muted italic">No techs clocked in</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {stats.clockedInNames.map(name => {
@@ -368,8 +368,8 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
                       key={name}
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                         onJob
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-green-100 text-green-700'
+                          ? 'bg-infoSoft text-info'
+                          : 'bg-successSoft text-success'
                       }`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${onJob ? 'bg-blue-500' : 'bg-green-500'}`} />
@@ -381,11 +381,11 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
             )}
             {stats.clockedInNames.length > 0 && (
               <div className="flex gap-3 mt-2">
-                <span className="flex items-center gap-1 text-xs text-gray-400">
+                <span className="flex items-center gap-1 text-xs text-muted">
                   <span className="w-2 h-2 rounded-full bg-blue-500" />
                   On job
                 </span>
-                <span className="flex items-center gap-1 text-xs text-gray-400">
+                <span className="flex items-center gap-1 text-xs text-muted">
                   <span className="w-2 h-2 rounded-full bg-green-500" />
                   Available
                 </span>

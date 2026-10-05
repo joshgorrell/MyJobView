@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -5,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
+
+const htmlEntities: Record<string,string>={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const escapeHtml=(value: unknown)=>String(value ?? '').replace(/[&<>"']/g,char=>htmlEntities[char]);
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -26,6 +30,13 @@ Deno.serve(async (req: Request) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    const {data:{user},error:authError}=await supabaseClient.auth.getUser();
+    if(authError || !user) return new Response(JSON.stringify({error:'Unauthorized'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    const {data:caller,error:callerError}=await supabaseClient.from('profiles').select('id,organization_id,role,is_active').eq('id',user.id).maybeSingle();
+    if(callerError || !caller || caller.is_active===false) return new Response(JSON.stringify({error:'Forbidden'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    const managerRoles=['admin','manager','service_manager','office_manager','production_manager','sales_manager'];
+    const canManage=managerRoles.includes(caller.role);
+
     // Use service role for reads that span multiple profiles
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -46,6 +57,7 @@ Deno.serve(async (req: Request) => {
       .from('internal_time_sessions')
       .select(`
         id,
+        organization_id,
         session_type,
         title,
         request_reason,
@@ -69,10 +81,18 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if(session.organization_id!==caller.organization_id ||
+      (direction==='to_approvers' && (session.status!=='pending_approval' || (session.assigned_to!==user.id && !canManage))) ||
+      (direction==='to_tech' && (!canManage || !['scheduled','denied'].includes(session.status))) ||
+      !['to_approvers','to_tech'].includes(direction)) {
+      return new Response(JSON.stringify({error:'Forbidden notification action'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    }
+
     // Fetch company settings for email config and approver list
     const { data: settings } = await supabaseAdmin
       .from('company_settings')
       .select('company_name, from_email, from_name, app_url, time_request_approver_ids')
+      .eq('organization_id',session.organization_id)
       .maybeSingle();
 
     const fromEmail = settings?.from_email || 'noreply@example.com';
@@ -102,7 +122,10 @@ Deno.serve(async (req: Request) => {
       const { data: approvers } = await supabaseAdmin
         .from('profiles')
         .select('id, full_name, email')
-        .in('id', approverIds);
+        .in('id', approverIds)
+        .eq('organization_id',session.organization_id)
+        .in('role',managerRoles)
+        .or('is_active.is.null,is_active.eq.true');
 
       if (!approvers || approvers.length === 0) {
         return new Response(JSON.stringify({ sent: 0, message: 'No approver profiles found' }), {
@@ -112,16 +135,16 @@ Deno.serve(async (req: Request) => {
 
       const subject = `${techName} requested ${sessionTypeLabel}`;
       const reasonLine = session.request_reason
-        ? `<p style="margin:0 0 8px;"><strong>Reason:</strong> ${session.request_reason}</p>`
+        ? `<p style="margin:0 0 8px;"><strong>Reason:</strong> ${escapeHtml(session.request_reason)}</p>`
         : '';
       const actionButton = dispatchLink
-        ? `<p style="margin:16px 0 0;"><a href="${dispatchLink}" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Review Request</a></p>`
+        ? `<p style="margin:16px 0 0;"><a href="${escapeHtml(dispatchLink)}" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Review Request</a></p>`
         : '';
 
       const htmlBody = `
         <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">
-          <h2 style="margin:0 0 16px;color:#111;">${subject}</h2>
-          <p style="margin:0 0 8px;"><strong>Type:</strong> ${sessionTypeLabel}</p>
+          <h2 style="margin:0 0 16px;color:#111;">${escapeHtml(subject)}</h2>
+          <p style="margin:0 0 8px;"><strong>Type:</strong> ${escapeHtml(sessionTypeLabel)}</p>
           <p style="margin:0 0 8px;"><strong>Duration:</strong> ${hours} hour${hours !== 1 ? 's' : ''}</p>
           <p style="margin:0 0 8px;"><strong>Date:</strong> ${session.session_date ?? 'Today'}</p>
           ${reasonLine}
@@ -134,7 +157,7 @@ Deno.serve(async (req: Request) => {
       let sentCount = 0;
       for (const approver of approvers) {
         if (!approver.email) continue;
-        await fetch('https://api.resend.com/emails', {
+        const response = await sendSystemEmail({
           method: 'POST',
           headers: {
             Authorization: `Bearer ${resendApiKey}`,
@@ -147,6 +170,7 @@ Deno.serve(async (req: Request) => {
             html: htmlBody,
           }),
         });
+        if(!response.ok) throw new Error(`Notification delivery failed (${response.status})`);
         sentCount++;
       }
 
@@ -170,6 +194,7 @@ Deno.serve(async (req: Request) => {
           .from('profiles')
           .select('full_name, email')
           .eq('id', session.approved_by)
+          .eq('organization_id',session.organization_id)
           .maybeSingle();
         approverName = approver?.full_name || approver?.email || 'A manager';
       }
@@ -180,7 +205,7 @@ Deno.serve(async (req: Request) => {
         : `Your ${sessionTypeLabel} request was declined`;
 
       const denialLine = !isApproved && session.denial_reason
-        ? `<p style="margin:0 0 8px;"><strong>Reason:</strong> ${session.denial_reason}</p>`
+        ? `<p style="margin:0 0 8px;"><strong>Reason:</strong> ${escapeHtml(session.denial_reason)}</p>`
         : '';
 
       const outcomeColor = isApproved ? '#16a34a' : '#dc2626';
@@ -188,9 +213,9 @@ Deno.serve(async (req: Request) => {
 
       const htmlBody = `
         <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">
-          <h2 style="margin:0 0 16px;color:${outcomeColor};">${outcomeLabel}: ${sessionTypeLabel} Request</h2>
-          <p style="margin:0 0 8px;"><strong>Reviewed by:</strong> ${approverName}</p>
-          <p style="margin:0 0 8px;"><strong>Type:</strong> ${sessionTypeLabel}</p>
+          <h2 style="margin:0 0 16px;color:${outcomeColor};">${outcomeLabel}: ${escapeHtml(sessionTypeLabel)} Request</h2>
+          <p style="margin:0 0 8px;"><strong>Reviewed by:</strong> ${escapeHtml(approverName)}</p>
+          <p style="margin:0 0 8px;"><strong>Type:</strong> ${escapeHtml(sessionTypeLabel)}</p>
           <p style="margin:0 0 8px;"><strong>Duration:</strong> ${hours} hour${hours !== 1 ? 's' : ''}</p>
           ${denialLine}
           ${isApproved
@@ -199,7 +224,7 @@ Deno.serve(async (req: Request) => {
           }
         </div>`;
 
-      await fetch('https://api.resend.com/emails', {
+      const response = await sendSystemEmail({
         method: 'POST',
         headers: {
           Authorization: `Bearer ${resendApiKey}`,
@@ -213,6 +238,7 @@ Deno.serve(async (req: Request) => {
         }),
       });
 
+      if(!response.ok) throw new Error(`Notification delivery failed (${response.status})`);
       return new Response(JSON.stringify({ sent: 1 }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

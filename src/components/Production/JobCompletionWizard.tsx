@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import WorkOrderTasksChecklist from './WorkOrderTasksChecklist';
 import { SignaturePad } from './SignaturePad';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 import { CheckCircle, Circle, Camera, AlertCircle, FileText, PenTool, Send, ChevronRight, ChevronLeft, Mail } from 'lucide-react';
 
 interface JobCompletionWizardProps {
@@ -18,6 +17,8 @@ interface WorkOrder {
   type: string;
   project_id: string | null;
   work_order_number: string;
+  work_order_type_id?: string | null;
+  work_order_option?: { system_key: string } | null;
 }
 
 interface ChecklistTemplate {
@@ -55,6 +56,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
   const [qualityScore, setQualityScore] = useState(5);
   const [flagForReview, setFlagForReview] = useState(false);
   const [sendFeedbackEmail, setSendFeedbackEmail] = useState(false);
+  const [vipCustomerNotPresent, setVipCustomerNotPresent] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -65,7 +67,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       const [woResult, photosResult] = await Promise.all([
         supabase
           .from('work_orders')
-          .select('id, title, type, work_order_number, project_id')
+          .select('id, title, type, work_order_number, project_id, work_order_type_id, work_order_option:work_order_options!work_order_type_id(system_key)')
           .eq('id', workOrderId)
           .maybeSingle(),
         supabase
@@ -77,8 +79,15 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       if (woResult.error) throw woResult.error;
       if (!woResult.data) throw new Error('Work order not found');
 
-      setWorkOrder(woResult.data);
+      const option=Array.isArray(woResult.data.work_order_option)?woResult.data.work_order_option[0]:woResult.data.work_order_option;
+      setWorkOrder({...woResult.data,work_order_option:option});
       setJobPhotos(photosResult.data || []);
+
+      const vipByType = woResult.data.type === 'vip_program' || option?.system_key === 'vip_program';
+      if (vipByType) {
+        const { data: vipVisit } = await supabase.from('vip_maintenance_visits').select('customer_not_present').eq('work_order_id', workOrderId).maybeSingle();
+        setVipCustomerNotPresent(!!vipVisit?.customer_not_present);
+      }
 
       const jobType = woResult.data.type || 'General';
       const { data: templateData, error: templateError } = await supabase
@@ -122,17 +131,20 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
     setChecklist({ ...checklist, [itemId]: !checklist[itemId] });
   }
 
+  const isVipMaintenance = workOrder?.type === 'vip_program' || workOrder?.work_order_option?.system_key === 'vip_program';
+
   function canProceedToNextStep(): boolean {
-    if (step === 2 && template) {
+    if (step === 2 && template && !isVipMaintenance) {
       const requiredItems = template.checklist_items.filter(item => item.required);
       return requiredItems.every(item => checklist[item.id]);
     }
-    if (step === 3 && template?.required_photos) {
+    if (step === 3 && template?.required_photos && !isVipMaintenance) {
       return template.required_photos.every(category =>
         jobPhotos.some(photo => photo.category === category)
       );
     }
     if (step === 5 && template?.requires_signature) {
+      if (isVipMaintenance && vipCustomerNotPresent) return true;
       return !!signatureDataUrl && !!customerName.trim();
     }
     return true;
@@ -141,9 +153,18 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
   async function handleSubmit() {
     if (!profile || !workOrder || !template) return;
 
+    if (isVipMaintenance) {
+      const { data: incomplete, error: validationError } = await supabase.rpc('vip_maintenance_incomplete_sections', { p_work_order_id: workOrderId });
+      if (validationError) { alert('Unable to validate VIP Maintenance checklist.'); return; }
+      if (incomplete?.length) { alert(`VIP Maintenance is incomplete: ${incomplete.join(', ')}`); return; }
+    }
+
     setSubmitting(true);
 
     try {
+      const {data:runningTime,error:timeError}=await supabase.from('time_entries').select('id').eq('work_order_id',workOrderId).eq('technician_id',profile.id).is('clock_out',null).maybeSingle();
+      if(timeError) throw timeError;
+      if(runningTime) throw new Error('Stop Job Time in this Work Order before completing the visit.');
       let signatureUrl = null;
 
       if (signatureDataUrl) {
@@ -188,51 +209,6 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       });
       if (completionError) throw completionError;
 
-      // Capture GPS coordinates for job clock-out
-      const gpsResult = await gpsTrackingService.captureLocationForClockEvent(true);
-
-      // Update active time_entry with clock_out and GPS coordinates
-      const now = new Date();
-      const { data: activeEntry, error: fetchError } = await supabase
-        .from('time_entries')
-        .select('id, clock_in')
-        .eq('work_order_id', workOrderId)
-        .eq('technician_id', profile.id)
-        .is('clock_out', null)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('Error fetching active time entry:', fetchError);
-      } else if (activeEntry) {
-        const clockInTime = new Date(activeEntry.clock_in);
-        const clockOutTime = now;
-        const diffMs = clockOutTime.getTime() - clockInTime.getTime();
-        const totalHours = Math.max(0, diffMs / (1000 * 60 * 60));
-
-        const { error: timeUpdateError } = await supabase
-          .from('time_entries')
-          .update({
-            clock_out: now.toISOString(),
-            total_hours: totalHours,
-            status: 'completed',
-            clock_out_latitude: gpsResult.latitude,
-            clock_out_longitude: gpsResult.longitude,
-            clock_out_gps_accuracy: gpsResult.accuracy,
-            clock_out_gps_capture_method: gpsResult.method,
-            clock_out_gps_duration_ms: gpsResult.duration_ms,
-            clock_out_gps_attempted_at: gpsResult.attempted_at,
-            clock_out_gps_captured_at: gpsResult.captured_at
-          })
-          .eq('id', activeEntry.id);
-
-        if (timeUpdateError) {
-          console.error('Error updating time entry:', timeUpdateError);
-        }
-      }
-
-      // Stop GPS tracking
-      gpsTrackingService.stopTracking();
-
       // Send feedback email if requested
       if (sendFeedbackEmail && customerEmail.trim()) {
         try {
@@ -266,7 +242,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       }
 
       onComplete();
-    } catch (error) {
+    } catch (error:any) {
       console.error('Error submitting job completion:', error);
       alert((error as {message?: string}).message || 'Failed to submit job completion');
     } finally {
@@ -290,13 +266,23 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
     );
   }
 
-  const totalSteps = 5;
-  const progress = (step / totalSteps) * 100;
+  const visibleSteps = isVipMaintenance ? [1, 5] : [1, 2, 3, 4, 5];
+  const totalSteps = visibleSteps.length;
+  const visibleStepIndex = Math.max(0, visibleSteps.indexOf(step));
+  const progress = ((visibleStepIndex + 1) / totalSteps) * 100;
+  const goNext = () => {
+    const index = visibleSteps.indexOf(step);
+    if (index >= 0 && index < visibleSteps.length - 1) setStep(visibleSteps[index + 1]);
+  };
+  const goBack = () => {
+    const index = visibleSteps.indexOf(step);
+    if (index > 0) setStep(visibleSteps[index - 1]);
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-lg max-w-2xl mx-auto">
       {/* Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-gray-200 bg-slate-800 rounded-t-xl">
         <h2 className="text-xl sm:text-2xl font-bold text-white">Complete Job</h2>
         <p className="text-gray-300">
           {workOrder.work_order_number}: {workOrder.title}
@@ -307,7 +293,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-xs text-gray-600 mt-2">Step {step} of {totalSteps}</p>
+        <p className="text-xs text-gray-600 mt-2">Step {visibleStepIndex + 1} of {totalSteps}</p>
       </div>
 
       {/* Step Content */}
@@ -358,13 +344,13 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
               <AlertCircle className="w-4 h-4 inline mr-2" />
-              You will need to complete all required checklist items and obtain customer signature.
+              {isVipMaintenance ? 'Your VIP Maintenance inspection is the checklist. Review your work order notes, then capture customer acknowledgment if present.' : 'You will need to complete all required checklist items and obtain customer signature.'}
             </div>
           </div>
         )}
 
         {/* Step 2: Checklist */}
-        {step === 2 && (
+        {step === 2 && !isVipMaintenance && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-green-100 rounded-lg">
@@ -414,7 +400,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         )}
 
         {/* Step 3: Photos */}
-        {step === 3 && (
+        {step === 3 && !isVipMaintenance && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-purple-100 rounded-lg">
@@ -468,7 +454,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         )}
 
         {/* Step 4: Notes */}
-        {step === 4 && (
+        {step === 4 && !isVipMaintenance && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-orange-100 rounded-lg">
@@ -492,6 +478,8 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
                 placeholder="Enter any notes about the job, parts used, customer concerns, recommendations, etc..."
               />
             </div>
+
+            
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -533,11 +521,16 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
                 <PenTool className="w-6 h-6 text-indigo-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Customer Signature</h3>
-                <p className="text-sm text-gray-600">Customer sign-off required</p>
+                <h3 className="text-lg font-semibold text-gray-900">{isVipMaintenance ? "Customer Acknowledgment" : "Customer Signature"}</h3>
+                <p className="text-sm text-gray-600">{isVipMaintenance && vipCustomerNotPresent ? "Customer was not present for this VIP visit" : "Customer sign-off required"}</p>
               </div>
             </div>
 
+            {isVipMaintenance && vipCustomerNotPresent ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                Customer Not Present was recorded on the VIP visit. Customer name and signature are not required.
+              </div>
+            ) : (<>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Customer Name <span className="text-red-500">*</span>
@@ -631,6 +624,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
                 Customer name and signature are required to complete the job.
               </div>
             )}
+            </>)}
           </div>
         )}
       </div>
@@ -644,18 +638,18 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
           Cancel
         </button>
         <div className="flex-1" />
-        {step > 1 && (
+        {visibleStepIndex > 0 && (
           <button
-            onClick={() => setStep(step - 1)}
+            onClick={goBack}
             className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
           </button>
         )}
-        {step < totalSteps ? (
+        {visibleStepIndex < totalSteps - 1 ? (
           <button
-            onClick={() => setStep(step + 1)}
+            onClick={goNext}
             disabled={!canProceedToNextStep()}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >

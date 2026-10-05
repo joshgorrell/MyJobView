@@ -277,6 +277,34 @@ assert.deepEqual(
 console.log(
   "Independent permissions, defaults, self-grant protection, revocation and legacy sharing tests passed.",
 );
+await db.exec(await readFile(new URL('../../supabase/migrations/20261001160418_lost_review_viewed_audit.sql', import.meta.url), 'utf8'));
+await db.exec(`SET ROLE service_role; UPDATE lost_review_details SET reviewed_by='${id(10)}' WHERE request_id='${id(30)}'; RESET ROLE;`);
+assert.equal((await db.query('SELECT reviewed_by FROM lost_review_details WHERE request_id=$1', [id(30)])).rows[0].reviewed_by, id(10), 'First reviewer can be recorded');
+await as(11);
+await assert.rejects(db.exec(`UPDATE lost_review_details SET reviewed_by='${id(11)}'`), 'Employees cannot forge review audit directly');
+await db.exec('RESET ROLE');
+await db.exec(await readFile(new URL('../../supabase/migrations/20261001162100_lost_review_office_bid_formats.sql', import.meta.url), 'utf8'));
+const bucket = (await db.query("SELECT public,allowed_mime_types FROM storage.buckets WHERE id='lost-review-bids'")).rows[0];
+assert.equal(bucket.public, false, 'Office bids retain private storage');
+for (const type of ['application/msword','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']) assert.ok(bucket.allowed_mime_types.includes(type), 'Office type accepted by bucket: ' + type);
+await db.exec(await readFile(new URL('../../supabase/migrations/20261001164956_lost_job_admin_assessments.sql', import.meta.url), 'utf8'));
+await db.exec(`SET ROLE service_role; INSERT INTO lost_review_assessments(request_id,organization_id,primary_reason,preventability,attention_rating,created_by,updated_by) VALUES('${id(30)}','${id(1)}','lowest_price','no',5,'${id(10)}','${id(10)}'); RESET ROLE;`);
+await as(10);
+assert.equal(await count('lost_review_assessments'),1,'Same-company admin sees assessment');
+await assert.rejects(db.exec(`UPDATE lost_review_assessments SET attention_rating=1`),'Direct assessment writes denied');
+await db.exec("SET test.access='false'");
+assert.equal(await count('lost_review_assessments'),0,'Revoked Reviews module hides assessments');
+await db.exec("SET test.access='true'");
+await as(11);
+assert.equal(await count('lost_review_assessments'),0,'Sales cannot read admin coaching');
+await as(20);
+assert.equal(await count('lost_review_assessments'),0,'Other-company admin cannot read coaching');
+await db.exec('RESET ROLE; SET ROLE anon');
+await assert.rejects(db.query('SELECT * FROM lost_review_assessments'),'Public cannot read assessments');
+await db.exec('RESET ROLE');
+await assert.rejects(db.exec('UPDATE lost_review_assessments SET attention_rating=6'),'Out-of-range ratings rejected');
+await assert.rejects(db.exec("UPDATE lost_review_assessments SET contributing_reasons=ARRAY['invalid']"),'Invalid reasons rejected');
+console.log('Admin assessment privacy, write protection, tenant boundaries and rating constraints passed.');
 await db.close();
 console.log(
   "Lost opportunity review privacy, sharing, completion, owner notification, external proposal and tenant tests passed.",

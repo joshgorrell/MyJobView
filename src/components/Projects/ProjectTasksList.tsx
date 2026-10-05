@@ -1,3 +1,5 @@
+import LegacyHandoffReview from './LegacyHandoffReview';
+import {useJobDraft} from '../../lib/useJobDraft';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { TaskGroups, ScopeTask } from '../Shared/TaskGroups';
@@ -7,7 +9,7 @@ export default function ProjectTasksList({ projectId, canEdit=false }: {projectI
  const [tasks,setTasks]=useState<Task[]>([]);
  const [history,setHistory]=useState<Activity[]>([]);
  const [phases,setPhases]=useState<Array<{id:string;name:string}>>([]);
- const [editing,setEditing]=useState<Task|null>(null);
+ const [editing,setEditing]=useJobDraft<Task>(`mjv-project-task-draft:${projectId}`);
  const [error,setError]=useState(''); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false);
  async function load() {
   setLoading(true);
@@ -22,7 +24,7 @@ export default function ProjectTasksList({ projectId, canEdit=false }: {projectI
  }
  useEffect(()=>{load();},[projectId]);
  async function save(event:React.FormEvent){event.preventDefault();if(!editing||saving)return;setSaving(true);
-  const values={title:editing.title.trim(),description:editing.description||null,labor_phase_id:editing.labor_phase_id||null,estimated_hours:editing.estimated_hours||0,room_name:editing.room_name||null};
+  const values={estimate_is_manual:true,title:editing.title.trim(),description:editing.description||null,labor_phase_id:editing.labor_phase_id||null,estimated_hours:editing.estimated_hours||0,room_name:editing.room_name||null};
   const result=editing.id ? await supabase.from('project_tasks').update(values).eq('id',editing.id) : await supabase.from('project_tasks').insert({...values,project_id:projectId,status:'open',sort_order:tasks.length});
   setSaving(false);if(result.error){setError(result.error.message);return;}setEditing(null);await load();
  }
@@ -31,6 +33,7 @@ export default function ProjectTasksList({ projectId, canEdit=false }: {projectI
   if(result.error)setError(result.error.message);else await load();
  }
  return <section className="space-y-4 text-primary">
+  {canEdit&&<LegacyHandoffReview projectId={projectId} onSaved={load}/>}
   {error&&<p className="text-red-600 text-sm" role="alert">{error}<button onClick={load} className="min-h-11 underline ml-2">Retry</button></p>}
   {loading&&<p className="text-muted text-sm">Loading tasks...</p>}
   {canEdit&&<button onClick={()=>setEditing({id:'',title:'',description:'',estimated_hours:null,labor_phase_id:null,status:'open',progress_status:'pending'})} className="min-h-11 px-3 text-info">Add task</button>}
