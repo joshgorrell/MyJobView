@@ -22,7 +22,7 @@ const existingMethod={id:'00000000-0000-0000-0000-000000000013',payment_type:'ac
 const newMethod={...existingMethod,id:'00000000-0000-0000-0000-000000000014',display_brand:'New Bank',display_last4:'6789'};
 const contact={full_name:'Test Customer',email:'customer@example.com',phone:'5551231234',address_line1:'1 Main Street',city:'Topeka',state:'KS',zip_code:'66604'};
 const document={contract_number:'SC-1',monthly_price:35,term_months:36,renewal_term_months:1,cancellation_notice_days:30,billing_mode:'autopay',mail_invoice_fee:0,autopay_authorization:'I authorize recurring automatic payments for security monitoring.',services:[{name:'Monitoring',monthly_price:35}],template:{name:'Monitoring agreement',contract_terms:'First clause\n\n' + 'Long readable terms. '.repeat(700)+'\n\nFINAL CLAUSE INCLUDED'},dealer:{company_name:'Electronic Life',company_email:'support@example.com',annual_billing_enabled:false,default_billing_preference:'monthly'}};
-let agreement={id:'00000000-0000-0000-0000-000000000005',status:'pending_customer',contact,document,document_version:'v1',signed_snapshot_available:false,customer_signature:null,customer_signature_date:null,customer_completed_at:null,draft:{revision:0,current_step:1,form_data:null,saved_at:null}};
+let agreement={id:'00000000-0000-0000-0000-000000000005',status:'pending_customer',support_contact:{name:'Sales Rep',email:'rep@example.com'},contact,document,document_version:'v1',signed_snapshot_available:false,customer_signature:null,customer_signature_date:null,customer_completed_at:null,draft:{revision:0,current_step:1,form_data:null,saved_at:null}};
 await context.route('https://security-test.supabase.co/**',async route=>{
  const body=route.request().postDataJSON();
  if(route.request().url().includes('/functions/v1/security-payment-methods')) {
@@ -58,6 +58,8 @@ await page.evaluate(() => { document.documentElement.style.colorScheme = 'dark';
 await page.getByPlaceholder('Enter your full legal name').waitFor();
 assert.deepEqual(await page.getByPlaceholder('Enter your full legal name').evaluate(el => { const s = getComputedStyle(el); return [s.colorScheme, s.backgroundColor, s.color]; }), ['light', 'rgb(255, 255, 255)', 'rgb(0, 0, 0)'], 'White controls with black text inside a dark workspace');
 await page.getByText('All changes saved',{exact:true}).waitFor();
+assert.equal(await page.getByRole('link',{name:'Sales Rep · rep@example.com',exact:true}).getAttribute('href'),'mailto:rep@example.com');
+for(const name of ['Print / Save PDF','Download agreement']) assert.equal(await page.getByRole('button',{name,exact:true}).evaluate(el=>getComputedStyle(el).color),'rgb(17, 24, 39)');
 await page.getByPlaceholder('Enter your full legal name').fill('Josh Test');
 await page.getByText('All changes saved',{exact:true}).waitFor();
 await page.getByRole('button',{name:'Continue',exact:true}).click();
@@ -106,7 +108,8 @@ await download.saveAs('/tmp/mjv-security-agreement.html');
 const html=await readFile('/tmp/mjv-security-agreement.html','utf8');
 assert.ok(html.includes('FINAL CLAUSE INCLUDED'));
 assert.ok(!html.includes('secret-0'),'Downloaded agreement excludes monitoring codewords');
-await page.getByText('Review terms and conditions',{exact:true}).click();
+assert.equal(await page.getByText('Review terms and conditions',{exact:true}).count(),0,'Terms are presented in the final signing step');
+assert.ok(await page.getByText('FINAL CLAUSE INCLUDED',{exact:false}).count());
 await page.screenshot({path:'/tmp/mjv-security-mobile.png',fullPage:true});
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Mobile page has no horizontal overflow');
 await page.getByRole('button',{name:'Tap to Sign'}).click();

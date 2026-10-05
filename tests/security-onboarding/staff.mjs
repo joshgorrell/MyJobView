@@ -7,6 +7,9 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  ALTER TABLE profiles ADD COLUMN primary_office_id uuid; ALTER TABLE profiles ADD COLUMN default_office_id uuid;
  CREATE TABLE company_offices(id uuid PRIMARY KEY,organization_id uuid,is_active boolean,is_headquarters boolean,display_order integer);
  INSERT INTO company_offices VALUES('${id(90)}','${org}',true,true,0);
+ ALTER TABLE profiles ADD COLUMN full_name text; ALTER TABLE profiles ADD COLUMN email text;
+ UPDATE profiles SET full_name='Sales Rep',email='rep@example.com' WHERE id='${id(11)}';
+ UPDATE company_settings SET company_email='office@example.com';
  ALTER TABLE profiles ADD COLUMN is_active boolean DEFAULT true; ALTER TABLE profiles ADD COLUMN can_edit_contacts boolean DEFAULT false;
  ALTER TABLE department_modules ADD COLUMN id uuid DEFAULT gen_random_uuid();
  CREATE FUNCTION public.get_user_module_access(uuid,uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
@@ -40,6 +43,7 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await db.exec('ALTER TABLE invoices ADD COLUMN qbo_invoice_id text');
  await db.exec(await readFile(new URL('../../supabase/migrations/20261004175855_security_mailed_invoice_accounting_sync.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261004180433_security_monitoring_catalog_staff_scope.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261005143631_security_onboarding_sender_contact.sql',import.meta.url),'utf8'));
  const staff=async(action,cid=null,payload={})=>(await db.query('select public.staff_security_onboarding($1,$2,$3) result',[action,cid,JSON.stringify(payload)])).rows[0].result;
  const create={request_id:id(71),template_id:template,contact_id:contact,service_ids:[id(70)],term_months:12,account_type:'residential'};
  await role('authenticated',id(12));await assert.rejects(staff('create',null,create),'Organization membership does not grant onboarding access');
@@ -212,5 +216,22 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  assert.deepEqual(retry,frozen,'Provider payload remains identical after template changes');
  await db.query('select public.security_finish_invitation($1,$2)',[attempt.id,'mail-id']);await db.query('select public.security_finish_invitation($1,$2)',[attempt.id,'mail-id']);
  await role('postgres');assert.equal((await db.query('select magic_link_token from security_contracts where id=$1',[unsigned.id])).rows[0].magic_link_token,attempt.token);
+ await role('anon');
+ const withSender=await rpc('get',unsigned.id,attempt.token);
+ assert.deepEqual(withSender.support_contact,{name:'Sales Rep',email:'rep@example.com'});
+ assert.equal(withSender.support_contact.organization_id,undefined);
+ const originalVersion=withSender.document_version;
+ await role('postgres');
+ await db.query('update security_contracts set invitation_sent_by_user_id=$1 where id=$2',[id(1),unsigned.id]);
+ await role('anon');
+ assert.equal((await rpc('get',unsigned.id,attempt.token)).support_contact.email,'office@example.com','Portal identities never become sender contacts');
+ await role('postgres');
+ await db.query('update security_contracts set invitation_sent_by_user_id=$1 where id=$2',[id(11),unsigned.id]);
+ await db.query('update profiles set is_active=false where id=$1',[id(11)]);
+ await role('anon');
+ const fallback=await rpc('get',unsigned.id,attempt.token);
+ assert.equal(fallback.support_contact.email,'office@example.com');
+ assert.equal(fallback.document_version,originalVersion,'Sender contact never changes agreement terms or version');
+ await role('postgres');await db.query('update profiles set is_active=true where id=$1',[id(11)]);
  console.log('Staff onboarding tests passed: module access, atomic creation/rollback/retries, shared form validation, real verified payment, signed entry, immutable terms, approval before activation, audited field corrections, preserved original submission, concurrent edits, manager permissions, and invitation delivery reconciliation.');
 }

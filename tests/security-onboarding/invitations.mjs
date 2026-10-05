@@ -3,11 +3,11 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 let authorized=true,providerFails=true,finishFails=false,reads=0,sends=0,finishes=0,message=null,sent=false;
 const keys=[],payloads=[];
-const attempt={id:'attempt-1',organization_id:'org-1',token:'private-token',recipient:'override@example.com',expires_at:new Date(Date.now()+30*86400000).toISOString()};
+const attempt={id:'attempt-1',actor_id:'staff-1',organization_id:'org-1',token:'private-token',recipient:'override@example.com',expires_at:new Date(Date.now()+30*86400000).toISOString()};
 const caller={auth:{getUser:async()=>({data:{user:{id:'staff-1'}}})},rpc:async()=>authorized?{data:{...attempt,sent_at:sent?'now':null,provider_id:sent?'provider-1':null}}:{error:{message:'Denied'}}};
 const admin={from:table=>{
- const q={select:()=>q,eq:()=>q,single:async()=>read(),maybeSingle:async()=>read()};
- function read(){reads++;return {data:table==='security_contracts'?{organization_id:'org-1',contact_id:'contact-1'}:table==='contacts'?{full_name:'<img src=x onerror=alert(1)>',email:'original@example.com'}:table==='email_templates'?{subject:'Invitation {{customer_name}}',body:'<p>{{customer_name}}</p><a href="{{onboarding_url}}">Sign</a>'}:table==='company_settings'?{company_name:'Dealer',portal_url:'https://myjobview.com/portal',from_email:'dealer@example.com'}:table==='organizations'?{}:null};}
+ const q={select:()=>q,eq:()=>q,neq:()=>q,single:async()=>read(),maybeSingle:async()=>read()};
+ function read(){reads++;return {data:table==='security_contracts'?{organization_id:'org-1',contact_id:'contact-1'}:table==='contacts'?{full_name:'<img src=x onerror=alert(1)>',email:'original@example.com'}:table==='email_templates'?{subject:'Invitation {{customer_name}}',body:'<p>{{customer_name}}</p><a href="{{onboarding_url}}">Sign</a>'}:table==='company_settings'?{company_name:'Dealer',portal_url:'https://myjobview.com/portal',from_email:'dealer@example.com'}:table==='profiles'?{full_name:'Sales <Rep>',email:'rep@example.com'}:table==='organizations'?{}:null};}
  return q;
 },rpc:async(name,args)=>{
  if(name==='security_invitation_message'){message ||= args.p_message;return {data:message};}
@@ -33,7 +33,7 @@ const call=async()=>{
 try {
  authorized=false;await call();assert.equal(reads,0);assert.equal(sends,0,'Denied staff cannot send email');
  authorized=true;await call();assert.equal(finishes,0,'Provider failure never records an invitation');
- assert.deepEqual(message.to,['override@example.com']);assert.ok(message.html.includes('&lt;img'));assert.ok(!message.html.includes('https://evil.example'));
+ assert.deepEqual(message.to,['override@example.com']);assert.equal(message.reply_to,'rep@example.com');assert.ok(message.html.includes('Sales &lt;Rep&gt;'));assert.ok(message.html.includes('mailto:rep@example.com'));assert.ok(message.text.includes('rep@example.com'));assert.ok(message.html.includes('&lt;img'));assert.ok(!message.html.includes('https://evil.example'));
  providerFails=false;finishFails=true;let result=await call();assert.equal(result.body.success,false);assert.equal(sent,false);
  finishFails=false;result=await call();assert.equal(result.body.success,true);assert.equal(sent,true);
  assert.equal(new Set(keys).size,1);assert.equal(new Set(payloads).size,1,'Retries preserve the exact provider payload');

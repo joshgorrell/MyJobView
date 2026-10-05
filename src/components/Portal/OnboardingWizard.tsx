@@ -217,22 +217,18 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   }
 
   return (
-    <div className="security-onboarding-controls relative">
+    <div className="security-onboarding-controls relative text-gray-900">
       <div className="px-4 sm:px-8 py-5 bg-blue-50 border-b border-blue-100 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="font-semibold text-gray-900">Agreement {contract.contract_number}</p>
             <p className="text-sm text-gray-700">{formatCurrency(Number(contract.monthly_price) || 0)}/month · {contract.term_months} month initial term</p></div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => { try { printSecurityAgreement(agreementHtml()); } catch (e) { setSaveError(e instanceof Error ? e.message : 'Printing failed.'); } }}
-              className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium"><Printer className="w-4 h-4" />Print / Save PDF</button>
+              className="flex items-center gap-2 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-50"><Printer className="w-4 h-4" />Print / Save PDF</button>
             <button onClick={() => downloadSecurityAgreement(agreementHtml(), contract.contract_number)}
-              className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium"><Download className="w-4 h-4" />Download agreement</button>
+              className="flex items-center gap-2 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-50"><Download className="w-4 h-4" />Download agreement</button>
           </div>
         </div>
-        <details className="bg-white border border-gray-200 rounded-xl p-4">
-          <summary className="font-semibold text-blue-900 cursor-pointer">Review terms and conditions</summary>
-          <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{terms || 'Terms are unavailable. Contact your provider before signing.'}</div>
-        </details>
         <div className="flex flex-wrap justify-between items-center gap-3">
           <p role="status" aria-live="polite" className="text-sm text-gray-700">{saveStatus === 'saved' ? 'All changes saved' : saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Changes could not be saved' : 'Unsaved changes'}</p>
           <button onClick={async () => { if (await saveProgress()) setPaused(true); }} disabled={saving || saveStatus === 'saving'}

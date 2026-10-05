@@ -50,6 +50,7 @@ export interface SecurityContractSummary {
 }
 
 export interface PortalSecurityAgreement {
+  support_contact?: { name: string; email: string } | null;
   summary?: SecurityContractSummary | null; portal_module_enabled?: boolean;
   id: string; status: string; contact: SecurityDraftForm['personalInfo'] & SecurityDraftForm['propertyInfo'];
   document: SecurityAgreementDocument; document_version: string;

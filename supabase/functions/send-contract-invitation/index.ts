@@ -85,6 +85,14 @@ Deno.serve(async (req: Request) => {
     const portalUrl = settings?.portal_url || "https://myjobview.com/portal";
     const companyLogoUrl = settings?.company_logo_url || "";
     const companyEmail = settings?.company_email || "";
+    // Use the prepared attempt's staff sender so retries retain the same identity.
+    const { data: sender } = await supabase.from('profiles').select('full_name, email')
+      .eq('id', attempt.actor_id).eq('organization_id', contract.organization_id)
+      .eq('is_active', true).neq('role', 'portal').maybeSingle();
+    const validEmail = (value: unknown) => typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? value.trim() : '';
+    const supportEmail = validEmail(sender?.email) || validEmail(companyEmail);
+    const supportName = validEmail(sender?.email) ? (sender?.full_name || companyName) : companyName;
+
 
     // Use appOrigin (sent by the frontend) if available, otherwise fall back to subdomain or portal_url
     const subdomain = orgData?.subdomain || null;
@@ -115,6 +123,11 @@ Deno.serve(async (req: Request) => {
       .replace(/\{\{logo_block\}\}/g, logoBlock)
       .replace(/\{\{company_email\}\}/g, () => escapeHtml(companyEmail));
 
+    if (supportEmail) {
+      const footer = `<div style="padding:24px;text-align:center;font-size:14px;color:#374151"><p>Questions about your agreement?</p><a style="color:#1e40af" href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportName)} · ${escapeHtml(supportEmail)}</a></div>`;
+      emailHtml = /<\/body>/i.test(emailHtml) ? emailHtml.replace(/<\/body>/i, footer + '</body>') : emailHtml + footer;
+    }
+
     let emailSubject = template.subject
       .replace(/\{\{customer_name\}\}/g, customerName)
       .replace(/\{\{company_name\}\}/g, companyName);
@@ -134,21 +147,22 @@ What's Next:
 - Review your agreement details
 - Complete any required fields
 - Review terms and conditions
-- Provide your digital signature
 - Add or select a payment method and authorize automatic recurring payments
+- Choose your billing preference
+- Provide your digital signature
 
 IMPORTANT: This link will expire in ${expirationDays} days.
 
-If you have any questions, please contact us.
+${supportEmail ? `Questions about your agreement? Contact ${supportName} at ${supportEmail}.` : 'If you have any questions, please contact us.'}
 
 Best regards,
 ${companyName}
 
-This is an automated message. Please do not reply to this email.
+${supportEmail ? `Replies go to ${supportEmail}.` : 'This is an automated message. Please contact your provider with questions.'}
     `;
 
     const { data: message, error: messageError } = await supabase.rpc('security_invitation_message', {
-      p_attempt: attempt.id, p_message: { from: `${fromName} <${fromEmail}>`, to: [customerEmail], subject: emailSubject, html: emailHtml, text: emailText },
+      p_attempt: attempt.id, p_message: { from: `${fromName} <${fromEmail}>`, to: [customerEmail], subject: emailSubject, html: emailHtml, text: emailText, ...(supportEmail ? { reply_to: supportEmail } : {}) },
     });
     if (messageError || !message) throw new Error('Invitation delivery could not be prepared safely.');
 

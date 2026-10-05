@@ -52,7 +52,7 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
 
   const completed = agreement && (!!agreement.customer_completed_at || ['pending_approval', 'approved', 'active', 'cancelled', 'rejected'].includes(agreement.status));
   return (
-    <div className="security-onboarding-controls min-h-screen bg-slate-50">
+    <div className="security-onboarding-controls min-h-screen bg-slate-50 text-gray-900">
       <header className="bg-[#0f2347] text-white px-4 sm:px-6 py-4">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -117,6 +117,12 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
             </a>)}
           </div>
         )}
+        {agreement?.support_contact?.email && <footer className="mt-6 border-t border-gray-200 pt-5 text-center text-sm text-gray-700">
+          <p>Questions about your agreement?</p>
+          <a className="mt-1 inline-block font-medium text-blue-800 underline break-all" href={`mailto:${agreement.support_contact.email}`}>
+            {agreement.support_contact.name ? `${agreement.support_contact.name} · ` : ''}{agreement.support_contact.email}
+          </a>
+        </footer>}
       </main>
     </div>
   );
