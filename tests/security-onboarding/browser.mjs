@@ -387,6 +387,31 @@ for(const width of [320,390,768,1440]) {
  assert.equal(await productPage.title(),'Product form closed');
 }
 await productContext.close();
+const qbContext=await browser.newContext({viewport:{width:390,height:844}});
+let paymentsConnected=true;
+await qbContext.route('https://security-test.supabase.co/**',async route=>{
+ const path=new URL(route.request().url()).pathname;
+ const one=route.request().headers().accept?.includes('vnd.pgrst.object');
+ let data=[];
+ if(path.endsWith('/auth/v1/user')) data={id:'qb-admin'};
+ else if(path.endsWith('/profiles')) data={id:'qb-admin',organization_id:'org-1',role:'admin',is_active:true};
+ else if(path.endsWith('/quickbooks_settings')) data={id:'settings',is_connected:true,payments_enabled:paymentsConnected,environment:'sandbox'};
+ else if(one) data={};
+ await route.fulfill({json:data});
+});
+const qbPage=await qbContext.newPage();const qbErrors=[];qbPage.on('pageerror',e=>qbErrors.push(e.message));
+await qbPage.addInitScript(()=>localStorage.setItem('sb-security-test-auth-token',JSON.stringify({access_token:'fixture',refresh_token:'fixture',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'qb-admin'}})));
+await qbPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?qb-status&integration=quickbooks&qbo=success');
+await qbPage.getByRole('heading',{name:'QuickBooks Payments: Connected',exact:true}).waitFor();
+assert.ok(await qbPage.getByRole('status').getByText('QuickBooks authorization saved.',{exact:false}).count());
+assert.ok(await qbPage.getByRole('button',{name:'Reconnect QuickBooks Payments',exact:true}).count());
+assert.ok(await qbPage.getByText('This connection uses the QuickBooks sandbox.',{exact:false}).count());
+paymentsConnected=false;
+await qbPage.getByRole('button',{name:'Refresh connection status',exact:true}).click();
+await qbPage.getByRole('heading',{name:'QuickBooks Payments: Not connected',exact:true}).waitFor();
+assert.ok(await qbPage.getByRole('button',{name:'Connect QuickBooks Payments',exact:true}).count());
+assert.deepEqual(qbErrors,[]);
+await qbContext.close();
 await browser.close();
 server.kill();
 console.log('Browser tests passed: all five initial terms saved with monthly renewal, light controls in dark theme, mobile resume, failure/retry, save for later, signature reset, existing/new payment selection, AutoPay consent, signed download and print layout.');

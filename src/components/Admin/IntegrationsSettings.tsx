@@ -29,7 +29,7 @@ interface OrgPaymentSettings {
 }
 
 export function IntegrationsSettings() {
-  const [activeIntegration, setActiveIntegration] = useState<'payment_processor' | 'quickbooks' | 'google_maps' | 'google_calendar' | 'twilio' | 'openai' | 'resend'>('payment_processor');
+  const [activeIntegration, setActiveIntegration] = useState<'payment_processor' | 'quickbooks' | 'google_maps' | 'google_calendar' | 'twilio' | 'openai' | 'resend'>(() => { const params = new URLSearchParams(window.location.search); return params.get('integration') === 'quickbooks' || params.has('qbo') ? 'quickbooks' : 'payment_processor'; });
   const [settings, setSettings] = useState<CompanySettings>({});
   const [originalSettings, setOriginalSettings] = useState<CompanySettings>({});
   const [loading, setLoading] = useState(false);

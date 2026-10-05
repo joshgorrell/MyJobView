@@ -25,6 +25,7 @@ export function QuickBooksSettings() {
   const [monitoringItem, setMonitoringItem] = useState('');
   const [monitoringMessage, setMonitoringMessage] = useState('');
   const [settingsError, setSettingsError] = useState(false);
+  const [connectionResult] = useState(() => new URLSearchParams(window.location.search).get('qbo'));
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [reconciling, setReconciling] = useState(false);
@@ -43,17 +44,6 @@ export function QuickBooksSettings() {
     loadSettings(profile.organization_id);
     loadSyncStats();
 
-    const params = new URLSearchParams(window.location.search);
-    const qboStatus = params.get('qbo');
-    if (qboStatus === 'success') {
-      alert('QuickBooks connected successfully!');
-      window.history.replaceState({}, '', '/admin/settings');
-      loadSettings(profile.organization_id);
-      loadSyncStats();
-    } else if (qboStatus === 'error') {
-      alert('Failed to connect to QuickBooks. Please try again.');
-      window.history.replaceState({}, '', '/admin/settings');
-    }
   }, [profile?.organization_id]);
 
   async function loadSettings(organizationId: string) {
@@ -63,6 +53,7 @@ export function QuickBooksSettings() {
         .from('quickbooks_settings')
         .select('security_monitoring_item_id, payments_enabled, id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
         .eq('organization_id', organizationId)
+        .abortSignal(AbortSignal.timeout(15000))
         .maybeSingle();
 
       if (error) throw error;
@@ -206,6 +197,9 @@ export function QuickBooksSettings() {
 
   return (
     <div className="space-y-6">
+      {connectionResult === 'success' && !settingsError && settings?.is_connected && <div role="status" className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900">QuickBooks authorization saved. Accounting is connected; Payments is {settings.payments_enabled ? 'connected' : 'not connected'}{settings.environment === 'sandbox' ? ' in sandbox (test mode)' : ' in production'}.</div>}
+      {connectionResult === 'error' && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">QuickBooks authorization did not complete. Your previous connection status is shown below. Try connecting again.</div>}
+      <button type="button" disabled={loading} onClick={() => { if (profile?.organization_id) void loadSettings(profile.organization_id); }} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"><RefreshCw className="h-4 w-4" />Refresh connection status</button>
       {settings?.is_connected && <div className="rounded-lg border p-4 space-y-3">
         <label className="block font-medium" htmlFor="security-qbo-item">QuickBooks reference item for monitoring/service income</label>
         <input id="security-qbo-item" value={monitoringItem} onChange={e => setMonitoringItem(e.target.value)} className="border rounded p-2 w-full" />
