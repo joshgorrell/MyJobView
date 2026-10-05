@@ -516,9 +516,12 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               const isDiscussionTask = (task as any)._isDiscussionTask;
               const isOwner = profile?.id === task.user_id;
               const isAssigned = profile?.id === (task as any).assigned_to;
+              const isDepartmentTask = !!(task as any).assigned_department_id;
+              const isMyDepartmentTask = isDepartmentTask && myDepartmentIds.includes((task as any).assigned_department_id);
+              const isOpenTeamTask = !(task as any).assigned_to && !(task as any).assigned_department_id;
               const isAdmin = profile?.role === 'admin';
               const canEdit = isOwner || isAdmin;
-              const canInteract = isOwner || isAssigned || isAdmin;
+              const canInteract = isOwner || isAssigned || isMyDepartmentTask || isOpenTeamTask || isAdmin;
               const canDelete = isOwner || isAdmin;
               const lead = task.lead_id ? leads[task.lead_id] : null;
 
