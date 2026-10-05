@@ -188,7 +188,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const validTabs = ['overview','vip','notes','tasks','materials','time','parts','photos','completion','history','flow'] as const;
   type WorkOrderTab = typeof validTabs[number];
   const requestedTab = new URLSearchParams(window.location.search).get('subtab') as WorkOrderTab | null;
-  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'overview');
+  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'tasks');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -713,7 +713,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
     { id: 'overview', label: 'Overview', icon: FileText },
     { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
+    { id: 'tasks', label: "Today's Work", icon: CheckSquare, count: tasks.length },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
     { id: 'photos', label: 'Photos', icon: Camera, count: jobPhotos.length },
     { id: 'materials', label: 'Materials', icon: Package, count: materials.length + partsUsed.length },
@@ -1076,7 +1076,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                   </div>
                 )}
 
-                {canEdit && (workOrder.internal_notes || editing) && (
+                {(canEdit || isAssignedTech) && (workOrder.internal_notes || editing) && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Internal Notes</label>
                     {editing ? (

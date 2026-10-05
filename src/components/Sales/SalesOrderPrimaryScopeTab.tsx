@@ -1,3 +1,4 @@
+import {useJobDraft} from '../../lib/useJobDraft';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -19,7 +20,9 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
   const [proposalSettings, setProposalSettings] = useState<ProposalSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [scopeText, setScopeText] = useState('');
+  const [draft,setDraft]=useJobDraft<{text:string}>(`mjv-order-scope:${order.id}`);
+  const [scopeText, setScopeText] = useState(draft?.text||'');
+  useEffect(()=>{if(draft){setScopeText(draft.text);setEditing(true);}},[order.id]);
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,7 +62,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
         .maybeSingle();
       if (data) {
         setProposalSettings(data);
-        setScopeText(data.scope_of_work || '');
+        if(!draft)setScopeText(data.scope_of_work || '');
       }
     } catch (err) {
       console.error('Error loading proposal settings:', err);
@@ -109,7 +112,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
         .eq('id', proposalSettings.id);
       if (error) throw error;
       setProposalSettings(prev => prev ? { ...prev, scope_of_work: scopeText.trim() || null } : prev);
-      setEditing(false);
+      setDraft(null);setEditing(false);
     } catch (err) {
       console.error('Error saving primary scope:', err);
       alert('Failed to save scope');
@@ -340,14 +343,14 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
             <textarea
               ref={textareaRef}
               value={scopeText}
-              onChange={(e) => setScopeText(e.target.value)}
+              onChange={(e) => {setScopeText(e.target.value);setDraft({text:e.target.value});}}
               placeholder="Describe the overall scope of work for this project..."
               rows={12}
               className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
             />
             <div className="flex items-center gap-2 justify-end">
               <button
-                onClick={() => { setEditing(false); setScopeText(proposalSettings?.scope_of_work || ''); }}
+                onClick={() => { setDraft(null);setEditing(false); setScopeText(proposalSettings?.scope_of_work || ''); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200 rounded-lg hover:bg-gray-700 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />

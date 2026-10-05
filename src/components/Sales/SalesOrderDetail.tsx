@@ -1,7 +1,8 @@
+import ProjectTasksList from '../Projects/ProjectTasksList';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, DollarSign, GitBranch, FolderOpen, BarChart3, Activity, Percent, Clock, CheckCircle, AlertCircle, User, Calendar, Layers, RotateCcw, X, Award, CheckCircle2, AlignLeft, Package } from 'lucide-react';
+import { CheckSquare, ArrowLeft, DollarSign, GitBranch, FolderOpen, BarChart3, Activity, Percent, Clock, CheckCircle, AlertCircle, User, Calendar, Layers, RotateCcw, X, Award, CheckCircle2, AlignLeft, Package } from 'lucide-react';
 import { SalesOrderBillingTab } from './SalesOrderBillingTab';
 import { SalesOrderChangeOrdersTab } from './SalesOrderChangeOrdersTab';
 import { SalesOrderProjectTab } from './SalesOrderProjectTab';
@@ -91,7 +92,7 @@ export interface ChangeOrderSummary {
   approver?: { full_name: string };
 }
 
-type TabType = 'scope' | 'primary_scope' | 'products' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions';
+type TabType = 'tasks' | 'scope' | 'primary_scope' | 'products' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions';
 
 interface SalesOrderDetailProps {
   orderId: string;
@@ -115,7 +116,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
   const [order, setOrder] = useState<SalesOrderFull | null>(null);
   const [changeOrders, setChangeOrders] = useState<ChangeOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const validTabs: TabType[] = ['scope', 'primary_scope', 'products', 'billing', 'change_orders', 'project', 'reports', 'stats', 'commissions'];
+  const validTabs: TabType[] = ['tasks', 'scope', 'primary_scope', 'products', 'billing', 'change_orders', 'project', 'reports', 'stats', 'commissions'];
   const getTabFromUrl = (): TabType => {
     const tab = new URLSearchParams(window.location.search).get('orderTab') as TabType | null;
     return tab && validTabs.includes(tab) ? tab : (initialTab ?? 'scope');
@@ -320,6 +321,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
 
   const tabs: { id: TabType; label: string; icon: typeof DollarSign; badge?: string }[] = [
     { id: 'scope', label: 'Sales Order', icon: Layers },
+    ...(order.project?.id ? [{id:'tasks' as TabType,label:'Tasks',icon:CheckSquare}] : []),
     { id: 'primary_scope', label: 'Scope', icon: AlignLeft },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'billing', label: 'Billing', icon: DollarSign },
@@ -484,6 +486,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
         {activeTab === 'scope' && (
           <SalesOrderScopeTab order={order} onRefresh={loadChangeOrders} changeOrders={changeOrders} />
         )}
+        {activeTab === 'tasks' && order.project?.id && <div className="p-4"><ProjectTasksList projectId={order.project.id} canEdit/></div>}
         {activeTab === 'primary_scope' && (
           <SalesOrderPrimaryScopeTab order={order} />
         )}

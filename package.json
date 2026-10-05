@@ -26,7 +26,9 @@
     "test:user-setup:browser": "npm run build && node tests/user-setup/browser.mjs",
     "test:employee-time:browser": "node tests/employee-time/browser.mjs",
     "test:employee-time": "node tests/employee-time/database.mjs && node tests/employee-time/integration.mjs && node tests/employee-time/runtime.mjs && node tests/employee-time/sync.mjs && node tests/employee-time/gps.mjs && node tests/employee-time/notifications.mjs",
-    "test:account-emails": "node tests/account-emails/transport.mjs && node tests/account-emails/database.mjs && node tests/account-emails/recovery.mjs && node tests/account-emails/consistency.mjs"
+    "test:account-emails": "node tests/account-emails/transport.mjs && node tests/account-emails/database.mjs && node tests/account-emails/recovery.mjs && node tests/account-emails/consistency.mjs",
+    "test:handoff": "node tests/work-orders/handoff-database.mjs && node tests/work-orders/modal-runtime.mjs && node tests/work-orders/offline-progress.mjs",
+    "test:handoff:browser": "node tests/work-orders/browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

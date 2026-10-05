@@ -1,3 +1,4 @@
+import LaborRemovalChoice, { itemHasLabor } from './LaborRemovalChoice';
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -512,6 +513,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [showRevisionManager, setShowRevisionManager] = useState(false);
   const [pricingExpanded, setPricingExpanded] = useState(false);
   const [laborHoursExpanded, setLaborHoursExpanded] = useState(false);
+  const [addedLaborChoice,setAddedLaborChoice]=useState<((scope:'parts_only'|'parts_and_labor')=>void)|null>(null);
   const [showModifiersModal, setShowModifiersModal] = useState(false);
   const [showAddItemToAreasModal, setShowAddItemToAreasModal] = useState(false);
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
@@ -2042,6 +2044,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const existingCORecord = coLineItems.find(c => c.proposal_line_item_id === itemId);
 
       if (existingCORecord?.action_type === 'add') {
+        if(await itemHasLabor(item)){setAddedLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setAddedLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){alert(result.error.message);return;}}else {const co=await supabase.from('change_order_line_items').delete().eq('id',existingCORecord.id);if(co.error){alert(co.error.message);return;}const li=await supabase.from('proposal_line_items').delete().eq('id',itemId);if(li.error){alert(li.error.message);return;}}await updateCOTotals(changeOrderId,onCORefresh);await refreshCOLineItems();await loadData();});return;}
         if (!confirm('Remove this newly-added item from the change order?')) return;
         setSaving(true);
         try {
@@ -2064,8 +2067,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       }
 
       const roomName = rooms.find(r => r.line_items.some(i => i.id === itemId))?.name || '';
-      const itemLaborTotal = (item as any).labor_total ?? 0;
-      const hasLabor = itemLaborTotal > 0;
+      const hasLabor = await itemHasLabor(item);
       setPendingCORemoval({ itemId, item, roomName, hasLabor });
       return;
     }
@@ -2155,43 +2157,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const selectedIds = Array.from(selectedItems);
       const allItems = rooms.flatMap(r => r.line_items);
 
-      const newlyAddedIds = selectedIds.filter(id => {
-        const coRecord = coLineItems.find(c => c.proposal_line_item_id === id);
-        return coRecord?.action_type === 'add';
-      });
-      const existingIds = selectedIds.filter(id => !newlyAddedIds.includes(id));
-
-      setSaving(true);
-      try {
-        if (newlyAddedIds.length > 0) {
-          const coRecordIds = newlyAddedIds
-            .map(id => coLineItems.find(c => c.proposal_line_item_id === id)?.id)
-            .filter(Boolean) as string[];
-          if (coRecordIds.length > 0) {
-            await supabase.from('change_order_line_items').delete().in('id', coRecordIds);
-          }
-          await supabase.from('proposal_line_items').delete().in('id', newlyAddedIds);
-          setRooms(rooms.map(room => ({
-            ...room,
-            line_items: room.line_items.filter(i => !newlyAddedIds.includes(i.id)),
-          })));
-        }
-      } catch (error: any) {
-        console.error('Error removing newly-added CO items:', error);
-        alert('Failed to remove items from change order');
-        setSaving(false);
-        return;
-      } finally {
-        if (existingIds.length === 0) setSaving(false);
-      }
-
+      const existingIds=selectedIds;
       if (existingIds.length > 0) {
-        const itemsForModal = existingIds.map(id => {
+        const itemsForModal = (await Promise.all(existingIds.map(async id => {
           const item = allItems.find(i => i.id === id);
           const roomName = rooms.find(r => r.line_items.some(i => i.id === id))?.name || '';
-          const hasLabor = !!((item as any)?.labor_total && (item as any).labor_total > 0);
+          const hasLabor = item ? await itemHasLabor(item) : false;
           return { itemId: id, item, roomName, hasLabor };
-        }).filter(e => e.item != null) as Array<{ itemId: string; item: any; roomName: string; hasLabor: boolean }>;
+        }))).filter(e => e.item != null) as Array<{ itemId: string; item: any; roomName: string; hasLabor: boolean }>;
 
         const initialScopes: Record<string, 'parts_only' | 'parts_and_labor'> = {};
         for (const entry of itemsForModal) {
@@ -2235,6 +2208,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       for (const entry of pendingBulkCORemoval) {
         const { itemId, item, roomName, hasLabor } = entry;
         const scope = bulkCORemovalScopes[itemId] ?? 'parts_and_labor';
+        const existing=coLineItems.find(c=>c.proposal_line_item_id===itemId);
+        if(existing?.action_type==='add'){if(scope==='parts_only'&&hasLabor){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error)throw result.error;}else {const r=await supabase.from('change_order_line_items').delete().eq('id',existing.id);if(r.error)throw r.error;const li=await supabase.from('proposal_line_items').delete().eq('id',itemId);if(li.error)throw li.error;}continue;}
+
         const computedLineTotal = (item.line_total && item.line_total > 0)
           ? item.line_total
           : (parseFloat(String(item.unit_price || 0)) * (item.quantity || 1));
@@ -2261,6 +2237,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       })));
       await updateCOTotals(changeOrderId, onCORefresh);
       await refreshCOLineItems();
+      await loadData();
       await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
       setSelectedItems(new Set());
       setPendingBulkCORemoval(null);
@@ -5271,7 +5248,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   >
                     <div className="mt-0.5 w-4 h-4 rounded-full border-2 border-orange-500/60 group-hover:border-orange-400 shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-primary">Remove Part Only</div>
+                      <div className="text-sm font-medium text-primary">Remove item · Keep labor</div>
                       <div className="text-xs text-muted mt-0.5">Removes the part cost. Labor remains billable.</div>
                     </div>
                   </button>
@@ -5281,8 +5258,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   >
                     <div className="mt-0.5 w-4 h-4 rounded-full border-2 border-red-500/60 group-hover:border-red-400 shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-primary">Remove Part + Labor</div>
-                      <div className="text-xs text-muted mt-0.5">Removes both part and labor cost from scope.</div>
+                      <div className="text-sm font-medium text-primary">Remove item and labor</div>
+                      <div className="text-xs text-muted mt-0.5">Removes the item and associated work from the approved scope.</div>
                     </div>
                   </button>
                 </>
@@ -5632,6 +5609,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         /></Suspense>
       )}
 
+      {addedLaborChoice&&<LaborRemovalChoice onChoose={addedLaborChoice} onCancel={()=>setAddedLaborChoice(null)}/>}
       {showTasksPanel && (
         <Suspense fallback={null}><ProposalTasksPanel
           proposalId={proposalId}

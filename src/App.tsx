@@ -1,3 +1,4 @@
+import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
@@ -289,6 +290,8 @@ function AppContent() {
   // Check if we're in standalone/popout mode (no header/nav)
   const isStandalone = new URLSearchParams(window.location.search).get('standalone') === 'true';
 
+  useEffect(()=>{if(!profile?.id)return;const sync=()=>{syncVisitEvents(profile.id).catch(console.error);};sync();window.addEventListener('online',sync);return()=>window.removeEventListener('online',sync);},[profile?.id]);
+
   // Initialize state from URL on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -381,6 +384,7 @@ function AppContent() {
 
   // Save active tab to localStorage and update URL whenever state changes
   useEffect(() => {
+    if(['/proposals-fullscreen','/sales-order-fullscreen'].includes(currentPath))return;
     localStorage.setItem('activeTab', activeTab);
 
     // Skip URL manipulation for standalone routes that don't use tab-based navigation
@@ -715,7 +719,7 @@ function AppContent() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const soId = urlParams.get('id');
-    const soActiveTab = urlParams.get('activeTab') as 'scope' | 'primary_scope' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions' | null;
+    const soActiveTab = urlParams.get('activeTab') as 'tasks' | 'scope' | 'primary_scope' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions' | null;
 
     if (!soId) {
       return (

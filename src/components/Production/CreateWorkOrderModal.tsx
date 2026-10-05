@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { X, Search, Plus, User, Briefcase, Users, MapPin, AlertTriangle, Bell, Mail, MessageSquare, Link, Calendar, PhoneCall, LayoutGrid, ExternalLink, Package, ChevronDown, ChevronUp, ClipboardList, Phone, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import ProjectScope from '../Projects/ProjectScope';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
 import { TeamAvailabilityModal } from '../Shared/TeamAvailabilityModal';
 import { AvailabilityBrowserModal } from '../Shared/AvailabilityBrowserModal';
@@ -47,7 +48,8 @@ interface Task {
   title: string;
   description: string;
   estimated_hours: number;
-  project_task_id?: string; // Link to project task for auto-completion
+  project_task_id?: string;
+  visit_instructions?: string;
 }
 
 interface LaborPhase {
@@ -138,6 +140,15 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const [showAvailabilityBrowser, setShowAvailabilityBrowser] = useState(false);
   const [showTeamAvailability, setShowTeamAvailability] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [technicianVisitNotes, setTechnicianVisitNotes] = useState<Record<string, string>>({});
+  const [allProjects, setAllProjects] = useState<Array<{id:string;name:string;project_number:string}>>([]);
+  const [activeTaskIds, setActiveTaskIds] = useState<string[]>([]);
+  const [technicianTaskIds, setTechnicianTaskIds] = useState<Record<string, string[]>>({});
+  const creationKey = useRef(crypto.randomUUID());
+  const submitting = useRef(false);
+  const [projectContextError, setProjectContextError] = useState('');
+  const projectContextRequest = useRef(0);
+
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskHours, setNewTaskHours] = useState('0');
@@ -145,6 +156,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   // Labor phase and project tasks
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>('');
+  const [taskLoadError,setTaskLoadError] = useState('');
+  const [taskLoading,setTaskLoading] = useState(false);
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [showAllProjectPhases, setShowAllProjectPhases] = useState(false);
   const [selectedProjectTasks, setSelectedProjectTasks] = useState<Set<string>>(new Set());
@@ -158,7 +171,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const [showPartsSection, setShowPartsSection] = useState(false);
   const [partSearch, setPartSearch] = useState('');
   const [partSearchResults, setPartSearchResults] = useState<ProductResult[]>([]);
-  const [partSearching, setPartSearching] = useState(false);
+  const [, setPartSearching] = useState(false);
 
   // Validation errors
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -210,6 +223,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
   useEffect(() => {
     loadTechnicians();
+    supabase.from('projects').select('id,name,project_number').order('created_at', {ascending:false}).then(({data})=>setAllProjects(data || []));
     if (contactId) {
       loadContact(contactId);
     } else if (serviceRequest?.contact_id) {
@@ -240,8 +254,6 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   useEffect(() => {
     if (formData.type === 'project') {
       setFormData(prev => ({ ...prev, billable_type: 'project' }));
-      // Clear tasks when switching to project type (tasks come from project master list)
-      setTasks([]);
     } else if (formData.type === 'warranty') {
       setFormData(prev => ({ ...prev, billable_type: 'warranty' }));
     } else if (formData.type === 'site_survey') {
@@ -275,6 +287,29 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       setSelectedPhaseId('');
       setProjectTasks([]);
     }
+  }, [formData.project_id]);
+
+  useEffect(() => {
+    const request = ++projectContextRequest.current;
+    setProjectContextError('');
+    if (!formData.project_id) return;
+    supabase.from('projects').select('contact_id, job_site_address, customer_location_id').eq('id', formData.project_id).maybeSingle().then(async ({ data, error }) => {
+      if (request !== projectContextRequest.current) return;
+      if (error || !data) { setProjectContextError('Project context could not be loaded. Reselect the project to retry.'); return; }
+      if (data.contact_id) {
+        const { data: customer, error: customerError } = await supabase.from('contacts').select('*').eq('id', data.contact_id).maybeSingle();
+        if (request !== projectContextRequest.current) return;
+        if (customerError || !customer) { setProjectContextError('Project customer could not be loaded.'); return; }
+        setSelectedContact(customer);
+      }
+      const site = data.job_site_address;
+      setFormData(previous => ({ ...previous,
+        customer_address: typeof site === 'string' ? site : site?.street || site?.address || '',
+        customer_city: typeof site === 'object' ? site?.city || '' : '',
+        customer_state: typeof site === 'object' ? site?.state || '' : '',
+        customer_zip: typeof site === 'object' ? site?.zip || site?.zip_code || '' : '',
+      }));
+    });
   }, [formData.project_id]);
 
   // Load project tasks when project or phase is selected
@@ -502,6 +537,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const projectTaskRequest = useRef(0);
   async function loadProjectTasks(projectId: string, phaseId?: string) {
     const request = ++projectTaskRequest.current;
+    setTaskLoading(true); setTaskLoadError('');
     setProjectTasks([]);
     setSelectedProjectTasks(new Set());
     try {
@@ -510,8 +546,6 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         .select('id, title, description, estimated_hours, labor_phase_id, status')
         .eq('project_id', projectId)
         .eq('status', 'open')
-        .gt('estimated_hours', 0) // Only items with labor/time can be tasks
-        .not('labor_phase_id', 'is', null) // Only items with labor phase can be tasks
         .order('sort_order');
 
       // Filter by phase if selected
@@ -523,10 +557,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
       if (error) throw error;
       if (request === projectTaskRequest.current) setProjectTasks(data || []);
+      const { data: active } = await supabase.from('work_order_tasks').select('project_task_id, work_orders!inner(project_id,status)').eq('work_orders.project_id', projectId).not('work_orders.status','in','(completed,cancelled)').not('status','in','(completed,cancelled)');
+      if (request === projectTaskRequest.current) setActiveTaskIds((active || []).map(task => task.project_task_id).filter(Boolean));
     } catch (error) {
       console.error('Error loading project tasks:', error);
-      if (request === projectTaskRequest.current) setProjectTasks([]);
-    }
+      if (request === projectTaskRequest.current) {setProjectTasks([]);setTaskLoadError('Project tasks could not be loaded. Retry before saving.');}
+    } finally { if(request === projectTaskRequest.current) setTaskLoading(false); }
   }
 
   function handleToggleProjectTask(taskId: string) {
@@ -558,7 +594,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     setSelectedContact(contact);
     setSearchQuery('');
     setSearchResults([]);
-    // Auto-populate address fields from contact
+    // Linked projects resolve their own site rather than a billing address.
+    if (formData.project_id) return;
     setFormData(prev => ({
       ...prev,
       customer_address: contact.street_address || '',
@@ -636,9 +673,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     if (salesOrderInTestTune && !formData.labor_category_id) {
       errors.labor_category_id = 'Labor category is required during Test & Tune period';
     }
-    if (formData.type === 'project' && formData.project_id && !selectedPhaseId) {
-      errors.labor_phase_id = 'A labor phase is required for project work orders';
-    }
+    if (projectContextError) errors.project_id = projectContextError;
+    if(formData.project_id && (taskLoading || taskLoadError)) errors.project_id = taskLoadError || 'Project tasks are still loading.';
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -662,7 +698,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       ...prev,
       start_date: date,
       start_time: startTime,
-      end_time: calculatedEndTime,
+      end_time: endTime || calculatedEndTime,
       estimated_hours: '1'
     }));
   }
@@ -707,10 +743,11 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || submitting.current) return;
 
     if (!validate()) return;
 
+    submitting.current = true;
     setLoading(true);
 
     try {
@@ -753,7 +790,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         company_id: profile.organization_id,
         contact_id: finalContactId,
         customer_location_id: selectedContact?.id === serviceRequest?.contact_id ? serviceRequest?.customer_location_id || null : null,
-        project_id: formData.type === 'project' ? formData.project_id : (formData.project_id || null),
+        project_id: formData.project_id || null,
+        service_location_address: formData.customer_address || null,
+        service_location_city: formData.customer_city || null,
+        service_location_state: formData.customer_state || null,
+        service_location_zip: formData.customer_zip || null,
+        address: [formData.customer_address, formData.customer_city, formData.customer_state, formData.customer_zip].filter(Boolean).join(', '),
         labor_phase_id: selectedPhaseId || null, // Store selected labor phase
         labor_category_id: formData.labor_category_id || null, // Store labor category for Test & Tune tracking
         work_order_group_id: selectedTechnicians.length > 1 ? groupId : null,
@@ -773,7 +815,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         target_completion_date: formData.target_completion_date || null,
         estimated_hours: parseFloat(formData.estimated_hours) || 0,
         notes: formData.notes,
-        internal_notes: formData.internal_notes,
+        internal_notes: [formData.internal_notes, technicianVisitNotes[techId]].filter(Boolean).join('\n'),
         send_appointment_reminder: formData.send_appointment_reminder,
         reminder_email: formData.reminder_email,
         reminder_sms: formData.reminder_sms,
@@ -785,70 +827,22 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         recurrence_rule: index === 0 && recurrenceRule !== null ? recurrenceRule : null,
       }));
 
-      const { data: createdWorkOrders, error } = await supabase
-        .from('work_orders')
-        .insert(workOrdersToCreate)
-        .select('id, work_order_number');
-
+      const assignments = workOrdersToCreate.map((workOrder, index) => ({
+        work_order: workOrder,
+        tasks: tasks.filter(task => selectedTechnicians.length === 1 || (technicianTaskIds[selectedTechnicians[index]] || []).includes(task.id)).map(task => ({
+          title: task.title, description: task.description, estimated_hours: task.estimated_hours,
+          project_task_id: task.project_task_id || null, visit_instructions: task.visit_instructions || null,
+        })),
+        parts: parts.map(({ id, ...part }) => ({ ...part, warranty_item: false })),
+      }));
+      const { data: createdWorkOrders, error } = await supabase.rpc('create_work_order_assignments', {
+        p_request_id: creationKey.current, p_assignments: assignments,
+        p_service_request_id: serviceRequest?.id || null,
+      });
       if (error) throw error;
-
-      // Create tasks for each work order if any tasks were added
-      if (tasks.length > 0 && createdWorkOrders && createdWorkOrders.length > 0) {
-        const tasksToCreate = createdWorkOrders.flatMap((wo, index) =>
-          tasks.map((task, taskIndex) => ({
-            work_order_id: wo.id,
-            title: task.title,
-            description: task.description,
-            estimated_hours: task.estimated_hours,
-            assigned_to: selectedTechnicians[index],
-            project_task_id: task.project_task_id || null, // Link to project task for auto-completion
-            status: 'pending',
-            sort_order: taskIndex
-          }))
-        );
-
-        const { error: tasksError } = await supabase
-          .from('work_order_tasks')
-          .insert(tasksToCreate);
-
-        if (tasksError) {
-          throw new Error('Work orders were created, but their task assignments could not be saved. Open the work orders to review before creating another.');
-        }
-      }
-
-      // Save parts to all created work orders
-      if (parts.length > 0 && createdWorkOrders && createdWorkOrders.length > 0) {
-        const partsToInsert = createdWorkOrders.flatMap(wo =>
-          parts.map(part => ({
-            work_order_id: wo.id,
-            product_id: part.product_id,
-            part_name: part.part_name,
-            part_sku: part.part_sku || null,
-            quantity: part.quantity,
-            unit_cost: part.unit_cost,
-            unit_price: part.unit_price,
-            warranty_item: false
-          }))
-        );
-        const { error: partsError } = await supabase
-          .from('service_parts_used')
-          .insert(partsToInsert);
-        if (partsError) {
-          console.error('Error saving parts:', partsError);
-        }
-      }
 
       // If converting from a service request, update it and send tech notifications
       if (serviceRequest && createdWorkOrders && createdWorkOrders.length > 0) {
-        await supabase
-          .from('service_requests')
-          .update({
-            status: 'scheduled',
-            work_order_id: createdWorkOrders[0].id,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', serviceRequest.id);
-
         const contactName = selectedContact?.full_name || selectedContact?.company_name || serviceRequest.customer_name;
         const address = serviceRequest.job_location_address || selectedContact?.street_address;
         for (let i = 0; i < selectedTechnicians.length; i++) {
@@ -888,20 +882,15 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       console.error('Error creating work order:', error);
       alert(`Failed to create work order: ${error?.message || 'Unknown error'}`);
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
 
-  const workOrderTypeHelp = {
-    project: 'Installation work linked to a project/sales order. Not directly billable as dollars are in the project estimate.',
-    service: 'Billable time & materials service work. Will appear in Service Billing queue.',
-    site_survey: 'Non-billable site assessment before work begins.',
-    warranty: 'Non-billable warranty work. Must reference the original work order being covered.'
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-label="Create work order" className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">
             {serviceRequest ? 'Convert to Work Order' : 'Create Work Order'}
@@ -959,7 +948,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             <select className="w-full p-3 border rounded-lg" value={workOrderTypeId || workOrderOptions.find(option=>option.kind==='type'&&option.system_key===formData.type)?.id || ''}
               onChange={e=>{const option=workOrderOptions.find(o=>o.id===e.target.value);if(option){setWorkOrderTypeId(option.id);setFormData({...formData,type:option.behavior as typeof formData.type});}}}>
               {!workOrderOptions.length && <option value="">{formData.type.replace(/_/g,' ')}</option>}
-              {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active&&(!projectId||o.behavior==='project')).map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
+              {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active).map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
             </select>
           </div>
 
@@ -1248,6 +1237,14 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
           )}
 
+          {allProjects.length > 0 && <label className="block text-sm text-primary">Choose project (loads its customer and job site)
+            <select value={formData.project_id} onChange={event=>setFormData(previous=>({...previous,project_id:event.target.value}))} className="block w-full bg-surface text-primary border border-subtle rounded-lg p-2 mt-1">
+              <option value="">No project / standalone service</option>{allProjects.map(project=><option key={project.id} value={project.id}>{project.project_number} · {project.name}</option>)}
+            </select>
+          </label>}
+          {formData.project_id && <details className="border border-subtle rounded-lg p-3"><summary className="min-h-11 text-info cursor-pointer text-sm">Open full project scope</summary><ProjectScope project={{id:formData.project_id}} /></details>}
+          {taskLoadError && <p role="alert" className="text-red-600 text-sm">{taskLoadError}<button type="button" onClick={()=>loadProjectTasks(formData.project_id,showAllProjectPhases?undefined:selectedPhaseId)} className="min-h-11 ml-2 underline">Retry</button></p>}
+          {projectContextError && <p role="alert" className="text-red-600 text-sm">{projectContextError}</p>}
           {/* Project Link - Optional for non-project types */}
           {selectedContact && formData.type !== 'project' && customerProjects.length > 0 && (
             <div className="space-y-2">
@@ -1504,7 +1501,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
 
             {/* Labor Category - hidden when in project context, required for Test & Tune */}
-            {!projectId && (
+            {(
               <div className={salesOrderInTestTune ? 'p-4 bg-purple-50 border-2 border-purple-300 rounded-lg' : ''}>
                 {salesOrderInTestTune && (
                   <div className="flex items-start gap-2 mb-3 text-sm text-purple-800">
@@ -1706,13 +1703,33 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
           </div>
 
+          {selectedTechnicians.length > 1 && <section className="space-y-3 border border-subtle rounded-lg p-4">
+            <h3 className="font-semibold text-primary">Work for each technician</h3>
+            <p className="text-sm text-secondary">Add tasks below, then select each technician's visit work. Shared work can be selected for more than one technician.</p>
+            {selectedTechnicians.map(techId => <div key={techId} className="space-y-2 border border-subtle rounded-lg p-3">
+              <h4 className="font-medium text-primary">{technicians.find(tech => tech.id === techId)?.full_name || 'Technician'}</h4>
+              <select aria-label="Copy task selection from technician" value="" onChange={event => setTechnicianTaskIds(previous => ({ ...previous, [techId]: [...(previous[event.target.value] || [])] }))} className="bg-surface text-primary border border-subtle rounded-lg p-2">
+                <option value="">Copy selection from...</option>
+                {selectedTechnicians.filter(id => id !== techId).map(id => <option key={id} value={id}>{technicians.find(tech => tech.id === id)?.full_name}</option>)}
+              </select>
+              {tasks.map(task => <label key={task.id} className="flex items-center gap-2 min-h-11 text-primary text-sm">
+                <input type="checkbox" checked={(technicianTaskIds[techId] || []).includes(task.id)} onChange={event => setTechnicianTaskIds(previous => ({ ...previous, [techId]: event.target.checked ? [...(previous[techId] || []), task.id] : (previous[techId] || []).filter(id => id !== task.id) }))} />{task.title}
+              </label>)}
+              <label className="block text-sm text-secondary">Technician visit instructions<textarea value={technicianVisitNotes[techId] || ''} onChange={event => setTechnicianVisitNotes(previous => ({ ...previous, [techId]: event.target.value }))} className="block w-full border border-subtle rounded-lg p-2 mt-1 bg-surface text-primary" /></label>
+              {!tasks.length && <p className="text-sm text-muted">No tasks added yet.</p>}
+            </div>)}
+          </section>}
+          {tasks.length > 0 && <details className="border border-subtle rounded-lg p-3"><summary className="text-sm font-medium text-primary cursor-pointer min-h-11">Task visit instructions</summary>
+            {tasks.map(task => <label key={task.id} className="block text-sm text-primary my-2">{task.title}<textarea value={task.visit_instructions || ''} onChange={event => setTasks(previous => previous.map(value => value.id === task.id ? { ...value, visit_instructions: event.target.value } : value))} placeholder="Instructions for this visit; master instructions stay unchanged" className="block w-full bg-surface text-primary border border-subtle rounded-lg p-2 mt-1" /></label>)}
+          </details>}
+
           {/* Labor Phase and Project Tasks Section - For project work orders */}
-          {formData.type === 'project' && formData.project_id && (
+          {formData.project_id && (
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 space-y-4">
               <div>
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-2">
                   <Briefcase className="w-5 h-5 text-blue-600" />
-                  Labor Phase *
+                  Labor Phase (Optional)
                 </h3>
                 <p className="text-sm text-gray-600 mb-3">
                   Choose the phase for this visit to see its unfinished tasks. Select tasks to assign them to this work order.
@@ -1724,7 +1741,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
                     validationErrors.labor_phase_id ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
                 >
-                  <option value="" disabled>— Select a phase —</option>
+                  <option value="">All phases</option>
                   {laborPhases.map(phase => (
                     <option key={phase.id} value={phase.id}>
                       {phase.name}
@@ -1737,6 +1754,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
               </div>
 
               <button type="button" onClick={() => { setShowAllProjectPhases(value => !value); setSelectedProjectTasks(new Set()); }} className="min-h-11 px-3 py-2 border border-blue-200 rounded-lg text-sm text-blue-700">{showAllProjectPhases ? 'Show this phase' : 'Browse all phases'}</button>
+              {activeTaskIds.length > 0 && <p className="text-sm text-amber-700">{activeTaskIds.length} task assignments are already on active visits. Selecting them again creates deliberate shared work.</p>}
               {projectTasks.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

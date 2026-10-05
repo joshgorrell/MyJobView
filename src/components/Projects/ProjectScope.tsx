@@ -1,156 +1,241 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { formatCurrency } from '../../lib/utils';
-
-interface ProjectScopeProps {
-  project: any;
-}
-
-export default function ProjectScope({ project }: ProjectScopeProps) {
-  const [proposal, setProposal] = useState<any>(null);
-  const [rooms, setRooms] = useState<any[]>([]);
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
+type Room = { id: string; name: string; description: string | null };
+type Equipment = {
+  id: string;
+  room_id: string | null;
+  description: string;
+  quantity: number;
+  unit: string;
+  task_notes?: string | null;
+  programming_notes?: string | null;
+  phase_notes?: {name:string;notes:string|null}[];
+  equipment_removed?:boolean;
+};
+type Scope = {
+  overall_scope: string | null;
+  rooms: Room[];
+  equipment: Equipment[];
+  captured_at?: string;
+};
+export default function ProjectScope({
+  project,
+}: {
+  project: { id: string; sales_orders?: { proposal_id: string | null } };
+}) {
+  const [versions, setVersions] = useState<
+    { id: string; label: string; scope: Scope }[]
+  >([]);
+  const [version, setVersion] = useState("");
+  const [scope, setScope] = useState<Scope | null>(null);
+  const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
-
+  const [error, setError] = useState("");
   useEffect(() => {
-    loadProposalScope();
-  }, [project]);
+    let active = true;
+    setScope(null);
+    setVersions([]);
+    setVersion("");
+    setLoading(true);
+    setError("");
+    (async () => {
+      try {
+        const { data: record, error: failure } = await supabase
+          .from("projects")
+          .select("sold_handoff,sales_orders(proposal_id)")
+          .eq("id", project.id)
+          .maybeSingle();
+        if (failure) throw failure;
+        const [changes, retained] = await Promise.all([
+          supabase
+            .from("project_scope_changes")
+            .select("id,scope,created_at")
+            .eq("project_id", project.id)
+            .order("created_at"),
+          supabase
+            .from("project_retained_handoffs")
+            .select("scope")
+            .eq("project_id", project.id)
+            .maybeSingle(),
+        ]);
+        if (changes.error) throw changes.error;
+        if (retained.error) throw retained.error;
+        const available: { id: string; label: string; scope: Scope }[] = [];
+        if (record?.sold_handoff)
+          available.push({
+            id: "sold",
+            label: "Original sold scope",
+            scope: record.sold_handoff,
+          });
+        if (retained.data?.scope)
+          available.push({
+            id: "reviewed",
+            label: "Earliest reviewed scope",
+            scope: retained.data.scope,
+          });
+        for (const change of changes.data || [])
+          available.push({
+            id: change.id,
+            label: `Approved change · ${new Date(change.created_at).toLocaleDateString()}`,
+            scope: change.scope,
+          });
+        if (available.length) {
+          if (active) {
+            const latest = available[available.length - 1];
+            setVersions(available);
+            setVersion(latest.id);
+            setScope(latest.scope);
+            setVerified(true);
+          }
+          return;
+        }
 
-  async function loadProposalScope() {
-    if (!project.sales_orders?.proposal_id) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const { data: proposalData, error: proposalError } = await supabase
-        .from('proposals')
-        .select('*')
-        .eq('id', project.sales_orders.proposal_id)
-        .maybeSingle();
-
-      if (proposalError) throw proposalError;
-
-      const { data: roomsData, error: roomsError } = await supabase
-        .from('proposal_rooms')
-        .select(`
-          *,
-          proposal_line_items(*)
-        `)
-        .eq('proposal_id', project.sales_orders.proposal_id)
-        .order('sort_order');
-
-      if (roomsError) throw roomsError;
-
-      setProposal(proposalData);
-      setRooms(roomsData || []);
-    } catch (error) {
-      console.error('Error loading proposal scope:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (loading) {
+        const proposalId =
+          (record?.sales_orders as unknown as { proposal_id: string } | null)
+            ?.proposal_id || project.sales_orders?.proposal_id;
+        if (!proposalId) return;
+        const [settings, rooms, items] = await Promise.all([
+          supabase
+            .from("proposal_settings")
+            .select("scope_of_work")
+            .eq("proposal_id", proposalId)
+            .maybeSingle(),
+          supabase
+            .from("proposal_rooms")
+            .select("id,name,description")
+            .eq("proposal_id", proposalId)
+            .order("sort_order"),
+          supabase
+            .from("proposal_line_items")
+            .select(
+              "id,room_id,description,quantity,unit,task_notes,programming_notes,is_hidden",
+            )
+            .eq("proposal_id", proposalId)
+            .order("sort_order"),
+        ]);
+        for (const result of [settings, rooms, items])
+          if (result.error) throw result.error;
+        if (active) {
+          setScope({
+            overall_scope: settings.data?.scope_of_work || null,
+            rooms: rooms.data || [],
+            equipment: (items.data || []).filter((item) => !item.is_hidden),
+          });
+          setVerified(false);
+        }
+      } catch (failure) {
+        if (active)
+          setError(
+            (failure as { message?: string }).message ||
+              "Scope could not be loaded.",
+          );
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [project.id]);
+  if (loading) return <p className="text-muted p-4">Loading scope...</p>;
+  if (error)
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-400">Loading scope...</div>
-      </div>
+      <p role="alert" className="text-red-600 p-4">
+        {error}
+      </p>
     );
-  }
-
-  if (!proposal) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-400">No proposal linked to this project</div>
-      </div>
-    );
-  }
-
+  if (!scope)
+    return <p className="text-muted p-4">No linked proposal scope.</p>;
+  const equipment = (roomId: string | null) => (
+    <ul className="space-y-3 mt-3">
+      {scope.equipment
+        .filter((item) => item.room_id === roomId)
+        .map((item) => (
+          <li key={item.id} className="text-sm text-primary">
+            <p>
+              {item.quantity} {item.unit} · {item.description}{item.equipment_removed&&" · Labor only; equipment removed"}
+            </p>
+            {item.task_notes && (
+              <p className="text-secondary whitespace-pre-wrap mt-1">
+                {item.task_notes}
+              </p>
+            )}
+            {item.phase_notes?.map((phase,index)=>phase.notes&&<p key={index} className="text-secondary whitespace-pre-wrap mt-1">{phase.name}: {phase.notes}</p>)}
+            {item.programming_notes && (
+              <p className="text-secondary whitespace-pre-wrap mt-1">
+                {item.programming_notes}
+              </p>
+            )}
+          </li>
+        ))}
+    </ul>
+  );
   return (
-    <div className="p-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-4">
-          <h2 className="text-xl font-bold text-white mb-2">Contract Scope</h2>
-          <div className="text-sm text-gray-400">
-            From Proposal: {proposal.proposal_number}
-          </div>
-        </div>
-
-        {/* Rooms */}
-        <div className="space-y-4">
-          {rooms.map((room) => (
-            <div key={room.id} className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-              <div className="p-4 bg-gray-900 border-b border-gray-700">
-                <h3 className="text-lg font-semibold text-white">{room.name}</h3>
-              </div>
-
-              <div className="p-4">
-                {room.description && (
-                  <div className="mb-6">
-                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Scope of Work</div>
-                    <div className="text-gray-100 whitespace-pre-wrap leading-relaxed text-base" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", serif' }}>
-                      {room.description}
-                    </div>
-                  </div>
-                )}
-
-                {/* Line Items */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-xs text-gray-400 border-b border-gray-700">
-                      <tr>
-                        <th className="text-left py-2 px-2">Description</th>
-                        <th className="text-right py-2 px-2 w-20">Qty</th>
-                        <th className="text-right py-2 px-2 w-24">Price</th>
-                        <th className="text-right py-2 px-2 w-24">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {room.proposal_line_items?.map((item: any) => (
-                        <tr key={item.id} className="border-b border-gray-700">
-                          <td className="py-2 px-2 text-white">{item.description}</td>
-                          <td className="py-2 px-2 text-right text-gray-300">
-                            {item.quantity} {item.unit}
-                          </td>
-                          <td className="py-2 px-2 text-right text-gray-300">
-                            ${item.unit_price?.toFixed(2)}
-                          </td>
-                          <td className="py-2 px-2 text-right text-white font-semibold">
-                            ${item.line_total?.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Room Subtotal */}
-                <div className="flex justify-end mt-3 pt-3 border-t border-gray-700">
-                  <div className="text-right">
-                    <div className="text-sm text-gray-400">Room Subtotal</div>
-                    <div className="text-lg font-bold text-white">
-                      $
-                      {room.proposal_line_items
-                        ?.reduce((sum: number, item: any) => sum + (item.line_total || 0), 0)
-                        .toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Total */}
-        <div className="mt-6 bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <div className="flex justify-between items-center text-xl font-bold">
-            <span className="text-gray-400">Total Contract Value</span>
-            <span className="text-white">{proposal.total != null ? formatCurrency(proposal.total) : ''}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <section className="space-y-4 p-4 text-primary">
+      <h2 className="font-semibold text-lg">
+        {versions.find((v) => v.id === version)?.label ||
+          "Current proposal scope"}
+      </h2>
+      {versions.length > 1 && (
+        <label className="block text-sm">
+          Scope version
+          <select
+            className="block mt-1 w-full max-w-md bg-surface border border-subtle rounded p-2"
+            value={version}
+            onChange={(e) => {
+              setVersion(e.target.value);
+              setScope(versions.find((v) => v.id === e.target.value)!.scope);
+            }}
+          >
+            {versions.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {version === "reviewed" && (
+        <p className="text-sm text-muted">
+          This is the earliest reviewed snapshot for this older job; the
+          original sold scope was not recorded.
+        </p>
+      )}
+      {!verified && (
+        <p className="text-sm text-muted">
+          No verified original handoff is stored for this older project. This is
+          the current proposal text; it may include later edits.
+        </p>
+      )}
+      {scope.captured_at && (
+        <p className="text-xs text-muted">
+          Captured {new Date(scope.captured_at).toLocaleString()}
+        </p>
+      )}
+      <article className="border border-subtle rounded-lg bg-surface p-4">
+        <h3 className="font-medium mb-2">Overall scope</h3>
+        <p className="whitespace-pre-wrap text-sm text-secondary">
+          {scope.overall_scope || "No overall scope recorded."}
+        </p>
+      </article>
+      {scope.rooms.map((room) => (
+        <article
+          key={room.id}
+          className="border border-subtle rounded-lg bg-surface p-4"
+        >
+          <h3 className="font-medium mb-2">{room.name}</h3>
+          <p className="whitespace-pre-wrap text-sm text-secondary">
+            {room.description || "No room scope recorded."}
+          </p>
+          {equipment(room.id)}
+        </article>
+      ))}
+      {scope.equipment.some((item) => !item.room_id) && (
+        <article className="border border-subtle rounded-lg bg-surface p-4">
+          <h3 className="font-medium">General equipment</h3>
+          {equipment(null)}
+        </article>
+      )}
+    </section>
   );
 }

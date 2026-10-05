@@ -111,17 +111,6 @@ export function DuplicateProposalModal({
       setLoading(true);
       setError(null);
 
-      const { data: originalProposal, error: fetchError } = await supabase
-        .from('proposals')
-        .select(`
-          *,
-          proposal_line_items(*)
-        `)
-        .eq('id', proposalId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
       const targetContactId = duplicationType === 'same' ? currentContactId : selectedContactId;
 
       if (!targetContactId) {
@@ -141,68 +130,9 @@ export function DuplicateProposalModal({
         throw new Error('The selected contact does not have a ZIP code. A ZIP code is required for sales tax calculation. Please add a ZIP code to the contact first.');
       }
 
-      const { data: newProposal, error: insertError } = await supabase
-        .from('proposals')
-        .insert({
-          company_id: profile?.company_id,
-          contact_id: targetContactId,
-          title: newTitle,
-          description: originalProposal.description,
-          status: 'designing',
-          total: originalProposal.total,
-          valid_until: null,
-          notes: originalProposal.notes,
-          discount_amount: originalProposal.discount_amount,
-          discount_type: originalProposal.discount_type,
-          tax_rate: originalProposal.tax_rate,
-          tax_amount: originalProposal.tax_amount,
-          subtotal: originalProposal.subtotal,
-          created_by: profile?.id
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      if (includeLineItems && originalProposal.proposal_line_items?.length > 0) {
-        const lineItemsToInsert = originalProposal.proposal_line_items.map((item: any) => ({
-          proposal_id: newProposal.id,
-          product_id: item.product_id,
-          item_type: item.item_type,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          line_total: item.line_total,
-          sort_order: item.sort_order,
-          room_id: item.room_id,
-          labor_hours: item.labor_hours,
-          labor_rate: item.labor_rate,
-          labor_total: item.labor_total
-        }));
-
-        const { error: lineItemsError } = await supabase
-          .from('proposal_line_items')
-          .insert(lineItemsToInsert);
-
-        if (lineItemsError) throw lineItemsError;
-      }
-
-      await supabase
-        .from('proposal_versions')
-        .insert({
-          proposal_id: newProposal.id,
-          version_number: 1,
-          snapshot_data: {
-            title: newProposal.title,
-            description: newProposal.description,
-            total: newProposal.total,
-            status: newProposal.status
-          },
-          changed_by: profile?.id,
-          change_description: `Duplicated from proposal #${originalProposal.proposal_number}`
-        });
-
-      onSuccess(newProposal.id);
+      const {data:newId,error:copyError}=await supabase.rpc('duplicate_job_proposal',{p_source:proposalId,p_contact:targetContactId,p_title:newTitle,p_include:includeLineItems});
+      if(copyError)throw copyError;
+      onSuccess(newId);
     } catch (error: any) {
       console.error('Error duplicating proposal:', error);
       setError(error.message || 'Failed to duplicate proposal');

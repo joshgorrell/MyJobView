@@ -115,6 +115,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
   const [contacts, setContacts] = useState<any[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  useEffect(()=>{if(!hasUnsavedChanges)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[hasUnsavedChanges]);
   const [initialSettings, setInitialSettings] = useState<string>('');
   const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
   const [editingAreaName, setEditingAreaName] = useState('');

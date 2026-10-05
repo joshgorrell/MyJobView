@@ -36,22 +36,17 @@ for (const hasViewport of [true,false]) {
   for(const cleanup of cleanups.reverse()) cleanup?.();
   assert.equal(listeners.size,0); assert.equal(body.style.overflow,'auto'); assert.ok(restoredFocus);
 }
-const fixture={project_tasks:[
-  {id:'assigned',project_id:'p',labor_phase_id:'rough',title:'Assigned install',status:'open',labor_phase:{name:'Rough-in'}},
-  {id:'reference',project_id:'p',labor_phase_id:'rough',title:'Other rough work',status:'open',labor_phase:{name:'Rough-in'}},
-  {id:'other-phase',project_id:'p',labor_phase_id:'trim',title:'Trim work',status:'open',labor_phase:{name:'Trim'}},
-  {id:'finished',project_id:'p',labor_phase_id:'rough',title:'Finished work',status:'completed'},
-  {id:'cancelled',project_id:'p',labor_phase_id:'rough',title:'Cancelled work',status:'cancelled'},
-],work_order_tasks:[{id:'wo-task',work_order_id:'wo',project_task_id:'assigned',title:'Assigned install'}],work_order_task_completions:[]};
-const inserted=[];
-const supabase={from(table){const predicates=[];let mutation;const query={select(){return query;},eq(key,value){predicates.push(row=>row[key]===value);return query;},order(){return query;},insert(value){mutation=value;return query;},then(resolve){if(mutation)inserted.push(mutation);return Promise.resolve({data:(fixture[table]||[]).filter(row=>predicates.every(test=>test(row))),error:null}).then(resolve);}};return query;},channel(){const channel={on(){return channel;},subscribe(){return channel;},unsubscribe(){}};return channel;}};
-const h=harness('src/components/Production/WorkOrderTasksChecklist.tsx',{}, {'../../lib/supabase':{supabase}});
-const props={workOrderId:'wo',projectId:'p',laborPhaseId:'rough',currentUserId:'tech'};
-async function settle(){for(const fn of h.effects.splice(0)) fn();for(let i=0;i<8;i++)await new Promise(setImmediate);return h.render(props,'default');}
+const fixture={work_order_tasks:[{id:'visit-a',work_order_id:'wo',project_task_id:'master-a',title:'Issued title',description:'Issued instruction',status:'pending',estimated_hours:0,visit_instructions:'Rough-in only'}],project_task_activity:[]};
+const packet={name:'Project',sold_handoff:{captured_at:'2026-10-01T00:00:00Z',overall_scope:'Original overall scope',rooms:[{id:'room',name:'Bedroom',description:'Original room scope'}],equipment:[]},tasks:[{id:'master-a',title:'Current master instruction',description:'Install bedroom TV',status:'open',progress_status:'partial',estimated_hours:0},{id:'finished',title:'Finished work',status:'completed',progress_status:'completed',estimated_hours:1}],history:[{id:'old-visit',project_task_id:'master-a',work_order_id:'previous-wo',work_order_task_id:'previous-assignment',disposition:'partial',notes:'Backing unfinished',technician_name:'Previous tech',created_at:'2026-09-30T00:00:00Z'}]};
+const calls=[];
+const supabase={from(table){const predicates=[];const query={select(){return query;},eq(key,value){predicates.push(row=>row[key]===value);return query;},order(){return query;},then(resolve){return Promise.resolve({data:(fixture[table]||[]).filter(row=>predicates.every(test=>test(row))),error:null}).then(resolve);}};return query;},async rpc(name,args){if(name==='get_work_order_project_context')return {data:packet,error:null};calls.push({name,args});return {data:'update',error:null};},channel(){const channel={on(){return channel;},subscribe(){return channel;},unsubscribe(){}};return channel;}};
+const h=harness('src/components/Production/WorkOrderTasksChecklist.tsx',{crypto:{randomUUID:()=>`event-${calls.length}`},navigator:{onLine:true},window:{addEventListener(){},removeEventListener(){}},document:{visibilityState:'visible',addEventListener(){},removeEventListener(){}}},{'../../lib/supabase':{supabase},'../../lib/jobOffline':{cacheVisitPacket(){},readVisitPacket(){return null},pendingVisitEvents(){return []},discardVisitEvent(){},queueVisitEvent(user,event){calls.push({name:'record_visit_task_progress',args:event})},async syncVisitEvents(){}}});
+const props={workOrderId:'wo',projectId:'project',currentUserId:'tech'};
+async function settle(){for(const fn of h.effects.splice(0))fn();for(let i=0;i<8;i++)await new Promise(setImmediate);return h.render(props,'default');}
 h.render(props,'default');let tree=await settle();
-assert.equal(text(tree).split('Assigned install').length-1,1,'Assigned project task must not appear twice');
-assert.ok(text(tree).includes('Other rough work'));assert.ok(!text(tree).includes('Trim work'));assert.ok(!text(tree).includes('Finished work'));assert.ok(!text(tree).includes('Cancelled work'));
-const references=nodes(tree).find(node=>node.type==='ul');assert.ok(!nodes(references).some(node=>node.type==='button'),'Reference tasks cannot be completed as assigned work');
-nodes(tree).find(node=>node.type==='button'&&text(node).includes('Browse all phases')).props.onClick();h.render(props,'default');tree=await settle();assert.ok(text(tree).includes('Trim work'));
-nodes(tree).find(node=>node.type==='button'&&node.props['aria-label']?.includes('Assigned install')).props.onClick();tree=h.render(props,'default');await nodes(tree).find(node=>node.type==='button'&&text(node)==='Complete').props.onClick();assert.equal(inserted[0].work_order_task_id,'wo-task');assert.equal(inserted[0].work_order_id,'wo');assert.equal(inserted[0].project_task_id,undefined);
-console.log('Work order task scope and modal lifecycle tests passed.');
+assert.ok(text(tree).includes("Today's Work"));assert.ok(text(tree).includes('Current master instruction'));assert.ok(text(tree).includes('Rough-in only'));assert.ok(text(tree).includes('Backing unfinished'),'Past visits must be visible');assert.ok(!text(tree).includes('Finished work'),'Unassigned project tasks stay out of today');
+await nodes(tree).find(node=>node.type==='button'&&text(node)==='Finish my portion').props.onClick();tree=await settle();assert.equal(calls[0].args.p_assignment_id,'visit-a');assert.equal(calls[0].args.p_complete_project,false);
+await nodes(tree).find(node=>node.type==='button'&&text(node)==='Complete entire project task').props.onClick();tree=await settle();assert.equal(calls[1].args.p_complete_project,true);
+nodes(tree).find(node=>node.type==='button'&&text(node)==='Full Project').props.onClick();tree=h.render(props,'default');assert.ok(text(tree).includes('Finished work'));assert.ok(text(tree).includes('Original overall scope'));assert.ok(text(tree).includes('Original room scope'));
+assert.ok(!nodes(tree).some(node=>node.type==='button'&&text(node).includes('Complete entire')),'Full project is reference, not unrelated assignment completion');
+console.log('Work order task scope, progress, full project and modal lifecycle tests passed.');
