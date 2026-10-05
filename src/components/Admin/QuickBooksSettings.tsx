@@ -298,8 +298,10 @@ export function QuickBooksSettings() {
       {isConnected && (
         <>
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm text-blue-900">Security onboarding requires QuickBooks Payments access to save cards or bank accounts and select existing payment methods. Your Intuit app and merchant account must support Payments.</p>
-            <button onClick={()=>void handleConnect(true)} disabled={connecting} className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-50">Connect QuickBooks Payments</button>
+            <h3 className="font-semibold text-blue-900">QuickBooks Payments: {settings?.payments_enabled ? 'Connected' : 'Not connected'}</h3>
+            {settings?.environment === 'sandbox' && <p className="text-sm text-amber-900">This connection uses the QuickBooks sandbox. It is for testing and cannot collect live customer payments.</p>}
+            <p className="text-sm text-blue-900">Connecting QuickBooks Accounting does not automatically enable payment enrollment. Security onboarding requires QuickBooks Payments access to save cards or bank accounts and select existing payment methods. Your Intuit app and merchant account must support Payments.</p>
+            <button onClick={()=>void handleConnect(true)} disabled={connecting} className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-50">{settings?.payments_enabled ? 'Reconnect QuickBooks Payments' : 'Connect QuickBooks Payments'}</button>
           </div>
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
