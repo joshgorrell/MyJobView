@@ -48,3 +48,32 @@ const count=calls.filter(c=>c.upload).length;await upload('image/svg+xml');await
 fail=false;await nodes(tree).find(n=>n.type==='button'&&text(n)==='Remove Artwork').props.onClick();tree=admin.render({},'CompanySettings');assert.equal(nodes(tree).find(n=>n.type==='Identity').props.company.business_card_banner_url,'');
 await nodes(tree).find(n=>n.type==='button'&&text(n)==='Use Electronic Life Artwork').props.onClick();tree=admin.render({},'CompanySettings');assert.equal(nodes(tree).find(n=>n.type==='Identity').props.company.business_card_banner_url,null);
 console.log('Default/custom/removed artwork, safe website links, card-owner branding, upload paths, save failures, validation, removal and reset passed.');
+
+// Preferences preview must keep core branding if the additive artwork field is
+// unavailable, and must not depend on the separate subdomain lookup succeeding.
+async function editorBrandingScenario({code=null, subdomainFailure=false, retry=false, banner=null}={}) {
+  const queries=[];let currentCode=code;
+  const editorSupabase={from(table){let projection='',org='';const q=new Proxy({},{get(_,key){if(key==='then')return (resolve,reject)=>{
+    queries.push({table,projection,org});
+    if(table==='organizations'&&subdomainFailure)return Promise.reject(new Error('Network unavailable')).then(resolve,reject);
+    const error=table==='company_settings'&&currentCode&&projection.includes('business_card_banner_url')?{code:currentCode,message:'Unavailable field'}:null;
+    const data=error?null:table==='company_settings'?{company_name:'  Electronic   Life  ',company_logo_url:'company-logo',website:'electroniclife.com',...(projection.includes('business_card_banner_url')?{business_card_banner_url:banner}:{})}:table==='organizations'?{subdomain:'elife'}:records.business_cards;
+    return Promise.resolve({data,error}).then(resolve,reject);
+  };if(key==='select')return value=>{projection=value;return q};if(key==='eq')return (field,value)=>{if(field==='organization_id')org=value;return q};return()=>q}});return q}};
+  const editor=harness('src/components/BusinessCard/UserBusinessCardEditor.tsx',{'../../lib/supabase':{supabase:editorSupabase},'../../contexts/AuthContext':{useAuth:()=>({user:{id:'owner'},profile:{id:'owner',organization_id:'org-a',full_name:'Josh Gorrell'},setProfileAvatar(){}})},'../ui/ConfirmModal':{default:'Confirm'},'../../lib/businessCardLinks':{getBusinessCardUrl:()=>''},'./BusinessCardIdentity':identityMock});
+  editor.render({},'UserBusinessCardEditor');let preview=await editor.settle({},'UserBusinessCardEditor');
+  if(retry){assert.ok(text(preview).includes('Company logo and artwork could not load.'));currentCode=null;nodes(preview).find(n=>n.type==='button'&&text(n)==='Retry').props.onClick();editor.render({},'UserBusinessCardEditor');preview=await editor.settle({},'UserBusinessCardEditor');}
+  const company=nodes(preview).find(n=>n.type==='Identity').props.company;
+  assert.equal(company.company_logo_url,'company-logo');
+  const actual=identity.render({...props,company},'BusinessCardIdentity');
+  assert.ok(nodes(actual).some(n=>n.type==='img'&&n.props.src==='company-logo'));
+  if(banner==='')assert.ok(!nodes(actual).some(n=>n.type==='img'&&n.props.alt===''));
+  else assert.ok(nodes(actual).some(n=>n.type==='img'&&n.props.src===(banner||'/images/electronic-life-card-banner.webp')));
+  assert.ok(queries.filter(q=>q.table==='company_settings').every(q=>q.org==='org-a'));
+  return queries;
+}
+for(const code of ['42703','PGRST204','42501']){const q=await editorBrandingScenario({code,subdomainFailure:true});assert.equal(q.filter(q=>q.table==='company_settings').length,2);}
+await editorBrandingScenario({banner:'https://example.com/custom.png'});
+await editorBrandingScenario({banner:''});
+await editorBrandingScenario({code:'NETWORK',retry:true});
+console.log('Editor logo/default artwork survives missing artwork column, column permissions and subdomain failure; custom/removed artwork, retry and tenant scope pass.');
