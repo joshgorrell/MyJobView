@@ -30,7 +30,11 @@ ALTER TABLE public.tasks
   ADD CONSTRAINT tasks_single_assignment_target
   CHECK (NOT (assigned_to IS NOT NULL AND assigned_department_id IS NOT NULL));
 
-CREATE OR REPLACE FUNCTION public.user_has_department_access(
+CREATE SCHEMA IF NOT EXISTS private;
+REVOKE ALL ON SCHEMA private FROM PUBLIC, anon;
+GRANT USAGE ON SCHEMA private TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.user_has_department_access(
   p_user_id uuid,
   p_department_id uuid
 )
@@ -76,23 +80,23 @@ AS $$
   END;
 $$;
 
-REVOKE ALL ON FUNCTION public.user_has_department_access(uuid, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.user_has_department_access(uuid, uuid) TO authenticated;
+REVOKE ALL ON FUNCTION private.user_has_department_access(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private.user_has_department_access(uuid, uuid) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_my_task_department_ids()
 RETURNS TABLE(department_id uuid)
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
+SECURITY INVOKER
+SET search_path = public, private
+AS $
   SELECT d.id
   FROM departments d
   WHERE d.is_active = true
-    AND public.user_has_department_access(auth.uid(), d.id);
+    AND private.user_has_department_access(auth.uid(), d.id);
 $$;
 
-REVOKE ALL ON FUNCTION public.get_my_task_department_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_my_task_department_ids() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_my_task_department_ids() TO authenticated;
 
 DROP POLICY IF EXISTS "Internal users can view open team tasks" ON public.tasks;
@@ -117,7 +121,7 @@ CREATE POLICY "Department members can view department tasks"
   TO authenticated
   USING (
     assigned_department_id IS NOT NULL
-    AND public.user_has_department_access(auth.uid(), assigned_department_id)
+    AND private.user_has_department_access(auth.uid(), assigned_department_id)
   );
 
 CREATE OR REPLACE FUNCTION public.notify_task_assigned()
@@ -176,7 +180,7 @@ BEGIN
            now()
     FROM profiles p
     WHERE COALESCE(p.is_active, true) = true
-      AND public.user_has_department_access(p.id, NEW.assigned_department_id);
+      AND private.user_has_department_access(p.id, NEW.assigned_department_id);
   END IF;
 
   RETURN NEW;
@@ -238,7 +242,7 @@ BEGIN
       RAISE EXCEPTION 'This task is assigned to another user';
     END IF;
   ELSIF v_task.assigned_department_id IS NOT NULL THEN
-    IF NOT public.user_has_department_access(v_user_id, v_task.assigned_department_id)
+    IF NOT private.user_has_department_access(v_user_id, v_task.assigned_department_id)
        AND v_task.user_id <> v_user_id
        AND NOT COALESCE(v_is_admin, false) THEN
       RAISE EXCEPTION 'You do not have access to this department task';
@@ -294,7 +298,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.complete_task_atomic(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.complete_task_atomic(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.complete_task_atomic(uuid) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.reopen_task_atomic(p_task_id uuid)
@@ -341,7 +345,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.reopen_task_atomic(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.reopen_task_atomic(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.reopen_task_atomic(uuid) TO authenticated;
 
 
@@ -367,3 +371,8 @@ CREATE TRIGGER trigger_enforce_atomic_task_completion
   BEFORE UPDATE OF status ON public.tasks
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_atomic_task_completion();
+
+
+-- Trigger functions do not need to be callable through the Data API.
+REVOKE ALL ON FUNCTION public.notify_task_assigned() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.enforce_atomic_task_completion() FROM PUBLIC, anon, authenticated;
