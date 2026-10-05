@@ -154,7 +154,11 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       setMyDepartmentIds(accessibleDepartmentIds);
 
       if (viewFilter === 'my') {
-        const myFilters = [`user_id.eq.${profile.id}`, `assigned_to.eq.${profile.id}`];
+        const myFilters = [
+          `user_id.eq.${profile.id}`,
+          `assigned_to.eq.${profile.id}`,
+          'and(assigned_to.is.null,assigned_department_id.is.null)'
+        ];
         if (accessibleDepartmentIds.length > 0) {
           myFilters.push(`assigned_department_id.in.(${accessibleDepartmentIds.join(',')})`);
         }
@@ -174,7 +178,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
         .is('parent_id', null);
 
       if (viewFilter === 'my') {
-        discussionQuery = discussionQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id}`);
+        discussionQuery = discussionQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id},assigned_to.is.null`);
       }
 
       const { data: discussionTasks, error: discussionError } = await discussionQuery
