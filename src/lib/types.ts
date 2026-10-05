@@ -230,6 +230,7 @@ export interface CompanySettings {
   from_email?: string | null;
   from_name?: string | null;
   reply_to_email?: string | null;
+  welcome_support_email?: string | null;
   job_module_enabled?: boolean;
   job_module_settings?: {
     commission_defaults?: {
