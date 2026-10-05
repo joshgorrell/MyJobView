@@ -113,7 +113,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
       const approvedNonBillable = cos.filter(c => c.status === 'approved' && c.is_billable === false && c.show_on_report !== false);
       const visibleCOs = cos.filter(c => !(c.is_billable === false && c.show_on_report === false));
 
-      const originalContract = order.contract_total || 0;
+      const originalContract = order.proposal?.total ?? order.original_contract_total ?? order.contract_total ?? 0;
       const coChangeTotal = approvedBillable.reduce((s, c) => s + (c.change_amount || 0), 0);
       const coTaxTotal = approvedBillable.reduce((s, c) => s + (c.tax_amount || 0), 0);
       const currentContractTotal = originalContract + coChangeTotal + coTaxTotal;
@@ -228,7 +228,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
       const invoices = invoiceRes.data || [];
       const payments = paymentRes.data || [];
 
-      const originalContract = order.contract_total || 0;
+      const originalContract = order.proposal?.total ?? order.original_contract_total ?? order.contract_total ?? 0;
       const coTotal = billableCOs.reduce((s, c) => s + (c.change_amount || 0) + (c.tax_amount || 0), 0);
       const currentContractTotal = originalContract + coTotal;
       const totalInvoiced = invoices.reduce((s, i) => s + (i.total || 0), 0);
@@ -569,7 +569,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
       const invoices = invoiceResult.data || [];
       const cos = coResult.data || [];
       const tasks = taskResult.data || [];
-      const originalContract = order.contract_total || 0;
+      const originalContract = order.proposal?.total ?? order.original_contract_total ?? order.contract_total ?? 0;
       const coTotal = cos.reduce((s, c) => s + (c.change_amount || 0), 0);
       const coTax = cos.reduce((s, c) => s + (c.tax_amount || 0), 0);
       const totalRevenue = originalContract + coTotal;
