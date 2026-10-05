@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Mail, Building2, Layout, UserCircle, Briefcase, X, Send } from 'lucide-react';
+import { Check, Building2, Layout, UserCircle, Briefcase, X, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { CreatedUserData } from './AddUserForm';
 
@@ -43,9 +43,10 @@ export function UserCreatedConfirmation({
       );
 
       const result = await response.json();
-      if (!response.ok) {
+      if (!response.ok || !result.success) {
         throw new Error(result.error || 'Failed to send welcome email');
       }
+      if (result.warning) setEmailError(result.warning);
       setEmailSent(true);
     } catch (error: any) {
       console.error('Error sending welcome email:', error);
@@ -168,8 +169,8 @@ export function UserCreatedConfirmation({
                 </p>
                 <p className="text-xs text-gray-500">
                   {emailSent
-                    ? `${userData.email} has been sent login instructions`
-                    : `Email login info to ${userData.email}`}
+                    ? `${userData.email} has been sent a secure password setup link`
+                    : `Send a password setup link to ${userData.email}`}
                 </p>
               </div>
             </button>

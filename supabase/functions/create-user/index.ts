@@ -209,24 +209,8 @@ serve(async (req) => {
       console.error("Starred modules exception:", starredErr);
     }
 
-    try {
-      await fetch(
-        `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": authHeader,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: newUser.user.email,
-            full_name,
-          }),
-        }
-      );
-    } catch (emailError) {
-      console.error("Welcome email exception:", emailError);
-    }
+    // Welcome sending is an explicit next step in UserCreatedConfirmation.
+    // Do not silently send a second welcome or swallow provider failures here.
 
     return new Response(
       JSON.stringify({ 

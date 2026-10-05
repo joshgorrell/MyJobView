@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { validateAssessment } from "./adminReview.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { bidFileFormat, bidFileHelp, validBidFile } from "./bidFileTypes.ts";
@@ -298,7 +299,7 @@ Deno.serve(async (req) => {
                 }</p><p><strong>Competing bid files:</strong> ${attachments.length}</p>${emailAttachments.length ? `<p>Attached to this email${part}: ${emailAttachments.map(a => escape(a.filename)).join(", ")}</p>` : ""}<p><a href="${
                   escape(link)
                 }">View the private response and attachments in MJV</a></p>`;
-              const sent = await fetch("https://api.resend.com/emails", {
+              const sent = await sendSystemEmail({
                 method: "POST",
                 headers: {
                   Authorization: `Bearer ${key}`,
@@ -469,7 +470,7 @@ Deno.serve(async (req) => {
         b.title,
         url,
       );
-      const result = await fetch("https://api.resend.com/emails", {
+      const result = await sendSystemEmail({
         method: "POST",
         headers: {
           Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`,

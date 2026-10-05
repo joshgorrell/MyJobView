@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -354,7 +355,7 @@ Deno.serve(async (req: Request) => {
         daysLabel: '30 days',
       });
 
-      const emailResponse = await fetch('https://api.resend.com/emails', {
+      const emailResponse = await sendSystemEmail({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
