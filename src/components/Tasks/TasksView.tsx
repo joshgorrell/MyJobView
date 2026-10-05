@@ -34,6 +34,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; isDiscussion?: boolean } | null>(null);
   const [viewFilter, setViewFilter] = useState<'my' | 'all'>('my');
   const [canViewAllTasks, setCanViewAllTasks] = useState<boolean>(false);
+  const [myDepartmentIds, setMyDepartmentIds] = useState<string[]>([]);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -147,15 +148,15 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           contacts(full_name, company_name, phone)
         `);
 
-      let myDepartmentIds: string[] = [];
-      if (viewFilter === 'my') {
-        const { data: departmentRows, error: departmentError } = await supabase.rpc('get_my_task_department_ids');
-        if (departmentError) throw departmentError;
-        myDepartmentIds = (departmentRows || []).map((row: any) => row.department_id);
+      const { data: departmentRows, error: departmentError } = await supabase.rpc('get_my_task_department_ids');
+      if (departmentError) throw departmentError;
+      const accessibleDepartmentIds = (departmentRows || []).map((row: any) => row.department_id);
+      setMyDepartmentIds(accessibleDepartmentIds);
 
+      if (viewFilter === 'my') {
         const myFilters = [`user_id.eq.${profile.id}`, `assigned_to.eq.${profile.id}`];
-        if (myDepartmentIds.length > 0) {
-          myFilters.push(`assigned_department_id.in.(${myDepartmentIds.join(',')})`);
+        if (accessibleDepartmentIds.length > 0) {
+          myFilters.push(`assigned_department_id.in.(${accessibleDepartmentIds.join(',')})`);
         }
         tasksQuery = tasksQuery.or(myFilters.join(','));
       }
