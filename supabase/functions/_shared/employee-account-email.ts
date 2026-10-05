@@ -1,3 +1,4 @@
+import { renderAccountEmail } from './account-email-template.ts';
 import { sendSystemEmail } from './system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 export const corsHeaders = {
@@ -5,7 +6,6 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
-const escape = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 export async function handleAccountEmail(req: Request, kind: 'welcome' | 'reset') {
   const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -39,7 +39,7 @@ export async function handleAccountEmail(req: Request, kind: 'welcome' | 'reset'
     tracked = true;
     const key = Deno.env.get('RESEND_API_KEY');
     if (!key) throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
-    const { data: settings, error: settingsError } = await db.from('company_settings').select('company_name,app_url,from_email,from_name,reply_to_email').eq('organization_id', admin.organization_id).single();
+    const { data: settings, error: settingsError } = await db.from('company_settings').select('company_name,company_logo_url,app_url,from_email,from_name,reply_to_email').eq('organization_id', admin.organization_id).single();
     if (settingsError) throw settingsError;
     const from = settings?.from_email;
     if (!from || from.endsWith('@resend.dev')) throw new Error('Configure a verified email sender in company settings.');
@@ -56,10 +56,12 @@ export async function handleAccountEmail(req: Request, kind: 'welcome' | 'reset'
     if (!actualRedirect || new URL(actualRedirect).origin !== login.origin || (kind === 'welcome' && new URL(actualRedirect).searchParams.get('account_setup') !== 'welcome')) throw new Error('Add the application URL and welcome URL to Supabase Auth redirect URLs.');
     const company = settings.company_name || 'Your company';
     const subject = kind === 'welcome' ? `Welcome to MyJobView — ${company}` : 'Reset your MyJobView password';
-    const button = kind === 'welcome' ? 'Set Up My Account' : 'Reset My Password';
-    const introduction = kind === 'welcome' ? `${company} uses MyJobView to keep projects, tasks, schedules, and team communication in one place. Choose your password to get started.` : 'Use the secure link below to choose a new password.';
-    const text = `Hello ${target.full_name},\n\n${introduction}\n\nYour login email: ${target.email}\n\n${button}: ${link.properties.action_link}\n\nThis one-time link expires. Ask your administrator for a new email if needed.\n\nLogin: ${login.origin}`;
-    const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#111827"><h1 style="color:#163d7a">MyJobView</h1><h2>${escape(subject)}</h2><p>Hello ${escape(target.full_name)},</p><p>${escape(introduction)}</p><p>Your login email: <strong>${escape(target.email)}</strong></p><p style="margin:28px 0"><a href="${escape(link.properties.action_link)}" style="background:#163d7a;color:white;padding:14px 22px;text-decoration:none;border-radius:6px">${button}</a></p><p>This one-time link expires. Ask your administrator for a new email if needed.</p><p>Login: <a href="${escape(login.origin)}">${escape(login.origin)}</a></p></div>`;
+    const { html, text } = renderAccountEmail({
+      kind, companyName: company, companyLogoUrl: settings.company_logo_url,
+      fullName: target.full_name, email: target.email,
+      actionUrl: link.properties.action_link, loginUrl: login.origin,
+      supportEmail: settings.reply_to_email || from,
+    });
     const response = await sendSystemEmail({ method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: `${(settings.from_name || settings.company_name || 'MyJobView').replace(/[<>\r\n]/g, '')} <${from}>`, to: [target.email], reply_to: settings.reply_to_email || from, subject, text, html }) });
     const result = await response.json();
     if (!response.ok || !result.id) throw new Error(`Email provider rejected the message: ${result.message || 'Unknown error'}`);

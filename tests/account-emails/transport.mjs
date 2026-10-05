@@ -6,7 +6,7 @@ const env = { RESEND_API_KEY: 'test-key', SUPABASE_URL: 'https://test.supabase.c
 globalThis.Deno = { env: { get: key => env[key] }, serve() {} };
 let actor = { role: 'admin', is_active: true, organization_id: 'org-1' };
 let target = { id: 'employee', email: 'employee@example.com', full_name: '<Employee>', is_active: true };
-let settings = { company_name: 'Company', app_url: 'https://app.example.com', from_email: 'verified@example.com', from_name: 'Company', reply_to_email: 'help@example.com' };
+let settings = { company_name: 'Company', company_logo_url: 'https://dealer.example.com/logo.png', app_url: 'https://app.example.com', from_email: 'verified@example.com', from_name: 'Company', reply_to_email: 'help@example.com' };
 let providerStatus = 200;
 let redirectAllowed = true;
 let updateFailure = false;
@@ -45,7 +45,9 @@ async function load(path, substitutions = []) {
 }
 const {sendSystemEmail}=await load('supabase/functions/_shared/system-email.ts');
 globalThis.__sendSystemEmail=sendSystemEmail;
-const {handleAccountEmail}=await load('supabase/functions/_shared/employee-account-email.ts', [[/import \{ sendSystemEmail \} from [^;]+;/,'const sendSystemEmail = globalThis.__sendSystemEmail;']]);
+const {renderAccountEmail}=await load('supabase/functions/_shared/account-email-template.ts');
+globalThis.__renderAccountEmail=renderAccountEmail;
+const {handleAccountEmail}=await load('supabase/functions/_shared/employee-account-email.ts', [[/import \{ sendSystemEmail \} from [^;]+;/,'const sendSystemEmail = globalThis.__sendSystemEmail;'],[/import \{ renderAccountEmail \} from [^;]+;/,'const renderAccountEmail = globalThis.__renderAccountEmail;']]);
 const req = (body={email:target.email},token='valid') => new Request('https://edge.example.com',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
 assert.equal((await handleAccountEmail(req({},'invalid'),'welcome')).status,401);
 actor.role='tech'; assert.equal((await handleAccountEmail(req(),'welcome')).status,403); actor.role='admin';
@@ -60,7 +62,7 @@ providerStatus=200;
 let response=await handleAccountEmail(req(),'welcome'); assert.equal(response.status,200); assert.equal((await response.json()).success,true);
 assert.ok(tracked.welcome_sent_at); assert.equal(tracked.welcome_email_id,'email-123'); assert.equal(tracked.welcome_error,null);
 assert.equal(sent.at(-1).payload.from,'Company <verified@example.com>'); assert.equal(sent.at(-1).payload.reply_to,'help@example.com');
-assert.ok(sent.at(-1).payload.html.includes('Set Up My Account')); assert.ok(sent.at(-1).payload.html.includes('&lt;Employee&gt;'));
+assert.ok(sent.at(-1).payload.html.includes('Set Up My Account'));assert.ok(sent.at(-1).payload.html.includes('https://dealer.example.com/logo.png'));assert.ok(sent.at(-1).payload.html.includes('Powered by MyJobView'));assert.ok(sent.at(-1).payload.html.includes('mailto:help@example.com')); assert.ok(sent.at(-1).payload.html.includes('&lt;Employee&gt;'));
 assert.ok(!sent.at(-1).payload.html.includes('<Employee>'));
 response=await handleAccountEmail(req(),'reset'); assert.equal(response.status,200); assert.ok(sent.at(-1).payload.html.includes('Reset My Password'));
 const count=sent.length; redirectAllowed=false; assert.equal((await handleAccountEmail(req(),'welcome')).status,400); assert.equal(sent.length,count); redirectAllowed=true;
@@ -94,3 +96,9 @@ assert.deepEqual(sent.at(-2).payload.to,['old@example.com']);assert.ok(sent.at(-
 assert.deepEqual(sent.at(-1).payload.to,['new@example.com']);assert.ok(sent.at(-1).payload.text.includes('hash-for-new'));
 providerStatus=403;assert.equal((await handleAuthEmail(authReq(recovery))).status,502);
 console.log('Signed Auth hook recovery, replay-window rejection, provider failure and secure email-change token mapping passed.');
+
+const fixture={kind:'welcome',companyName:'Other Dealer',companyLogoUrl:'https://other.example.com/logo.png',fullName:'Employee',email:'user@example.com',actionUrl:'https://app.example.com/setup',loginUrl:'https://app.example.com',supportEmail:'support@example.com'};
+assert.ok(renderAccountEmail(fixture).html.includes('https://other.example.com/logo.png'));
+const noLogo=renderAccountEmail({...fixture,companyLogoUrl:null}).html;assert.ok(noLogo.includes('Other Dealer'));assert.ok(!noLogo.includes('<img'));
+assert.ok(!renderAccountEmail({...fixture,companyLogoUrl:'javascript:alert(1)'}).html.includes('<img'));
+console.log('Dealer logo, company-name fallback, safe logo URLs and support footer passed.');
