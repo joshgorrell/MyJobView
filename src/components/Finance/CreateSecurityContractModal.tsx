@@ -52,7 +52,7 @@ interface AIPrefill {
 
 interface CreateSecurityContractModalProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (contract: { id: string }) => void;
   onPaperCreated?: (contract: { id: string }) => void;
   prefill?: AIPrefill;
 }
@@ -268,7 +268,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
       creationRequest.current = crypto.randomUUID();
       if (onPaperCreated) onPaperCreated(contractData);
-      else onSuccess();
+      else onSuccess(contractData);
     } catch (error: any) {
       console.error('Error creating contract:', error);
       const errorMessage = error?.message || 'Unknown error occurred';

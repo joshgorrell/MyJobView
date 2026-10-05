@@ -190,6 +190,46 @@ assert.match(await staffPage.locator('label').filter({hasText:'Monthly Price Ove
 assert.match(await staffPage.locator('label').filter({hasText:'Internal Notes'}).innerText(),/Internal only/);
 assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Staff edit visibility labels fit mobile');
 
+// Creation immediately offers sending; declining keeps the pending agreement.
+let invitationCount=0;
+await staffContext.route('https://security-test.supabase.co/rest/v1/security_contracts*',async route=>{
+ const record={id:'new-contract',contract_number:'SC-NEW',status:'draft',created_at:'2026-10-05T12:00:00Z',monthly_price:35,email_override:insertedContract?.email_override,contact:{full_name:'Test Customer',email:'customer@example.com'},template:{name:'Monitoring'}};
+ return route.fulfill({json:insertedContract?[record]:[]});
+});
+await staffContext.route('https://security-test.supabase.co/functions/v1/send-contract-invitation',async route=>{
+ assert.equal(route.request().postDataJSON().contractId,'new-contract');invitationCount++;
+ return route.fulfill({json:{success:true}});
+});
+insertedContract=undefined;
+await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?onboarding-list');
+await staffPage.getByRole('heading',{name:'Security Onboarding',exact:true}).waitFor();
+assert.equal(await staffPage.getByRole('button',{name:'Enter completed paper form',exact:true}).count(),0);
+assert.equal(await staffPage.getByRole('button',{name:'Print blank onboarding form',exact:true}).count(),1);
+assert.equal(await staffPage.getByRole('button',{name:'View all agreements',exact:true}).innerText(),'Agreements');
+for(const sendNow of [false,true]) {
+ await staffPage.getByRole('button',{name:'New agreement',exact:true}).click();
+ await staffPage.getByRole('heading',{name:'Create Security Agreement',exact:true}).waitFor();
+ await staffPage.getByRole('combobox').first().selectOption('template-1');
+ await staffPage.getByPlaceholder('Type a name or email to search...').fill('Test');
+ await staffPage.getByRole('button',{name:/Test Customer.*customer@example.com/}).click();
+ await staffPage.getByRole('checkbox',{name:/Monitoring.*35/}).check();
+ await staffPage.getByPlaceholder('Send invitation to a different email address...').fill('recipient@example.com');
+ await staffPage.getByRole('button',{name:'Create Agreement',exact:true}).click();
+ await staffPage.getByRole('heading',{name:'Agreement Created',exact:true}).waitFor();
+ assert.equal(invitationCount,0,'Creating or declining never sends automatically');
+ assert.ok((await staffPage.getByRole('dialog',{name:'Agreement action'}).innerText()).includes('recipient@example.com'));
+ assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Create/send flow fits mobile');
+ if(sendNow){
+  await staffPage.getByRole('button',{name:'Send Agreement',exact:true}).click();
+  await staffPage.getByRole('heading',{name:'Agreement Sent!',exact:true}).waitFor();
+  assert.equal(invitationCount,1);
+  await staffPage.getByRole('button',{name:'Done',exact:true}).click();
+ }else await staffPage.getByRole('button',{name:'Not now',exact:true}).click();
+ assert.equal(await staffPage.getByRole('button',{name:'Print blank onboarding form',exact:true}).count(),1,'Pending cards do not repeat blank printing');
+}
+await staffPage.getByRole('button',{name:'View all agreements',exact:true}).click();
+assert.equal(await staffPage.title(),'Contract Management');
+
 let printPayload;
 await staffContext.route('https://security-test.supabase.co/functions/v1/generate-blank-contract-form',async route=>{printPayload=route.request().postDataJSON();await route.fulfill({contentType:'text/html',body:'<h1>Handwritten onboarding form</h1>'});});
 await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?print');
