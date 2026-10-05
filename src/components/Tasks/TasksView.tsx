@@ -34,6 +34,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; isDiscussion?: boolean } | null>(null);
   const [viewFilter, setViewFilter] = useState<'my' | 'all'>('my');
   const [canViewAllTasks, setCanViewAllTasks] = useState<boolean>(false);
+  const [myDepartmentIds, setMyDepartmentIds] = useState<string[]>([]);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -143,11 +144,25 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           *,
           profiles!tasks_user_id_fkey(full_name),
           assigned_profile:profiles!tasks_assigned_to_fkey(full_name),
+          assigned_department:departments!tasks_assigned_department_id_fkey(id, display_name),
           contacts(full_name, company_name, phone)
         `);
 
+      const { data: departmentRows, error: departmentError } = await supabase.rpc('get_my_task_department_ids');
+      if (departmentError) throw departmentError;
+      const accessibleDepartmentIds = (departmentRows || []).map((row: any) => row.department_id);
+      setMyDepartmentIds(accessibleDepartmentIds);
+
       if (viewFilter === 'my') {
-        tasksQuery = tasksQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id}`);
+        const myFilters = [
+          `user_id.eq.${profile.id}`,
+          `assigned_to.eq.${profile.id}`,
+          'and(assigned_to.is.null,assigned_department_id.is.null)'
+        ];
+        if (accessibleDepartmentIds.length > 0) {
+          myFilters.push(`assigned_department_id.in.(${accessibleDepartmentIds.join(',')})`);
+        }
+        tasksQuery = tasksQuery.or(myFilters.join(','));
       }
 
       const { data: tasksData, error: tasksError } = await tasksQuery
@@ -163,7 +178,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
         .is('parent_id', null);
 
       if (viewFilter === 'my') {
-        discussionQuery = discussionQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id}`);
+        discussionQuery = discussionQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id},assigned_to.is.null`);
       }
 
       const { data: discussionTasks, error: discussionError } = await discussionQuery
@@ -172,7 +187,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       if (discussionError) throw discussionError;
 
       // Fetch profile data for discussion tasks
-      const userIds = [...new Set(discussionTasks?.map((t: any) => t.user_id) || [])];
+      const userIds = [...new Set((discussionTasks || []).flatMap((t: any) => [t.user_id, t.assigned_to]).filter(Boolean))];
       const { data: profilesData } = userIds.length > 0
         ? await supabase.from('profiles').select('id, full_name').in('id', userIds)
         : { data: [] };
@@ -196,6 +211,10 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           created_at: post.created_at,
           updated_at: post.updated_at,
           profiles: postProfile,
+          assigned_to: post.assigned_to || null,
+          assigned_profile: post.assigned_to ? profilesMap.get(post.assigned_to) : null,
+          assigned_department_id: null,
+          assigned_department: null,
           _isDiscussionTask: true,
           _discussionPost: post
         };
@@ -285,30 +304,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           }]);
         }
       } else {
-        // Handle regular task
-        const updateData: any = {
-          status: newStatus,
-          completed_at: newStatus === 'completed' ? new Date().toISOString() : null
-        };
-
-        if (newStatus === 'completed' && !(task as any).assigned_to && !(task as any).claimed_by) {
-          updateData.claimed_by = profile?.id;
-        }
-
-        const { error } = await supabase
-          .from('tasks')
-          .update(updateData)
-          .eq('id', task.id);
-
-        if (error) throw error;
-
-        if (newStatus === 'completed' && profile) {
-          const pointsToAward = (task as any).points || 10;
-          await supabase.rpc('award_points', {
-            p_user_id: profile.id,
-            p_points: pointsToAward,
-            p_reason: `Completed task: ${task.title}`
-          });
+        // Regular tasks complete atomically in the database so only the first
+        // eligible user can claim an open/department task and receive points.
+        if (newStatus === 'completed') {
+          const { error } = await supabase.rpc('complete_task_atomic', { p_task_id: task.id });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.rpc('reopen_task_atomic', { p_task_id: task.id });
+          if (error) throw error;
         }
       }
 
@@ -377,12 +380,13 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       const descriptionMatch = task.description?.toLowerCase().includes(search);
       const assignedUserName = (task as any).assigned_user_name?.toLowerCase();
       const assignedUserMatch = assignedUserName?.includes(search);
+      const assignedDepartmentMatch = (task as any).assigned_department?.display_name?.toLowerCase().includes(search);
       const leadMatch = task.lead_id && leads[task.lead_id]
         ? (leads[task.lead_id].company_name?.toLowerCase().includes(search) ||
            leads[task.lead_id].contact_name?.toLowerCase().includes(search))
         : false;
 
-      if (!titleMatch && !descriptionMatch && !assignedUserMatch && !leadMatch) {
+      if (!titleMatch && !descriptionMatch && !assignedUserMatch && !assignedDepartmentMatch && !leadMatch) {
         return false;
       }
     }
@@ -512,9 +516,12 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               const isDiscussionTask = (task as any)._isDiscussionTask;
               const isOwner = profile?.id === task.user_id;
               const isAssigned = profile?.id === (task as any).assigned_to;
+              const isDepartmentTask = !!(task as any).assigned_department_id;
+              const isMyDepartmentTask = isDepartmentTask && myDepartmentIds.includes((task as any).assigned_department_id);
+              const isOpenTeamTask = !(task as any).assigned_to && !(task as any).assigned_department_id;
               const isAdmin = profile?.role === 'admin';
               const canEdit = isOwner || isAdmin;
-              const canInteract = isOwner || isAssigned || isAdmin;
+              const canInteract = isOwner || isAssigned || isMyDepartmentTask || isOpenTeamTask || isAdmin;
               const canDelete = isOwner || isAdmin;
               const lead = task.lead_id ? leads[task.lead_id] : null;
 
@@ -596,6 +603,16 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         {(task as any).assigned_profile && (
                           <span className="px-1.5 py-0.5 rounded font-medium bg-violet-100 text-violet-700 truncate max-w-[80px]">
                             → {(task as any).assigned_profile.full_name.split(' ')[0]}
+                          </span>
+                        )}
+                        {(task as any).assigned_department && (
+                          <span className="px-1.5 py-0.5 rounded font-medium bg-cyan-100 text-cyan-700 truncate max-w-[110px]">
+                            → {(task as any).assigned_department.display_name}
+                          </span>
+                        )}
+                        {!(task as any).assigned_profile && !(task as any).assigned_department && task.status !== 'completed' && (
+                          <span className="px-1.5 py-0.5 rounded font-medium bg-gray-100 text-gray-600">
+                            Anyone
                           </span>
                         )}
                         {task.status === 'completed' && task.completed_at && (
