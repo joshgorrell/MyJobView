@@ -695,7 +695,7 @@ function AppContent() {
     if (!user || !profile) return <LoginForm />;
     if (!['admin', 'manager', 'sales_manager'].includes(profile.role)) {
       return (
-        <div className="h-screen bg-workspace flex items-center justify-center">
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
             <TrendingUp size={64} className="mx-auto text-muted mb-4" />
             <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
@@ -722,14 +722,14 @@ function AppContent() {
 
     if (!soId) {
       return (
-        <div className="h-screen bg-workspace flex items-center justify-center">
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
           <p className="text-muted">No sales order specified.</p>
         </div>
       );
     }
 
     return (
-      <div className="h-screen bg-workspace flex flex-col overflow-auto p-3 sm:p-6">
+      <div className="theme-workspace h-screen bg-workspace flex flex-col overflow-auto p-3 sm:p-6">
         <Suspense fallback={<LoadingFallback />}>
           <SalesOrderDetail orderId={soId} onBack={() => window.close()} isStandalone={true} initialTab={soActiveTab ?? undefined} />
         </Suspense>
@@ -749,7 +749,7 @@ function AppContent() {
 
     if (!checkModuleAccess('proposals')) {
       return (
-        <div className="h-screen bg-workspace flex items-center justify-center">
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
             <FileText size={64} className="mx-auto text-muted mb-4" />
             <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
@@ -764,7 +764,7 @@ function AppContent() {
     const proposalId = urlParams.get('id');
 
     return (
-      <div className="h-screen bg-workspace flex flex-col overflow-hidden">
+      <div className="theme-workspace h-screen bg-workspace flex flex-col overflow-hidden">
         <Suspense fallback={<LoadingFallback />}>
           <ProposalsView isStandalone={!!proposalId} openProposalId={proposalId} />
         </Suspense>
@@ -866,7 +866,7 @@ function AppContent() {
   }
 
   return (
-    <div className="workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
+    <div className="theme-workspace workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
       {!isStandalone && (
         <>

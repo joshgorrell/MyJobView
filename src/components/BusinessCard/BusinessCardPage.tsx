@@ -304,7 +304,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
   return (
     <div className={isOwnCard ? "p-0" : "min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 py-12"}>
       <div className="max-w-lg mx-auto">
-        <div className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d] rounded-3xl shadow-2xl border border-purple-400/30 overflow-hidden">
+        <div data-theme-fixed className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d] rounded-3xl shadow-2xl border border-purple-400/30 overflow-hidden">
           <BusinessCardIdentity fullName={card.full_name} title={card.title} email={card.email} phone={card.phone} linkedinUrl={card.linkedin_url} photoUrl={card.photo_url} company={companySettings} />
           <div className="px-6 sm:px-8 pb-6">
             {card.bio && (

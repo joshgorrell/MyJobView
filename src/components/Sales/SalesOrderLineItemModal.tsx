@@ -252,7 +252,7 @@ export function SalesOrderLineItemModal({
   const isLabor = lineItem?.item_type === 'labor';
 
   const modal = (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+    <div className="theme-workspace fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
 
         {/* Header */}

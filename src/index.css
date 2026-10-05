@@ -12,7 +12,7 @@
   --text-muted: 209 213 219;
   --border-subtle: 75 85 99;
   --border-strong: 107 114 128;
-  --brand-text: 96 165 250;
+  --brand-text: 147 197 253;
   --warning-text: 253 230 138;
   --warning-surface: 60 42 21;
   --warning-border: 146 64 14;
@@ -251,6 +251,16 @@ html {
   --accent-surface: 69 10 10;
   color: rgb(var(--text-primary));
   color-scheme: dark;
+  --workspace-text-primary: 255 255 255;
+  --workspace-text-secondary: 229 231 235;
+  --workspace-text-muted: 212 212 212;
+  --workspace-brand-text: 147 197 253;
+  --workspace-info-text: 147 197 253;
+  --workspace-warning-text: 253 230 138;
+  --workspace-success-text: 134 239 172;
+  --workspace-danger-text: 252 165 165;
+  --workspace-attention-text: 253 186 116;
+  --workspace-accent-text: 252 165 165;
 }
 
 [data-theme='mjv'] .theme-header {
