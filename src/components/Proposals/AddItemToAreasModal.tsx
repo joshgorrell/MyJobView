@@ -461,7 +461,7 @@ export default function AddItemToAreasModal({
   } : null;
 
   const modal = (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+    <div className="theme-workspace fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ maxHeight: '92vh' }}>
 
         {/* Header */}

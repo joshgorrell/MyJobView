@@ -32,7 +32,7 @@ export function ThemeSelector() {
           <button key={value} type="button" aria-pressed={preference === value} disabled={saving}
             onClick={() => select(value)}
             className={`min-w-0 rounded-lg border p-2.5 sm:p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-wait ${preference === value ? 'border-brand bg-infoSoft text-primary' : 'border-subtle bg-surface text-primary hover:bg-elevated'}`}>
-            <span aria-hidden="true" className={`mb-2 flex h-7 items-center justify-end rounded-md bg-gradient-to-r ${preview} ${value === 'mjv' ? 'border-2 border-black' : ''}`}>
+            <span data-theme-fixed aria-hidden="true" className={`mb-2 flex h-7 items-center justify-end rounded-md bg-gradient-to-r ${preview} ${value === 'mjv' ? 'border-2 border-black' : ''}`}>
               {preference === value && <Check className="mr-1 h-5 w-5 rounded-full bg-blue-700 p-0.5 text-white" />}
             </span>
             <span className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold leading-5"><Icon aria-hidden="true" className="h-4 w-4 shrink-0" />{label}</span>

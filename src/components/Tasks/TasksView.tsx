@@ -475,7 +475,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               placeholder="Search tasks..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-9 py-2 text-sm bg-canvas text-primary placeholder:text-muted border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             {searchTerm && (
               <button
@@ -488,7 +488,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
+            <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer hover:text-primary transition-colors">
               <input
                 type="checkbox"
                 checked={showCompleted}
@@ -502,10 +502,10 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       </div>
 
       {filteredTasks.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+        <div className="text-center py-12 bg-surface rounded-lg border-2 border-dashed border-subtle">
           <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-          <p className="text-gray-300">Create your first task to get started</p>
+          <h3 className="text-lg font-medium text-primary mb-2">No tasks found</h3>
+          <p className="text-muted">Create your first task to get started</p>
         </div>
       ) : (
         <div className="space-y-1.5">

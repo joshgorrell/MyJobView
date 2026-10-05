@@ -274,7 +274,7 @@ export function UserBusinessCardEditor() {
       </div>}
       {!editing ? (
         <section className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm" aria-label="Your business card">
-          <div className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d]">
+          <div data-theme-fixed className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d]">
             <BusinessCardIdentity fullName={fullName || profile?.full_name || 'Your business card'} title={title} email={email} phone={phone} linkedinUrl={linkedinUrl} photoUrl={photoUrl} company={company} />
             <BusinessCardFooter company={company} />
           </div>

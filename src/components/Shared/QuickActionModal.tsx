@@ -127,7 +127,7 @@ export function QuickActionModal({
           max-width: 100%;
           font-size: max(16px, 1em) !important;
         }
-        .qam-header-icon svg { color: white; }
+        .qam-header-icon svg { color: rgb(var(--text-primary)); }
         @media (max-width: 639px) {
           .qam-body button { min-height: 44px; }
           .qam-body input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
