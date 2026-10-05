@@ -318,7 +318,6 @@ function SendAgreementDialog({
 export default function SecurityOnboarding({ onNavigateToContracts, canAccessContractManagement }: SecurityOnboardingProps = {}) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPrintForm, setShowPrintForm] = useState(false);
-  const [createPaperOnboarding, setCreatePaperOnboarding] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -559,6 +558,16 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
           <p className="text-sm sm:text-base text-gray-300">Track pending and in-progress customer agreement onboarding</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            aria-label="New agreement"
+            title="New agreement"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span>New</span>
+          </button>
           {onNavigateToContracts && canAccessContractManagement !== false && (
             <button
               type="button"
@@ -568,7 +577,7 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
               className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/25 px-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
             >
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Agreements</span>
+              <span>Agreements</span>
             </button>
           )}
           <button
@@ -576,21 +585,9 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
             onClick={() => setShowPrintForm(true)}
             aria-label="Print blank onboarding form"
             title="Print blank onboarding form"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-blue-700 transition-colors hover:bg-blue-50"
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Print Paper Form</span>
-          </button>
-          <button type="button" onClick={() => { setCreatePaperOnboarding(true); setShowCreateModal(true); }} aria-label="Enter completed paper form" title="Enter completed paper form" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-blue-700 hover:bg-blue-50"><FileText className="h-4 w-4" /><span className="hidden sm:inline">Enter Completed Paper Form</span></button>
-          <button
-            type="button"
-            onClick={() => { setCreatePaperOnboarding(false); setShowCreateModal(true); }}
-            aria-label="New online agreement"
-            title="New online agreement"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">New Online</span>
           </button>
         </div>
       </div>
@@ -820,12 +817,6 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
       {showCreateModal && (
         <CreateSecurityContractModal
           onClose={() => setShowCreateModal(false)}
-          onPaperCreated={createPaperOnboarding ? (contract) => {
-            setShowCreateModal(false);
-            setContractForManualEntry(contract as Contract);
-            setShowManualEntry(true);
-            loadContracts(false);
-          } : undefined}
           onSuccess={() => {
             setShowCreateModal(false);
             loadContracts(false);
