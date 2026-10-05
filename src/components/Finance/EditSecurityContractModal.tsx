@@ -477,7 +477,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
                 <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers <SecurityFieldVisibility internal /></label>
                 {accountServices.includes('dial_up') && (
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number <SecurityFieldVisibility internal /></label>
+                    <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
                     <input
                       type="text"
                       value={serviceAccountNumbers.dial_up || ''}
@@ -489,7 +489,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
                 )}
                 {accountServices.includes('telguard') && (
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number <SecurityFieldVisibility internal /></label>
+                    <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number</label>
                     <input
                       type="text"
                       value={serviceAccountNumbers.telguard || ''}
@@ -501,7 +501,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
                 )}
                 {accountServices.includes('alarmnet') && (
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number <SecurityFieldVisibility internal /></label>
+                    <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number</label>
                     <input
                       type="text"
                       value={serviceAccountNumbers.alarmnet || ''}
@@ -513,7 +513,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
                 )}
                 {accountServices.includes('alarm_com') && (
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number <SecurityFieldVisibility internal /></label>
+                    <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number</label>
                     <input
                       type="text"
                       value={serviceAccountNumbers.alarm_com || ''}
