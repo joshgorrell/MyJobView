@@ -5,6 +5,7 @@ import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign,
 import SecurityContractDetail from './SecurityContractDetail';
 import SecurityAccountStats from './SecurityAccountStats';
 import ConfirmModal from '../ui/ConfirmModal';
+import {PaymentAlertsPanel} from './PaymentAlertsPanel';
 
 interface Contract {
   id: string;
@@ -259,6 +260,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </div>
       </div>
 
+      <PaymentAlertsPanel onOpenContract={id=>{const contract=contracts.find(c=>c.id===id);if(contract)setSelectedContract(contract);}} />
       <div className="flex gap-1 mb-6 bg-white/10 rounded-lg p-1 w-fit">
         <button
           onClick={() => setActiveTab('contracts')}

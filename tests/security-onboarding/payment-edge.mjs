@@ -4,6 +4,7 @@ import ts from 'typescript';
 const compile=source=>ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 const moduleFrom=source=>import('data:text/javascript;base64,'+Buffer.from(compile(source)).toString('base64'));
 const {maskedPayment,paymentsOrigin}=await moduleFrom(await readFile(new URL('../../supabase/functions/_shared/security-payment-vault.ts',import.meta.url),'utf8'));
+let staffStatus='pending_customer';
 let staffAllowed=false,allowed=true,enabled=true,mail=false,linked=true,adminReads=0,providerReads=0,stored;
 const contract={contact_id:'customer-1',organization_id:'org-1'};
 const chain=table=>{
@@ -24,7 +25,7 @@ const chain=table=>{
  return q;
 };
 globalThis.__securityEdgeDeps={
- createClient:()=>({rpc:async(name)=> (name==='staff_security_onboarding' ? staffAllowed : allowed)?{data:{status:'pending_customer',customer_completed_at:null}}:{error:{message:'Denied'}}}),
+ createClient:()=>({rpc:async(name)=> (name==='staff_security_onboarding' ? staffAllowed : allowed)?{data:{status:staffStatus,customer_completed_at:staffStatus==='active'?'completed':null}}:{error:{message:'Denied'}}}),
  corsHeaders:{},getSupabaseAdmin:()=>({from:chain}),getConnection:async()=>({environment:'sandbox',payments_enabled:enabled}),
  getValidAccessToken:async()=>'server-only-access-token',getQboIdByLocalId:async()=>null,maskedPayment,paymentsOrigin,
  vaultRequest:async(origin,access,customer,type,token,id)=>{
@@ -43,6 +44,7 @@ const call=async(body)=>{
 };
 allowed=false;assert.equal((await call({action:'list'})).status,403);assert.equal(adminReads,0,'Denied invitations do not reach service-role reads');
 staffAllowed=true;assert.equal((await call({action:'list',token:''})).status,200,'Authorized staff use the same enrollment gateway');
+staffStatus='active';assert.equal((await call({action:'list',token:''})).status,200,'Authorized staff can enroll a replacement for an active agreement');assert.equal((await call({action:'list'})).status,403,'Invitation alone cannot edit an active agreement');staffStatus='pending_customer';
 staffAllowed=false;assert.equal((await call({action:'list',token:''})).status,403,'Staff access is enforced before provider reads');adminReads=0;providerReads=0;
 allowed=true;assert.equal((await call({action:'add',cardNumber:'4111111111111111'})).status,400,'Raw payment data is rejected');
 enabled=false;assert.equal((await call({action:'list'})).status,409);assert.equal(providerReads,0,'Accounting-only credentials cannot enroll methods');

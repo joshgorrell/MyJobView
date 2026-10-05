@@ -257,3 +257,9 @@ verify_jwt = false
 
 [functions.lost-opportunity-review]
 verify_jwt = false
+
+[functions.security-payment-alerts]
+verify_jwt = false
+
+[functions.security-payment-settlement-watch]
+verify_jwt = false

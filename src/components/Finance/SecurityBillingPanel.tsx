@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
+import {PaymentAlertsPanel} from './PaymentAlertsPanel';
+import {ActiveAutopayMethodEditor} from './ActiveAutopayMethodEditor';
 
 interface Cycle { id:string; state:string; amount:number|null; period_start:string; last_message:string|null; processor_id:string|null;updated_at:string }
 export function SecurityBillingPanel({ contractId, organizationId, canEdit = false }: { contractId:string; organizationId:string; canEdit?:boolean }) {
@@ -40,6 +42,8 @@ export function SecurityBillingPanel({ contractId, organizationId, canEdit = fal
   }
   return <section className="no-print bg-white text-gray-900 rounded-xl p-5 mb-6 space-y-4">
     <h2 className="font-semibold text-lg">Monitoring billing</h2>
+    <PaymentAlertsPanel contractId={contractId}/>
+    <ActiveAutopayMethodEditor contractId={contractId} organizationId={organizationId} onUpdated={()=>void reload()}/>
     <p>Monitoring starts: {dates.monitoring_start_date || 'Not scheduled'}. First payment scheduled: {dates.first_payment_date || 'Not scheduled'}. First payment confirmed: {firstPaid ? new Date(firstPaid).toLocaleDateString() : 'Not yet confirmed'}.</p>
     <label className="block">Tax classification (required before activation)
       {canEdit && <button type="button" aria-label="Edit tax classification" onClick={()=>setEditingClassification(true)} className="p-2 text-blue-700"><Pencil className="w-4 h-4"/></button>}
