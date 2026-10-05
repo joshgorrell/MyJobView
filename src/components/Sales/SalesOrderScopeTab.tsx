@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { Package, Wrench, Tag, LayoutGrid, Globe, FileText, ChevronDown, ChevronRight, CreditCard as Edit2, Check, X, Plus, Eye, EyeOff, Trash2, Save, Lock, Receipt, TrendingDown, TrendingUp, Percent as PercentIcon, GripVertical, Columns2 as Columns, Wifi, WifiOff, Loader2, Settings, ChevronDown as ChevronDownSm, RotateCcw, ShieldCheck, Pencil } from 'lucide-react';
+import { Package, Wrench, Tag, FileText, ChevronDown, ChevronRight, CreditCard as Edit2, Check, X, Plus, Eye, EyeOff, Trash2, Save, Lock, Receipt, TrendingDown, TrendingUp, Percent as PercentIcon, GripVertical, Columns2 as Columns, Wifi, WifiOff, Loader2, Pencil, ListChecks } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
 import ConfirmModal from '../ui/ConfirmModal';
 import { PortalProposalDetail } from '../Portal/PortalProposalDetail';
@@ -128,29 +128,6 @@ interface PortalTemplate {
   show_scope_of_work: boolean;
 }
 
-const ALL_SHOWING: PortalTemplate = {
-  id: '',
-  name: 'Show All',
-  description: null,
-  is_default: false,
-  is_personal: false,
-  show_quantity: true,
-  show_unit_price: true,
-  show_line_item_total: true,
-  show_manufacturer: true,
-  show_sku: true,
-  show_model_number: true,
-  show_area_descriptions: true,
-  show_area_subtotals: true,
-  show_area_names: true,
-  show_labor_hours: true,
-  show_labor_rate: true,
-  show_labor_total: true,
-  show_tax_breakdown: true,
-  show_subtotal: true,
-  show_scope_of_work: true,
-};
-
 import type { ChangeOrderSummary } from './SalesOrderDetail';
 
 interface SalesOrderScopeTabProps {
@@ -200,7 +177,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   const [loading, setLoading] = useState(true);
   const [proposalTotals, setProposalTotals] = useState<ProposalTotals | null>(null);
   const [proposalSettings, setProposalSettings] = useState<ProposalSettings | null>(null);
-  const [viewMode, setViewMode] = useState<'portal' | 'grid'>('portal');
+  const [showTasks, setShowTasks] = useState(true);
   const [portalVisible, setPortalVisible] = useState(false);
   const [togglingPortal, setTogglingPortal] = useState(false);
   const [showPortalPreview, setShowPortalPreview] = useState(false);
@@ -211,7 +188,6 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   const [proposalTemplateId, setProposalTemplateId] = useState<string | null>(null);
   const [soTemplateOverrideId, setSoTemplateOverrideId] = useState<string | null>(null);
   const [availableTemplates, setAvailableTemplates] = useState<PortalTemplate[]>([]);
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   // Warning state when rep selects a template different from what customer approved
 
@@ -366,6 +342,43 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
       .then(({ data }) => { if (data) setLaborPhases(data); });
   }, [order.proposal_id, loadScope]);
 
+  // Load persisted task toggle preference
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('user_column_preferences')
+        .select('column_settings')
+        .eq('user_id', user.id)
+        .eq('view_name', 'sales_order_scope')
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.column_settings?.showTasks !== undefined) {
+            setShowTasks(data.column_settings.showTasks);
+          }
+        });
+    });
+  }, []);
+
+  function toggleShowTasks() {
+    const next = !showTasks;
+    setShowTasks(next);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('user_column_preferences')
+        .upsert({
+          user_id: user.id,
+          view_name: 'sales_order_scope',
+          column_settings: { showTasks: next },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,view_name' })
+        .then(({ error }) => {
+          if (error) console.error('Error saving task preference:', error);
+        });
+    });
+  }
+
   useEffect(() => {
     if (editingRoomId && roomScopeRef.current) {
       roomScopeRef.current.focus();
@@ -445,11 +458,6 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
         onConfirm: () => setPortalVisibility(false),
       });
     }
-  }
-
-  // Called when rep clicks a template in the picker
-  function requestTemplateChange(templateId: string | null) {
-    guardPortalAction(() => applyTemplateOverride(templateId));
   }
 
   async function applyTemplateOverride(templateId: string | null) {
@@ -684,129 +692,9 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           <Eye className="w-3.5 h-3.5" />
         </button>
 
-        {/* Customer sees / template strip — inline, portal mode only */}
-        {viewMode === 'portal' && (
-          <div className="relative flex items-center gap-1.5 px-2.5 py-1 bg-gray-800/60 border border-gray-700 rounded-lg min-w-0">
-            <Globe className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-            <span className="text-xs text-gray-400 hidden sm:inline">Customer sees:</span>
-            <span className="text-xs font-semibold text-white truncate max-w-[120px] sm:max-w-[200px]">
-              {portalTemplate ? portalTemplate.name : 'Show All'}
-            </span>
-            {soTemplateOverrideId ? (
-              <span className="text-xs text-amber-500/80 hidden sm:inline">overridden</span>
-            ) : proposalTemplateId ? (
-              <span className="text-xs text-gray-500 hidden sm:inline">from proposal</span>
-            ) : null}
-            {/* Reset button — only when override active */}
-            {soTemplateOverrideId && (
-              <button
-                onClick={() => applyTemplateOverride(null)}
-                disabled={savingTemplate}
-                className="flex items-center p-0.5 text-gray-500 hover:text-amber-400 rounded transition-colors flex-shrink-0"
-                title="Reset to proposal's original template"
-              >
-                <RotateCcw className="w-3 h-3" />
-              </button>
-            )}
-            <button
-              onClick={() => setShowTemplatePicker(v => !v)}
-              disabled={savingTemplate}
-              className="flex items-center gap-1 px-2 py-0.5 text-xs text-gray-300 hover:text-white border border-gray-600 hover:border-gray-500 rounded-md transition-colors disabled:opacity-50 flex-shrink-0"
-            >
-              <Settings className="w-3 h-3" />
-              <span className="hidden sm:inline">Change</span>
-              <ChevronDownSm className={`w-3 h-3 transition-transform ${showTemplatePicker ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Template dropdown — anchored to this inline strip */}
-            {showTemplatePicker && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => { setShowTemplatePicker(false); }} />
-                <div className="absolute top-full left-0 mt-1.5 bg-gray-800 border border-gray-600 rounded-xl shadow-2xl z-20 min-w-[220px] sm:min-w-[280px] max-w-[calc(100vw-1rem)] py-1.5 overflow-hidden">
-                <div className="px-3 py-2 border-b border-gray-700/50">
-                  <p className="text-xs font-semibold text-gray-300">Customer Portal Display</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Choose what pricing details the customer sees</p>
-                </div>
-
-                {/* "Show All" option */}
-                <button
-                  onClick={() => requestTemplateChange(null)}
-                  disabled={savingTemplate}
-                  className={`w-full px-3 py-2.5 text-left hover:bg-gray-700/50 transition-colors flex items-start gap-2.5 ${!portalTemplate ? 'bg-blue-900/20' : ''}`}
-                >
-                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${!portalTemplate ? 'border-blue-500 bg-blue-500' : 'border-gray-600'}`}>
-                    {!portalTemplate && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-white font-medium">Show All</span>
-                      {/* Mark "Show All" as the approved option when proposal had no template */}
-                      {!approvedTemplate && (
-                        <span className="flex items-center gap-0.5 text-xs text-green-400 bg-green-900/30 px-1.5 py-0.5 rounded">
-                          <ShieldCheck className="w-3 h-3" />
-                          approved
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500">Show all pricing details, model numbers, and labor</div>
-                  </div>
-                </button>
-
-                {availableTemplates.length > 0 && (
-                  <div className="border-t border-gray-700/30 mt-1 pt-1">
-                    {availableTemplates.map(tmpl => (
-                      <button
-                        key={tmpl.id}
-                        onClick={() => requestTemplateChange(tmpl.id)}
-                        disabled={savingTemplate}
-                        className={`w-full px-3 py-2.5 text-left hover:bg-gray-700/50 transition-colors flex items-start gap-2.5 ${portalTemplate?.id === tmpl.id ? 'bg-blue-900/20' : ''}`}
-                      >
-                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${portalTemplate?.id === tmpl.id ? 'border-blue-500 bg-blue-500' : 'border-gray-600'}`}>
-                          {portalTemplate?.id === tmpl.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-sm text-white font-medium">{tmpl.name}</span>
-                            {/* Always show the "approved" badge on the template the customer saw */}
-                            {tmpl.id === approvedTemplate?.id && (
-                              <span className="flex items-center gap-0.5 text-xs text-green-400 bg-green-900/30 px-1.5 py-0.5 rounded">
-                                <ShieldCheck className="w-3 h-3" />
-                                approved
-                              </span>
-                            )}
-                            {tmpl.is_personal && (
-                              <span className="text-xs text-gray-500">personal</span>
-                            )}
-                          </div>
-                          {tmpl.description && <div className="text-xs text-gray-500 mt-0.5 truncate">{tmpl.description}</div>}
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {tmpl.show_unit_price ? <span className="text-xs text-green-400/80">Pricing</span> : <span className="text-xs text-gray-600 line-through">Pricing</span>}
-                            {tmpl.show_quantity ? <span className="text-xs text-green-400/80">Qty</span> : <span className="text-xs text-gray-600 line-through">Qty</span>}
-                            {tmpl.show_manufacturer ? <span className="text-xs text-green-400/80">Mfr</span> : <span className="text-xs text-gray-600 line-through">Mfr</span>}
-                            {tmpl.show_sku ? <span className="text-xs text-green-400/80">SKU</span> : <span className="text-xs text-gray-600 line-through">SKU</span>}
-                            {tmpl.show_area_subtotals ? <span className="text-xs text-green-400/80">Area Totals</span> : <span className="text-xs text-gray-600 line-through">Area Totals</span>}
-                            {tmpl.show_labor_total ? <span className="text-xs text-green-400/80">Labor</span> : <span className="text-xs text-gray-600 line-through">Labor</span>}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {availableTemplates.length === 0 && (
-                  <div className="px-3 py-3 text-xs text-gray-500">
-                    No templates configured. Create templates in Admin &gt; Proposal Templates.
-                  </div>
-                )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
         </div>{/* end left zone */}
 
-        {/* Right zone: CO filter | view mode toggle */}
+        {/* Right zone: CO filter | Show/Hide Tasks toggle */}
         <div className="flex items-center gap-2 flex-shrink-0">
 
         {/* CO Filter dropdown — only shown when there are non-draft COs */}
@@ -838,29 +726,19 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           </div>
         )}
 
-        {/* View mode toggle */}
-        <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
-          <button
-            onClick={() => setViewMode('portal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-              viewMode === 'portal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-200'
-            }`}
-            title="Customer portal view"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Portal</span>
-          </button>
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-              viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-200'
-            }`}
-            title="Internal grid view"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Grid</span>
-          </button>
-        </div>
+        {/* Show / Hide Tasks toggle */}
+        <button
+          onClick={toggleShowTasks}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+            showTasks
+              ? 'bg-orange-500/15 border-orange-500/40 text-orange-400 hover:bg-orange-500/25'
+              : 'bg-gray-800 border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300'
+          }`}
+          title={showTasks ? 'Hide task notes from line items' : 'Show task notes on line items'}
+        >
+          <ListChecks className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">{showTasks ? 'Tasks Visible' : 'Tasks Hidden'}</span>
+        </button>
         </div>{/* end right zone */}
       </div>
 
@@ -975,29 +853,6 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
         </div>
       ) : displayRooms.length === 0 ? (
         <div className="text-center py-12 text-gray-400">No areas or items found on this proposal.</div>
-      ) : viewMode === 'portal' ? (
-        <PortalView
-          rooms={displayRooms}
-          proposalTotals={proposalTotals}
-          proposalSettings={proposalSettings}
-          portalTemplate={portalTemplate}
-          formatCurrency={formatCurrency}
-          editingRoomId={editingRoomId}
-          roomScopeText={roomScopeText}
-          roomShowScope={roomShowScope}
-          roomScopeRef={roomScopeRef}
-          savingRoomScope={savingRoomScope}
-          onToggleRoom={toggleRoom}
-          onStartEditRoom={startEditRoom}
-          onCancelEditRoom={cancelEditRoom}
-          onSaveRoomScope={saveRoomScope}
-          onRoomScopeTextChange={setRoomScopeText}
-          onRoomShowScopeChange={setRoomShowScope}
-          onEditTask={startEditTask}
-          coLineItemMap={selectedCOId ? coLineItemMap : null}
-          coAddedItems={selectedCOId ? coAddedItems : []}
-          getActionBadge={getActionBadge}
-        />
       ) : (
         <GridView
           rooms={displayRooms}
@@ -1021,6 +876,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           coLineItemMap={selectedCOId ? coLineItemMap : null}
           coAddedItems={selectedCOId ? coAddedItems : []}
           getActionBadge={getActionBadge}
+          showTasks={showTasks}
         />
       )}
 
@@ -1107,279 +963,6 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
     </div>
   );
 }
-interface PortalViewProps {
-  rooms: Room[];
-  proposalTotals: ProposalTotals | null;
-  proposalSettings: ProposalSettings | null;
-  portalTemplate: PortalTemplate | null;
-  formatCurrency: (v: number) => string;
-  editingRoomId: string | null;
-  roomScopeText: string;
-  roomShowScope: boolean;
-  roomScopeRef: React.RefObject<HTMLTextAreaElement>;
-  savingRoomScope: boolean;
-  onToggleRoom: (id: string) => void;
-  onStartEditRoom: (room: Room) => void;
-  onCancelEditRoom: () => void;
-  onSaveRoomScope: (id: string) => void;
-  onRoomScopeTextChange: (v: string) => void;
-  onRoomShowScopeChange: (v: boolean) => void;
-  onEditTask: (item: LineItem) => void;
-  coLineItemMap: Map<string, string> | null;
-  coAddedItems: CoAddedItem[];
-  getActionBadge: (actionType: string) => React.ReactNode;
-}
-
-function PortalView({ rooms, proposalTotals, proposalSettings, portalTemplate, formatCurrency,
-  editingRoomId, roomScopeText, roomShowScope, roomScopeRef, savingRoomScope,
-  onToggleRoom, onStartEditRoom, onCancelEditRoom, onSaveRoomScope,
-  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, coLineItemMap, coAddedItems, getActionBadge }: PortalViewProps) {
-  // Resolve effective settings — template takes precedence, otherwise show all
-  const tmpl = portalTemplate ?? ALL_SHOWING;
-  const allRoomsSubtotal = rooms.reduce((s, r) => {
-    const { parts, labor } = getRoomItemsSubtotal(r);
-    return s + parts + labor;
-  }, 0);
-
-  return (
-    <div className="space-y-5">
-      {rooms.map((room, idx) => {
-          const { parts: roomPartsTotal, labor: roomLaborTotal } = getRoomItemsSubtotal(room);
-          const itemsSubtotal = roomPartsTotal + roomLaborTotal;
-          const { modifiersTotal, taxTotal, areaTotal: roomTotal } = computeRoomTotal(itemsSubtotal, allRoomsSubtotal, proposalTotals);
-          const hasModifiers = Math.abs(modifiersTotal) > 0.005;
-          const hasTax = taxTotal > 0.005;
-          const isEditingThisRoom = editingRoomId === room.id;
-          const visibleItems = room.line_items.filter(i => !i.is_hidden && (!coLineItemMap || coLineItemMap.has(i.id)));
-          const roomAddedItems = coAddedItems.filter(i => i.room_name === room.name);
-          if (coLineItemMap && visibleItems.length === 0 && roomAddedItems.length === 0) return null;
-
-          return (
-            <div key={room.id} className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden"
-              style={{ animation: `fadeSlideUp 0.4s ease-out ${idx * 0.06}s both` }}
-            >
-              <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-500/20 p-2 rounded-lg flex-shrink-0">
-                    <Package className="w-4 h-4 text-blue-400" />
-                  </div>
-                  <h3 className="text-base font-bold text-white">{room.name}</h3>
-                </div>
-              </div>
-
-              {isEditingThisRoom ? (
-                <div className="px-5 pt-4 pb-3 space-y-3">
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Area Scope of Work</label>
-                  <textarea
-                    ref={roomScopeRef}
-                    value={roomScopeText}
-                    onChange={(e) => onRoomScopeTextChange(e.target.value)}
-                    placeholder="Describe the scope of work for this area..."
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
-                  />
-                  <button onClick={() => onRoomShowScopeChange(!roomShowScope)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-colors ${roomShowScope ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100'}`}
-                  >
-                    {roomShowScope ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                    {roomShowScope ? 'Showing on proposal' : 'Hidden on proposal'}
-                  </button>
-                  <div className="flex items-center gap-2 justify-end">
-                    <button onClick={onCancelEditRoom} className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
-                      <X className="w-3.5 h-3.5" />Cancel
-                    </button>
-                    <button onClick={() => onSaveRoomScope(room.id)} disabled={savingRoomScope}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />{savingRoomScope ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="px-5 pt-4 pb-2 group/scope">
-                  {room.description && room.show_scope && tmpl.show_area_descriptions ? (
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 relative">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                          <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Scope of Work</p>
-                        </div>
-                        <button onClick={() => onStartEditRoom(room)} className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors opacity-0 group-hover/scope:opacity-100">
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <p className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed ml-5">{room.description}</p>
-                    </div>
-                  ) : room.description && (!room.show_scope || !tmpl.show_area_descriptions) ? (
-                    <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-3 flex items-center justify-between gap-2">
-                      <span className="text-xs text-gray-400 flex items-center gap-1.5">
-                        <EyeOff className="w-3 h-3" />
-                        {!room.show_scope ? 'Area description hidden on proposal' : 'Area descriptions hidden by display template'}
-                      </span>
-                      <button onClick={() => onStartEditRoom(room)} className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors">
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button onClick={() => onStartEditRoom(room)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-gray-600 border border-dashed border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />Add scope of work for this area
-                    </button>
-                  )}
-                </div>
-              )}
-
-              <div className="px-5 pb-5 pt-2">
-                {visibleItems.length === 0 && roomAddedItems.length === 0 ? (
-                  <p className="py-4 text-sm text-gray-400 italic">No items in this area.</p>
-                ) : (
-                  <div className="overflow-x-auto -mx-5 px-5">
-                    <table className="w-full min-w-[280px]">
-                      <thead>
-                        <tr className="border-b-2 border-gray-100">
-                          <th className="text-left py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Item</th>
-                          {tmpl.show_quantity && <th className="text-center py-3 text-xs font-bold text-gray-500 uppercase tracking-wider px-3 whitespace-nowrap">Qty</th>}
-                          {tmpl.show_unit_price && <th className="text-right py-3 text-xs font-bold text-gray-500 uppercase tracking-wider px-3 whitespace-nowrap">Price</th>}
-                          {tmpl.show_line_item_total && <th className="text-right py-3 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total</th>}
-                          <th className="py-3 w-8" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleItems.map(item => (
-                          <PortalLineItemRow
-                            key={item.id}
-                            item={item}
-                            tmpl={tmpl}
-                            formatCurrency={formatCurrency}
-                            onEditTask={() => onEditTask(item)}
-                            actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null}
-                          />
-                        ))}
-                        {roomAddedItems.map(item => {
-                          const isLabor = item.item_type === 'labor';
-                          const qty = item.new_quantity ?? 0;
-                          const price = item.new_unit_price ?? 0;
-                          const laborTotal = item.labor_total ?? 0;
-                          const rowTotal = (qty * price) + laborTotal;
-                          return (
-                            <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                              <td className="py-3.5">
-                                <div className="flex items-start gap-2">
-                                  {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" /> : <Package className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />}
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-gray-900">
-                                      {item.product_description || item.product_name || ''}
-                                      {getActionBadge('add')}
-                                    </div>
-                                    {item.sku && <div className="text-xs text-cyan-600 font-mono mt-0.5">{item.sku}</div>}
-                                  </div>
-                                </div>
-                              </td>
-                              {tmpl.show_quantity && <td className="text-center py-3.5 px-3 text-sm text-gray-700 whitespace-nowrap">{qty}</td>}
-                              {tmpl.show_unit_price && <td className="text-right py-3.5 px-3 text-sm text-gray-600 whitespace-nowrap tabular-nums">{formatCurrency(price)}</td>}
-                              {tmpl.show_line_item_total && <td className="text-right py-3.5 text-sm font-bold whitespace-nowrap tabular-nums text-gray-900">{formatCurrency(rowTotal)}</td>}
-                              <td />
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      {tmpl.show_area_subtotals && (
-                        <tfoot className="bg-gray-50">
-                          <tr>
-                            <td colSpan={[true, tmpl.show_quantity, tmpl.show_unit_price].filter(Boolean).length} className="pt-3 pb-3 pr-3 text-right">
-                              <div className="flex flex-col items-end gap-0.5">
-                                {roomPartsTotal > 0 && <span className="text-xs text-gray-400 tabular-nums flex items-center gap-1"><Package className="w-3 h-3 opacity-50" />Parts: {formatCurrency(roomPartsTotal)}</span>}
-                                {roomLaborTotal > 0 && tmpl.show_labor_total && <span className="text-xs text-cyan-600/70 tabular-nums flex items-center gap-1"><Wrench className="w-3 h-3 opacity-50" />Labor: {formatCurrency(roomLaborTotal)}</span>}
-                                {hasModifiers && <span className={`text-xs tabular-nums flex items-center gap-1 ${modifiersTotal < 0 ? 'text-red-500/70' : 'text-blue-500/70'}`}>{modifiersTotal < 0 ? '−' : '+'}{formatCurrency(Math.abs(modifiersTotal))} adj.</span>}
-                                {hasTax && tmpl.show_tax_breakdown && <span className="text-xs text-gray-400/70 tabular-nums flex items-center gap-1">+{formatCurrency(taxTotal)} tax</span>}
-                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-0.5">Area Total</span>
-                              </div>
-                            </td>
-                            <td className="pt-3 pb-3 text-right font-bold text-blue-600 text-base tabular-nums align-bottom">{formatCurrency(roomTotal)}</td>
-                            <td />
-                          </tr>
-                        </tfoot>
-                      )}
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-        );
-      })}
-
-      {/* Synthetic room cards for CO-added rooms not in the base proposal */}
-      {coLineItemMap && (() => {
-        const existingRoomNames = new Set(rooms.map(r => r.name));
-        const orphanItems = coAddedItems.filter(i => !existingRoomNames.has(i.room_name ?? ''));
-        if (orphanItems.length === 0) return null;
-        const groups = new Map<string, CoAddedItem[]>();
-        orphanItems.forEach(item => {
-          const key = item.room_name ?? 'Unassigned';
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key)!.push(item);
-        });
-        return Array.from(groups.entries()).map(([roomName, items]) => (
-          <div key={`co-room-${roomName}`} className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-500/20 p-2 rounded-lg flex-shrink-0">
-                  <Package className="w-4 h-4 text-blue-400" />
-                </div>
-                <h3 className="text-base font-bold text-white">{roomName}</h3>
-              </div>
-            </div>
-            <div className="px-5 pb-5 pt-2">
-              <div className="overflow-x-auto -mx-5 px-5">
-                <table className="w-full min-w-[280px]">
-                  <thead>
-                    <tr className="border-b-2 border-gray-100">
-                      <th className="text-left py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Item</th>
-                      {tmpl.show_quantity && <th className="text-center py-3 text-xs font-bold text-gray-500 uppercase tracking-wider px-3 whitespace-nowrap">Qty</th>}
-                      {tmpl.show_unit_price && <th className="text-right py-3 text-xs font-bold text-gray-500 uppercase tracking-wider px-3 whitespace-nowrap">Price</th>}
-                      {tmpl.show_line_item_total && <th className="text-right py-3 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total</th>}
-                      <th className="py-3 w-8" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map(item => {
-                      const isLabor = item.item_type === 'labor';
-                      const qty = item.new_quantity ?? 0;
-                      const price = item.new_unit_price ?? 0;
-                      const laborTotal = item.labor_total ?? 0;
-                      const rowTotal = (qty * price) + laborTotal;
-                      return (
-                        <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="py-3.5">
-                            <div className="flex items-start gap-2">
-                              {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" /> : <Package className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />}
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-gray-900">
-                                  {item.product_description || item.product_name || ''}
-                                  {getActionBadge('add')}
-                                </div>
-                                {item.sku && <div className="text-xs text-cyan-600 font-mono mt-0.5">{item.sku}</div>}
-                              </div>
-                            </div>
-                          </td>
-                          {tmpl.show_quantity && <td className="text-center py-3.5 px-3 text-sm text-gray-700 whitespace-nowrap">{qty}</td>}
-                          {tmpl.show_unit_price && <td className="text-right py-3.5 px-3 text-sm text-gray-600 whitespace-nowrap tabular-nums">{formatCurrency(price)}</td>}
-                          {tmpl.show_line_item_total && <td className="text-right py-3.5 text-sm font-bold whitespace-nowrap tabular-nums text-gray-900">{formatCurrency(rowTotal)}</td>}
-                          <td />
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        ));
-      })()}
-    </div>
-  );
-}
 
 const GRID_COLUMNS: { key: string; label: string }[] = [
   { key: 'manufacturer', label: 'Manufacturer' },
@@ -1422,12 +1005,13 @@ interface GridViewProps {
   coLineItemMap: Map<string, string> | null;
   coAddedItems: CoAddedItem[];
   getActionBadge: (actionType: string) => React.ReactNode;
+  showTasks: boolean;
 }
 
 function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
   editingRoomId, roomScopeText, roomShowScope, roomScopeRef, savingRoomScope,
   laborPhases, onToggleRoom, onStartEditRoom, onCancelEditRoom, onSaveRoomScope,
-  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onPhaseChange, coLineItemMap, coAddedItems, getActionBadge }: GridViewProps) {
+  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onPhaseChange, coLineItemMap, coAddedItems, getActionBadge, showTasks }: GridViewProps) {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(DEFAULT_VISIBLE_COLUMNS));
   const [showColumnMenu, setShowColumnMenu] = useState(false);
 
@@ -1584,7 +1168,7 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                           </thead>
                           <tbody>
                             {filteredItems.map(item => (
-                              <GridLineItemRow key={item.id} item={item} formatCurrency={formatCurrency} onEditTask={() => onEditTask(item)} visibleColumns={visibleColumns} laborPhases={laborPhases} onPhaseChange={onPhaseChange} onViewItem={(id) => setLineItemModal({ id, mode: 'view' })} onEditItem={(id) => setLineItemModal({ id, mode: 'edit' })} actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null} />
+                              <GridLineItemRow key={item.id} item={item} formatCurrency={formatCurrency} onEditTask={() => onEditTask(item)} visibleColumns={visibleColumns} laborPhases={laborPhases} onPhaseChange={onPhaseChange} onViewItem={(id) => setLineItemModal({ id, mode: 'view' })} onEditItem={(id) => setLineItemModal({ id, mode: 'edit' })} actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null} showTasks={showTasks} />
                             ))}
                             {roomAddedItems.map(item => {
                               const isLabor = item.item_type === 'labor';
@@ -1683,7 +1267,7 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                                   <Wrench className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              {item.task_notes && (
+                              {showTasks && item.task_notes && (
                                 <div className={`flex items-baseline gap-1.5 mt-2 px-2 py-1 rounded text-xs ${item.show_task_notes ? 'bg-green-900/20 border border-green-700/30 text-green-400' : 'bg-orange-900/20 border border-orange-700/30 text-orange-300'}`}>
                                   <span className="font-semibold shrink-0">Task{!item.show_task_notes ? ' (Internal):' : ':'}</span>
                                   <span>{item.task_notes}</span>
@@ -1929,92 +1513,7 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
   );
 }
 
-function PortalLineItemRow({
-  item, tmpl, formatCurrency, onEditTask, actionBadge,
-}: {
-  item: LineItem;
-  tmpl: PortalTemplate;
-  formatCurrency: (v: number) => string;
-  onEditTask: () => void;
-  actionBadge?: React.ReactNode;
-}) {
-  const rowTotal = (item.line_total || 0) + (item.labor_total || 0);
-  const visibleAccessories = item.accessories?.filter(a => !a.is_hidden) ?? [];
-  const isLabor = item.item_type === 'labor';
-  // Compute colspan for spanning rows (task notes, accessories)
-  const colCount = 1 + (tmpl.show_quantity ? 1 : 0) + (tmpl.show_unit_price ? 1 : 0) + (tmpl.show_line_item_total ? 1 : 0) + 1;
-
-  return (
-    <>
-      <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors group/row">
-        <td className="py-3.5">
-          <div className="flex items-start gap-2">
-            {isLabor ? <Wrench className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" /> : <Package className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-gray-900">
-                {item.description}
-                {actionBadge}
-              </div>
-              {tmpl.show_manufacturer && item.products?.manufacturers?.name && (
-                <p className="text-xs text-gray-400 mt-0.5">{item.products.manufacturers.name}</p>
-              )}
-              {tmpl.show_sku && item.products?.sku && (
-                <p className="text-xs text-gray-400">SKU: {item.products.sku}</p>
-              )}
-              {item.proposal_classes && (
-                <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-xs font-medium" style={{ background: item.proposal_classes.color + '22', color: item.proposal_classes.color }}>
-                  <Tag className="w-2.5 h-2.5" />{item.proposal_classes.name}
-                </span>
-              )}
-            </div>
-          </div>
-        </td>
-        {tmpl.show_quantity && (
-          <td className="text-center py-3.5 px-3 text-sm text-gray-700 font-medium whitespace-nowrap align-top">
-            {item.quantity}{item.unit && item.unit !== 'ea' ? ` ${item.unit}` : ''}
-          </td>
-        )}
-        {tmpl.show_unit_price && (
-          <td className="text-right py-3.5 px-3 text-sm text-gray-600 whitespace-nowrap align-top tabular-nums">{formatCurrency(item.unit_price)}</td>
-        )}
-        {tmpl.show_line_item_total && (
-          <td className="text-right py-3.5 text-sm font-bold whitespace-nowrap align-top tabular-nums text-gray-900">{formatCurrency(rowTotal)}</td>
-        )}
-        <td className="py-3.5 pl-2 align-top">
-          <button onClick={onEditTask} className={`p-1 rounded transition-colors opacity-0 group-hover/row:opacity-100 ${item.task_notes ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`} title={item.task_notes ? 'Edit install task' : 'Add install task'}>
-            <Wrench className="w-3.5 h-3.5" />
-          </button>
-        </td>
-      </tr>
-      {item.task_notes && (
-        <tr className="border-b border-gray-100">
-          <td colSpan={colCount} className="px-4 pb-2.5 pt-0">
-            <div className={`flex items-baseline gap-1.5 px-2 py-1 rounded text-xs ${item.show_task_notes ? 'bg-green-50 border border-green-100 text-green-700' : 'bg-orange-50 border border-orange-100 text-orange-700'}`}>
-              <span className="font-semibold shrink-0">Task{!item.show_task_notes ? ' (Internal):' : ':'}</span>
-              <span>{item.task_notes}</span>
-            </div>
-          </td>
-        </tr>
-      )}
-      {visibleAccessories.map(acc => (
-        <tr key={acc.id} className="border-b border-gray-50 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-          <td className="py-2 pl-8">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-300 text-xs select-none">↳</span>
-              <p className="text-xs text-gray-600">{acc.description}</p>
-            </div>
-          </td>
-          {tmpl.show_quantity && <td className="text-center py-2 px-3 text-xs text-gray-500 whitespace-nowrap">{acc.quantity}</td>}
-          {tmpl.show_unit_price && <td className="text-right py-2 px-3 text-xs text-gray-500 whitespace-nowrap tabular-nums">{formatCurrency(acc.unit_price)}</td>}
-          {tmpl.show_line_item_total && <td className="text-right py-2 text-xs text-gray-600 whitespace-nowrap tabular-nums">{formatCurrency((acc.line_total || 0) + (acc.labor_total || 0))}</td>}
-          <td />
-        </tr>
-      ))}
-    </>
-  );
-}
-
-function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, laborPhases, onPhaseChange, onViewItem, onEditItem, actionBadge }: {
+function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, laborPhases, onPhaseChange, onViewItem, onEditItem, actionBadge, showTasks }: {
   item: LineItem;
   formatCurrency: (v: number) => string;
   onEditTask: () => void;
@@ -2024,6 +1523,7 @@ function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, lab
   onViewItem: (id: string) => void;
   onEditItem: (id: string) => void;
   actionBadge?: React.ReactNode;
+  showTasks: boolean;
 }) {
   const [savingPhase, setSavingPhase] = useState(false);
   const isLabor = item.item_type === 'labor';
@@ -2169,7 +1669,7 @@ function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, lab
           </div>
         </td>
       </tr>
-      {item.task_notes && (
+      {showTasks && item.task_notes && (
         <tr>
           <td colSpan={colCount} className="px-3 pb-2 pt-0">
             <div className={`flex items-baseline gap-1.5 px-2.5 py-1 rounded text-xs ${item.show_task_notes ? 'bg-green-900/20 border border-green-700/30 text-green-400' : 'bg-orange-900/20 border border-orange-700/30 text-orange-300'}`}>
