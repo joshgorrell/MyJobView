@@ -139,11 +139,8 @@ const AddProjectTimeModal = lazy(() => import('./components/Projects/AddProjectT
 // Loading component
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-3"></div>
-        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-      </div>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="inline-block animate-spin rounded-full h-8 w-8 border-[3px] border-blue-500 border-t-transparent"></div>
     </div>
   );
 }
@@ -951,13 +948,7 @@ function AppContent() {
           {activeTab === 'feed' && checkModuleAccess('feed') && <MasterFeed key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
           {activeTab === 'fishbowl' && checkModuleAccess('fishbowl') && <FishbowlView key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
           {activeTab === 'connections' && checkModuleAccess('connections') && <ConnectionsView key={activeTab} />}
-          {(activeTab === 'proposals' || activeTab === 'sales') && (() => {
-            // Show loading while departments are still loading
-            if (departmentsLoading) {
-              return false;
-            }
-            return checkModuleAccess('proposals');
-          })() && (
+          {(activeTab === 'proposals' || activeTab === 'sales') && checkModuleAccess('proposals') && (
             <ProposalsView
               key={activeTab}
               openProposalId={openProposalId}

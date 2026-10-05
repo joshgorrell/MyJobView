@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -14,31 +14,30 @@ import {
   type COLineItemRecord,
   type COModifierSnapshot,
 } from '../../lib/coAuditTrail';
-import ProposalSettings from './ProposalSettings';
-import ProposalRevisionManager from './ProposalRevisionManager';
-import AddItemToAreasModal from './AddItemToAreasModal';
-import QuickAddProductModal from './QuickAddProductModal';
-import AreaScopeEditor from './AreaScopeEditor';
+const ProposalSettings = lazy(() => import('./ProposalSettings'));
+const ProposalRevisionManager = lazy(() => import('./ProposalRevisionManager'));
+const AddItemToAreasModal = lazy(() => import('./AddItemToAreasModal'));
+const AreaScopeEditor = lazy(() => import('./AreaScopeEditor'));
 import InlineProductSearch from './InlineProductSearch';
-import ProposalTaxReport from './ProposalTaxReport';
-import LaborPhaseReport from './LaborPhaseReport';
-import ProductDetailModal from './ProductDetailModal';
-import EditCustomerModal from './EditCustomerModal';
-import { ManualApprovalModal } from './ManualApprovalModal';
-import ProposalNotificationHistory from './ProposalNotificationHistory';
-import ApprovalActionModal from './ApprovalActionModal';
-import { PreSendValidationModal } from './PreSendValidationModal';
-import { ReactivateProposalModal } from './ReactivateProposalModal';
-import { ProposalQA } from './ProposalQA';
+const ProposalTaxReport = lazy(() => import('./ProposalTaxReport'));
+const LaborPhaseReport = lazy(() => import('./LaborPhaseReport'));
+const ProductDetailModal = lazy(() => import('./ProductDetailModal'));
+const EditCustomerModal = lazy(() => import('./EditCustomerModal'));
+const ManualApprovalModal = lazy(() => import('./ManualApprovalModal').then(m => ({ default: m.ManualApprovalModal })));
+const ProposalNotificationHistory = lazy(() => import('./ProposalNotificationHistory'));
+const ApprovalActionModal = lazy(() => import('./ApprovalActionModal'));
+const PreSendValidationModal = lazy(() => import('./PreSendValidationModal').then(m => ({ default: m.PreSendValidationModal })));
+const ReactivateProposalModal = lazy(() => import('./ReactivateProposalModal').then(m => ({ default: m.ReactivateProposalModal })));
+const ProposalQA = lazy(() => import('./ProposalQA').then(m => ({ default: m.ProposalQA })));
 import BulkUpdateConfirmationModal from './BulkUpdateConfirmationModal';
 import BulkUpdateProjectInfoModal from './BulkUpdateProjectInfoModal';
-import TwoPhaseLaborEditor from './TwoPhaseLaborEditor';
-import ProposalTasksPanel from './ProposalTasksPanel';
-import { UnlockProposalModal } from './UnlockProposalModal';
-import { PromoteRevisionModal } from './PromoteRevisionModal';
-import { PortalVersionHistoryModal } from './PortalVersionHistoryModal';
-import { PortalProposalDetail } from '../Portal/PortalProposalDetail';
-import { EmailProposalModal } from './EmailProposalModal';
+const TwoPhaseLaborEditor = lazy(() => import('./TwoPhaseLaborEditor'));
+const ProposalTasksPanel = lazy(() => import('./ProposalTasksPanel'));
+const UnlockProposalModal = lazy(() => import('./UnlockProposalModal').then(m => ({ default: m.UnlockProposalModal })));
+const PromoteRevisionModal = lazy(() => import('./PromoteRevisionModal').then(m => ({ default: m.PromoteRevisionModal })));
+const PortalVersionHistoryModal = lazy(() => import('./PortalVersionHistoryModal').then(m => ({ default: m.PortalVersionHistoryModal })));
+const PortalProposalDetail = lazy(() => import('../Portal/PortalProposalDetail').then(m => ({ default: m.PortalProposalDetail })));
+const EmailProposalModal = lazy(() => import('./EmailProposalModal').then(m => ({ default: m.EmailProposalModal })));
 import { checkProposalReadiness, type ValidationSection } from '../../lib/proposalValidation';
 import { getTaxApplicability, computeTaxTotals, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
 import type { ProposalRoomPrefill } from '../AIAssistant/AIAssistant';
@@ -5400,7 +5399,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       {/* Modals */}
       {showAddItemToAreasModal && (
-        <AddItemToAreasModal
+        <Suspense fallback={null}><AddItemToAreasModal
           proposalId={proposalId}
           rooms={rooms}
           activeAreaId={activeAreaId && activeAreaId !== '__unassigned__' ? activeAreaId : undefined}
@@ -5439,12 +5438,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               return existing ?? { ...r, line_items: [] };
             }));
           }}
-        />
+        /></Suspense>
       )}
 
       {showRevisionManager && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <ProposalRevisionManager
+          <Suspense fallback={null}><ProposalRevisionManager
             proposalId={proposalId}
             onSelectRevision={(revisionId) => {
               setShowRevisionManager(false);
@@ -5462,7 +5461,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               setShowPromoteRevisionModal(true);
             }}
             onClose={() => setShowRevisionManager(false)}
-          />
+          /></Suspense>
         </div>
       )}
 
@@ -5578,7 +5577,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       {showSettings && (
         <div className="fixed inset-0 z-50">
-          <ProposalSettings
+          <Suspense fallback={null}><ProposalSettings
             proposalId={proposalId}
             initialTab={activeSettingsTab}
             onBack={() => {
@@ -5587,25 +5586,25 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               loadData();
               loadColumnPreferences();
             }}
-          />
+          /></Suspense>
         </div>
       )}
 
       {showTaxReport && (
-        <ProposalTaxReport
+        <Suspense fallback={null}><ProposalTaxReport
           proposalId={proposalId}
           onClose={() => setShowTaxReport(false)}
-        />
+        /></Suspense>
       )}
 
       {showLaborPhaseReport && (
-        <LaborPhaseReport
+        <Suspense fallback={null}><LaborPhaseReport
           proposalId={proposalId}
           proposalNumber={proposal?.proposal_number}
           customerName={proposal?.contacts?.full_name || proposal?.contacts?.company_name || undefined}
           rooms={rooms}
           onClose={() => setShowLaborPhaseReport(false)}
-        />
+        /></Suspense>
       )}
 
       {showFilterModal && (
@@ -5620,7 +5619,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       )}
 
       {editingScopeRoom && (
-        <AreaScopeEditor
+        <Suspense fallback={null}><AreaScopeEditor
           roomId={editingScopeRoom.id}
           roomName={editingScopeRoom.name}
           currentDescription={editingScopeRoom.description}
@@ -5630,19 +5629,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             await loadData();
             setEditingScopeRoom(null);
           }}
-        />
+        /></Suspense>
       )}
 
       {showTasksPanel && (
-        <ProposalTasksPanel
+        <Suspense fallback={null}><ProposalTasksPanel
           proposalId={proposalId}
           lineItems={rooms.flatMap(r => r.line_items.map(li => ({ id: li.id, description: li.description })))}
           onClose={() => setShowTasksPanel(false)}
-        />
+        /></Suspense>
       )}
 
       {editingLaborItem && (
-        <TwoPhaseLaborEditor
+        <Suspense fallback={null}><TwoPhaseLaborEditor
           lineItemId={editingLaborItem.id}
           itemDescription={editingLaborItem.description}
           productId={editingLaborItem.productId}
@@ -5652,7 +5651,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             setEditingLaborItem(null);
             loadData();
           }}
-        />
+        /></Suspense>
       )}
 
       {/* PDF Generation Modal */}
@@ -6688,14 +6687,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       {/* Product Detail / Edit Modal */}
       {showProductDetail && (
-        <ProductDetailModal
+        <Suspense fallback={null}><ProductDetailModal
           lineItemId={showProductDetail}
           onClose={() => setShowProductDetail(null)}
           onSaved={() => {
             setShowProductDetail(null);
             loadData();
           }}
-        />
+        /></Suspense>
       )}
 
       {/* Substitute Item Modal */}
@@ -6814,7 +6813,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       )}
 
       {showEditCustomerModal && proposal && (
-        <EditCustomerModal
+        <Suspense fallback={null}><EditCustomerModal
           proposalId={proposal.id}
           currentContactId={proposal.contact_id}
           onClose={() => setShowEditCustomerModal(false)}
@@ -6822,12 +6821,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             setShowEditCustomerModal(false);
             await loadData();
           }}
-        />
+        /></Suspense>
       )}
 
       {showManualApprovalModal && proposal && proposal.contacts && (
         proposal.status === 'approved_pending_action' ? (
-          <ApprovalActionModal
+          <Suspense fallback={null}><ApprovalActionModal
             proposal={proposal}
             contact={proposal.contacts}
             onClose={() => setShowManualApprovalModal(false)}
@@ -6835,9 +6834,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               setShowManualApprovalModal(false);
               loadData();
             }}
-          />
+          /></Suspense>
         ) : (
-          <ManualApprovalModal
+          <Suspense fallback={null}><ManualApprovalModal
             proposalId={proposal.id}
             proposalNumber={proposal.proposal_number}
             contactEmail={proposal.contacts?.email || ''}
@@ -6851,19 +6850,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 loadData();
               }
             }}
-          />
+          /></Suspense>
         )
       )}
 
       {showNotificationHistory && proposal && (
-        <ProposalNotificationHistory
+        <Suspense fallback={null}><ProposalNotificationHistory
           proposalId={proposal.id}
           onClose={() => setShowNotificationHistory(false)}
-        />
+        /></Suspense>
       )}
 
       {showApprovalActionModal && proposal && proposal.contacts && (
-        <ApprovalActionModal
+        <Suspense fallback={null}><ApprovalActionModal
           proposal={proposal}
           contact={proposal.contacts}
           onClose={() => setShowApprovalActionModal(false)}
@@ -6871,11 +6870,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             setShowApprovalActionModal(false);
             loadData();
           }}
-        />
+        /></Suspense>
       )}
 
       {showSubmissionModal && proposal && (
-        <PreSendValidationModal
+        <Suspense fallback={null}><PreSendValidationModal
           proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
           onClose={() => setShowSubmissionModal(false)}
@@ -6885,11 +6884,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             setShowSettings(true);
             setActiveSettingsTab(section);
           }}
-        />
+        /></Suspense>
       )}
 
       {showReactivateModal && proposal && (
-        <ReactivateProposalModal
+        <Suspense fallback={null}><ReactivateProposalModal
           proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
           lastModified={proposal.updated_at || proposal.created_at}
@@ -6902,7 +6901,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           onReview={() => {
             setShowReactivateModal(false);
           }}
-        />
+        /></Suspense>
       )}
 
       {pendingBulkUpdate && (
@@ -6932,16 +6931,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       )}
 
       {showUnlockWarningModal && proposal && (
-        <UnlockProposalModal
+        <Suspense fallback={null}><UnlockProposalModal
           proposalNumber={proposal.proposal_number}
           onCreateRevision={handleCreateRevision}
           onUnlockAndEdit={handleUnlockProposal}
           onClose={() => setShowUnlockWarningModal(false)}
-        />
+        /></Suspense>
       )}
 
       {showPortalVersionHistory && proposal && (
-        <PortalVersionHistoryModal
+        <Suspense fallback={null}><PortalVersionHistoryModal
           proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
           currentPortalVersion={proposal.current_portal_version ?? 0}
@@ -6950,26 +6949,26 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             setShowPortalVersionHistory(false);
             loadData();
           }}
-        />
+        /></Suspense>
       )}
 
       {showPromoteRevisionModal && proposal && (
-        <PromoteRevisionModal
+        <Suspense fallback={null}><PromoteRevisionModal
           revisionName={proposal.revision_name || 'Revision'}
           revisionNumber={proposal.proposal_number}
           onConfirm={handlePromoteRevision}
           onClose={() => setShowPromoteRevisionModal(false)}
-        />
+        /></Suspense>
       )}
 
       {showEmailProposalModal && proposal && proposal.contacts && (
-        <EmailProposalModal
+        <Suspense fallback={null}><EmailProposalModal
           proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
           contactEmail={proposal.contacts.email || ''}
           contactName={proposal.contacts.full_name || proposal.contacts.contact_name}
           onClose={() => setShowEmailProposalModal(false)}
-        />
+        /></Suspense>
       )}
 
       {showActivityModal && proposal && (
@@ -7154,19 +7153,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             </button>
           </div>
           <div className="flex-1 overflow-y-auto bg-gray-50">
-            <PortalProposalDetail
+            <Suspense fallback={null}><PortalProposalDetail
               proposalId={proposalId}
               onBack={() => setShowPortalPreview(false)}
               previewMode={true}
               templateOverrideId={proposal?.report_template_id ?? null}
               hideCostsOverride={previewHideCosts}
-            />
+            /></Suspense>
           </div>
         </div>,
         document.body
       )}
       {showQA && (
-        <ProposalQA
+        <Suspense fallback={null}><ProposalQA
           proposalId={proposalId}
           isPortal={false}
           onClose={() => { setShowQA(false); setAutoQaThreadId(null); setQaContext({ roomId: null, lineItemId: null, label: null }); loadQaMessages(); }}
@@ -7175,7 +7174,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           contextLabel={qaContext.label}
           onMessagesChanged={loadQaMessages}
           autoThreadId={autoQaThreadId}
-        />
+        /></Suspense>
       )}
     </div>
   );

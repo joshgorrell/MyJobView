@@ -53,7 +53,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -74,7 +73,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     if (profile) {
       loadPreferences().catch(err => {
         console.error('Failed to load preferences:', err);
-        setPreferencesLoaded(true);
       });
     }
   }, [profile]);
@@ -87,21 +85,17 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load proposals after preferences are ready so the first request uses the saved filters.
+  // Load proposals immediately — preferences load in parallel and re-trigger this effect
+  // if they change any filter values, so the user sees content sooner on first visit.
   useEffect(() => {
     if (authLoading || !profile) {
       setLoading(false);
       return;
     }
 
-    if (!preferencesLoaded) {
-      setLoading(true);
-      return;
-    }
-
     setLoading(true);
     loadProposals().catch(err => console.error('Failed to load proposals:', err));
-  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, selectedRepId, preferencesLoaded]);
+  }, [filterStatus, showExpired, hideDeclined, hideArchived, hideApproved, currentPage, itemsPerPage, debouncedSearch, sortField, sortDirection, profile, authLoading, selectedRepId]);
 
   // Reset to page 1 when filter/sort criteria change (but not when currentPage itself changes).
   // Load pending deposits only when profile or rep filter changes (not on every page/sort change)
@@ -166,8 +160,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
-    } finally {
-      setPreferencesLoaded(true);
     }
   }
 
