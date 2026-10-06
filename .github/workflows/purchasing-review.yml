@@ -1,0 +1,29 @@
+name: Purchasing checks
+on:
+  pull_request:
+    paths:
+      - 'src/components/Inventory/**'
+      - 'src/components/Production/PartsRequestManagement.tsx'
+      - 'supabase/functions/send-purchase-order-email/**'
+      - 'supabase/functions/_shared/purchase-document.ts'
+      - 'supabase/migrations/*purchasing*'
+      - 'tests/purchasing/**'
+      - '.github/workflows/purchasing-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  purchasing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:purchasing
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:purchasing:browser

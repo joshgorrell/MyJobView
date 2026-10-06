@@ -17,6 +17,8 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
+import {QuoteRequests} from './QuoteRequests';
+import {PurchasingDocumentModal} from './PurchasingDocumentModal';
 import { ReceivePOModal } from './ReceivePOModal';
 
 interface PurchaseOrder {
@@ -62,9 +64,12 @@ export function PurchaseOrders() {
   const [loadError, setLoadError] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [createQuote,setCreateQuote]=useState(false);
+  const [quoteRefresh,setQuoteRefresh]=useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
-  const canCreate = profile?.can_create_purchase_orders === true || ['admin', 'manager', 'finance'].includes(profile?.role || '');
+  const canCreate = profile?.can_create_purchase_orders === true || profile?.role==='admin';
+  const [viewDocument,setViewDocument]=useState<string|null>(null);
 
   useEffect(() => {
     void loadOrders();
@@ -93,6 +98,7 @@ export function PurchaseOrders() {
         `)
         .eq('organization_id', profile.organization_id)
         .neq('status', 'cancelled')
+        .eq('document_type','po')
         .order('created_at', { ascending: false })
         .abortSignal(controller.signal);
 
@@ -154,7 +160,8 @@ export function PurchaseOrders() {
         <div>
           <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><ClipboardList className="w-5 h-5" /></div><div><h2 className="text-xl sm:text-2xl font-bold text-gray-900">Purchase Orders</h2><p className="text-sm text-gray-500">Track every order from draft through receiving</p></div></div>
         </div>
-        {canCreate && <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-medium"><Plus className="w-4 h-4" />New Purchase Order</button>}
+        {canCreate && <button onClick={() => {setCreateQuote(false);setShowCreateModal(true);}} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-medium"><Plus className="w-4 h-4" />New Purchase Order</button>}
+        {canCreate&&<button onClick={()=>{setCreateQuote(true);setShowCreateModal(true);}} className="border border-blue-600 text-blue-700 rounded px-4 py-2">New Quote Request</button>}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -173,10 +180,12 @@ export function PurchaseOrders() {
           </div>
         </div>
 
-        {filteredOrders.length === 0 ? <EmptyState canCreate={canCreate} onCreate={() => setShowCreateModal(true)} hasSearch={Boolean(searchTerm || filterStatus !== 'all')} /> : <div className="divide-y divide-gray-200">{filteredOrders.map((po) => <PurchaseOrderRow key={po.id} po={po} canCreate={canCreate} onReceive={() => setSelectedPO(po)} onUpdate={() => void loadOrders()} />)}</div>}
+        {filteredOrders.length === 0 ? <EmptyState canCreate={canCreate} onCreate={() => {setCreateQuote(false);setShowCreateModal(true);}} hasSearch={Boolean(searchTerm || filterStatus !== 'all')} /> : <div className="divide-y divide-gray-200">{filteredOrders.map((po) => <PurchaseOrderRow key={po.id} po={po} canCreate={canCreate} onReceive={() => setSelectedPO(po)} onView={()=>setViewDocument(po.id)} onUpdate={() => void loadOrders()} />)}</div>}
       </div>
 
-      {showCreateModal && <CreatePurchaseOrderModal onClose={() => setShowCreateModal(false)} onSuccess={() => { setShowCreateModal(false); void loadOrders(); }} />}
+      {canCreate && <QuoteRequests key={quoteRefresh}/>}
+      {viewDocument&&<PurchasingDocumentModal documentId={viewDocument} onClose={()=>setViewDocument(null)} onSuccess={loadOrders}/>}
+      {showCreateModal && <CreatePurchaseOrderModal initialQuote={createQuote} onClose={() => setShowCreateModal(false)} onSuccess={() => { setShowCreateModal(false); setQuoteRefresh(n=>n+1); void loadOrders(); }} />}
       {selectedPO && <ReceivePOModal poId={selectedPO.id} poNumber={selectedPO.po_number} onClose={() => setSelectedPO(null)} onSuccess={() => { setSelectedPO(null); void loadOrders(); }} />}
     </div>
   );
@@ -192,10 +201,11 @@ function FilterButton({ label, count, active, onClick }: { label: string; count:
 }
 
 function EmptyState({ canCreate, onCreate, hasSearch }: { canCreate: boolean; onCreate: () => void; hasSearch: boolean }) {
-  return <div className="text-center py-14 px-6"><div className="w-14 h-14 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-4"><ClipboardList className="w-7 h-7" /></div><h3 className="text-lg font-semibold text-gray-900">{hasSearch ? 'No matching purchase orders' : 'No purchase orders yet'}</h3><p className="text-sm text-gray-500 mt-1 mb-5">{hasSearch ? 'Try changing the search or filter.' : 'Create your first purchase order to start tracking incoming inventory.'}</p>{canCreate && !hasSearch && <button onClick={onCreate} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"><Plus className="w-4 h-4" />New Purchase Order</button>}</div>;
+  return <div className="text-center py-14 px-6"><div className="w-14 h-14 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-4"><ClipboardList className="w-7 h-7" /></div><h3 className="text-lg font-semibold text-gray-900">{hasSearch ? 'No matching purchase orders' : 'No purchase orders yet'}</h3><p className="text-sm text-gray-500 mt-1 mb-5">{hasSearch ? 'Try changing the search or filter.' : 'Create your first purchase order to start tracking incoming inventory.'}</p>{canCreate && !hasSearch && <button onClick={onCreate} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"><Plus className="w-4 h-4" />New Purchase Order</button>}
+</div>;
 }
 
-function PurchaseOrderRow({ po, canCreate, onReceive, onUpdate }: { po: PurchaseOrder; canCreate: boolean; onReceive: () => void; onUpdate: () => void }) {
+function PurchaseOrderRow({ po, canCreate, onReceive, onUpdate, onView }: { po: PurchaseOrder; canCreate: boolean; onReceive: () => void; onUpdate: () => void; onView:()=>void }) {
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -232,5 +242,5 @@ function PurchaseOrderRow({ po, canCreate, onReceive, onUpdate }: { po: Purchase
     setBusy(false);
   }
 
-  return <div className="p-4 sm:p-5 hover:bg-gray-50/70 transition-colors"><div className="flex flex-col lg:flex-row lg:items-center gap-4"><div className="flex items-start gap-3 min-w-0 flex-1"><button onClick={() => setExpanded(!expanded)} className="mt-1 text-gray-400 hover:text-gray-700">{expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}</button><div className={`w-10 h-10 rounded-lg border flex items-center justify-center shrink-0 ${statusClass}`}><Package className="w-5 h-5" /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-gray-900">{po.po_number}</span><span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${statusClass}`}>{statusLabels[po.status] || po.status}</span></div><p className="text-sm text-gray-700 mt-1 truncate">{po.vendor_name}</p><p className="text-xs text-gray-500 mt-0.5">{po.warehouse_name} · Ordered {new Date(po.order_date).toLocaleDateString()}</p></div></div><div className="grid grid-cols-3 gap-4 lg:w-[430px] lg:shrink-0"><div><p className="text-xs text-gray-500">Expected</p><p className="text-sm font-medium text-gray-800">{po.expected_date ? new Date(po.expected_date).toLocaleDateString() : 'Not set'}</p></div><div><p className="text-xs text-gray-500">Receiving</p><p className="text-sm font-medium text-gray-800">{po.units_received} / {po.units_ordered} units</p><div className="h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden"><div className={`h-full ${receivedPercent === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${receivedPercent}%` }} /></div></div><div><p className="text-xs text-gray-500">Total</p><p className="text-sm font-semibold text-gray-900">{formatCurrency(po.total)}</p></div></div></div>{message && <div className="mt-3 ml-8 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{message}</div>}{expanded && <div className="mt-4 ml-8 pt-4 border-t border-gray-100"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4"><div><span className="text-gray-500">Items:</span> <span className="font-medium text-gray-800">{po.items_count}</span></div><div><span className="text-gray-500">Vendor email:</span> <span className="font-medium text-gray-800">{po.vendor_email || 'Not available'}</span></div>{po.internal_note && <div className="sm:col-span-2"><span className="text-gray-500">Internal note:</span> <span className="text-gray-800">{po.internal_note}</span></div>}{po.external_note && <div className="sm:col-span-2"><span className="text-gray-500">Vendor note:</span> <span className="text-gray-800">{po.external_note}</span></div>}</div><div className="flex flex-wrap gap-2"><button onClick={onReceive} disabled={po.status === 'received' || busy} className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"><Package className="w-4 h-4" />Receive Items</button>{po.status === 'draft' && canCreate && <button onClick={() => void submitPO()} disabled={busy} className="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50 text-sm font-medium"><Send className="w-4 h-4" />Submit PO</button>}{['draft', 'submitted', 'sent'].includes(po.status) && canCreate && <button onClick={() => void emailPO()} disabled={busy} className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"><Mail className="w-4 h-4" />Email Vendor</button>}{po.status === 'draft' && canCreate && <button onClick={() => void deletePO()} disabled={busy} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 text-sm font-medium"><Trash2 className="w-4 h-4" />Delete Draft</button>}</div></div>}</div>;
+  return <div className="p-4 sm:p-5 hover:bg-gray-50/70 transition-colors"><div className="flex flex-col lg:flex-row lg:items-center gap-4"><div className="flex items-start gap-3 min-w-0 flex-1"><button onClick={() => setExpanded(!expanded)} className="mt-1 text-gray-400 hover:text-gray-700">{expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}</button><div className={`w-10 h-10 rounded-lg border flex items-center justify-center shrink-0 ${statusClass}`}><Package className="w-5 h-5" /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-gray-900">{po.po_number}</span><span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${statusClass}`}>{statusLabels[po.status] || po.status}</span></div><p className="text-sm text-gray-700 mt-1 truncate">{po.vendor_name}</p><p className="text-xs text-gray-500 mt-0.5">{po.warehouse_name} · Ordered {new Date(po.order_date).toLocaleDateString()}</p></div></div><div className="grid grid-cols-3 gap-4 lg:w-[430px] lg:shrink-0"><div><p className="text-xs text-gray-500">Expected</p><p className="text-sm font-medium text-gray-800">{po.expected_date ? new Date(po.expected_date).toLocaleDateString() : 'Not set'}</p></div><div><p className="text-xs text-gray-500">Receiving</p><p className="text-sm font-medium text-gray-800">{po.units_received} / {po.units_ordered} units</p><div className="h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden"><div className={`h-full ${receivedPercent === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${receivedPercent}%` }} /></div></div><div><p className="text-xs text-gray-500">Total</p><p className="text-sm font-semibold text-gray-900">{formatCurrency(po.total)}</p></div></div></div>{message && <div className="mt-3 ml-8 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{message}</div>}{expanded && <div className="mt-4 ml-8 pt-4 border-t border-gray-100"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4"><div><span className="text-gray-500">Items:</span> <span className="font-medium text-gray-800">{po.items_count}</span></div><div><span className="text-gray-500">Vendor email:</span> <span className="font-medium text-gray-800">{po.vendor_email || 'Not available'}</span></div>{po.internal_note && <div className="sm:col-span-2"><span className="text-gray-500">Internal note:</span> <span className="text-gray-800">{po.internal_note}</span></div>}{po.external_note && <div className="sm:col-span-2"><span className="text-gray-500">Vendor note:</span> <span className="text-gray-800">{po.external_note}</span></div>}</div><div className="flex flex-wrap gap-2"><button onClick={onView} className="border rounded px-3 py-2 text-sm">View Job Lines</button><button onClick={onReceive} disabled={!canCreate || !['submitted','sent','partial'].includes(po.status) || busy} className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"><Package className="w-4 h-4" />Receive Items</button>{po.status === 'draft' && canCreate && <button onClick={() => void submitPO()} disabled={busy} className="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50 text-sm font-medium"><Send className="w-4 h-4" />Submit PO</button>}{['draft', 'submitted', 'sent'].includes(po.status) && canCreate && <button onClick={() => void emailPO()} disabled={busy} className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"><Mail className="w-4 h-4" />Email Vendor</button>}{po.status === 'draft' && canCreate && <button onClick={() => void deletePO()} disabled={busy} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 text-sm font-medium"><Trash2 className="w-4 h-4" />Delete Draft</button>}</div></div>}</div>;
 }

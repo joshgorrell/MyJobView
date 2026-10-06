@@ -1,140 +1,130 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { sendSystemEmail } from "../_shared/system-email.ts";
+import { renderPurchaseDocument } from "../_shared/purchase-document.ts";
+const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
-  }
-
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  const reply = (body: unknown, status = 200) =>
+    Response.json(body, { status, headers: cors });
   try {
-    const { poId } = await req.json();
-
-    if (!poId) {
-      return new Response(JSON.stringify({ error: "Missing poId" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
+    if (req.method !== "POST")
+      return reply({ error: "Method not allowed" }, 405);
+    const token = req.headers.get("Authorization")?.replace(/^Bearer /, "");
+    if (!token) return reply({ error: "Unauthorized" }, 401);
+    const db = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-
-    // Fetch PO with vendor and items
-    const { data: po, error: poError } = await supabase
+    const { data: identity, error: authError } = await db.auth.getUser(token);
+    if (authError || !identity.user)
+      return reply({ error: "Unauthorized" }, 401);
+    const { data: profile } = await db
+      .from("profiles")
+      .select("organization_id,role,can_create_purchase_orders")
+      .eq("id", identity.user.id)
+      .single();
+    if (
+      !profile?.organization_id ||
+      !(profile.role === "admin" || profile.can_create_purchase_orders)
+    )
+      return reply({ error: "Purchasing permission required" }, 403);
+    const { poId, vendorId } = await req.json();
+    if (!poId) return reply({ error: "Missing document" }, 400);
+    const { data: doc, error } = await db
       .from("purchase_orders")
-      .select(`
-        *,
-        vendors ( vendor_name, email, contact_name, address, city, state, zip, phone ),
-        po_items ( product_name, model_number, quantity, unit_price, total_price )
-      `)
+      .select("*,po_items(*)")
       .eq("id", poId)
-      .maybeSingle();
-
-    if (poError || !po) {
-      return new Response(JSON.stringify({ error: "Purchase order not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      .eq("organization_id", profile.organization_id)
+      .single();
+    if (error || !doc) return reply({ error: "Document not found" }, 404);
+    if (!["draft", "submitted", "sent"].includes(doc.status))
+      return reply({ error: "Document cannot be sent in this status" }, 400);
+    const quote = doc.document_type === "rfq";
+    let recipientId = doc.vendor_id;
+    if (quote) {
+      const { data: bid } = await db
+        .from("purchase_quote_vendors")
+        .select("id,vendor_id")
+        .eq("quote_id", doc.id)
+        .eq("organization_id", profile.organization_id)
+        .eq("vendor_id", vendorId)
+        .single();
+      if (!bid)
+        return reply({ error: "Vendor is not on this quote request" }, 400);
+      recipientId = bid.vendor_id;
     }
-
-    const vendorEmail = po.vendors?.email;
-    if (!vendorEmail) {
-      return new Response(JSON.stringify({ error: "Vendor does not have an email address on file" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const items = (po.po_items || [])
-      .map(
-        (i: any) =>
-          `${i.product_name}${i.model_number ? ` (${i.model_number})` : ""} - Qty: ${i.quantity} - Unit: $${i.unit_price || 0} - Total: $${i.total_price || 0}`
-      )
-      .join("\n");
-
-    // Build Bill To block
-    const billToLines = [
-      po.bill_to_name,
-      po.bill_to_address,
-      [po.bill_to_city, po.bill_to_state, po.bill_to_zip].filter(Boolean).join(", "),
-    ].filter(Boolean);
-    const billToBlock = billToLines.length > 0 ? billToLines.join("\n") : "N/A";
-
-    // Build Ship To block
-    const shipToLines = [
-      po.ship_to_name,
-      po.ship_to_address,
-      [po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(", "),
-    ].filter(Boolean);
-    const shipToBlock = shipToLines.length > 0 ? shipToLines.join("\n") : "N/A";
-
-    const emailBody = `
-Purchase Order: ${po.po_number}
-
-To: ${po.vendors?.vendor_name || ""}
-${po.vendors?.contact_name ? `Attn: ${po.vendors.contact_name}` : ""}
-
-Please process the following purchase order:
-
-PO Number: ${po.po_number}
-Order Date: ${po.order_date}
-${po.expected_date ? `Expected Date: ${po.expected_date}` : ""}
-
-Bill To:
-${billToBlock}
-
-Ship To:
-${shipToBlock}
-
-Items:
-${items}
-
-Subtotal: $${po.subtotal || 0}
-${po.shipping_cost ? `Shipping: $${po.shipping_cost}` : ""}
-${po.tax_amount ? `Tax: $${po.tax_amount}` : ""}
-Total: $${po.total || 0}
-
-${po.external_note ? `Vendor Instructions:\n${po.external_note}` : ""}
-
-${po.notes ? `Notes: ${po.notes}` : ""}
-
-Thank you for your prompt service.
-`.trim();
-
-    // Send email via Supabase auth admin invite (workaround for email sending)
-    const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(vendorEmail, {
-      data: {
-        subject: `Purchase Order ${po.po_number}`,
-        body: emailBody,
+    const { data: vendor } = await db
+      .from("vendors")
+      .select("id,vendor_name,email")
+      .eq("id", recipientId)
+      .eq("organization_id", profile.organization_id)
+      .single();
+    if (!vendor?.email) return reply({ error: "Vendor email is missing" }, 400);
+    const { data: settings } = await db
+      .from("company_settings")
+      .select("from_email,from_name,company_name,company_email,reply_to_email")
+      .eq("organization_id", profile.organization_id)
+      .single();
+    const sender = settings?.from_email || settings?.company_email;
+    if (!sender || sender.endsWith("@resend.dev"))
+      return reply({ error: "Configure a verified company email sender" }, 400);
+    const rendered = renderPurchaseDocument(
+      doc,
+      vendor,
+      settings.company_name || "MyJobView",
+    );
+    const payload = {
+      from: `${String(settings.from_name || settings.company_name || "MyJobView").replace(/[<>\r\n]/g, "")} <${sender}>`,
+      to: [vendor.email],
+      reply_to: settings.reply_to_email || settings.company_email || sender,
+      ...rendered,
+    };
+    const hash = Array.from(
+      new Uint8Array(
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(JSON.stringify(payload)),
+        ),
+      ),
+    )
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const result = await sendSystemEmail({
+      headers: {
+        "Idempotency-Key": `purchasing-${doc.id}-${recipientId}-${hash.slice(0, 24)}`,
       },
+      body: JSON.stringify(payload),
     });
-
-    if (emailError) {
-      throw new Error(`Failed to send email: ${emailError.message}`);
-    }
-
-    // Emailing a PO submits it automatically.
-    await supabase
-      .from("purchase_orders")
-      .update({ status: "submitted", submitted_at: new Date().toISOString() })
-      .eq("id", poId);
-
-    return new Response(JSON.stringify({ message: "PO emailed to vendor", vendorEmail }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!result.ok) throw Error("Email provider rejected the document");
+    const update = quote
+      ? await db
+          .from("purchase_quote_vendors")
+          .update({ sent_at: new Date().toISOString() })
+          .eq("quote_id", doc.id)
+          .eq("vendor_id", recipientId)
+      : await db
+          .from("purchase_orders")
+          .update({
+            status: "submitted",
+            submitted_at: doc.submitted_at || new Date().toISOString(),
+            submitted_by: identity.user.id,
+          })
+          .eq("id", doc.id)
+          .eq("organization_id", profile.organization_id);
+    if (update.error)
+      throw Error(
+        "Email accepted, but status could not be saved. Retry safely.",
+      );
+    return reply({
+      message: quote ? "Quote request emailed" : "Purchase order emailed",
     });
-  } catch (err: any) {
-    console.error("Error in send-purchase-order-email:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  } catch (e: any) {
+    return reply({ error: e.message || "Document delivery failed" }, 500);
   }
 });

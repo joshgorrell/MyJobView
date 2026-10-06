@@ -811,7 +811,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                       checked={formData[key]}
                       onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
                     />
-                    {key.replace(/_/g, ' ')}
+                    {key==='can_create_purchase_orders'?'Manage Purchasing (requests, quotes, POs and receiving)':key.replace(/_/g, ' ')}
                   </label>
                 ),
               )}
