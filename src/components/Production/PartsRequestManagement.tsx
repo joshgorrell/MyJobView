@@ -1,15 +1,24 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Briefcase, Building2, ExternalLink, Filter, Calendar, Flag, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Building2, ExternalLink, Calendar, Flag, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
 import { PartsRequestForm } from './PartsRequestForm';
 import { ChangeVendorModal } from './ChangeVendorModal';
+import {PurchasingDocumentModal} from '../Inventory/PurchasingDocumentModal';
 import ConfirmModal from '../ui/ConfirmModal';
+
+const getSourceLabel = (req: ProductRequest): string => {
+    if (req.sales_order_id) return 'Sales Order';
+    if (req.work_order_id) return 'Work Order';
+    if (req.service_request_id) return 'Service Request';
+    return 'General / Stock';
+  };
 
 interface ProductRequest {
   id: string;
   requested_by: string;
+  contact?: {first_name:string;last_name:string;company_name:string;full_name:string} | null;
   request_type: string;
   work_order_id: string | null;
   project_id: string | null;
@@ -28,6 +37,7 @@ interface ProductRequest {
   } | null;
   work_order?: {
     wo_number: string;
+    contact?: {first_name:string;last_name:string;company_name:string;full_name:string} | null;
   } | null;
   project?: {
     project_name: string;
@@ -81,8 +91,8 @@ export function PartsRequestManagement() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [offices, setOffices] = useState<any[]>([]);
 
-  const canManage = profile?.role === 'admin' ||
-                    ['office_manager', 'purchasing', 'service_manager', 'production_manager'].includes(profile?.role || '');
+  const canManage = profile?.role === 'admin' || profile?.can_create_purchase_orders === true;
+  const [purchaseItems,setPurchaseItems]=useState<Array<{id:string;job_reference:string}>|null>(null);
 
   useEffect(() => {
     loadRequests();
@@ -97,8 +107,9 @@ export function PartsRequestManagement() {
         .select(`
           *,
           requester:profiles!product_requests_requested_by_fkey(first_name, last_name),
-          work_order:work_orders(wo_number),
-          project:projects(project_name),
+          work_order:work_orders(wo_number:work_order_number,contact:contacts!contact_id(first_name,last_name,company_name,full_name)),
+          contact:contacts!customer_contact_id(first_name,last_name,company_name,full_name),
+          project:projects(project_name:name),
           sales_order:sales_orders(order_number, contact:contacts(first_name, last_name, company_name)),
           service_request:service_requests(customer_name, job_description),
           office:company_offices(office_name),
@@ -178,14 +189,9 @@ export function PartsRequestManagement() {
     return <Package className="w-4 h-4 text-gray-500" />;
   };
 
-  const getSourceLabel = (req: ProductRequest): string => {
-    if (req.sales_order_id) return 'Sales Order';
-    if (req.work_order_id) return 'Work Order';
-    if (req.service_request_id) return 'Service Request';
-    return 'General / Stock';
-  };
-
   const getCustomerName = (req: ProductRequest): string => {
+    const direct=req.contact || req.work_order?.contact;
+    if(direct)return direct.full_name || `${direct.first_name || ''} ${direct.last_name || ''}`.trim() || direct.company_name || '';
     if (req.sales_order?.contact) {
       const c = req.sales_order.contact;
       return `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.company_name || '';
@@ -286,7 +292,7 @@ export function PartsRequestManagement() {
     }>> = {};
 
     filteredOpen.forEach(request => {
-      (request.items || []).forEach(item => {
+      (request.items || []).filter(item=>!item.purchase_order_id).forEach(item => {
         const vendor = item.vendor || 'Unknown Vendor';
         if (!grouped[vendor]) grouped[vendor] = [];
         grouped[vendor].push({
@@ -332,7 +338,7 @@ export function PartsRequestManagement() {
     filteredOpen.forEach(request => {
       const jobKey = getJobKey(request);
       if (!grouped[jobKey]) grouped[jobKey] = [];
-      (request.items || []).forEach(item => {
+      (request.items || []).filter(item=>!item.purchase_order_id).forEach(item => {
         grouped[jobKey].push({
           itemId: item.id,
           requestId: request.id,
@@ -358,7 +364,7 @@ export function PartsRequestManagement() {
   const getJobKey = (req: ProductRequest): string => {
     if (req.sales_order?.order_number) return `SO-${req.sales_order.order_number}`;
     if (req.work_order?.wo_number) return `WO-${req.work_order.wo_number}`;
-    if (req.project?.project_number) return `PROJ-${req.project.project_number}`;
+    if (req.project_id) return `PROJ-${req.project_id}`;
     if (req.service_request_id) return `SR-${req.service_request_id.slice(0, 8)}`;
     return 'General / Stock';
   };
@@ -406,210 +412,9 @@ export function PartsRequestManagement() {
     setSelectedItems(next);
   };
 
-  const resolveVendorId = async (vendorName: string): Promise<string | null> => {
-    if (!vendorName) return null;
-    const { data } = await supabase
-      .from('vendors')
-      .select('id')
-      .ilike('vendor_name', vendorName)
-      .limit(1)
-      .maybeSingle();
-    return data?.id || null;
-  };
-
-  const createPurchaseOrder = async (request: ProductRequest) => {
-    try {
-      const reqItems = request.items || [];
-      const vendors = [...new Set(reqItems.map(i => i.vendor).filter(Boolean))];
-      if (vendors.length > 1) {
-        alert(`This request has items from ${vendors.length} different vendors. A purchase order can only be for one vendor. Please use the By Vendor view to create separate POs per vendor.`);
-        return;
-      }
-
-      const vendorName = vendors[0] || '';
-      const vendorId = await resolveVendorId(vendorName);
-      if (!vendorId) {
-        alert(`Could not find vendor "${vendorName}" in the vendor database. Please add the vendor first or use the By Vendor view.`);
-        return;
-      }
-
-      const { data: warehouse } = await supabase
-        .from('warehouses')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      if (!warehouse) {
-        alert('No warehouse found. Please create a warehouse first.');
-        return;
-      }
-
-      const totalCost = reqItems.reduce((sum, item) => sum + (item.estimated_cost || 0), 0);
-      const customerName = getCustomerName(request);
-      const officeName = request.office?.office_name || 'N/A';
-
-      const { data: po, error: poError } = await supabase
-        .from('purchase_orders')
-        .insert({
-          vendor_id: vendorId,
-          warehouse_id: warehouse.id,
-          total: totalCost,
-          status: 'draft',
-          notes: `Generated from Parts Request #${request.id.slice(0, 8)}\nSource: ${getSourceLabel(request)}${getSourceRef(request) ? ` (${getSourceRef(request)})` : ''}\nCustomer: ${customerName || 'N/A'}\nOffice: ${officeName}\n\n${request.notes || ''}`,
-          created_by: user?.id
-        })
-        .select()
-        .single();
-
-      if (poError) throw poError;
-
-      const poItems = reqItems.map(item => ({
-        po_id: po.id,
-        product_id: item.product_id || null,
-        product_name: item.product_name,
-        model_number: item.model_number,
-        vendor: item.vendor,
-        quantity: item.quantity_approved || item.quantity_requested,
-        unit_price: item.estimated_cost && item.quantity_requested ? item.estimated_cost / item.quantity_requested : 0,
-        total_price: item.estimated_cost || 0,
-        product_request_item_id: item.id
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('po_items')
-        .insert(poItems);
-      if (itemsError) throw itemsError;
-
-      // Update each request item individually with its own quantity
-      for (const item of reqItems) {
-        await supabase
-          .from('product_request_items')
-          .update({
-            purchase_order_id: po.id,
-            ordered_status: 'ordered',
-            ordered_quantity: item.quantity_approved || item.quantity_requested
-          })
-          .eq('id', item.id);
-      }
-
-      await updateRequestStatus(request.id, 'po_created');
-      alert(`Purchase Order ${po.po_number} created successfully!`);
-    } catch (error: any) {
-      console.error('Error creating PO:', error);
-      alert(`Error creating purchase order: ${error.message || 'Unknown error'}`);
-    }
-  };
-
-  const createPOFromSelected = async (itemsToUse?: any[]) => {
-    const itemsData = itemsToUse || [];
-
-    if (itemsData.length === 0) {
-      if (selectedItems.size === 0) {
-        alert('Please select at least one item');
-        return;
-      }
-      Object.values(itemsByVendor).forEach(items => {
-        items.forEach(item => {
-          if (selectedItems.has(item.itemId)) itemsData.push(item);
-        });
-      });
-    }
-
-    if (itemsData.length === 0) {
-      alert('No items to create PO');
-      return;
-    }
-
-    const vendors = [...new Set(itemsData.map((item: any) => item.vendor).filter(Boolean))];
-    if (vendors.length > 1) {
-      alert(`Selected items span ${vendors.length} vendors. A purchase order can only be for one vendor. Please select items from a single vendor.`);
-      return;
-    }
-
-    try {
-      const vendorName = vendors[0] || '';
-      const vendorId = await resolveVendorId(vendorName);
-      if (!vendorId) {
-        alert(`Could not find vendor "${vendorName}" in the vendor database. Please add the vendor first.`);
-        return;
-      }
-
-      const { data: warehouse } = await supabase
-        .from('warehouses')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      if (!warehouse) {
-        alert('No warehouse found. Please create a warehouse first.');
-        return;
-      }
-
-      const totalCost = itemsData.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
-
-      const { data: po, error: poError } = await supabase
-        .from('purchase_orders')
-        .insert({
-          vendor_id: vendorId,
-          warehouse_id: warehouse.id,
-          total: totalCost,
-          status: 'draft',
-          notes: `Combined PO from ${itemsData.length} product request items across ${new Set(itemsData.map((i: any) => i.requestId)).size} request(s)`,
-          created_by: user?.id
-        })
-        .select()
-        .single();
-
-      if (poError) throw poError;
-
-      const poItems = itemsData.map((item: any) => ({
-        po_id: po.id,
-        product_id: item.productId || null,
-        product_name: item.productName,
-        model_number: item.modelNumber || null,
-        vendor: item.vendor || null,
-        quantity: item.quantityRequested,
-        unit_price: item.estimatedCost && item.quantityRequested ? item.estimatedCost / item.quantityRequested : 0,
-        total_price: item.estimatedCost || 0,
-        product_request_item_id: item.itemId
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('po_items')
-        .insert(poItems);
-      if (itemsError) throw itemsError;
-
-      // Update each item individually with its own quantity
-      for (const item of itemsData) {
-        await supabase
-          .from('product_request_items')
-          .update({
-            purchase_order_id: po.id,
-            ordered_status: 'ordered',
-            ordered_quantity: item.quantityRequested
-          })
-          .eq('id', item.itemId);
-      }
-
-      // Update each affected request: if all items are now ordered, set status to po_created
-      const requestIds = [...new Set(itemsData.map((item: any) => item.requestId))];
-      for (const reqId of requestIds) {
-        const { data: reqItems } = await supabase
-          .from('product_request_items')
-          .select('id, ordered_status')
-          .eq('request_id', reqId);
-        const allOrdered = (reqItems || []).every(i => i.ordered_status === 'ordered');
-        if (allOrdered) {
-          await supabase.from('product_requests').update({ status: 'po_created' }).eq('id', reqId);
-        }
-      }
-
-      alert(`Purchase Order ${po.po_number} created with ${itemsData.length} items!`);
-      setSelectedItems(new Set());
-      await loadRequests();
-    } catch (error: any) {
-      console.error('Error creating PO:', error);
-      alert(`Error creating purchase order: ${error.message}`);
-    }
-  };
+  const purchasingSources = (ids: string[]) => requests.flatMap(request=>(request.items||[]).filter(item=>ids.includes(item.id)&&!item.purchase_order_id).map(item=>({id:item.id,job_reference:[getCustomerName(request),getSourceRef(request)].filter(Boolean).join(' · ')||getSourceLabel(request)})));
+  const createPurchaseOrder = (request:ProductRequest) => {const sources=purchasingSources((request.items||[]).map(i=>i.id));if(!sources.length){alert('These items are already linked to purchase orders.');return;}setPurchaseItems(sources);};
+  const createPOFromSelected = (itemsToUse?:any[]) => {const ids=itemsToUse?.map(i=>i.itemId)||[...selectedItems];if(!ids.length){alert('Select at least one request item');return;}setPurchaseItems(purchasingSources(ids));};
 
   if (loading) {
     return (
@@ -672,7 +477,7 @@ export function PartsRequestManagement() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Fulfilled / Ordered ({fulfilledRequests.length})
+            On POs / Closed ({fulfilledRequests.length})
           </button>
         </div>
 
@@ -761,7 +566,7 @@ export function PartsRequestManagement() {
                 onClick={() => createPOFromSelected()}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
               >
-                Create PO for Selected
+                Create PO / Request Quotes
               </button>
             </div>
           </div>
@@ -806,7 +611,7 @@ export function PartsRequestManagement() {
                           onClick={() => createPOFromSelected(items)}
                           className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
                         >
-                          Create PO
+                          Create PO / Request Quotes
                         </button>
                       </div>
                       <div className="divide-y divide-gray-200">
@@ -1059,22 +864,16 @@ export function PartsRequestManagement() {
                   {canManage && mainTab === 'open' && request.status === 'pending' && (
                     <div className="mt-3 pt-3 border-t border-gray-200 flex flex-col sm:flex-row gap-2">
                       <button
-                        onClick={(e) => { e.stopPropagation(); updateRequestStatus(request.id, 'approved'); }}
-                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 font-medium"
-                      >
-                        Approve
-                      </button>
-                      <button
                         onClick={(e) => { e.stopPropagation(); createPurchaseOrder(request); }}
                         className="flex-1 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 font-medium"
                       >
-                        Create PO
+                        Create PO / Request Quotes
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); updateRequestStatus(request.id, 'rejected'); }}
                         className="flex-1 px-3 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 font-medium"
                       >
-                        Reject
+                        Cancel Request
                       </button>
                     </div>
                   )}
@@ -1084,7 +883,7 @@ export function PartsRequestManagement() {
                         onClick={(e) => { e.stopPropagation(); createPurchaseOrder(request); }}
                         className="w-full px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 font-medium"
                       >
-                        Create Purchase Order
+                        Create PO / Request Quotes
                       </button>
                     </div>
                   )}
@@ -1095,6 +894,7 @@ export function PartsRequestManagement() {
         )}
       </div>
 
+      {purchaseItems && <PurchasingDocumentModal requestItems={purchaseItems} onClose={()=>setPurchaseItems(null)} onSuccess={()=>{setSelectedItems(new Set());setSelectedRequest(null);loadRequests();}}/>}
       {/* Modals */}
       {showForm && (
         <PartsRequestForm
@@ -1118,7 +918,6 @@ export function PartsRequestManagement() {
           canManage={canManage}
           canDelete={canDeleteRequest(selectedRequest)}
           hasPO={hasPurchaseOrder(selectedRequest)}
-          onApprove={() => { updateRequestStatus(selectedRequest.id, 'approved'); setSelectedRequest(null); }}
           onReject={() => { updateRequestStatus(selectedRequest.id, 'rejected'); setSelectedRequest(null); }}
           onCreatePO={() => { createPurchaseOrder(selectedRequest); setSelectedRequest(null); }}
           onDelete={() => { setConfirmDeleteId(selectedRequest.id); setSelectedRequest(null); }}
@@ -1154,13 +953,12 @@ export function PartsRequestManagement() {
 
 // --- Request Detail Modal ---
 
-function RequestDetailModal({ request, onClose, canManage, canDelete, hasPO, onApprove, onReject, onCreatePO, onDelete }: {
+function RequestDetailModal({ request, onClose, canManage, canDelete, hasPO, onReject, onCreatePO, onDelete }: {
   request: ProductRequest;
   onClose: () => void;
   canManage: boolean;
   canDelete: boolean;
   hasPO: boolean;
-  onApprove: () => void;
   onReject: () => void;
   onCreatePO: () => void;
   onDelete: () => void;
@@ -1304,22 +1102,16 @@ function RequestDetailModal({ request, onClose, canManage, canDelete, hasPO, onA
           {canManage && isOpen && request.status === 'pending' && (
             <>
               <button
-                onClick={onApprove}
-                className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm"
-              >
-                Approve
-              </button>
-              <button
                 onClick={onCreatePO}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
               >
-                Create PO
+                Create PO / Request Quotes
               </button>
               <button
                 onClick={onReject}
                 className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm"
               >
-                Reject
+                Cancel Request
               </button>
             </>
           )}
@@ -1328,7 +1120,7 @@ function RequestDetailModal({ request, onClose, canManage, canDelete, hasPO, onA
               onClick={onCreatePO}
               className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
             >
-              Create Purchase Order
+              Create PO / Request Quotes
             </button>
           )}
         </div>

@@ -1206,8 +1206,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       {
                         key: 'can_create_purchase_orders',
                         icon: Briefcase,
-                        label: 'Can Create Purchase Orders',
-                        desc: 'Create, submit, email, and delete draft POs',
+                        label: 'Manage Purchasing',
+                        desc: 'View all product requests, request vendor quotes, create POs and receive items. No request approval step.',
                       },
                       {
                         key: 'can_view_prospects',
