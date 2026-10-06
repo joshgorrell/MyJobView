@@ -29,6 +29,8 @@ alter table invoices add column invoice_number text,add column tax_snapshot_id u
 const deliverySql=await readFile('supabase/migrations/20261006152705_invoice_portal_delivery.sql','utf8');
 await db.exec(deliverySql.slice(0,deliverySql.indexOf('-- Reuse')));
 await db.exec(await readFile('supabase/migrations/20261006153642_invoice_submission_unlock.sql','utf8'));
+await db.exec('create table payments(id uuid default gen_random_uuid(),invoice_id uuid references invoices,amount numeric);grant all on payments to authenticated');
+await db.exec(await readFile('supabase/migrations/20261006183831_invoice_draft_default.sql','utf8'));
 await db.exec('create trigger trg_prevent_post_submit_changes before update on invoices for each row execute function prevent_post_submit_field_changes()');
 await db.exec(`create table contacts(id uuid primary key,organization_id uuid,portal_user_id uuid);insert into contacts values('${customer}','${org}','70000000-0000-0000-0000-000000000001');grant select on contacts to authenticated;alter table invoices enable row level security;create policy finance_test on invoices for all to authenticated using(organization_id=public.get_user_org_id() and public.can_view_all_org_invoices()) with check(organization_id=public.get_user_org_id() and public.can_view_all_org_invoices());`);
 const baseline=await readFile('supabase/migrations/20260923134130_invoice_cutover_submit_void_rls_locking.sql','utf8');
@@ -36,6 +38,19 @@ const policyStart=baseline.indexOf('CREATE POLICY "Portal users can view their i
 const policyEnd=baseline.indexOf('-- ============================================================',policyStart);
 await db.exec(baseline.slice(policyStart,policyEnd));
 await db.exec('grant usage on schema public,auth to authenticated;grant all on company_settings,organizations,profiles,work_orders,products,service_parts_used,time_entries,invoices,invoice_line_items,service_requests,service_billing_queue to authenticated;set role authenticated');
+
+// Defaults and legacy callers cannot publish an invoice during creation.
+for (const attemptedStatus of [null,'submitted','paid','sent']) {
+ const created=(await db.query('insert into invoices(organization_id,company_id,contact_id,status,portal_visible) values($1,$1,$2,$3,true) returning id,status,portal_visible',[org,customer,attemptedStatus])).rows[0];
+ assert.equal(created.status,'draft');assert.equal(created.portal_visible,false);
+ await assert.rejects(db.query("update invoices set status='submitted' where id=$1",[created.id]),/Use Submit/);
+ await assert.rejects(db.query('insert into payments(invoice_id,amount) values($1,1)',[created.id]),/Submit the invoice/);
+ assert.equal((await db.query('select count(*) n from invoice_portal_deliveries where invoice_id=$1',[created.id])).rows[0].n,0);
+ await db.query('delete from invoices where id=$1',[created.id]);
+}
+const defaultDraft=(await db.query('insert into invoices(organization_id,company_id,contact_id) values($1,$1,$2) returning id,status,portal_visible',[org,customer])).rows[0];
+assert.equal(defaultDraft.status,'draft');assert.equal(defaultDraft.portal_visible,false);
+await db.query('delete from invoices where id=$1',[defaultDraft.id]);
 
 const header={invoice_date:'2026-10-06',due_date:'2026-10-06',tax_amount:10,tax_rate:.1};
 const lines=[{description:'Service labor',quantity:4.25,unit_price:100,item_type:'labor'},{description:'Part',quantity:2,unit_price:100,cost:20,item_type:'material',source_part_id:part,product_id:product,notes:'internal',notes_visible_on_invoice:false}];
@@ -78,4 +93,5 @@ await assert.rejects(db.query('delete from service_parts_used where id=$1',[part
 await assert.rejects(db.query('select private.submit_invoice_engine($1)',[invoice]),/permission denied/);
 await assert.rejects(db.query('select * from claim_invoice_portal_deliveries()'),/permission denied/);
 await db.exec("set test.actor='70000000-0000-0000-0000-000000000001'");assert.equal((await db.query('select count(*) n from invoices')).rows[0].n,1,'Portal customer can see only the submitted invoice');await db.exec("set test.actor=''");
+await db.query('insert into payments(invoice_id,amount) values($1,1)',[invoice]);
 await db.close();console.log('Linked visit, actual hours, selling prices, editable drafts, retry prevention rollback, draft privacy, submission locks and intentional unlock checks passed.');

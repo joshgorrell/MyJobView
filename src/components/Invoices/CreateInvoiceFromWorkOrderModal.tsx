@@ -819,7 +819,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
         )}
 
         {step === 'review' && (
-          <form onSubmit={e => handleSubmit(e,true)} className="p-6 space-y-6">
+          <form onSubmit={e => handleSubmit(e,false)} className="p-6 space-y-6">
             <section className="rounded-lg border border-gray-200 p-4 space-y-3">
               <h3 className="font-semibold text-gray-900">Job closeout · {reviewOrders.length} work order(s)</h3>
               <p className="text-sm text-gray-600">{reviewOrders.map(w=>w.work_order_number).join(', ')}</p>
@@ -1190,7 +1190,8 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
                 Change Work Orders
               </button>}
               <button
-                type="submit"
+                type="button"
+                onClick={e => handleSubmit(e,true)}
                 disabled={submitting || openClocks || reviewOrders.some(w=>w.status!=='completed')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
               >

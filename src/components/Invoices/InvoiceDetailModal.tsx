@@ -705,7 +705,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   const customerName = invoice.contacts?.full_name ||
     invoice.contacts?.contact_name ||
     `${invoice.contacts?.first_name || ''} ${invoice.contacts?.last_name || ''}`.trim() || 'Customer';
-  const canPay = invoice.status !== 'paid' && invoice.status !== 'void' && invoice.amount_due > 0;
+  const canPay = ['submitted','partial','overdue'].includes(invoice.status) && invoice.amount_due > 0;
   const canVoid = invoice.status !== 'void' &&
     (invoice.status === 'draft' || invoice.status === 'submitted' || canDeletePaidInvoices);
   const canDelete = invoice.status === 'draft' && !invoice.edit_unlocked_at;

@@ -6,9 +6,11 @@ Actual hours remain unchanged. Billable hours default to the next quarter hour a
 
 **Save Open Draft** keeps the invoice private indefinitely, including while other linked work is unfinished. **Submit Invoice** requires completed, billable linked work orders and closed job clocks. Submission locks accounting fields and lines, queues portal notification when enabled, and marks the visit billed. An authorized billing user can **Unlock for Changes** on an unpaid submitted invoice, recording a reason. Unlock hides the draft, preserves its work-order links, and requires resubmission. Paid/part-paid and monitoring invoices cannot be unlocked. Previously emailed copies and external QuickBooks payment links cannot be recalled by hiding a local draft.
 
+All invoice creation paths start as private drafts, including deposits and recurring invoices. Creation never publishes an invoice by itself. Existing monitoring automation explicitly calls the submission RPC after creating its draft; ordinary staff-created invoices wait for the user to submit. The work-order review form saves a draft when submitted with Enter; only the explicit **Submit Invoice** button publishes.
+
 ## Deployment
 
-Apply the three migrations in order, deploy `invoice-portal-delivery`, `quickbooks-sync-invoices`, and `send-invoice-email`, and `security-qbo-billing-setup`, then deploy the frontend. The worker's JWT gateway check is disabled because it validates the dedicated Vault credential using the existing service-only `security_billing_worker_authorized` RPC. It does not accept user tokens.
+Apply the four migrations in order, deploy `invoice-portal-delivery`, `quickbooks-sync-invoices`, and `send-invoice-email`, and `security-qbo-billing-setup`, then deploy the frontend. The worker's JWT gateway check is disabled because it validates the dedicated Vault credential using the existing service-only `security_billing_worker_authorized` RPC. It does not accept user tokens.
 
 The minute scheduler reuses `security_billing_project_url` and `security_billing_worker_secret` provisioned by the existing security billing deployment. Verify both Vault secrets exist and that the project URL is this deployment's Supabase URL. Verify `invoice-portal-delivery-every-minute` is active. Configure the verified email sender and `RESEND_API_KEY`, the customer portal URL, and enable portal invoices in dealer settings.
 
