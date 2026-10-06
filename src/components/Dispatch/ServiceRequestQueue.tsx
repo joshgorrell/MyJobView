@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateWorkOrderModal } from '../Production/CreateWorkOrderModal';
 import type { ServiceRequestContext } from '../Production/CreateWorkOrderModal';
+import { SchedulingCalendar } from '../Shared/SchedulingCalendar';
+import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import ConfirmModal from '../ui/ConfirmModal';
 import {
   AlertCircle,
@@ -23,8 +25,6 @@ import {
   DollarSign,
   Paperclip,
   UserPlus,
-  ChevronLeft,
-  ChevronRight,
   ListTodo,
   ClipboardList,
   MessageSquareWarning,
@@ -55,6 +55,11 @@ interface ServiceRequest {
   billable_type: string;
   billable_by: string;
   priority: string;
+  earliest_date?: string | null;
+  customer_contact_instruction?: string;
+  warranty_type?: string | null;
+  warranty_reference?: string | null;
+  warranty_notes?: string | null;
   requested_tech_ids: string[] | null;
   estimated_duration: string | null;
   requested_date: string | null;
@@ -101,7 +106,6 @@ export function ServiceRequestQueue() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'queue' | 'needs_info'>('queue');
   const [filterPriority, setFilterPriority] = useState<string>('all');
@@ -117,7 +121,7 @@ export function ServiceRequestQueue() {
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   const isManager = profile?.role === 'admin' ||
-    profile?.role === 'service_manager' ||
+    String(profile?.role) === 'service_manager' ||
     profile?.role === 'manager';
 
   useEffect(() => {
@@ -748,6 +752,12 @@ export function ServiceRequestQueue() {
                           </div>
                         </div>
 
+                        <div className="text-sm text-secondary space-y-1">
+                          <p>{request.customer_contact_instruction === 'requester' ? 'Requester will coordinate with customer' : request.customer_contact_instruction === 'already_contacted' ? 'Customer already contacted / schedule as requested' : 'Dispatch should contact customer'}</p>
+                          {request.earliest_date && <p>Do not schedule before: {request.earliest_date}</p>}
+                          {request.warranty_type && <p>Warranty: {request.warranty_type} · {request.warranty_reference} · {request.warranty_notes}</p>}
+                          {request.estimated_duration && <p>Estimated duration: {request.estimated_duration}</p>}
+                        </div>
                         {/* Contact details grid */}
                         {(request.customer_phone || request.customer_email || request.requested_date || request.attachments?.length > 0) && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -766,7 +776,7 @@ export function ServiceRequestQueue() {
                             {request.requested_date && (
                               <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted">
                                 <Calendar className="w-3.5 h-3.5 text-muted shrink-0" />
-                                {new Date(request.requested_date).toLocaleDateString()}
+                                Need by: {request.requested_date.split('T')[0]}
                                 {request.requested_time && ` · ${request.requested_time}`}
                               </div>
                             )}
@@ -916,6 +926,13 @@ export function ServiceRequestQueue() {
           billable_type: req.billable_type,
           priority: req.priority,
           notes: req.notes,
+          earliest_date: req.earliest_date,
+          customer_contact_instruction: req.customer_contact_instruction,
+          warranty_type: req.warranty_type,
+          warranty_reference: req.warranty_reference,
+          warranty_notes: req.warranty_notes,
+          estimated_duration: req.estimated_duration,
+
           contact_id: req.contact_id,
           customer_location_id: req.customer_location_id,
           requested_tech_ids: req.requested_tech_ids,
@@ -1107,7 +1124,6 @@ interface CombineWorkOrderModalProps {
 }
 
 function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: CombineWorkOrderModalProps) {
-  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState('');
@@ -1116,7 +1132,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
   const [description, setDescription] = useState(
     serviceRequests.map((sr, i) => `${i + 1}. [${sr.customer_name}] ${sr.job_description}`).join('\n\n')
   );
-  const [internalNotes, setInternalNotes] = useState('');
+  const [internalNotes, setInternalNotes] = useState(serviceRequests.map((sr, i) => [`Request ${i + 1}`, sr.notes, `Customer contact: ${sr.customer_contact_instruction || 'dispatch'}`, sr.earliest_date && `Do not schedule before: ${sr.earliest_date}`, sr.requested_date && `Need by: ${sr.requested_date}`, sr.estimated_duration && `Estimated duration: ${sr.estimated_duration}`, sr.warranty_type && `Warranty: ${sr.warranty_type}; ${sr.warranty_reference || ''}; ${sr.warranty_notes || ''}`].filter(Boolean).join('\n')).join('\n\n'));
 
   const customer = serviceRequests[0];
 
@@ -1147,9 +1163,13 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
       return;
     }
 
+    if (serviceRequests.some(sr => sr.earliest_date && scheduledDate < sr.earliest_date)) {
+      alert('Schedule on or after every selected request’s earliest date.');
+      return;
+    }
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('combine_service_requests_to_work_order', {
+      const { error } = await supabase.rpc('combine_service_requests_to_work_order', {
         p_service_request_ids: serviceRequests.map(sr => sr.id),
         p_tech_ids: selectedTechs,
         p_scheduled_date: scheduledDate,
