@@ -40,6 +40,7 @@ interface InvoiceDetail {
   edit_unlocked_at: string | null;
   qbo_invoice_id: string | null;
   portal_visible: boolean;
+  customer_visible_on_submit: boolean;
   security_billing_cycle_id?: string | null;
   id: string;
   invoice_number: string;
@@ -332,7 +333,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
         notes, payment_terms, contact_id, sales_order_id, source_type,
         billing_name, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip,
         tax_environment, tax_project_type, tax_override, tax_override_reason, tax_jurisdiction_id,
-        tax_calculation_status, portal_visible, qbo_invoice_id, qbo_void_pending, security_billing_cycle_id, edit_unlocked_at,
+        tax_calculation_status, portal_visible, customer_visible_on_submit, qbo_invoice_id, qbo_void_pending, security_billing_cycle_id, edit_unlocked_at,
         bill_to_contact_id,
         contacts:contact_id (
           contact_name, first_name, last_name, full_name, email, phone,
@@ -731,7 +732,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
               </div>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
                 <StatusIcon className="w-3 h-3" />
-                {invoice.status==='draft'?'Open draft — private':invoice.status==='void'?'Void':`${invoice.status==='submitted'?'Submitted':invoice.status.charAt(0).toUpperCase()+invoice.status.slice(1)} — locked`}
+                {invoice.status==='draft'?'Open draft — private':invoice.status==='void'?'Void':`${invoice.status==='submitted'?'Submitted':invoice.status.charAt(0).toUpperCase()+invoice.status.slice(1)} — ${invoice.portal_visible?'customer visible':'internal'} — locked`}
               </span>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -739,7 +740,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
             </button>
           </div>
 
-          {!customerView && !readonly && invoice.status!=='draft' && portalDelivery && <div className={`px-6 py-3 text-sm ${portalDelivery.status==='failed'?'bg-amber-50 text-amber-900':'bg-blue-50 text-blue-900'}`}>
+          {!customerView && !readonly && invoice.status!=='draft' && invoice.portal_visible && portalDelivery && <div className={`px-6 py-3 text-sm ${portalDelivery.status==='failed'?'bg-amber-50 text-amber-900':'bg-blue-50 text-blue-900'}`}>
             Customer notification: {portalDelivery.status==='sent'?'Sent':portalDelivery.status==='failed'?'Needs attention — automatic retry scheduled':portalDelivery.status==='skipped'?'Not sent (invoice is private or void)':'Queued'}.
             {portalDelivery.error && <span className="block mt-1">{portalDelivery.error}</span>}
           </div>}
@@ -802,7 +803,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
             {!readonly && (
               <button
                 onClick={() => { setEmailOverride(invoice?.contacts?.email || ''); setConfirmEmail(true); }}
-                disabled={sendingEmail || loadingBillingSummary || ['draft','void'].includes(invoice.status)}
+                disabled={sendingEmail || loadingBillingSummary || !invoice.portal_visible || ['draft','void'].includes(invoice.status)}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
@@ -993,27 +994,27 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                     <span className="text-gray-900">{formatPaymentTerms(invoice.payment_terms)}</span>
                   </div>
                 )}
-                {!readonly && invoice.status !== 'draft' && invoice.status !== 'void' && (
+                {!readonly && !customerView && canManageBilling && invoice.status !== 'void' && (
                   <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100">
-                    <span className="text-gray-500">Visible on Customer Portal</span>
+                    <span className="text-gray-500">Customer-visible on submission</span>
                     <button
                       onClick={async () => {
                         if (!invoice) return;
-                        const newValue = !invoice.portal_visible;
+                        const newValue = !(invoice.status==='draft'?invoice.customer_visible_on_submit:invoice.portal_visible);
                         try {
                           const { error } = await supabase
                             .from('invoices')
-                            .update({ portal_visible: newValue })
+                            .update({ customer_visible_on_submit:newValue,...(invoice.status==='draft'?{}:{portal_visible:newValue}) })
                             .eq('id', invoice.id);
                           if (error) throw error;
-                          setInvoice(prev => prev ? { ...prev, portal_visible: newValue } : prev);
+                          setInvoice(prev => prev ? { ...prev, customer_visible_on_submit:newValue,...(invoice.status==='draft'?{}:{portal_visible:newValue}) } : prev);
                         } catch (err) {
                           console.error('Error toggling portal visibility:', err);
                         }
                       }}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${invoice.portal_visible ? 'bg-blue-600' : 'bg-gray-300'}`}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${(invoice.status==='draft'?invoice.customer_visible_on_submit:invoice.portal_visible) ? 'bg-blue-600' : 'bg-gray-300'}`}
                     >
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${invoice.portal_visible ? 'translate-x-4' : 'translate-x-1'}`} />
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${(invoice.status==='draft'?invoice.customer_visible_on_submit:invoice.portal_visible) ? 'translate-x-4' : 'translate-x-1'}`} />
                     </button>
                   </div>
                 )}

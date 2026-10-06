@@ -18,6 +18,7 @@ interface Invoice {
   invoice_date: string;
   due_date: string | null;
   status: string;
+  portal_visible: boolean;
   total: number;
   amount_paid: number;
   amount_due: number;
@@ -79,6 +80,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           invoice_date,
           due_date,
           status,
+          portal_visible,
           total,
           amount_paid,
           amount_due,
@@ -355,7 +357,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                           <p className="text-sm text-secondary">{invoice.customer_name}</p>
                         )}
                       </div>
-                      <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
+                      <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} portalVisible={invoice.portal_visible} />
                     </div>
                     <div className="flex items-center justify-between text-sm mb-3">
                       <span className="text-muted">{new Date(invoice.invoice_date).toLocaleDateString()}</span>
@@ -372,12 +374,12 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                       </div>
                     )}
                     <div className="flex items-center justify-end gap-1 pt-2 border-t border-subtle" onClick={(e) => e.stopPropagation()}>
-                      {invoice.status !== 'paid' && (
+                      {['submitted','partial','overdue'].includes(invoice.status) && invoice.amount_due>0 && (
                         <button onClick={(e) => { e.stopPropagation(); setRecordingPaymentInvoice(invoice); }} className="p-2 text-green-600 hover:bg-green-50 rounded-lg touch-manipulation" aria-label="Record Payment">
                           <DollarSign className="w-4 h-4" />
                         </button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); handleSendInvoice(invoice); }} disabled={sendingInvoice === invoice.id} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 touch-manipulation" aria-label="Send Invoice Email">
+                      <button onClick={(e) => { e.stopPropagation(); handleSendInvoice(invoice); }} disabled={sendingInvoice === invoice.id || !invoice.portal_visible || ['draft','void'].includes(invoice.status)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 touch-manipulation" aria-label="Send Invoice Email">
                         {sendingInvoice === invoice.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); setConvertingInvoice(invoice); }} className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg touch-manipulation" aria-label="Convert to Recurring">
@@ -443,7 +445,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
+                            <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} portalVisible={invoice.portal_visible} />
                           </td>
                           <td className="px-6 py-4 text-right">
                             <p className="text-sm font-medium text-primary">${(invoice.total ?? 0).toFixed(2)}</p>
@@ -456,7 +458,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                           </td>
                           <td className="px-4 sm:px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1 sm:gap-2">
-                              {invoice.status !== 'paid' && (
+                              {['submitted','partial','overdue'].includes(invoice.status) && invoice.amount_due>0 && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setRecordingPaymentInvoice(invoice); }}
                                   className="p-2 sm:p-2.5 text-green-600 hover:text-green-900 hover:bg-green-50 active:bg-green-100 rounded-lg transition-colors touch-manipulation"
@@ -467,7 +469,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleSendInvoice(invoice); }}
-                                disabled={sendingInvoice === invoice.id}
+                                disabled={sendingInvoice === invoice.id || !invoice.portal_visible || ['draft','void'].includes(invoice.status)}
                                 className="p-2 sm:p-2.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors disabled:opacity-50 touch-manipulation"
                                 title="Resend Invoice Email"
                               >
@@ -708,7 +710,7 @@ function OpenedCell({ stats }: { stats: InvoiceOpenStats | null }) {
   );
 }
 
-function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string }) {
+function StatusBadge({ status, updatedAt, portalVisible }: { status: string; updatedAt?: string; portalVisible?: boolean }) {
   const configs = {
     draft: { icon: <Clock className="w-3 h-3" />, label: 'Open — private', className: 'bg-surface text-secondary' },
     submitted: { icon: <Send className="w-3 h-3" />, label: 'Submitted — locked', className: 'bg-blue-100 text-blue-700' },
@@ -732,7 +734,7 @@ function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${config.className}`}>
       {config.icon}
-      {config.label}
+      {config.label}{!['draft','void'].includes(status) && !portalVisible ? ' · Internal' : ''}
     </span>
   );
 }

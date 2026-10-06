@@ -8,9 +8,11 @@ Actual hours remain unchanged. Billable hours default to the next quarter hour a
 
 All invoice creation paths start as private drafts, including deposits and recurring invoices. Creation never publishes an invoice by itself. Existing monitoring automation explicitly calls the submission RPC after creating its draft; ordinary staff-created invoices wait for the user to submit. The work-order review form saves a draft when submitted with Enter; only the explicit **Submit Invoice** button publishes.
 
+**Customer-visible** defaults on and can be turned off before submission, including on saved drafts. Internal invoices submit and lock normally and can receive payment or credit records after submission, but have no portal visibility or automatic customer notification. Manual customer email is disabled until the invoice is made customer-visible.
+
 ## Deployment
 
-Apply the four migrations in order, deploy `invoice-portal-delivery`, `quickbooks-sync-invoices`, and `send-invoice-email`, and `security-qbo-billing-setup`, then deploy the frontend. The worker's JWT gateway check is disabled because it validates the dedicated Vault credential using the existing service-only `security_billing_worker_authorized` RPC. It does not accept user tokens.
+Apply the five migrations in order, deploy `invoice-portal-delivery`, `quickbooks-sync-invoices`, and `send-invoice-email`, and `security-qbo-billing-setup`, then deploy the frontend. The worker's JWT gateway check is disabled because it validates the dedicated Vault credential using the existing service-only `security_billing_worker_authorized` RPC. It does not accept user tokens.
 
 The minute scheduler reuses `security_billing_project_url` and `security_billing_worker_secret` provisioned by the existing security billing deployment. Verify both Vault secrets exist and that the project URL is this deployment's Supabase URL. Verify `invoice-portal-delivery-every-minute` is active. Configure the verified email sender and `RESEND_API_KEY`, the customer portal URL, and enable portal invoices in dealer settings.
 

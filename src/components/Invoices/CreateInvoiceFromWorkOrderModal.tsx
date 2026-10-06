@@ -410,6 +410,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
         if(error) throw error;
         if(draft.status !== 'draft') throw new Error('This job is already invoiced. Open its existing invoice.');
         setDraftInvoiceId(draft.id);
+        setPortalVisible(draft.customer_visible_on_submit ?? true);
         setTaxRate(Number(draft.tax_rate || 0));setTaxEnvironment(draft.tax_environment);setTaxProjectType(draft.tax_project_type);
         setInvoiceDate(draft.invoice_date);setDueDate(draft.due_date || '');setNotes(draft.notes || '');
         setBilling({billing_name:draft.billing_name || '',billing_address_line1:draft.billing_address_line1 || '',billing_address_line2:draft.billing_address_line2 || '',billing_city:draft.billing_city || '',billing_state:draft.billing_state || '',billing_zip:draft.billing_zip || ''});
@@ -1178,8 +1179,8 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
               />
             </div>
 
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={portalVisible} onChange={e=>setPortalVisible(e.target.checked)} />Notify customer and publish to portal when submitted</label>
-            <p className="text-xs text-gray-500">Drafts are private. Submitting queues the customer notification automatically; email delivery and online-payment readiness appear on the invoice.</p>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={portalVisible} onChange={e=>setPortalVisible(e.target.checked)} />Customer-visible invoice (portal and notification on submission)</label>
+            <p className="text-xs text-gray-500">Unchecked means internal only: submitted and locked, with no portal access or customer notification. Drafts are always private. Customer-visible submission queues the customer notification automatically; email delivery and online-payment readiness appear on the invoice.</p>
             <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
               <button type="button" disabled={submitting} onClick={e=>handleSubmit(e,false)} className="min-h-11 px-4 py-2 border rounded-lg">Save Open Draft</button>
               {!preSelectedWorkOrderId && <button

@@ -148,6 +148,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [dueDate, setDueDate] = useState('');
   const [dueDateAutoSet, setDueDateAutoSet] = useState(false);
   const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [customerVisible, setCustomerVisible] = useState(true);
   const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>('residential');
   const [taxProjectType, setTaxProjectType] = useState('general_installation_repair');
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -560,6 +561,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           status: 'draft',
+          customer_visible_on_submit: customerVisible,
           subtotal,
           tax_amount: tax,
           total,
@@ -621,7 +623,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           throw new Error(submitResult.errors?.join(', ') || 'Submission failed');
         }
 
-        if (action === 'submit_email') {
+        if (action === 'submit_email' && customerVisible) {
           try {
             await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoiceData.id } });
           } catch (sendErr) {
@@ -1435,6 +1437,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               >
                 Cancel
               </button>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={customerVisible} onChange={e=>setCustomerVisible(e.target.checked)} />Customer-visible on submission (off = internal only)</label>
               <button
                 type="submit"
                 disabled={submitting}
@@ -1455,7 +1458,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </button>
               <button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || !customerVisible}
                 onClick={(e) => { e.preventDefault(); handleSubmit(e as any, 'submit_email'); }}
                 className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
               >

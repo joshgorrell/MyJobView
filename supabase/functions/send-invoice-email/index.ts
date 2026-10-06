@@ -171,7 +171,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (['draft','void'].includes(invoice.status)) return new Response(JSON.stringify({error:'Publish an invoice before emailing it.'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    if (!invoice.portal_visible || ['draft','void'].includes(invoice.status)) return new Response(JSON.stringify({error:'Submit a customer-visible invoice before emailing it.'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
 
     const settings = await getCompanySettings(
       Deno.env.get('SUPABASE_URL') ?? '',
