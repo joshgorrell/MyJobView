@@ -261,3 +261,6 @@ verify_jwt = false
 # Supabase Auth signs Send Email Hook requests; handleAuthEmail verifies the signature.
 [functions.send-auth-email]
 verify_jwt = false
+
+[functions.invoice-portal-delivery]
+verify_jwt = false

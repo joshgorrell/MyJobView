@@ -1,14 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
-export async function getEmailTemplate(templateType: string, supabaseUrl: string, supabaseKey: string) {
+export async function getEmailTemplate(templateType: string, supabaseUrl: string, supabaseKey: string, organizationId?: string) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const { data, error } = await supabase
-    .from('email_templates')
-    .select('subject, body')
-    .eq('template_type', templateType)
-    .eq('is_active', true)
-    .maybeSingle();
+  let query = supabase.from('email_templates').select('subject, body').eq('template_type',templateType).eq('is_active',true);
+  if(organizationId) query=query.eq('organization_id',organizationId);
+  const { data, error } = await query.maybeSingle();
 
   if (error || !data) {
     console.error(`Failed to load email template: ${templateType}`, error);
@@ -18,26 +15,14 @@ export async function getEmailTemplate(templateType: string, supabaseUrl: string
   return data;
 }
 
-export async function getCompanySettings(supabaseUrl: string, supabaseKey: string) {
+export async function getCompanySettings(supabaseUrl: string, supabaseKey: string, organizationId?: string) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const [settingsRes, officesRes, orgRes] = await Promise.all([
-    supabase
-      .from('company_settings')
-      .select('company_name, company_email, company_logo_url, from_email, from_name, reply_to_email, app_url, portal_url')
-      .maybeSingle(),
-    supabase
-      .from('company_offices')
-      .select('office_name, phone')
-      .not('phone', 'is', null)
-      .neq('phone', '')
-      .order('display_order'),
-    supabase
-      .from('organizations')
-      .select('subdomain')
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  let settingsQuery=supabase.from('company_settings').select('company_name, company_email, company_logo_url, from_email, from_name, reply_to_email, app_url, portal_url');
+  let officesQuery=supabase.from('company_offices').select('office_name, phone').not('phone','is',null).neq('phone','').order('display_order');
+  let orgQuery=supabase.from('organizations').select('subdomain');
+  if(organizationId){settingsQuery=settingsQuery.eq('organization_id',organizationId);officesQuery=officesQuery.eq('organization_id',organizationId);orgQuery=orgQuery.eq('id',organizationId);}
+  const [settingsRes,officesRes,orgRes]=await Promise.all([settingsQuery.maybeSingle(),officesQuery,orgQuery.limit(1).maybeSingle()]);
 
   const offices: { office_name: string; phone: string }[] = officesRes.data || [];
   const s = settingsRes.data;

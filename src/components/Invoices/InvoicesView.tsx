@@ -289,7 +289,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                 className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Statuses</option>
-                <option value="draft">Draft</option>
+                <option value="draft">Open drafts</option>
                 <option value="submitted">Submitted</option>
                 <option value="partial">Partially Paid</option>
                 <option value="paid">Paid</option>
@@ -710,8 +710,8 @@ function OpenedCell({ stats }: { stats: InvoiceOpenStats | null }) {
 
 function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string }) {
   const configs = {
-    draft: { icon: <Clock className="w-3 h-3" />, label: 'Draft', className: 'bg-surface text-secondary' },
-    submitted: { icon: <Send className="w-3 h-3" />, label: 'Submitted', className: 'bg-blue-100 text-blue-700' },
+    draft: { icon: <Clock className="w-3 h-3" />, label: 'Open — private', className: 'bg-surface text-secondary' },
+    submitted: { icon: <Send className="w-3 h-3" />, label: 'Submitted — locked', className: 'bg-blue-100 text-blue-700' },
     partial: { icon: <AlertCircle className="w-3 h-3" />, label: 'Partial', className: 'bg-yellow-100 text-yellow-700' },
     paid: { icon: <CheckCircle className="w-3 h-3" />, label: 'Paid', className: 'bg-green-100 text-green-700' },
     overdue: { icon: <AlertCircle className="w-3 h-3" />, label: 'Overdue', className: 'bg-red-100 text-red-700' },
@@ -723,9 +723,9 @@ function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string
   if (status === 'draft' && updatedAt) {
     const daysSinceUpdate = Math.floor((Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24));
     if (daysSinceUpdate > 30) {
-      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Aging Draft', className: 'bg-red-100 text-red-700' };
+      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Open — private', className: 'bg-red-100 text-red-700' };
     } else if (daysSinceUpdate >= 16) {
-      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Needs Attention', className: 'bg-amber-100 text-amber-700' };
+      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Open — private · review', className: 'bg-amber-100 text-amber-700' };
     }
   }
 

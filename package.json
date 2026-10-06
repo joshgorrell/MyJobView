@@ -31,7 +31,9 @@
     "test:account-emails": "node tests/account-emails/transport.mjs && node tests/account-emails/database.mjs && node tests/account-emails/recovery.mjs && node tests/account-emails/consistency.mjs",
     "test:handoff": "node tests/work-orders/handoff-database.mjs && node tests/work-orders/modal-runtime.mjs && node tests/work-orders/offline-progress.mjs",
     "test:handoff:browser": "node tests/work-orders/browser.mjs",
-    "test:service-requests:browser": "npm run build && node tests/service-requests/intake-browser.mjs"
+    "test:service-requests:browser": "npm run build && node tests/service-requests/intake-browser.mjs",
+    "test:work-order-billing": "node tests/work-order-billing/database.mjs && node tests/work-order-billing/worker.mjs && node tests/work-order-billing/qbo.mjs",
+    "test:work-order-billing:browser": "npm run build && node tests/work-order-billing/browser.mjs && node tests/work-order-billing/work-order-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

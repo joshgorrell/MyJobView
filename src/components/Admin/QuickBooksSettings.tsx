@@ -22,6 +22,7 @@ export function QuickBooksSettings() {
   const { profile } = useAuth();
   const [settings, setSettings] = useState<Omit<QBSettings, 'access_token' | 'refresh_token' | 'token_expires_at'> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [invoiceItems,setInvoiceItems]=useState({service_labor:'',service_parts:''});
   const [monitoringItem, setMonitoringItem] = useState('');
   const [monitoringMessage, setMonitoringMessage] = useState('');
   const [billingItems, setBillingItems] = useState<Array<{id:string;name:string;income_account:string}>>([]);
@@ -53,7 +54,7 @@ export function QuickBooksSettings() {
     try {
       const { data, error } = await supabase
         .from('quickbooks_settings')
-        .select('security_monitoring_item_id, payments_enabled, id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
+        .select('service_labor_item_id,service_parts_item_id,security_monitoring_item_id, payments_enabled, id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
         .eq('organization_id', organizationId)
         .abortSignal(AbortSignal.timeout(15000))
         .maybeSingle();
@@ -61,6 +62,7 @@ export function QuickBooksSettings() {
       if (error) throw error;
       setSettings(data);
       setMonitoringItem(data?.security_monitoring_item_id || "");
+      setInvoiceItems({service_labor:data?.service_labor_item_id || '',service_parts:data?.service_parts_item_id || ''});
     } catch (error) {
       console.error('Error loading QuickBooks settings:', error);
       setSettingsError(true);
@@ -232,6 +234,22 @@ export function QuickBooksSettings() {
           } catch(e) {setMonitoringMessage(e instanceof Error?e.message:'Billing setup could not be saved.');}
           finally {setBillingBusy(false);}
         }}>Save monitoring item</button>
+        <div className="border-t pt-3 space-y-3">
+          <p className="font-medium">Invoice income items</p>
+          <p className="text-sm text-gray-600">Choose the QuickBooks service reference items for labor and parts income. Each work-order part remains a separate invoice line at its selling price.</p>
+          {(['service_labor','service_parts'] as const).map(purpose=><div key={purpose} className="flex flex-col sm:flex-row gap-2">
+            <label className="flex-1 text-sm">{purpose==='service_labor'?'Labor income':'Parts income'}
+              <select value={invoiceItems[purpose]} disabled={billingBusy || profile?.role!=='admin'} onChange={e=>setInvoiceItems(prev=>({...prev,[purpose]:e.target.value}))} className="mt-1 w-full p-3 border rounded-lg bg-white text-gray-900">
+                <option value="">Choose an income item</option>
+                {invoiceItems[purpose] && !billingItems.some(i=>i.id===invoiceItems[purpose]) && <option value={invoiceItems[purpose]}>Saved item ({invoiceItems[purpose]})</option>}
+                {billingItems.map(item=><option key={item.id} value={item.id}>{item.name} · {item.income_account}</option>)}
+              </select>
+            </label>
+            <button disabled={billingBusy || profile?.role!=='admin' || !billingItems.some(i=>i.id===invoiceItems[purpose])} className="self-end px-4 py-3 rounded bg-blue-700 text-white disabled:opacity-50" onClick={async()=>{
+              setBillingBusy(true);try {const {data,error}=await supabase.functions.invoke('security-qbo-billing-setup',{body:{action:'save',itemId:invoiceItems[purpose],purpose}});if(error || data?.error)throw new Error(data?.error || 'Could not save income item');setMonitoringMessage(`Saved ${purpose==='service_labor'?'labor':'parts'} income: ${data.item.name}`);}catch(e){setMonitoringMessage(e instanceof Error?e.message:'Could not save income item');}finally{setBillingBusy(false);}
+            }}>Save</button>
+          </div>)}
+        </div>
         {monitoringMessage && <p role="status">{monitoringMessage}</p>}
       </div>}
       {settingsError && (

@@ -1,3 +1,5 @@
+import {CreateInvoiceFromWorkOrderModal} from '../Invoices/CreateInvoiceFromWorkOrderModal';
+import {InvoiceDetailModal} from '../Invoices/InvoiceDetailModal';
 import { WorkOrderTimeControl } from './WorkOrderTimeControl';
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import Flow from '../Flow/Flow';
@@ -200,6 +202,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [photoContext, setPhotoContext] = useState<'general' | 'work_order_notes' | 'vip_sales_lead'>('general');
   const [showCompletionWizard, setShowCompletionWizard] = useState(false);
+  const [showBillingReview,setShowBillingReview] = useState(false);
+  const [billingInvoiceId,setBillingInvoiceId] = useState<string | null>(null);
   const [showAddPartsModal, setShowAddPartsModal] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [vipFollowUpFinding, setVipFollowUpFinding] = useState<{id?:string;description:string}|null>(null);
@@ -331,6 +335,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   async function loadWorkOrderData() {
     try {
+      const {data: source, error: sourceError} = await supabase.from('work_orders').select('id,work_order_group_id').eq('id',workOrderId).single();
+      if(sourceError) throw sourceError;
+      let visitIds = [workOrderId];
+      if(source.work_order_group_id) {
+        const {data: linked,error} = await supabase.from('work_orders').select('id').eq('work_order_group_id',source.work_order_group_id);
+        if(error) throw error;
+        visitIds = (linked || []).map(w=>w.id);
+      }
       const [woResult, tasksResult, materialsResult, partsUsedResult, timeResult, partsResult, photosResult, completionResult] = await Promise.all([
         supabase
           .from('work_orders')
@@ -357,7 +369,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         supabase
           .from('service_parts_used')
           .select('*')
-          .eq('work_order_id', workOrderId)
+          .in('work_order_id', visitIds)
           .order('created_at', { ascending: false }),
         supabase
           .from('time_entries')
@@ -373,7 +385,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             clock_out_gps_capture_method,
             technician:profiles!technician_id(full_name)
           `)
-          .eq('work_order_id', workOrderId)
+          .in('work_order_id', visitIds)
           .order('entry_date', { ascending: false }),
         supabase
           .from('product_requests')
@@ -415,6 +427,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
       setTasks(tasksResult.data || []);
       setMaterials(materialsResult.data || []);
+      if(partsUsedResult.error) throw partsUsedResult.error;
+      if(timeResult.error) throw timeResult.error;
       setPartsUsed(partsUsedResult.data || []);
       setTimeEntries(timeResult.data || []);
       setPartRequests(partsResult.data || []);
@@ -665,6 +679,18 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     }
   }
 
+  const isVipMaintenance = workOrder?.type === 'vip_program' || workOrderOptions.some(o => o.id === workOrder?.work_order_type_id && o.system_key === 'vip_program');
+
+  useEffect(() => {
+    if (workOrder && activeTab === 'vip' && !isVipMaintenance) {
+      setActiveTab('overview');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('subtab');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [activeTab, isVipMaintenance,workOrder]);
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -690,23 +716,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   const canArchive = profile?.role === 'admin' || profile?.role === 'finance' || profile?.role === 'office_manager';
 
+  const canManageParts = ['admin','office_manager','project_manager','service_manager','manager','finance'].includes(profile?.role || '') || workOrder.assigned_to===profile?.id;
   const isAssignedTech = workOrder.assigned_to === profile?.id;
 
-  const totalTimeHours = timeEntries.reduce((sum, t) => sum + t.total_hours, 0);
+  const totalTimeHours = timeEntries.filter(t=>t.clock_out && !['rejected','cancelled'].includes(t.status)).reduce((sum, t) => sum + Number(t.total_hours || 0), 0);
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const pendingParts = partRequests.filter(p => p.status === 'pending').length;
   const canComplete = workOrder.status !== 'completed' && isAssignedTech && !jobCompletion;
 
-  const isVipMaintenance = workOrder.type === 'vip_program' || workOrderOptions.some(o => o.id === workOrder.work_order_type_id && o.system_key === 'vip_program');
-
-  useEffect(() => {
-    if (activeTab === 'vip' && !isVipMaintenance) {
-      setActiveTab('overview');
-      const url = new URL(window.location.href);
-      url.searchParams.delete('subtab');
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, [activeTab, isVipMaintenance]);
 
   const tabs = [
     { id: 'flow', label: 'Flow', icon: History },
@@ -798,6 +815,12 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {workOrder.type==='service' && workOrder.status!=='cancelled' && ['admin','manager','service_manager','finance'].includes(profile?.role || '') && <button onClick={async()=>{
+            const {data:link,error}=await supabase.from('work_order_invoice_links').select('invoice_id').eq('work_order_id',workOrderId).maybeSingle();
+            if(error){alert(error.message);return;}
+            if(link){const {data:inv}=await supabase.from('invoices').select('status').eq('id',link.invoice_id).single();if(inv?.status!=='draft'){setBillingInvoiceId(link.invoice_id);return;}}
+            setShowBillingReview(true);
+          }} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">Review & Invoice</button>}
           {canEdit && !editing && (
             <button
               onClick={() => setShowContactLogModal(true)}
@@ -950,7 +973,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {[
           { icon: CheckSquare, label: 'Tasks', value: `${completedTasks}/${tasks.length}`, color: 'text-blue-600' },
-          { icon: Clock, label: 'Hours', value: `${totalTimeHours.toFixed(1)}h`, color: 'text-slate-600' },
+          { icon: Clock, label: 'Hours', value: `${totalTimeHours.toFixed(2)}h`, color: 'text-slate-600' },
           { icon: Package, label: 'Parts Used', value: partsUsed.length, color: 'text-green-600' },
           { icon: Wrench, label: 'Part Requests', value: partRequests.length, sub: pendingParts > 0 ? `${pendingParts} pending` : undefined, color: 'text-orange-600' },
           { icon: Camera, label: 'Photos', value: jobPhotos.length, color: 'text-purple-600' },
@@ -1445,8 +1468,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         {activeTab === 'materials' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Parts Used</h3>
-              {isAssignedTech && (
+              <h3 className="font-semibold text-gray-900">Parts {workOrder.work_order_group_id ? '— all linked work orders' : ''}</h3>
+              {(isAssignedTech || canEdit || ['service_manager','finance','manager'].includes(profile?.role || '')) && (
                 <button
                   onClick={() => setShowAddPartsModal(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -1490,11 +1513,20 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                       <tr key={part.id} className={part.warranty_item ? 'bg-amber-50' : ''}>
                         <td className="py-2.5 text-gray-900 font-medium">{part.part_name}</td>
                         <td className="py-2.5 text-gray-500">{part.part_sku || '—'}</td>
-                        <td className="py-2.5 text-gray-700 text-right">{part.quantity}</td>
+                        <td className="py-2.5 text-gray-700 text-right">{canManageParts ? <input aria-label={`Quantity for ${part.part_name}`} type="number" min="0.01" step="0.01" defaultValue={part.quantity} key={`${part.id}-${part.quantity}`} className="w-20 px-2 py-1 border rounded text-right" onBlur={async e=>{
+                          const quantity=Number(e.target.value);if(!Number.isFinite(quantity) || quantity<=0){e.target.value=String(part.quantity);return;}
+                          if(quantity===Number(part.quantity))return;
+                          const {error}=await supabase.from('service_parts_used').update({quantity}).eq('id',part.id);
+                          if(error){alert(error.message);e.target.value=String(part.quantity);}else loadWorkOrderData();
+                        }}/> : part.quantity}</td>
                         <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_cost)}</td>
                         <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_price)}</td>
                         <td className="py-2.5 font-semibold text-gray-900 text-right">{formatCurrency(part.total_price)}</td>
                         <td className="py-2.5 text-center">
+                          {canManageParts && <button aria-label={`Remove ${part.part_name}`} className="block mx-auto mb-1 text-xs text-red-700 underline" onClick={async()=>{
+                            if(!window.confirm(`Remove ${part.part_name} from this visit's parts list?`))return;
+                            const {error}=await supabase.from('service_parts_used').delete().eq('id',part.id);if(error)alert(error.message);else loadWorkOrderData();
+                          }}>Remove</button>}
                           {part.warranty_item ? (
                             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Warranty</span>
                           ) : (
@@ -1508,7 +1540,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                     <tr className="border-t-2 border-gray-200">
                       <td colSpan={5} className="pt-3 text-sm font-semibold text-gray-700 text-right">Total:</td>
                       <td className="pt-3 text-sm font-bold text-gray-900 text-right">
-                        {formatCurrency(partsUsed.reduce((sum, p) => sum + p.total_price, 0))}
+                        {formatCurrency(partsUsed.reduce((sum, p) => sum + Number(p.total_price || 0), 0))}
                       </td>
                       <td></td>
                     </tr>
@@ -1561,7 +1593,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
               <>
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                   <span className="text-sm font-semibold text-gray-700">All Entries</span>
-                  <span className="text-sm font-bold text-gray-900">{totalTimeHours.toFixed(2)}h total</span>
+                  <span className="text-sm font-bold text-gray-900">{totalTimeHours.toFixed(2)}h total{workOrder.work_order_group_id ? ' across linked work orders' : ''}</span>
                 </div>
                 {timeEntries.map(entry => (
                   <div key={entry.id} className="border border-gray-200 rounded-xl p-4">
@@ -1800,6 +1832,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
       )}
 
+      {showBillingReview && <CreateInvoiceFromWorkOrderModal preSelectedWorkOrderId={workOrderId} onClose={()=>setShowBillingReview(false)} onSuccess={id=>{setShowBillingReview(false);setBillingInvoiceId(id);loadWorkOrderData();}} />}
+      {billingInvoiceId && <InvoiceDetailModal invoiceId={billingInvoiceId} onClose={()=>setBillingInvoiceId(null)} />}
       {showAddPartsModal && (
         <AddPartsModal
           workOrderId={workOrderId}

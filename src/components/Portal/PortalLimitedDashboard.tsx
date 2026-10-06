@@ -14,7 +14,7 @@ interface ProposalTile {
   expires_at: string | null;
 }
 
-export function PortalLimitedDashboard() {
+export function PortalLimitedDashboard({onOpenInvoices}:{onOpenInvoices?:()=>void}={}) {
   const securityPortalEnabled = useSecurityPortalEnabled();
   const [proposals, setProposals] = useState<ProposalTile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +164,9 @@ export function PortalLimitedDashboard() {
           <div><p className="font-semibold text-gray-900">Security agreements</p><p className="text-sm text-gray-600">Resume onboarding, review terms, and print your agreements.</p></div>
           <ArrowRight className="w-5 h-5 text-blue-700" />
         </a>}
+        {onOpenInvoices && <button onClick={onOpenInvoices} className="w-full flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl p-5 mb-6 text-left hover:border-blue-400">
+          <div><p className="font-semibold text-gray-900">Invoices</p><p className="text-sm text-gray-600">View submitted invoices and pay online.</p></div><ArrowRight className="w-5 h-5 text-blue-700" />
+        </button>}
         {/* Your Proposals Section */}
         {proposalsEnabled && (
         <div className="mb-8">

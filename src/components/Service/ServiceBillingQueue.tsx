@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { CreateInvoiceFromWorkOrderModal } from '../Invoices/CreateInvoiceFromWorkOrderModal';
+import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Clock,
@@ -19,6 +21,7 @@ import {
 interface BillingQueueItem {
   id: string;
   work_order_id: string;
+  invoice_id?: string | null;
   contact_id: string;
   billable_by: string;
   assigned_to_user_id: string;
@@ -58,6 +61,13 @@ interface ServiceBillingQueueProps {
 }
 
 export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) {
+  const [reviewWorkOrderId, setReviewWorkOrderId] = useState<string | null>(null);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  function openBilling(item: BillingQueueItem) {
+    if (onSelectItem) {onSelectItem(item);return;}
+    if (item.invoice_id && item.status !== 'invoice_created') setViewingInvoiceId(item.invoice_id);
+    else setReviewWorkOrderId(item.work_order_id);
+  }
   const { profile } = useAuth();
   const [activeQueue, setActiveQueue] = useState<'ready' | 'assigned' | 'unpaid'>('ready');
   const [items, setItems] = useState<BillingQueueItem[]>([]);
@@ -101,7 +111,7 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
 
       // Filter by queue type
       if (activeQueue === 'ready') {
-        query = query.eq('status', 'ready_for_billing');
+        query = query.in('status', ['ready_for_billing','invoice_created']);
       } else if (activeQueue === 'assigned') {
         query = query.in('status', ['assigned', 'in_progress']);
         if (!isManager) {
@@ -228,9 +238,9 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
       ready_for_billing: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Ready' },
       assigned: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Assigned' },
       in_progress: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'In Progress' },
-      invoice_created: { bg: 'bg-green-100', text: 'text-green-800', label: 'Invoice Created' },
+      invoice_created: { bg: 'bg-green-100', text: 'text-green-800', label: 'Open draft — private' },
       invoice_sent: { bg: 'bg-cyan-100', text: 'text-cyan-800', label: 'Invoice Sent' },
-      payment_pending: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Payment Pending' },
+      payment_pending: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Submitted — unpaid' },
       paid: { bg: 'bg-green-100', text: 'text-green-800', label: 'Paid' },
       overdue: { bg: 'bg-red-100', text: 'text-red-800', label: 'Overdue' }
     };
@@ -432,7 +442,7 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
                 className={`bg-white rounded-lg shadow-sm border-2 p-4 hover:shadow-md transition-all cursor-pointer ${
                   isOverdue ? 'border-red-300 bg-red-50' : isArchived ? 'border-gray-300 bg-gray-50' : 'border-gray-200'
                 }`}
-                onClick={() => onSelectItem && onSelectItem(item)}
+                onClick={() => openBilling(item)}
               >
                 {group.isGroup && (
                   <div className="mb-3 pb-3 border-b border-blue-200 bg-blue-50 -m-4 p-4 rounded-t-lg">
@@ -531,9 +541,9 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
                       {item.billable_by.replace('_', ' ')}
                     </span>
                   </div>
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1 text-sm">
+                  <button onClick={e=>{e.stopPropagation();openBilling(item);}} className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1 text-sm">
                     <Eye className="w-4 h-4" />
-                    View Details
+                    {item.invoice_id && item.status !== 'invoice_created' ? 'View Invoice' : 'Review & Invoice'}
                   </button>
                 </div>
               </div>
@@ -542,6 +552,8 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
         )}
       </div>
 
+      {reviewWorkOrderId && <CreateInvoiceFromWorkOrderModal preSelectedWorkOrderId={reviewWorkOrderId} onClose={()=>setReviewWorkOrderId(null)} onSuccess={invoiceId=>{setReviewWorkOrderId(null);setViewingInvoiceId(invoiceId);loadQueueItems();}} />}
+      {viewingInvoiceId && <InvoiceDetailModal invoiceId={viewingInvoiceId} onClose={()=>setViewingInvoiceId(null)} onPaymentRecorded={loadQueueItems} onVoided={loadQueueItems} onDeleted={loadQueueItems} />}
       {/* Summary Stats */}
       {items.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
