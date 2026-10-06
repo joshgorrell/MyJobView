@@ -758,12 +758,13 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Type customer name, company, or phone..."
+                    placeholder="Search name, company, phone, or email..."
                     className="w-full pl-10 pr-4 py-3 bg-surface border-2 border-blue-500/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg text-primary placeholder-gray-500"
                   />
                 </div>
 
-                <div className="h-48 overflow-y-auto rounded-lg border border-subtle bg-surface">
+                {(searching || searchQuery.trim().length >= 2) && (
+                <div className="max-h-64 overflow-y-auto rounded-lg border border-subtle bg-surface">
                 {searching && (
                   <div className="text-center py-4 text-muted">
                     <div className="animate-spin inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
@@ -795,7 +796,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   </div>
                 )}
 
-                {!searching && searchQuery.length >= 1 && searchResults.length === 0 && (
+                {!searching && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
                   <div className="text-center py-4 text-muted border border-dashed border-strong rounded-lg">
                     <p>No customers found matching "{searchQuery}"</p>
                     <p className="text-sm mt-1">Try a different search or create a new customer below</p>
@@ -803,14 +804,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 )}
 
                 </div>
+                )}
 
                 <button
                   type="button"
                   onClick={() => setShowNewCustomer(true)}
-                  className="w-full py-3 border border-dashed border-strong rounded-lg text-muted hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 border border-dashed border-strong rounded-lg text-muted hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
                 >
-                  <Plus className="w-5 h-5" />
-                  Create New Customer
+                  <Plus className="w-4 h-4" />
+                  New Customer
                 </button>
               </>
             )}
