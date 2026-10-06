@@ -1,5 +1,5 @@
-import { punchlistDescription } from '../../lib/punchlist';
-import { useState, useEffect } from 'react';
+import { punchlistDescription, punchlistList, canSchedulePunchlist, canRequestPunchlist } from '../../lib/punchlist';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   ClipboardList,
@@ -8,14 +8,11 @@ import {
   Send,
   Search,
   Eye,
-  Image as ImageIcon,
   MessageSquare,
   User,
-  Users,
   Mail,
   Phone,
   Calendar,
-  Filter,
   X,
   ChevronDown,
   ChevronUp,
@@ -26,7 +23,6 @@ import {
   TrendingUp,
   AlertCircle,
   Layers,
-  ArrowRight,
   Info,
   Trash2
 } from 'lucide-react';
@@ -36,6 +32,9 @@ import { useToast } from '../Shared/Toast';
 import { markPunchlistSeen } from '../../hooks/usePunchlistUnseenCount';
 import { PunchlistTaskDetailModal } from '../Portal/PunchlistTaskDetailModal';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
+
+import type { ServiceRequestContext } from './CreateWorkOrderModal';
+const CreateWorkOrderModal = lazy(() => import('./CreateWorkOrderModal').then(module => ({default: module.CreateWorkOrderModal})));
 
 interface PunchlistTask {
   id: string;
@@ -89,6 +88,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [listOrder, setListOrder] = useState<'newest' | 'customer'>('newest');
+  const [batchMode, setBatchMode] = useState<'request' | 'schedule'>('request');
+  const [scheduleQueue, setScheduleQueue] = useState<ServiceRequestContext[]>([]);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'punchlist' | 'customers'>('punchlist');
   const [openInviteCount, setOpenInviteCount] = useState(0);
@@ -147,33 +149,13 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
             )
           )
         `)
-        .order('updated_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Sort tasks with priority: Requested first, then Draft, then Completed
-      // Within each status, keep the date ordering
-      const sortedTasks = (data || []).sort((a, b) => {
-        const statusPriority: Record<string, number> = {
-          'requested': 1,
-          'scheduled': 2,
-          'draft': 3,
-          'completed': 4
-        };
-
-        const priorityA = statusPriority[a.status] || 4;
-        const priorityB = statusPriority[b.status] || 4;
-
-        // First sort by status priority
-        if (priorityA !== priorityB) {
-          return priorityA - priorityB;
-        }
-
-        // Within the same status, sort by updated_at (most recent first)
-        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-      });
-
-      setTasks(sortedTasks);
+      setTasks(data || []);
+      const eligible = new Set((data || []).filter(canSchedulePunchlist).map(task => task.id));
+      setSelectedTaskIds(previous => new Set([...previous].filter(id => eligible.has(id))));
     } catch (error) {
       console.error('Error loading punchlist tasks:', error);
     } finally {
@@ -283,6 +265,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
   // Helper functions for multi-select
   const toggleTaskSelection = (taskId: string) => {
+    const task = tasks.find(item => item.id === taskId);
+    const existing = tasks.find(item => selectedTaskIds.has(item.id));
+    if (!task || !canSchedulePunchlist(task) || (existing && existing.contact_id !== task.contact_id)) return;
     setSelectedTaskIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(taskId)) {
@@ -294,18 +279,6 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     });
   };
 
-  const selectableTasks = tasks.filter(
-    task => task.status === 'draft' && !task.service_request_id && !task.work_order_id
-  );
-
-  const toggleSelectAll = () => {
-    if (selectableTasks.length > 0 && selectableTasks.every(task => selectedTaskIds.has(task.id))) {
-      setSelectedTaskIds(new Set());
-    } else {
-      setSelectedTaskIds(new Set(selectableTasks.map(t => t.id)));
-    }
-  };
-
   const stats = {
     draft: tasks.filter(t => t.status === 'draft').length,
     requested: tasks.filter(t => t.status === 'requested').length,
@@ -314,30 +287,22 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     total: tasks.length,
   };
 
-  const filteredTasks = tasks.filter(task => {
-    // Filter by contact if set
-    if (contactFilter && task.contact_id !== contactFilter.id) {
-      return false;
+  const filteredTasks = punchlistList(tasks, {search: searchQuery, status: selectedFilter, contactId: contactFilter?.id, order: listOrder});
+  const selectionContactId = tasks.find(task => selectedTaskIds.has(task.id))?.contact_id || contactFilter?.id;
+  const selectableTasks = filteredTasks.filter(task => canSchedulePunchlist(task) && (!selectionContactId || task.contact_id === selectionContactId));
+  const selectedTasks = filteredTasks.filter(task => selectedTaskIds.has(task.id) && canSchedulePunchlist(task));
+  const canRequestSelected = selectedTasks.length > 0 && selectedTasks.every(canRequestPunchlist);
+  const changeView = (action: () => void) => { setSelectedTaskIds(new Set()); action(); };
+  const toggleSelectAll = () => {
+    setSelectedTaskIds(selectableTasks.length > 0 && selectableTasks.every(task => selectedTaskIds.has(task.id))
+      ? new Set() : new Set(selectableTasks.map(task => task.id)));
+  };
+  const startBatch = (mode: 'request' | 'schedule') => {
+    if (!selectedTasks.length || new Set(selectedTasks.map(task => task.contact_id)).size !== 1) {
+      toast.warning('Select items for one customer at a time'); return;
     }
-
-    // Filter by status
-    if (selectedFilter !== 'all' && task.status !== selectedFilter) {
-      return false;
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        task.title.toLowerCase().includes(query) ||
-        task.contact.full_name.toLowerCase().includes(query) ||
-        task.contact.email.toLowerCase().includes(query) ||
-        task.details?.toLowerCase().includes(query)
-      );
-    }
-
-    return true;
-  });
+    setBatchMode(mode); setShowBatchRequestModal(true);
+  };
 
   if (loading) {
     return (
@@ -353,6 +318,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   };
 
   const handleViewCustomerTasks = (contactId: string, contactName: string, filterStatus: string) => {
+    setSelectedTaskIds(new Set());
     setContactFilter({ id: contactId, name: contactName });
     setSelectedFilter(filterStatus);
     setSearchQuery('');
@@ -361,176 +327,42 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
   return (
     <div className="space-y-2 sm:space-y-4 px-1 sm:px-0">
-      {/* Header - Compact */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-base sm:text-xl font-bold text-primary flex items-center gap-2">
-          <ClipboardList className="w-5 h-5" />
-          <span className="sm:hidden">Punchlist</span><span className="hidden sm:inline">Punchlist Management</span>
-        </h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowHelp(true)}
-            className="p-2.5 bg-elevated hover:bg-surface text-primary rounded-lg transition-colors"
-            title="How Punchlist Access Works"
-          >
-            <HelpCircle className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleSendInvite}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
-          >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Send Invite</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs - Compact */}
-      <div className="border-b border-subtle">
-        <div className="flex gap-1">
-          <button
-            onClick={() => setActiveTab('punchlist')}
-            className={`px-4 py-2 text-sm font-medium transition-all ${
-              activeTab === 'punchlist'
-                ? 'text-primary border-b-2 border-blue-500 bg-surface/50'
-                : 'text-muted hover:text-secondary hover:bg-surface/30'
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <ClipboardList className="w-4 h-4" />
-              Tasks
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab('customers')}
-            className={`px-4 py-2 text-sm font-medium transition-all ${
-              activeTab === 'customers'
-                ? 'text-primary border-b-2 border-blue-500 bg-surface/50'
-                : 'text-muted hover:text-secondary hover:bg-surface/30'
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <Users className="w-4 h-4" />
-              Customers
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Punchlist Tab Content */}
-      {activeTab === 'punchlist' && (
-        <>
-      {/* Search and Filter Bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex-1 min-w-[140px] relative">
-          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tasks..."
-            className="w-full pl-9 pr-3 py-2 text-sm bg-surface border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        {/* Status dropdown */}
-        <div className="relative flex-shrink-0">
-          <select
-            value={selectedFilter}
-            onChange={e => setSelectedFilter(e.target.value as typeof selectedFilter)}
-            className="appearance-none pl-3 pr-7 py-2 bg-surface border border-subtle rounded-lg text-xs sm:text-sm text-primary focus:outline-none focus:border-gray-500 cursor-pointer hover:border-strong transition-colors"
-          >
-            <option value="all">All ({stats.total})</option>
-            <option value="draft">Not Requested ({stats.draft})</option>
-            <option value="requested">Requested ({stats.requested})</option>
-            <option value="scheduled">Scheduled ({stats.scheduled})</option>
-            <option value="completed">Completed ({stats.completed})</option>
+      <div data-testid="punchlist-toolbar" className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 min-w-0">
+        <select aria-label="Punchlist page" value={activeTab} onChange={e => changeView(() => setActiveTab(e.target.value as 'punchlist' | 'customers'))}
+          className="shrink-0 min-h-11 max-w-[110px] text-xs bg-surface border border-subtle rounded-lg text-primary px-1.5">
+          <option value="punchlist">Punchlist</option><option value="customers">Customers</option>
+        </select>
+        {activeTab === 'punchlist' && (<>
+          <div className="relative flex-1 min-w-[100px]">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
+            <input aria-label="Search punchlist items" value={searchQuery} onChange={e => changeView(() => setSearchQuery(e.target.value))} placeholder="Search…"
+              className="w-full min-h-11 pl-7 pr-2 text-base bg-surface border border-subtle rounded-lg text-primary" />
+          </div>
+          <select aria-label="Punchlist order" value={listOrder} onChange={e => changeView(() => setListOrder(e.target.value as 'newest' | 'customer'))}
+            className="shrink-0 min-h-11 max-w-[110px] px-1.5 text-xs bg-surface border border-subtle rounded-lg text-primary">
+            <option value="newest">Newest</option><option value="customer">By Customer</option>
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
-        </div>
-        {(selectedFilter !== 'all' || searchQuery) && (
-          <button
-            onClick={() => { setSelectedFilter('all'); setSearchQuery(''); }}
-            className="px-3 py-2 text-sm bg-elevated hover:bg-surface text-primary rounded-lg flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <X className="w-3.5 h-3.5" />
-            Clear
-          </button>
-        )}
+          <select aria-label="Punchlist status" value={selectedFilter} onChange={e => changeView(() => setSelectedFilter(e.target.value))}
+            className="shrink-0 min-h-11 max-w-[90px] px-1.5 text-xs bg-surface border border-subtle rounded-lg text-primary">
+            <option value="all">All ({stats.total})</option><option value="draft">Not Requested ({stats.draft})</option>
+            <option value="requested">Requested ({stats.requested})</option><option value="scheduled">Scheduled ({stats.scheduled})</option><option value="completed">Completed ({stats.completed})</option>
+          </select>
+          {contactFilter && <button onClick={() => changeView(() => setContactFilter(null))} title={`Clear customer filter: ${contactFilter.name}`}
+            className="shrink-0 min-h-11 px-2 text-xs text-primary bg-elevated rounded-lg max-w-[120px] truncate">{contactFilter.name} ×</button>}
+          {(searchQuery || selectedFilter !== 'all') && <button aria-label="Clear filters" onClick={() => changeView(() => {setSearchQuery('');setSelectedFilter('all');})} className="shrink-0 min-h-11 px-2 text-primary bg-elevated rounded-lg"><X className="w-4 h-4" /></button>}
+          <button aria-label="Select all visible items for this customer" title={selectionContactId ? "Select all visible items for this customer" : "Select one item to choose a customer first"} onClick={toggleSelectAll} disabled={!selectableTasks.length || !selectionContactId}
+            className="shrink-0 min-h-11 px-2 text-primary bg-elevated rounded-lg disabled:opacity-40"><CheckCheck className="w-4 h-4" /></button>
+          {selectedTasks.length > 0 && <>
+            <button aria-label="Clear selection" onClick={() => setSelectedTaskIds(new Set())} className="shrink-0 min-h-11 px-2 text-xs text-primary bg-elevated rounded-lg">{selectedTasks.length} ×</button>
+            <button onClick={() => startBatch('schedule')} className="shrink-0 min-h-11 px-2 flex items-center gap-1 text-xs bg-blue-600 text-white rounded-lg"><Calendar className="w-4 h-4" />Schedule</button>
+            <button onClick={() => startBatch('request')} disabled={!canRequestSelected} title={canRequestSelected ? 'Request service for selected items' : 'Selected items already have service requests; use Schedule'}
+              className="shrink-0 min-h-11 px-2 flex items-center gap-1 text-xs bg-blue-600 text-white rounded-lg disabled:opacity-40"><Send className="w-4 h-4" />Request Service</button>
+          </>}
+        </>)}
+        <button onClick={handleSendInvite} aria-label="Send customer invite" title="Send customer invite" className="shrink-0 min-h-11 px-2 bg-elevated text-primary rounded-lg"><Mail className="w-4 h-4" /></button>
+        <button onClick={() => setShowHelp(true)} aria-label="Punchlist help" className="shrink-0 min-h-11 px-2 bg-elevated text-primary rounded-lg"><HelpCircle className="w-4 h-4" /></button>
       </div>
-
-      {/* Contact Filter Banner */}
-      {contactFilter && (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-900/30 border border-amber-600 rounded-lg text-xs">
-          <div className="flex items-center gap-2 text-amber-300">
-            <User className="w-3.5 h-3.5 shrink-0" />
-            <span>Showing tasks for <span className="font-semibold">{contactFilter.name}</span></span>
-          </div>
-          <button
-            onClick={() => { setContactFilter(null); setSelectedFilter('all'); }}
-            className="flex items-center gap-1 text-amber-400 hover:text-amber-200 transition-colors"
-            title="Show all customers"
-          >
-            <X className="w-3.5 h-3.5" />
-            <span>Clear</span>
-          </button>
-        </div>
-      )}
-
-      {/* Batch Action Toolbar */}
-      {selectedTaskIds.size > 0 && (
-        <div className="flex items-center justify-between gap-3 px-2 py-2 sm:px-4 sm:py-3 bg-blue-900/40 border-2 border-blue-500 rounded-lg">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
-              {selectedTaskIds.size}
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-blue-200">
-                {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''} selected
-              </div>
-              <div className="text-xs text-blue-400">
-                {(() => {
-                  const selected = tasks.filter(t => selectedTaskIds.has(t.id));
-                  const customers = new Set(selected.map(t => t.contact_id)).size;
-                  return `${customers} customer${customers !== 1 ? 's' : ''} — will create ${customers} service request${customers !== 1 ? 's' : ''}`;
-                })()}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setSelectedTaskIds(new Set())}
-              className="px-3 py-1.5 text-xs bg-elevated hover:bg-gray-600 text-secondary rounded-lg transition-colors"
-            >
-              Clear
-            </button>
-            <button
-              onClick={() => setShowBatchRequestModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors"
-            >
-              <Layers className="w-3.5 h-3.5" />
-              Create Service Request{(() => {
-                const selected = tasks.filter(t => selectedTaskIds.has(t.id));
-                const customers = new Set(selected.map(t => t.contact_id)).size;
-                return customers > 1 ? 's' : '';
-              })()}
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex justify-end">
-        {selectableTasks.length > 0 && (
-          <button
-            onClick={toggleSelectAll}
-            className="px-1 py-1 text-xs text-brand hover:bg-elevated rounded flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <CheckCheck className="w-3.5 h-3.5" />
-            {selectableTasks.length > 0 && selectableTasks.every(task => selectedTaskIds.has(task.id)) ? 'Deselect All' : 'Select All'}
-          </button>
-        )}
-      </div>
-
+      {activeTab === 'punchlist' && (<>
       {/* Tasks List - Compact */}
       <div className="space-y-2">
         {filteredTasks.length === 0 ? (
@@ -549,39 +381,11 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           <>
 
             {filteredTasks.map((task, index) => {
-              // Add section headers when status changes
               const prevTask = index > 0 ? filteredTasks[index - 1] : null;
-              const showSectionHeader = selectedFilter === 'all' &&
-                                       (!prevTask || prevTask.status !== task.status);
-
+              const showCustomerHeader = listOrder === 'customer' && (!prevTask || prevTask.contact_id !== task.contact_id);
               return (
                 <div key={task.id}>
-                  {/* Section Header */}
-                  {showSectionHeader && task.status === 'requested' && (
-                    <div className="text-sm font-semibold text-amber-400 px-1 py-1 mt-1 flex items-center gap-1.5">
-                      <Send className="w-3.5 h-3.5" />
-                      Requested Tasks
-                    </div>
-                  )}
-                  {showSectionHeader && task.status === 'scheduled' && (
-                    <div className="text-sm font-semibold text-info px-1 py-1 mt-1 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      Scheduled Tasks
-                    </div>
-                  )}
-                  {showSectionHeader && task.status === 'draft' && (
-                    <div className="text-sm font-semibold text-warning px-1 py-1 mt-1 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5" />
-                      Not Requested
-                    </div>
-                  )}
-                  {showSectionHeader && task.status === 'completed' && (
-                    <div className="text-sm font-semibold text-success px-1 py-1 mt-1 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Completed Tasks
-                    </div>
-                  )}
-
+                  {showCustomerHeader && <div className="px-1 py-1 text-sm font-semibold text-primary">{task.contact.full_name}</div>}
                   {/* Task Card */}
                   <div className={`bg-surface border rounded-lg overflow-hidden transition-colors ${
                     selectedTaskIds.has(task.id)
@@ -590,10 +394,12 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                   }`}>
               <div className="px-2.5 py-2 sm:p-3 flex items-start gap-2">
                 <div className="w-4 shrink-0 pt-0.5">
-                  {task.status === 'draft' && !task.service_request_id && !task.work_order_id && (
+                  {canSchedulePunchlist(task) && (
                     <input type="checkbox" aria-label={`Select ${punchlistDescription(task)}`}
                       checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)}
-                      className="w-4 h-4 rounded border-strong text-blue-600 focus:ring-blue-500" />
+                      disabled={!!selectionContactId && task.contact_id !== selectionContactId}
+                      title={selectionContactId && task.contact_id !== selectionContactId ? 'Clear your selection before selecting a different customer' : 'Select this item'}
+                      className="w-4 h-4 rounded border-strong text-blue-600 focus:ring-blue-500 disabled:opacity-30 disabled:cursor-not-allowed" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -612,7 +418,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                   <div className="flex items-center gap-1.5 text-xs text-muted min-w-0">
                     <button onClick={() => setQuickViewContactId(task.contact_id)}
                       className="customer-link truncate text-left min-w-0 flex-1 sm:flex-none">{task.contact.full_name}</button>
-                    <span>·</span><span className="shrink-0">{new Date(task.requested_at || task.created_at).toLocaleDateString()}</span>
+                    <span>·</span><span className="shrink-0">{new Date(task.created_at).toLocaleDateString()}</span>
                     <span className={`sm:hidden shrink-0 text-[10px] ${task.status === 'draft' ? 'text-warning' : task.status === 'completed' ? 'text-success' : 'text-info'}`}>
                       · {task.status === 'draft' ? 'Not Requested' : task.status === 'completed' ? 'Completed' : task.status === 'scheduled' ? 'Scheduled' : 'Requested'}
                     </span>
@@ -816,7 +622,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
       {/* Batch Service Request Modal */}
       {showBatchRequestModal && (
         <BatchRequestModal
-          tasks={tasks.filter(t => selectedTaskIds.has(t.id))}
+          tasks={selectedTasks}
+          mode={batchMode}
+          onSchedule={requests => {setShowBatchRequestModal(false);setSelectedTaskIds(new Set());setScheduleQueue(requests);loadTasks();}}
           onClose={() => setShowBatchRequestModal(false)}
           onSuccess={() => {
             setShowBatchRequestModal(false);
@@ -825,6 +633,12 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           }}
         />
       )}
+
+      {scheduleQueue.length > 0 && <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center text-white">Loading scheduler…</div>}>
+        <CreateWorkOrderModal key={scheduleQueue[0].id} serviceRequest={scheduleQueue[0]}
+          onClose={() => {setScheduleQueue([]);loadTasks();}}
+          onSuccess={() => {setScheduleQueue(queue => queue.slice(1));loadTasks();}} />
+      </Suspense>}
 
       {/* Help Modal */}
       {showHelp && (
@@ -1079,9 +893,11 @@ interface BatchRequestModalProps {
   tasks: PunchlistTask[];
   onClose: () => void;
   onSuccess: () => void;
+  mode: 'request' | 'schedule';
+  onSchedule: (requests: ServiceRequestContext[]) => void;
 }
 
-function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps) {
+function BatchRequestModal({ tasks, onClose, onSuccess, mode, onSchedule }: BatchRequestModalProps) {
   const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [globalNotes, setGlobalNotes] = useState('');
@@ -1104,23 +920,39 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
   const groups = Object.values(customerGroups);
 
   async function handleCreate() {
+    if (!tasks.length || groups.length !== 1) { toast.error('Select items for one customer at a time'); return; }
     setLoading(true);
     try {
+      const requests: ServiceRequestContext[] = [];
+      const requestIds = new Set<string>();
       let successCount = 0;
       let taskCount = 0;
 
       for (const group of groups) {
-        const taskIds = group.tasks.map(t => t.id);
-        const { error } = await supabase.rpc('request_punchlist_service', {
-          p_task_ids: taskIds,
-          p_contact_id: group.contactId,
-          p_notes: globalNotes.trim() || null,
-        });
-        if (error) throw error;
-        successCount++;
-        taskCount += taskIds.length;
+        const drafts = group.tasks.filter(canRequestPunchlist);
+        if (drafts.length) {
+          const {data, error} = await supabase.rpc('request_punchlist_service', {
+            p_task_ids: drafts.map(task => task.id), p_contact_id: group.contactId, p_notes: globalNotes.trim() || null,
+          });
+          if (error) throw error;
+          if (!data) throw new Error('The service request could not be loaded');
+          requestIds.add(data);
+          successCount++;
+          taskCount += drafts.length;
+        }
+        if (mode === 'schedule') group.tasks.forEach(task => {if (task.service_request_id) requestIds.add(task.service_request_id);});
       }
-
+      if (mode === 'schedule') {
+        for (const id of requestIds) {
+          const {data, error} = await supabase.from('service_requests').select('*').eq('id', id).single();
+          if (error) throw error;
+          if (data.contact_id !== groups[0].contactId || data.status !== 'open' || data.work_order_id) throw new Error('A selected request has already been scheduled. Refresh the list.');
+          requests.push(data);
+        }
+        if (!requests.length) throw new Error('Select an item to schedule');
+        onSchedule(requests);
+        return;
+      }
       toast.success(
         `Created ${successCount} service request${successCount !== 1 ? 's' : ''} covering ${taskCount} task${taskCount !== 1 ? 's' : ''}.`,
         'Service Requests Created'
@@ -1144,7 +976,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
               <Layers className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-primary">Create Service Requests</h3>
+              <h3 className="text-base font-bold text-primary">{mode === 'schedule' ? 'Schedule Selected Items' : 'Request Service'}</h3>
               <p className="text-xs text-muted">{tasks.length} task{tasks.length !== 1 ? 's' : ''} across {groups.length} customer{groups.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
@@ -1159,7 +991,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
           <div className="flex items-start gap-2.5 bg-blue-900/30 border border-blue-700/50 rounded-lg p-3">
             <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
             <p className="text-xs text-blue-300 leading-relaxed">
-              One service request will be created per customer. Tasks from different customers cannot be combined — each customer gets their own request.
+              {mode === 'schedule' ? 'Choose a technician and time in the work-order form for each request. Existing requests include all their linked items. If you close the scheduler, remaining items stay requested for later scheduling.' : 'All selected items belong to this customer and will be included in one service request.'}
             </p>
           </div>
 
@@ -1174,7 +1006,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
                     <div className="text-xs text-muted">{group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''} selected</div>
                   </div>
                   <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 text-xs rounded-full font-medium border border-blue-600/30 whitespace-nowrap">
-                    1 SR
+                    {mode === 'schedule' ? 'One Customer' : '1 SR'}
                   </span>
                 </div>
                 <div className="divide-y divide-gray-700/50">
@@ -1194,7 +1026,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
           {/* Optional notes */}
           <div>
             <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
-              Notes (optional — applied to all requests)
+              Notes (optional — new requests only)
             </label>
             <textarea
               value={globalNotes}
@@ -1209,7 +1041,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-subtle bg-surface rounded-b-2xl shrink-0">
           <div className="text-xs text-muted">
-            {groups.length} service request{groups.length !== 1 ? 's' : ''} will be created
+            {mode === 'schedule' ? 'Schedule each request in turn' : `${groups.length} customer request${groups.length !== 1 ? 's' : ''}`}
           </div>
           <div className="flex gap-3">
             <button
@@ -1225,7 +1057,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess }: BatchRequestModalProps
               className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
             >
               <Send className="w-4 h-4" />
-              {loading ? 'Creating...' : `Create ${groups.length} Request${groups.length !== 1 ? 's' : ''}`}
+              {loading ? 'Preparing…' : mode === 'schedule' ? 'Continue to Schedule' : `Request Service (${tasks.length})`}
             </button>
           </div>
         </div>
