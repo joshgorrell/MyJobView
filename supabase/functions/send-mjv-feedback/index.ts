@@ -168,13 +168,19 @@ Deno.serve(async (req: Request) => {
     }
 
     let verifiedDealerName = 'Unknown dealer';
+    let fromAddress = '';
     if (profile.organization_id) {
       const { data: company } = await supabase
         .from('company_settings')
-        .select('company_name')
+        .select('company_name, from_email, from_name, company_email')
         .eq('organization_id', profile.organization_id)
         .maybeSingle();
       verifiedDealerName = company?.company_name || verifiedDealerName;
+      const senderEmail = company?.from_email || company?.company_email;
+      if (senderEmail) {
+        const senderName = (company?.from_name || verifiedDealerName).replace(/[<>\r\n]/g, '');
+        fromAddress = `${senderName} <${senderEmail}>`;
+      }
     }
 
     const payload = (await req.json()) as FeedbackPayload;
@@ -236,7 +242,9 @@ Deno.serve(async (req: Request) => {
       throw new Error('RESEND_API_KEY is not configured');
     }
 
-    const fromAddress = Deno.env.get('MJV_FEEDBACK_FROM_EMAIL') || 'MyJobView <noreply@myjobview.com>';
+    if (!fromAddress) {
+      throw new Error('Configure a sender in company email settings before sending feedback');
+    }
     const subjectType = TYPE_LABELS[payload.type];
     const dealer = String(payload.dealerName || 'Unknown dealer').trim();
     const submitter = String(payload.userName || payload.userEmail || 'Unknown user').trim();
