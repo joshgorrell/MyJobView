@@ -12,6 +12,13 @@ import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { RecurrenceSelector, RecurrenceRule } from '../Shared/RecurrenceSelector';
 
 export interface ServiceRequestContext {
+  earliest_date?: string | null;
+  customer_contact_instruction?: string;
+  warranty_type?: string | null;
+  warranty_reference?: string | null;
+  warranty_notes?: string | null;
+  estimated_duration?: string | null;
+
   id: string;
   customer_name: string;
   customer_phone: string | null;
@@ -135,7 +142,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const [warrantyWorkOrders, setWarrantyWorkOrders] = useState<WarrantyWorkOrder[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [selectedTechnicians, setSelectedTechnicians] = useState<string[]>(
-    serviceRequest?.requested_tech_ids?.length ? serviceRequest.requested_tech_ids : initialTechnicianIds
+    initialTechnicianIds
   );
   const [showAvailabilityBrowser, setShowAvailabilityBrowser] = useState(false);
   const [showTeamAvailability, setShowTeamAvailability] = useState(false);
@@ -198,13 +205,13 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     title: serviceRequest ? `${serviceRequest.request_type === 'project' ? 'Project' : 'Service'}: ${serviceRequest.job_description.substring(0, 60)}` : '',
     description: serviceRequest?.job_description || '',
     priority: serviceRequest?.priority === 'emergency' ? 'urgent' : serviceRequest?.priority === 'urgent' ? 'high' : 'medium',
-    start_date: serviceRequest?.requested_date || '',
+    start_date: '',
     start_time: serviceRequest?.requested_time || '',
     end_time: '',
-    target_completion_date: '',
+    target_completion_date: serviceRequest?.requested_date?.split('T')[0] || '',
     estimated_hours: '',
     notes: serviceRequest?.notes || '',
-    internal_notes: '',
+    internal_notes: serviceRequest ? [serviceRequest.notes, serviceRequest.earliest_date && `Do not schedule before: ${serviceRequest.earliest_date}`, serviceRequest.requested_date && `Need by: ${serviceRequest.requested_date}`, `Customer contact: ${serviceRequest.customer_contact_instruction || 'dispatch'}`, serviceRequest.estimated_duration && `Estimated duration: ${serviceRequest.estimated_duration}`, serviceRequest.warranty_type && `Warranty: ${serviceRequest.warranty_type}; ${serviceRequest.warranty_reference || ''}; ${serviceRequest.warranty_notes || ''}`].filter(Boolean).join('\n') : '',
 
     // Appointment reminders
     send_appointment_reminder: false,
@@ -218,7 +225,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     labor_category_id: '',
 
     // Customer contact confirmation
-    customer_contacted: serviceRequest?.customer_phone || serviceRequest?.customer_email ? '' : ''
+    customer_contacted: serviceRequest?.customer_contact_instruction === 'already_contacted' ? 'yes' : ''
   });
 
   useEffect(() => {
@@ -640,6 +647,9 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   function validate(): boolean {
     const errors: Record<string, string> = {};
 
+    if (serviceRequest?.earliest_date && formData.start_date && formData.start_date < serviceRequest.earliest_date) {
+      errors.start_date = 'Schedule on or after the customer’s earliest available date';
+    }
     if (!selectedContact && !showNewCustomer) {
       errors.customer = 'Please select or create a customer';
     }
@@ -952,6 +962,15 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </select>
           </div>
 
+          {serviceRequest && <div className="rounded-lg border border-subtle bg-surface p-3 text-sm text-secondary space-y-1">
+            <p className="font-semibold text-primary">Request scheduling instructions</p>
+            <p>{serviceRequest.customer_contact_instruction === 'requester' ? 'Requester will coordinate with customer.' : serviceRequest.customer_contact_instruction === 'already_contacted' ? 'Customer already contacted — schedule as requested.' : 'Dispatch should contact customer.'}</p>
+            {serviceRequest.earliest_date && <p>Earliest date: {serviceRequest.earliest_date}</p>}
+            {serviceRequest.requested_date && <p>Need by: {serviceRequest.requested_date} (deadline, not an appointment)</p>}
+            {!!serviceRequest.requested_tech_ids?.length && <p>Preferred tech: {serviceRequest.requested_tech_ids.map(id => technicians.find(t => t.id === id)?.full_name || 'Requested technician').join(', ')} — Dispatch makes final assignment.</p>}
+            {serviceRequest.estimated_duration && <p>Estimated duration: {serviceRequest.estimated_duration}</p>}
+            {serviceRequest.warranty_type && <p>Warranty: {serviceRequest.warranty_type} · {serviceRequest.warranty_reference} · {serviceRequest.warranty_notes}</p>}
+          </div>}
           {/* Customer Selection */}
           <div className="space-y-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
