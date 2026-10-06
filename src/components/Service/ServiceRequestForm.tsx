@@ -194,12 +194,13 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      if (searchQuery.length >= 1) {
+      if (searchQuery.trim().length >= 2) {
         searchContacts();
-      } else if (searchQuery.length === 0) {
-        loadDefaultContacts();
       } else {
+        // Keep the fast-entry form clean until staff actually search.
+        // Do not preload or suggest customers on open.
         setSearchResults([]);
+        setSearching(false);
       }
     }, 300);
 
@@ -309,32 +310,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     }
   }
 
-  async function loadDefaultContacts() {
-    setSearching(true);
-    try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('id, full_name, first_name, last_name, company_name, phone, email, street_address, city, state, zip_code')
-        .order('last_name', { nullsFirst: false })
-        .limit(50);
-
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }
-
   async function searchContacts() {
     setSearching(true);
     try {
       const searchTerm = searchQuery.trim();
 
-      if (!searchTerm) {
-        await loadDefaultContacts();
+      if (searchTerm.length < 2) {
+        setSearchResults([]);
+        setSearching(false);
         return;
       }
 
@@ -342,7 +325,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         .from('contacts')
         .select('id, full_name, first_name, last_name, company_name, phone, email, street_address, city, state, zip_code')
         .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%,company_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
-        .limit(20);
+        .limit(5);
 
       if (error) {
         console.error('Error searching contacts:', error);
