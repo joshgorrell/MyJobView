@@ -147,7 +147,7 @@ interface CreateInvoiceFromWorkOrderModalProps {
   preSelectedWorkOrderId?: string;
 }
 
-type FilterTab = 'all' | 'ready' | 'billed';
+type FilterTab = 'all' | 'ready' | 'draft' | 'billed';
 
 function getBillingBadge(status: BillingQueueStatus | null, isBillable: boolean) {
   if (!isBillable) {
@@ -321,10 +321,12 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
 
     if (activeFilter === 'ready') {
       list = list.filter(wo => wo.billing_queue_status === 'ready_for_billing');
+    } else if (activeFilter === 'draft') {
+      list = list.filter(wo => wo.billing_queue_status === 'invoice_created');
     } else if (activeFilter === 'billed') {
       list = list.filter(wo =>
         wo.billing_queue_status !== null &&
-        ['invoice_created', 'invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status)
+        ['invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status)
       );
     }
 
@@ -613,6 +615,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
   const filterTabs: { key: FilterTab; label: string; count?: number }[] = [
     { key: 'ready', label: 'Ready to Bill', count: readyCount },
     { key: 'all', label: 'All', count: workOrders.length },
+    { key: 'draft', label: 'Open Drafts' },
     { key: 'billed', label: 'Already Billed' },
   ];
 
@@ -624,7 +627,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Review & Invoice</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {step === 'select' ? 'Select completed service work orders to bill' : 'Review and adjust invoice details'}
+              {step === 'select' ? 'Select service work orders to review' : 'Review and adjust invoice details'}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -637,9 +640,9 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
             {workOrders.length === 0 ? (
               <div className="text-center py-12">
                 <Wrench className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Completed Work Orders</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Service Work Orders</h3>
                 <p className="text-gray-600">
-                  There are no completed service work orders available for billing.
+                  There are no service work orders available to review.
                 </p>
               </div>
             ) : (
@@ -719,7 +722,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
                       const badge = getBillingBadge(wo.billing_queue_status, wo.is_billable !== false);
                       const isSelected = selectedWorkOrderIds.includes(wo.id);
                       const isAlreadyBilled = wo.billing_queue_status !== null &&
-                        ['invoice_created', 'invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status);
+                        ['invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status);
                       const isReadyToBill = wo.billing_queue_status === 'ready_for_billing';
                       const customerName = wo.contacts?.contact_name ||
                         `${wo.contacts?.first_name || ''} ${wo.contacts?.last_name || ''}`.trim();
@@ -824,24 +827,12 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
               <div className="flex flex-wrap gap-3 text-sm"><strong>Actual labor: {laborEntries.reduce((sum,l)=>sum+l.calculated_hours,0).toFixed(2)} hours</strong><strong>Billable labor: {lineItems.filter(li=>li.item_type==='labor').reduce((sum,li)=>sum+Number(li.quantity),0).toFixed(2)} hours</strong></div>
               <details><summary className="min-h-11 cursor-pointer text-sm">Time by technician</summary>{laborEntries.map(l=><p key={l.id} className="text-sm">{[l.profiles?.first_name,l.profiles?.last_name].filter(Boolean).join(' ') || 'Technician'}: {l.calculated_hours.toFixed(2)} hours</p>)}</details>
               {reviewOrders.some(w=>w.status!=='completed') && <p className="text-amber-800">Work is still in progress. Save an open draft and submit once all linked work orders are complete.</p>}
-              <button type="button" className="text-sm text-blue-700 underline" onClick={()=>refreshCatalogParts(true)}>Refresh Parts from Work Orders</button>
+              <details><summary className="cursor-pointer text-sm text-gray-600">Update imported parts</summary><p className="text-xs text-gray-500 py-2">Parts load automatically. Use this only to replace imported part lines with the latest work-order quantities and prices; invoice edits to those lines will be replaced.</p><button type="button" className="text-sm text-blue-700 underline" onClick={()=>refreshCatalogParts(true)}>Refresh Parts from Work Orders</button></details>
               {openClocks && <p role="alert" className="text-red-700">A technician is still clocked in. You can save an open draft; clock out before submitting.</p>}
               <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>useLaborHours(false)} className="min-h-11 px-3 border rounded-lg text-sm">Use Actual</button><button type="button" onClick={()=>useLaborHours(true)} className="min-h-11 px-3 border rounded-lg text-sm">Round Up to ¼ Hour</button><button type="button" onClick={()=>setAddPartsTo(selectedWorkOrderIds[0])} className="min-h-11 px-3 border rounded-lg text-sm">+ Catalog Parts</button></div>
               <p className="text-xs text-gray-500">Actual time stays unchanged. Edit billable hours and invoice lines below. Technician notes stay internal unless you include them.</p>
             </section>
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Package className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="font-medium text-green-900 mb-1">
-                    Loaded {laborEntries.length} labor entries and {partsUsed.length} parts
-                  </p>
-                  <p className="text-sm text-green-700">
-                    Review the line items below and make any necessary adjustments before creating the invoice.
-                  </p>
-                </div>
-              </div>
-            </div>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1187,17 +1178,17 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
               />
             </div>
 
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={portalVisible} onChange={e=>setPortalVisible(e.target.checked)} />Publish to customer portal and notify customer</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={portalVisible} onChange={e=>setPortalVisible(e.target.checked)} />Notify customer and publish to portal when submitted</label>
             <p className="text-xs text-gray-500">Drafts are private. Submitting queues the customer notification automatically; email delivery and online-payment readiness appear on the invoice.</p>
             <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
               <button type="button" disabled={submitting} onClick={e=>handleSubmit(e,false)} className="min-h-11 px-4 py-2 border rounded-lg">Save Open Draft</button>
-              <button
+              {!preSelectedWorkOrderId && <button
                 type="button"
                 onClick={() => setStep('select')}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
-                Back
-              </button>
+                Change Work Orders
+              </button>}
               <button
                 type="submit"
                 disabled={submitting || openClocks || reviewOrders.some(w=>w.status!=='completed')}
