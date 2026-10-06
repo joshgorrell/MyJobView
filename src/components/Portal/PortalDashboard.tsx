@@ -54,7 +54,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const { tenant } = useTenant();
   const dealerName = tenant?.organizationName || 'Electronic Life';
   const dealerLogo = tenant?.logoUrl;
-  const [currentView, setCurrentView] = useState<string>(defaultModule);
+  const [currentView, setCurrentView] = useState<string>(()=>new URLSearchParams(window.location.search).get('tab')==='invoices'?'invoices':defaultModule);
   const [stats, setStats] = useState<DashboardStats>({
     activeProposals: 0,
     activeProjects: 0,
@@ -337,7 +337,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   }
 
   if (portalAccessLevel === 'proposal_only') {
-    return <PortalLimitedDashboard />;
+    if(currentView==='invoices' && moduleSettings.portal_invoices_enabled) return <div className="min-h-screen bg-gray-50 p-4"><button onClick={()=>setCurrentView('dashboard')} className="mb-4 px-3 py-2 border rounded-lg bg-white text-gray-900">Back to Portal</button><PortalInvoices isEmbedded /></div>;
+    return <PortalLimitedDashboard onOpenInvoices={moduleSettings.portal_invoices_enabled?()=>setCurrentView('invoices'):undefined} />;
   }
 
   const PortalHeader = ({ showBack = false }: { showBack?: boolean }) => (

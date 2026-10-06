@@ -10,7 +10,9 @@ Deno.serve(async(req:Request)=>{
   const {data:profile}=await caller.from('profiles').select('organization_id,role,is_active').eq('id',user.id).maybeSingle();
   if(profile?.role!=='admin' || !profile.is_active) return respond({error:'Only Admin can configure monitoring billing'},403);
   const input=await req.json();
-  if(!['list','save'].includes(input.action) || Object.keys(input).some(k=>!['action','itemId'].includes(k))) return respond({error:'Invalid request'},400);
+  if(!['list','save'].includes(input.action) || Object.keys(input).some(k=>!['action','itemId','purpose'].includes(k))) return respond({error:'Invalid request'},400);
+  const columns:Record<string,string>={monitoring:'security_monitoring_item_id',service_labor:'service_labor_item_id',service_parts:'service_parts_item_id'};
+  const column=columns[input.purpose || 'monitoring'];if(!column)return respond({error:'Invalid billing item purpose'},400);
   const admin=getSupabaseAdmin();const connection=await getConnection(admin,profile.organization_id);
   if(!connection) return respond({error:'Connect QuickBooks Accounting first'},409);
   if(input.action==='list') {
@@ -29,7 +31,7 @@ Deno.serve(async(req:Request)=>{
   const result=await qboRequest(admin,connection,'GET',`item/${encodeURIComponent(input.itemId)}`);
   const item=result.data?.Item;
   if(!result.ok || !item || item.Active===false || item.Type!=='Service' || !item.IncomeAccountRef?.value) return respond({error:'Choose an active QuickBooks service item with an income account'},400);
-  const {data:saved,error}=await admin.from('quickbooks_settings').update({security_monitoring_item_id:String(item.Id)}).eq('id',connection.id).eq('organization_id',profile.organization_id).eq('realm_id',connection.realm_id).eq('environment',connection.environment).select('id').maybeSingle();
+  const {data:saved,error}=await admin.from('quickbooks_settings').update({[column]:String(item.Id)}).eq('id',connection.id).eq('organization_id',profile.organization_id).eq('realm_id',connection.realm_id).eq('environment',connection.environment).select('id').maybeSingle();
   if(error || !saved) throw new Error('Billing setup could not be saved. Refresh the connection status and try again.');
   return respond({success:true,item:{id:String(item.Id),name:item.FullyQualifiedName || item.Name,income_account:item.IncomeAccountRef.name || 'Income account '+item.IncomeAccountRef.value}});
  }catch(e){return respond({error:e instanceof Error?e.message:'Billing setup failed'},400);}

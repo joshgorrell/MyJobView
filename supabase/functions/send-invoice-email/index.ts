@@ -171,9 +171,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (!invoice.portal_visible || ['draft','void'].includes(invoice.status)) return new Response(JSON.stringify({error:'Submit a customer-visible invoice before emailing it.'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+
     const settings = await getCompanySettings(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', invoice.organization_id
     );
 
     const customerEmail = overrideEmail?.trim() || invoice.contacts?.email;
@@ -214,7 +216,7 @@ Deno.serve(async (req: Request) => {
     const portalUrl = settings.subdomain
       ? `https://${settings.subdomain}.myjobview.com`
       : (settings.portal_url || `${Deno.env.get('SUPABASE_URL')}/portal`);
-    const invoiceUrl = `${portalUrl}/invoices/${invoice.id}`;
+    const target=new URL(portalUrl);if(target.pathname==='/')target.pathname='/portal';target.searchParams.set('tab','invoices');target.searchParams.set('invoice',invoice.id);const invoiceUrl=target.toString();
 
     const dueDate = new Date(invoice.due_date);
     const isOverdue = dueDate < new Date() && invoice.amount_due > 0;
@@ -256,7 +258,7 @@ Deno.serve(async (req: Request) => {
         const template = await getEmailTemplate(
           'invoice_sent',
           Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', invoice.organization_id
         );
         const { subject: stdSubject, emailBody } = await buildStandardInvoiceEmail(template, invoice, customerName, settings, invoiceUrl, isOverdue, customMessage);
         subject = stdSubject;
@@ -289,7 +291,7 @@ Deno.serve(async (req: Request) => {
         const template = await getEmailTemplate(
           'invoice_sent',
           Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', invoice.organization_id
         );
         const { subject: stdSubject, emailBody } = await buildStandardInvoiceEmail(template, invoice, customerName, settings, invoiceUrl, isOverdue, customMessage);
         subject = stdSubject;
@@ -300,7 +302,7 @@ Deno.serve(async (req: Request) => {
       const template = await getEmailTemplate(
         'invoice_sent',
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', invoice.organization_id
       );
       const { subject: stdSubject, emailBody } = await buildStandardInvoiceEmail(template, invoice, customerName, settings, invoiceUrl, isOverdue, customMessage);
       subject = stdSubject;
@@ -344,11 +346,10 @@ Deno.serve(async (req: Request) => {
       throw new Error('Failed to send email');
     }
 
-    if (invoice.status === 'draft') {
-      return new Response(
-        JSON.stringify({ error: 'Cannot email a draft invoice. Submit it first.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // A manual email to the invoice customer satisfies a pending automatic notice.
+    if(customerEmail.toLowerCase()===invoice.contacts?.email?.toLowerCase()) {
+      const deliveryAdmin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
+      await deliveryAdmin.from('invoice_portal_deliveries').update({status:'sent',sent_at:new Date().toISOString(),error:null,lease_until:null}).eq('invoice_id',invoice.id).eq('organization_id',invoice.organization_id).in('status',['pending','failed']);
     }
 
     // Record notification if proposalId is provided

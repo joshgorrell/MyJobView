@@ -340,7 +340,8 @@ export default function CreateProgressInvoiceModal({
           total: parseFloat(total.toFixed(2)),
           amount_paid: 0,
           amount_due: parseFloat(total.toFixed(2)),
-          status: 'sent',
+          status: 'draft',
+          portal_visible: false,
           payment_terms: paymentTerms,
           notes,
           billed_from_proposal: lineItems.some(i => i.source_type === 'proposal_line_item'),
@@ -904,7 +905,7 @@ export default function CreateProgressInvoiceModal({
                   {submitting ? (
                     <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Creating...</>
                   ) : (
-                    <><DollarSign className="w-4 h-4" />Create Invoice</>
+                    <><DollarSign className="w-4 h-4" />Save Open Draft</>
                   )}
                 </button>
               )}

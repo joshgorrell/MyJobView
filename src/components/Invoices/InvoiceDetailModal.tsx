@@ -1,3 +1,4 @@
+import {CreateInvoiceFromWorkOrderModal} from './CreateInvoiceFromWorkOrderModal';
 import {customerSecurityInvoiceLines} from '../../../supabase/functions/_shared/security-customer-invoice';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -36,6 +37,11 @@ interface Payment {
 }
 
 interface InvoiceDetail {
+  edit_unlocked_at: string | null;
+  qbo_invoice_id: string | null;
+  portal_visible: boolean;
+  customer_visible_on_submit: boolean;
+  security_billing_cycle_id?: string | null;
   id: string;
   invoice_number: string;
   invoice_title: string | null;
@@ -143,6 +149,14 @@ function formatPaymentTerms(terms: string | null): string {
 
 export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVoided, onDeleted, readonly = false, customerView = false }: InvoiceDetailModalProps) {
   const { profile } = useAuth();
+  const [editWorkOrderId,setEditWorkOrderId]=useState<string|null>(null);
+  const [portalDelivery,setPortalDelivery]=useState<{status:string;error:string|null;sent_at:string|null}|null>(null);
+  useEffect(()=>{
+    if(customerView || readonly) return;
+    let active=true;
+    const load=async()=>{const {data}=await supabase.from('invoice_portal_deliveries').select('status,error,sent_at').eq('invoice_id',invoiceId).maybeSingle();if(active)setPortalDelivery(data);};
+    load();const timer=setInterval(load,15000);return()=>{active=false;clearInterval(timer);};
+  },[invoiceId,customerView,readonly]);
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [officeAddress, setOfficeAddress] = useState<OfficeAddress | null>(null);
@@ -173,6 +187,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   const [showActivitySection, setShowActivitySection] = useState(false);
   const descriptionInputRef = useRef<HTMLInputElement>(null);
 
+  const canManageBilling = ['admin','manager','service_manager','finance'].includes(profile?.role || '');
   const canDeletePaidInvoices = profile?.role === 'admin' || profile?.can_delete_invoices === true;
 
   async function reverseCOBillingForInvoice(inv: InvoiceDetail) {
@@ -318,7 +333,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
         notes, payment_terms, contact_id, sales_order_id, source_type,
         billing_name, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip,
         tax_environment, tax_project_type, tax_override, tax_override_reason, tax_jurisdiction_id,
-        tax_calculation_status, portal_visible, qbo_invoice_id, qbo_void_pending,
+        tax_calculation_status, portal_visible, customer_visible_on_submit, qbo_invoice_id, qbo_void_pending, security_billing_cycle_id, edit_unlocked_at,
         bill_to_contact_id,
         contacts:contact_id (
           contact_name, first_name, last_name, full_name, email, phone,
@@ -691,10 +706,10 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   const customerName = invoice.contacts?.full_name ||
     invoice.contacts?.contact_name ||
     `${invoice.contacts?.first_name || ''} ${invoice.contacts?.last_name || ''}`.trim() || 'Customer';
-  const canPay = invoice.status !== 'paid' && invoice.status !== 'void' && invoice.amount_due > 0;
+  const canPay = ['submitted','partial','overdue'].includes(invoice.status) && invoice.amount_due > 0;
   const canVoid = invoice.status !== 'void' &&
     (invoice.status === 'draft' || invoice.status === 'submitted' || canDeletePaidInvoices);
-  const canDelete = invoice.status === 'draft';
+  const canDelete = invoice.status === 'draft' && !invoice.edit_unlocked_at;
   const isSalesOrderInvoice = !!invoice.sales_order_id;
 
   return (
@@ -702,6 +717,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
       <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 p-4 pt-6 overflow-y-auto">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-auto">
 
+          {editWorkOrderId && <CreateInvoiceFromWorkOrderModal preSelectedWorkOrderId={editWorkOrderId} onClose={()=>setEditWorkOrderId(null)} onSuccess={()=>{setEditWorkOrderId(null);loadInvoice();}} />}
           {/* Modal Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
@@ -716,7 +732,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
               </div>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
                 <StatusIcon className="w-3 h-3" />
-                {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                {invoice.status==='draft'?'Open draft — private':invoice.status==='void'?'Void':`${invoice.status==='submitted'?'Submitted':invoice.status.charAt(0).toUpperCase()+invoice.status.slice(1)} — ${invoice.portal_visible?'customer visible':'internal'} — locked`}
               </span>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -724,8 +740,22 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
             </button>
           </div>
 
+          {!customerView && !readonly && invoice.status!=='draft' && invoice.portal_visible && portalDelivery && <div className={`px-6 py-3 text-sm ${portalDelivery.status==='failed'?'bg-amber-50 text-amber-900':'bg-blue-50 text-blue-900'}`}>
+            Customer notification: {portalDelivery.status==='sent'?'Sent':portalDelivery.status==='failed'?'Needs attention — automatic retry scheduled':portalDelivery.status==='skipped'?'Not sent (invoice is private or void)':'Queued'}.
+            {portalDelivery.error && <span className="block mt-1">{portalDelivery.error}</span>}
+          </div>}
           {/* Action Bar */}
           <div className="flex items-center gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 flex-wrap">
+            {!readonly && !customerView && canManageBilling && invoice.status==='draft' && <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm" onClick={async()=>{
+              const {data:links}=await supabase.from('work_order_invoice_links').select('work_order_id').eq('invoice_id',invoice.id).limit(1);
+              if(links?.[0]) setEditWorkOrderId(links[0].work_order_id);
+              else {const {data,error}=await supabase.rpc('submit_invoice',{p_invoice_id:invoice.id});if(error || !data?.success)alert(error?.message || data?.errors?.join(', ') || 'Submission failed');else loadInvoice();}
+            }}> {invoice.source_type ? 'Submit Invoice' : 'Review & Submit'} </button>}
+            {!readonly && !customerView && canManageBilling && ['submitted','overdue'].includes(invoice.status) && invoice.amount_paid===0 && !invoice.security_billing_cycle_id && <button className="px-4 py-2 rounded-lg border text-sm" onClick={async()=>{
+              const reason=window.prompt('Unlock this invoice for changes? It will be hidden from the portal until resubmitted. Previously delivered copies and QuickBooks links remain issued. Enter the reason:');
+              if(!reason?.trim())return;
+              const {error}=await supabase.rpc('unlock_invoice_for_changes',{p_invoice_id:invoice.id,p_reason:reason});if(error)alert(error.message);else loadInvoice();
+            }}>Unlock for Changes</button>}
             {!readonly && canPay && (
               <button
                 onClick={() => setShowPaymentModal(true)}
@@ -773,7 +803,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
             {!readonly && (
               <button
                 onClick={() => { setEmailOverride(invoice?.contacts?.email || ''); setConfirmEmail(true); }}
-                disabled={sendingEmail || loadingBillingSummary}
+                disabled={sendingEmail || loadingBillingSummary || !invoice.portal_visible || ['draft','void'].includes(invoice.status)}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
@@ -821,7 +851,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Bill To</p>
-                  {!readonly && !editingBilling && (
+                  {!readonly && invoice.status==='draft' && !editingBilling && (
                     <button
                       onClick={startEditingBilling}
                       className="p-1 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
@@ -830,7 +860,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                       <Pencil className="w-3 h-3" />
                     </button>
                   )}
-                  {!readonly && !editingBilling && invoice.bill_to_contact && (
+                  {!readonly && invoice.status==='draft' && !editingBilling && invoice.bill_to_contact && (
                     <button
                       onClick={swapInvoiceBilling}
                       className="flex items-center gap-1 px-2 py-0.5 text-[11px] bg-gray-100 hover:bg-amber-50 text-gray-500 hover:text-amber-700 border border-gray-200 hover:border-amber-300 rounded-lg transition-colors"
@@ -964,27 +994,27 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                     <span className="text-gray-900">{formatPaymentTerms(invoice.payment_terms)}</span>
                   </div>
                 )}
-                {!readonly && invoice.status !== 'draft' && invoice.status !== 'void' && (
+                {!readonly && !customerView && canManageBilling && invoice.status !== 'void' && (
                   <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100">
-                    <span className="text-gray-500">Visible on Customer Portal</span>
+                    <span className="text-gray-500">Customer-visible on submission</span>
                     <button
                       onClick={async () => {
                         if (!invoice) return;
-                        const newValue = !invoice.portal_visible;
+                        const newValue = !(invoice.status==='draft'?invoice.customer_visible_on_submit:invoice.portal_visible);
                         try {
                           const { error } = await supabase
                             .from('invoices')
-                            .update({ portal_visible: newValue })
+                            .update({ customer_visible_on_submit:newValue,...(invoice.status==='draft'?{}:{portal_visible:newValue}) })
                             .eq('id', invoice.id);
                           if (error) throw error;
-                          setInvoice(prev => prev ? { ...prev, portal_visible: newValue } : prev);
+                          setInvoice(prev => prev ? { ...prev, customer_visible_on_submit:newValue,...(invoice.status==='draft'?{}:{portal_visible:newValue}) } : prev);
                         } catch (err) {
                           console.error('Error toggling portal visibility:', err);
                         }
                       }}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${invoice.portal_visible ? 'bg-blue-600' : 'bg-gray-300'}`}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${(invoice.status==='draft'?invoice.customer_visible_on_submit:invoice.portal_visible) ? 'bg-blue-600' : 'bg-gray-300'}`}
                     >
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${invoice.portal_visible ? 'translate-x-4' : 'translate-x-1'}`} />
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${(invoice.status==='draft'?invoice.customer_visible_on_submit:invoice.portal_visible) ? 'translate-x-4' : 'translate-x-1'}`} />
                     </button>
                   </div>
                 )}
@@ -1020,7 +1050,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                       invoice.invoice_line_items.map(item => (
                         <tr key={item.id} className="hover:bg-gray-50 group">
                           <td className="px-4 py-3">
-                            {!readonly && editingLineItemId === item.id ? (
+                            {!readonly && invoice.status==='draft' && editingLineItemId === item.id ? (
                               <div className="flex items-center gap-2">
                                 <input
                                   ref={descriptionInputRef}
@@ -1052,7 +1082,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                             ) : (
                               <div className="flex items-center gap-2">
                                 <span className="text-gray-800">{item.description}</span>
-                                {!readonly && (
+                                {!readonly && invoice.status==='draft' && (
                                   <button
                                     onClick={() => startEditingDescription(item)}
                                     className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"

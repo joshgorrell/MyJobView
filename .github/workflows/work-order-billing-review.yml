@@ -1,0 +1,37 @@
+name: Work order billing checks
+on:
+  pull_request:
+    paths:
+      - 'src/components/Invoices/**'
+      - 'src/components/Admin/QuickBooksSettings.tsx'
+      - 'supabase/functions/security-qbo-billing-setup/**'
+      - 'supabase/functions/quickbooks-sync-invoices/**'
+      - 'src/components/Service/ServiceBillingQueue.tsx'
+      - 'src/components/Production/WorkOrderDetail.tsx'
+      - 'src/components/Portal/**'
+      - 'supabase/functions/invoice-portal-delivery/**'
+      - 'supabase/functions/_shared/qbo-invoice-push.ts'
+      - 'supabase/functions/send-invoice-email/**'
+      - 'supabase/migrations/*invoice*'
+      - 'tests/work-order-billing/**'
+      - 'package*.json'
+      - '.github/workflows/work-order-billing-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  billing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:work-order-billing
+      - run: npm run test:service-requests
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:work-order-billing:browser

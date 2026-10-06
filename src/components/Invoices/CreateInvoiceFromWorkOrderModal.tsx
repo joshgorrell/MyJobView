@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Save, Clock, Wrench, Package, AlertCircle, Search, CheckCircle, DollarSign, FileText, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { computeInvoiceTax, type TaxEnvironment, type TaxProjectType, type ItemType } from '../../lib/taxCalculations';
+import { AddPartsModal } from '../Production/AddPartsModal';
 import { TaxRulesBadge } from '../Shared/TaxRulesBadge';
 
 type BillingQueueStatus =
@@ -95,7 +96,12 @@ interface PartsUsed {
   part_name: string;
   quantity: number;
   unit_cost: number;
-  total_cost: number;
+  unit_price: number;
+  total_price: number;
+  product_id: string | null;
+  part_sku: string | null;
+  is_warranty?: boolean;
+  warranty_item?: boolean;
   notes: string | null;
 }
 
@@ -110,6 +116,10 @@ interface LineItem {
   notes?: string;
   notes_visible_on_invoice?: boolean;
   showNotes?: boolean;
+  product_id?: string | null;
+  sku?: string | null;
+  cost?: number;
+  source_part_id?: string | null;
 }
 
 interface BillingAddress {
@@ -134,9 +144,10 @@ interface CreateInvoiceFromWorkOrderModalProps {
   onClose: () => void;
   onSuccess: (invoiceId: string) => void;
   preSelectedContactId?: string;
+  preSelectedWorkOrderId?: string;
 }
 
-type FilterTab = 'all' | 'ready' | 'billed';
+type FilterTab = 'all' | 'ready' | 'draft' | 'billed';
 
 function getBillingBadge(status: BillingQueueStatus | null, isBillable: boolean) {
   if (!isBillable) {
@@ -168,10 +179,19 @@ function getBillingBadge(status: BillingQueueStatus | null, isBillable: boolean)
   }
 }
 
-export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateInvoiceFromWorkOrderModalProps) {
+export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelectedWorkOrderId }: CreateInvoiceFromWorkOrderModalProps) {
+  const retryKey = useRef(crypto.randomUUID());
+  const autoOpened = useRef(false);
+  const [draftInvoiceId, setDraftInvoiceId] = useState<string | null>(null);
+  const [portalVisible, setPortalVisible] = useState(true);
+  const [addPartsTo, setAddPartsTo] = useState<string | null>(null);
+  const [closeoutNotes, setCloseoutNotes] = useState<{work_order_id: string; tech_notes: string}[]>([]);
+  const [openClocks, setOpenClocks] = useState(false);
+  const [reviewOrders, setReviewOrders] = useState<{id: string; work_order_number: string; status: string; contact_id: string}[]>([]);
+  const [laborRate, setLaborRate] = useState(0);
   const [step, setStep] = useState<'select' | 'review'>('select');
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [selectedWorkOrderIds, setSelectedWorkOrderIds] = useState<string[]>([]);
+  const [selectedWorkOrderIds, setSelectedWorkOrderIds] = useState<string[]>(preSelectedWorkOrderId ? [preSelectedWorkOrderId] : []);
   const [laborEntries, setLaborEntries] = useState<LaborEntry[]>([]);
   const [partsUsed, setPartsUsed] = useState<PartsUsed[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -217,7 +237,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
   async function loadWorkOrders() {
     setLoading(true);
     try {
-      const { data: woData, error: woError } = await supabase
+      const workOrderQuery = supabase
         .from('work_orders')
         .select(`
           id,
@@ -243,10 +263,10 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
             zip_code
           )
         `)
-        .eq('status', 'completed')
+        .neq('status', 'cancelled')
         .in('type', ['service'])
-        .order('actual_completion_date', { ascending: false })
-        .limit(200);
+        .order('actual_completion_date', { ascending: false });
+      const {data:woData,error:woError}=await (preSelectedWorkOrderId ? workOrderQuery.eq('id',preSelectedWorkOrderId) : workOrderQuery.limit(200));
 
       if (woError) throw woError;
 
@@ -268,6 +288,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
 
       const enriched: WorkOrder[] = (woData || []).map(wo => ({
         ...wo,
+        contacts:Array.isArray(wo.contacts)?wo.contacts[0]:wo.contacts,
         billing_queue_status: billingQueueMap[wo.id] ?? null,
       }));
 
@@ -300,10 +321,12 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
 
     if (activeFilter === 'ready') {
       list = list.filter(wo => wo.billing_queue_status === 'ready_for_billing');
+    } else if (activeFilter === 'draft') {
+      list = list.filter(wo => wo.billing_queue_status === 'invoice_created');
     } else if (activeFilter === 'billed') {
       list = list.filter(wo =>
         wo.billing_queue_status !== null &&
-        ['invoice_created', 'invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status)
+        ['invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status)
       );
     }
 
@@ -355,69 +378,50 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
 
       const finalWorkOrderIds = Array.from(allWorkOrderIds);
 
-      const [laborRes, partsRes] = await Promise.all([
-        supabase
-          .from('service_labor_entries')
-          .select(`
-            id,
-            tech_user_id,
-            calculated_hours,
-            labor_rate,
-            labor_total,
-            notes,
-            is_billable,
-            profiles:tech_user_id (
-              first_name,
-              last_name
-            )
-          `)
-          .in('work_order_id', finalWorkOrderIds)
-          .eq('is_billable', true),
-        supabase
-          .from('service_parts_used')
-          .select('id, part_name, quantity, unit_cost, total_cost, notes')
-          .in('work_order_id', finalWorkOrderIds)
+      const [timeRes, partsRes, notesRes, settingsRes, ordersRes, linksRes] = await Promise.all([
+        supabase.from('time_entries').select('id, technician_id, work_order_id, total_hours, clock_out, status, notes, profiles:technician_id(first_name,last_name)').in('work_order_id', finalWorkOrderIds),
+        supabase.from('service_parts_used').select('*').in('work_order_id', finalWorkOrderIds),
+        supabase.from('job_completions').select('work_order_id,tech_notes').in('work_order_id', finalWorkOrderIds),
+        supabase.from('company_settings').select('default_labor_rate,portal_invoices_enabled').maybeSingle(),
+        supabase.from('work_orders').select('id,work_order_number,status,contact_id,is_billable').in('id', finalWorkOrderIds),
+        supabase.from('work_order_invoice_links').select('invoice_id,work_order_id').in('work_order_id', finalWorkOrderIds),
       ]);
-
-      if (laborRes.error) throw laborRes.error;
-      if (partsRes.error) throw partsRes.error;
-
-      const labor = laborRes.data as LaborEntry[];
-      const parts = partsRes.data as PartsUsed[];
-
-      setLaborEntries(labor);
-      setPartsUsed(parts);
-
+      for (const result of [timeRes,partsRes,notesRes,settingsRes,ordersRes,linksRes]) if (result.error) throw result.error;
+      const orders = ordersRes.data || [];
+      if (new Set(orders.map(w => w.contact_id)).size !== 1) throw new Error('Select work orders for one customer.');
+      if (orders.some(w => w.is_billable === false)) throw new Error('A linked work order is marked nonbillable. Review its billing type.');
+      setReviewOrders(orders);
+      setCloseoutNotes(notesRes.data || []);
+      const time = (timeRes.data || []).filter(t => !['rejected','cancelled'].includes(t.status));
+      setOpenClocks(time.some(t => !t.clock_out));
+      const rate = Number(settingsRes.data?.default_labor_rate || 0);
+      setLaborRate(rate);
+      const labor: LaborEntry[] = time.filter(t => t.clock_out).map(t => ({id:t.id,tech_user_id:t.technician_id,calculated_hours:Number(t.total_hours || 0),labor_rate:rate,labor_total:Number(t.total_hours || 0)*rate,notes:t.notes,is_billable:true,profiles:t.profiles as unknown as LaborEntry['profiles']}));
+      const parts = (partsRes.data || []) as PartsUsed[];
+      setLaborEntries(labor);setPartsUsed(parts);
+      const actualHours = labor.reduce((sum,t) => sum + t.calculated_hours,0);
       const items: LineItem[] = [];
-
-      labor.forEach((entry) => {
-        const techName = `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.trim() || 'Technician';
-        items.push({
-          id: crypto.randomUUID(),
-          description: `Labor - ${techName}${entry.notes ? ` (${entry.notes})` : ''}`,
-          quantity: entry.calculated_hours,
-          unit_price: entry.labor_rate,
-          amount: entry.labor_total,
-          item_type: 'labor',
-          source: 'labor'
-        });
-      });
-
-      parts.forEach((part) => {
-        items.push({
-          id: crypto.randomUUID(),
-          description: part.part_name + (part.notes ? ` - ${part.notes}` : ''),
-          quantity: part.quantity,
-          unit_price: part.unit_cost,
-          amount: part.total_cost,
-          item_type: 'material',
-          source: 'parts'
-        });
-      });
-
+      if (actualHours > 0) items.push({id:crypto.randomUUID(),description:'Service labor',quantity:Math.ceil((actualHours - 1e-9)*4)/4,unit_price:rate,amount:Math.round(Math.ceil((actualHours - 1e-9)*4)/4*rate*100)/100,item_type:'labor',source:'labor'});
+      parts.filter(p => !p.is_warranty && !p.warranty_item).forEach(part => items.push({id:part.id,description:part.part_name,quantity:Number(part.quantity),unit_price:Number(part.unit_price),amount:Math.round(Number(part.quantity)*Number(part.unit_price)*100)/100,item_type:'material',source:'parts',source_part_id:part.id,product_id:part.product_id,sku:part.part_sku,cost:Number(part.unit_cost),notes:part.notes || '',notes_visible_on_invoice:false}));
+      const linkedInvoiceIds = [...new Set((linksRes.data || []).map(l => l.invoice_id))];
+      if (linkedInvoiceIds.length > 1) throw new Error('This job is linked to multiple invoices; review its billing history.');
+      if (linkedInvoiceIds.length === 1) {
+        const {data: draft,error} = await supabase.from('invoices').select('*,invoice_line_items(*)').eq('id',linkedInvoiceIds[0]).single();
+        if(error) throw error;
+        if(draft.status !== 'draft') throw new Error('This job is already invoiced. Open its existing invoice.');
+        setDraftInvoiceId(draft.id);
+        setPortalVisible(draft.customer_visible_on_submit ?? true);
+        setTaxRate(Number(draft.tax_rate || 0));setTaxEnvironment(draft.tax_environment);setTaxProjectType(draft.tax_project_type);
+        setInvoiceDate(draft.invoice_date);setDueDate(draft.due_date || '');setNotes(draft.notes || '');
+        setBilling({billing_name:draft.billing_name || '',billing_address_line1:draft.billing_address_line1 || '',billing_address_line2:draft.billing_address_line2 || '',billing_city:draft.billing_city || '',billing_state:draft.billing_state || '',billing_zip:draft.billing_zip || ''});
+        const importedParts=[...items.filter(li=>li.source_part_id)];
+        items.splice(0,items.length,...draft.invoice_line_items.sort((a:{sort_order:number},b:{sort_order:number})=>a.sort_order-b.sort_order).map((li:LineItem)=>({...li,quantity:Number(li.quantity),unit_price:Number(li.unit_price),amount:Number(li.amount)})));
+        items.push(...importedParts.filter(part=>!items.some(li=>li.source_part_id===part.source_part_id)));
+      } else setDraftInvoiceId(null);
       const firstWO = workOrders.find(wo => selectedWorkOrderIds.includes(wo.id));
-      if (firstWO?.contacts) {
-        setTaxRate(firstWO.contacts.tax_rate || 0.0935);
+      setIsTaxExempt(firstWO?.contacts?.is_tax_exempt || false);
+      if (firstWO?.contacts && !linkedInvoiceIds.length) {
+        setTaxRate(firstWO.contacts.tax_rate ?? 0.0935);
         setIsTaxExempt(firstWO.contacts.is_tax_exempt || false);
         const computed = computeDueDate(invoiceDate, firstWO.contacts.default_payment_terms);
         if (computed) {
@@ -443,7 +447,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
       setStep('review');
     } catch (error) {
       console.error('Error loading work order data:', error);
-      alert('Failed to load work order details');
+      alert(error instanceof Error ? error.message : 'Failed to load work order details');
     } finally {
       setLoading(false);
     }
@@ -500,12 +504,25 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
     setLineItems(lineItems.filter(item => item.id !== id));
   }
 
+  async function refreshCatalogParts(replace=false) {
+    const {data,error} = await supabase.from('service_parts_used').select('*').in('work_order_id',selectedWorkOrderIds);
+    if(error) {alert(error.message);return;}
+    setPartsUsed(data || []);
+    setLineItems(previous => {const prev=replace?previous.filter(li=>!li.source_part_id && li.source!=='parts'):previous;return [...prev,...(data || []).filter(p => !p.is_warranty && !p.warranty_item && !prev.some(li => li.source_part_id===p.id || li.id===p.id)).map(p=>({id:p.id,description:p.part_name,quantity:Number(p.quantity),unit_price:Number(p.unit_price),amount:Math.round(Number(p.quantity)*Number(p.unit_price)*100)/100,item_type:'material' as const,source:'parts' as const,source_part_id:p.id,product_id:p.product_id,sku:p.part_sku,cost:Number(p.unit_cost),notes:p.notes || '',notes_visible_on_invoice:false}))];});
+  }
+
+  function useLaborHours(roundUp: boolean) {
+    const actual = laborEntries.reduce((sum,l)=>sum+l.calculated_hours,0);
+    const quantity = roundUp ? Math.ceil((actual - 1e-9)*4)/4 : actual;
+    setLineItems(prev => {const rate=prev.find(li=>li.item_type==='labor')?.unit_price ?? laborRate;return [...prev.filter(li=>li.item_type!=='labor'),{id:crypto.randomUUID(),description:'Service labor',quantity,unit_price:rate,amount:Math.round(quantity*rate*100)/100,item_type:'labor',source:'labor'}];});
+  }
+
   function updateLineItem(id: string, field: keyof LineItem, value: any) {
     setLineItems(lineItems.map(item => {
       if (item.id !== id) return item;
       const updated = { ...item, [field]: value };
       if (field === 'quantity' || field === 'unit_price') {
-        updated.amount = Number(updated.quantity) * Number(updated.unit_price);
+        updated.amount = Math.round(Number(updated.quantity) * Number(updated.unit_price) * 100)/100;
       }
       return updated;
     }));
@@ -517,13 +534,20 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
     ));
   }
 
+  useEffect(() => {
+    if (preSelectedWorkOrderId && workOrders.length && !autoOpened.current) {
+      autoOpened.current = true;
+      loadWorkOrderData();
+    }
+  }, [workOrders, preSelectedWorkOrderId]);
+
   function toggleNoteVisibility(id: string) {
     setLineItems(lineItems.map(item =>
       item.id === id ? { ...item, notes_visible_on_invoice: !item.notes_visible_on_invoice } : item
     ));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent, publish = true) {
     e.preventDefault();
 
     if (selectedWorkOrderIds.length === 0) {
@@ -542,6 +566,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
       return;
     }
 
+    if (publish && (openClocks || reviewOrders.some(w=>w.status!=='completed'))) { alert('Clock out all technicians before billing.'); return; }
     setSubmitting(true);
     try {
       const taxResult = computeInvoiceTax({
@@ -556,76 +581,20 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
         isTaxExempt,
       });
 
-      const subtotal = taxResult.subtotal;
       const tax = taxResult.taxAmount;
-      const total = taxResult.total;
 
       const selectedWO = workOrders.find(wo => selectedWorkOrderIds.includes(wo.id));
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          contact_id: selectedWorkOrder.contact_id,
-          project_id: selectedWorkOrder.project_id,
-          invoice_date: invoiceDate,
-          due_date: dueDate || null,
-          status: 'draft',
-          subtotal,
-          tax_amount: tax,
-          total,
-          amount_paid: 0,
-          amount_due: total,
-          notes: notes || null,
-          tax_environment: taxEnvironment,
-          tax_project_type: taxProjectType,
-          tax_rate: taxRate,
-          payment_terms: normalizePaymentTerms(selectedWO?.contacts?.default_payment_terms) || null,
-          billing_name: billing.billing_name || null,
-          billing_address_line1: billing.billing_address_line1 || null,
-          billing_address_line2: billing.billing_address_line2 || null,
-          billing_city: billing.billing_city || null,
-          billing_state: billing.billing_state || null,
-          billing_zip: billing.billing_zip || null,
-        })
-        .select()
-        .single();
-
-      if (invoiceError) throw invoiceError;
-
-      const lineItemsData = lineItems.map((item, index) => ({
-        invoice_id: invoice.id,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        amount: item.amount,
-        item_type: item.item_type || 'material',
-        is_taxable: true,
-        notes: item.notes || null,
-        notes_visible_on_invoice: item.notes_visible_on_invoice ?? false,
-        sort_order: index,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('invoice_line_items')
-        .insert(lineItemsData);
-
-      if (itemsError) throw itemsError;
-
-      for (const workOrderId of selectedWorkOrderIds) {
-        await supabase
-          .from('service_billing_queue')
-          .update({
-            status: 'invoice_created',
-            invoice_id: invoice.id,
-            invoiced_at: new Date().toISOString()
-          })
-          .eq('work_order_id', workOrderId);
-      }
-
-      onSuccess(invoice.id);
+      const {data: invoiceId, error} = await supabase.rpc('save_work_order_invoice', {
+        p_request_id:retryKey.current,p_work_order_ids:selectedWorkOrderIds,p_invoice_id:draftInvoiceId,p_publish:publish,p_portal:portalVisible,
+        p_header:{invoice_date:invoiceDate,due_date:dueDate || invoiceDate,notes:notes || null,tax_environment:taxEnvironment,tax_project_type:taxProjectType,tax_rate:taxRate,tax_amount:tax,payment_terms:normalizePaymentTerms(selectedWO?.contacts?.default_payment_terms) || 'due_on_receipt',...billing},
+        p_lines:lineItems.map(item => ({description:item.description,quantity:item.quantity,unit_price:item.unit_price,item_type:item.item_type || 'material',is_taxable:true,source_part_id:item.source_part_id || null,product_id:item.product_id || null,sku:item.sku || null,cost:item.cost ?? null,notes:item.notes || null,notes_visible_on_invoice:item.notes_visible_on_invoice || false})),
+      });
+      if(error) throw error;
+      onSuccess(invoiceId);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert('Failed to create invoice. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -647,6 +616,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
   const filterTabs: { key: FilterTab; label: string; count?: number }[] = [
     { key: 'ready', label: 'Ready to Bill', count: readyCount },
     { key: 'all', label: 'All', count: workOrders.length },
+    { key: 'draft', label: 'Open Drafts' },
     { key: 'billed', label: 'Already Billed' },
   ];
 
@@ -656,9 +626,9 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
       <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full my-4 sm:my-8">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Create Invoice from Work Order</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Review & Invoice</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {step === 'select' ? 'Select completed service work orders to bill' : 'Review and adjust invoice details'}
+              {step === 'select' ? 'Select service work orders to review' : 'Review and adjust invoice details'}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -671,9 +641,9 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
             {workOrders.length === 0 ? (
               <div className="text-center py-12">
                 <Wrench className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Completed Work Orders</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Service Work Orders</h3>
                 <p className="text-gray-600">
-                  There are no completed service work orders available for billing.
+                  There are no service work orders available to review.
                 </p>
               </div>
             ) : (
@@ -753,7 +723,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
                       const badge = getBillingBadge(wo.billing_queue_status, wo.is_billable !== false);
                       const isSelected = selectedWorkOrderIds.includes(wo.id);
                       const isAlreadyBilled = wo.billing_queue_status !== null &&
-                        ['invoice_created', 'invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status);
+                        ['invoice_sent', 'payment_pending', 'paid', 'overdue', 'closed'].includes(wo.billing_queue_status);
                       const isReadyToBill = wo.billing_queue_status === 'ready_for_billing';
                       const customerName = wo.contacts?.contact_name ||
                         `${wo.contacts?.first_name || ''} ${wo.contacts?.last_name || ''}`.trim();
@@ -850,20 +820,20 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
         )}
 
         {step === 'review' && (
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Package className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="font-medium text-green-900 mb-1">
-                    Loaded {laborEntries.length} labor entries and {partsUsed.length} parts
-                  </p>
-                  <p className="text-sm text-green-700">
-                    Review the line items below and make any necessary adjustments before creating the invoice.
-                  </p>
-                </div>
-              </div>
-            </div>
+          <form onSubmit={e => handleSubmit(e,false)} className="p-6 space-y-6">
+            <section className="rounded-lg border border-gray-200 p-4 space-y-3">
+              <h3 className="font-semibold text-gray-900">Job closeout · {reviewOrders.length} work order(s)</h3>
+              <p className="text-sm text-gray-600">{reviewOrders.map(w=>w.work_order_number).join(', ')}</p>
+              {closeoutNotes.map((n,i)=><p key={i} className="text-sm text-gray-700 whitespace-pre-wrap">{reviewOrders.find(w=>w.id===n.work_order_id)?.work_order_number}: {n.tech_notes}</p>)}
+              <div className="flex flex-wrap gap-3 text-sm"><strong>Actual labor: {laborEntries.reduce((sum,l)=>sum+l.calculated_hours,0).toFixed(2)} hours</strong><strong>Billable labor: {lineItems.filter(li=>li.item_type==='labor').reduce((sum,li)=>sum+Number(li.quantity),0).toFixed(2)} hours</strong></div>
+              <details><summary className="min-h-11 cursor-pointer text-sm">Time by technician</summary>{laborEntries.map(l=><p key={l.id} className="text-sm">{[l.profiles?.first_name,l.profiles?.last_name].filter(Boolean).join(' ') || 'Technician'}: {l.calculated_hours.toFixed(2)} hours</p>)}</details>
+              {reviewOrders.some(w=>w.status!=='completed') && <p className="text-amber-800">Work is still in progress. Save an open draft and submit once all linked work orders are complete.</p>}
+              <details><summary className="cursor-pointer text-sm text-gray-600">Update imported parts</summary><p className="text-xs text-gray-500 py-2">Parts load automatically. Use this only to replace imported part lines with the latest work-order quantities and prices; invoice edits to those lines will be replaced.</p><button type="button" className="text-sm text-blue-700 underline" onClick={()=>refreshCatalogParts(true)}>Refresh Parts from Work Orders</button></details>
+              {openClocks && <p role="alert" className="text-red-700">A technician is still clocked in. You can save an open draft; clock out before submitting.</p>}
+              <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>useLaborHours(false)} className="min-h-11 px-3 border rounded-lg text-sm">Use Actual</button><button type="button" onClick={()=>useLaborHours(true)} className="min-h-11 px-3 border rounded-lg text-sm">Round Up to ¼ Hour</button><button type="button" onClick={()=>setAddPartsTo(selectedWorkOrderIds[0])} className="min-h-11 px-3 border rounded-lg text-sm">+ Catalog Parts</button></div>
+              <p className="text-xs text-gray-500">Actual time stays unchanged. Edit billable hours and invoice lines below. Technician notes stay internal unless you include them.</p>
+            </section>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1209,27 +1179,32 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess }: CreateIn
               />
             </div>
 
-            <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-              <button
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={portalVisible} onChange={e=>setPortalVisible(e.target.checked)} />Customer-visible invoice (portal and notification on submission)</label>
+            <p className="text-xs text-gray-500">Unchecked means internal only: submitted and locked, with no portal access or customer notification. Drafts are always private. Customer-visible submission queues the customer notification automatically; email delivery and online-payment readiness appear on the invoice.</p>
+            <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
+              <button type="button" disabled={submitting} onClick={e=>handleSubmit(e,false)} className="min-h-11 px-4 py-2 border rounded-lg">Save Open Draft</button>
+              {!preSelectedWorkOrderId && <button
                 type="button"
                 onClick={() => setStep('select')}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
-                Back
-              </button>
+                Change Work Orders
+              </button>}
               <button
-                type="submit"
-                disabled={submitting}
+                type="button"
+                onClick={e => handleSubmit(e,true)}
+                disabled={submitting || openClocks || reviewOrders.some(w=>w.status!=='completed')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
-                {submitting ? 'Creating...' : 'Create Invoice'}
+                {submitting ? 'Saving...' : 'Submit Invoice'}
               </button>
             </div>
           </form>
         )}
       </div>
       </div>
+    {addPartsTo && <AddPartsModal workOrderId={addPartsTo} onClose={()=>setAddPartsTo(null)} onSuccess={()=>{setAddPartsTo(null);refreshCatalogParts();}} />}
     </div>
   );
 }
