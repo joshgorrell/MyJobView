@@ -25,8 +25,6 @@ import {
   DollarSign,
   Paperclip,
   UserPlus,
-  ChevronLeft,
-  ChevronRight,
   ListTodo,
   ClipboardList,
   MessageSquareWarning,
@@ -108,7 +106,6 @@ export function ServiceRequestQueue() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'queue' | 'needs_info'>('queue');
   const [filterPriority, setFilterPriority] = useState<string>('all');
@@ -124,7 +121,7 @@ export function ServiceRequestQueue() {
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   const isManager = profile?.role === 'admin' ||
-    profile?.role === 'service_manager' ||
+    String(profile?.role) === 'service_manager' ||
     profile?.role === 'manager';
 
   useEffect(() => {
@@ -1127,7 +1124,6 @@ interface CombineWorkOrderModalProps {
 }
 
 function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: CombineWorkOrderModalProps) {
-  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState('');
@@ -1173,7 +1169,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('combine_service_requests_to_work_order', {
+      const { error } = await supabase.rpc('combine_service_requests_to_work_order', {
         p_service_request_ids: serviceRequests.map(sr => sr.id),
         p_tech_ids: selectedTechs,
         p_scheduled_date: scheduledDate,

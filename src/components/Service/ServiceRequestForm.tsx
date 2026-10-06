@@ -5,7 +5,6 @@ import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
 import type { CustomerLocation } from '../Contacts/CustomerLocationSelector';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import {
-  X,
   Search,
   MapPin,
   FileText,
@@ -13,7 +12,6 @@ import {
   User,
   Calendar,
   Paperclip,
-  Mic,
   Plus,
   RotateCcw,
   AlertTriangle,
@@ -109,6 +107,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [technicians, setTechnicians] = useState<{id: string; full_name: string}[]>([]);
   const [salesReps, setSalesReps] = useState<any[]>([]);
   const [warrantyReferences, setWarrantyReferences] = useState<string[]>([]);
+  const projectLoadVersion = useRef(0);
   const customerSearchVersion = useRef(0);
   const aiPrefillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,6 +226,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   }, [searchQuery]);
 
   useEffect(() => {
+    projectLoadVersion.current++;
     if (formData.contact_id && requestType === 'project') {
       loadCustomerProjects(formData.contact_id);
     } else {
@@ -375,6 +375,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   }
 
   async function loadCustomerProjects(contactId: string) {
+    const version = projectLoadVersion.current;
     setLoadingProjects(true);
     try {
       const { data, error } = await supabase
@@ -384,16 +385,17 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (version !== projectLoadVersion.current) return;
       setCustomerProjects(data || []);
 
-      if (data && data.length === 1) {
+      if (!isEditMode && data && data.length === 1) {
         selectProject(data[0]);
       }
     } catch (error) {
       console.error('Error loading customer projects:', error);
-      setCustomerProjects([]);
+      if (version === projectLoadVersion.current) setCustomerProjects([]);
     } finally {
-      setLoadingProjects(false);
+      if (version === projectLoadVersion.current) setLoadingProjects(false);
     }
   }
 
