@@ -385,10 +385,10 @@ export function ServiceRequestQueue() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white">Work Order Request Queue</h2>
+    <div className="space-y-3 sm:space-y-4 w-full max-w-full min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base sm:text-2xl font-bold text-white">Work Order Request Queue</h2>
           <p className="text-gray-400 text-sm mt-1">
             {queueRequests.length} active {queueRequests.length === 1 ? 'request' : 'requests'}
             {needsInfoRequests.length > 0 && (
@@ -399,7 +399,7 @@ export function ServiceRequestQueue() {
 
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          className="shrink-0 min-h-11 flex items-center gap-1.5 px-2 sm:px-4 py-2 text-xs sm:text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
         >
           <Filter className="w-4 h-4" />
           Filters
@@ -408,17 +408,17 @@ export function ServiceRequestQueue() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-800 rounded-lg w-full sm:w-fit overflow-x-auto">
+      <div className="flex gap-1 p-1 bg-gray-800 rounded-lg w-full max-w-full min-w-0 sm:w-fit">
         <button
           onClick={() => setActiveTab('queue')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'queue'
               ? 'bg-orange-600 text-white'
               : 'text-gray-400 hover:text-white hover:bg-gray-700'
           }`}
         >
           <ClipboardList className="w-4 h-4" />
-          Active Queue
+          <span className="sm:hidden">Active</span><span className="hidden sm:inline">Active Queue</span>
           {queueRequests.length > 0 && (
             <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
               activeTab === 'queue' ? 'bg-orange-500/40 text-orange-100' : 'bg-gray-700 text-gray-300'
@@ -429,14 +429,14 @@ export function ServiceRequestQueue() {
         </button>
         <button
           onClick={() => setActiveTab('needs_info')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'needs_info'
               ? 'bg-amber-600 text-white'
               : 'text-gray-400 hover:text-white hover:bg-gray-700'
           }`}
         >
           <MessageSquareWarning className="w-4 h-4" />
-          Needs More Info
+          <span className="sm:hidden">Needs Info</span><span className="hidden sm:inline">Needs More Info</span>
           {needsInfoRequests.length > 0 && (
             <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
               activeTab === 'needs_info' ? 'bg-amber-500/40 text-amber-100' : 'bg-amber-500/20 text-amber-400'
@@ -449,13 +449,13 @@ export function ServiceRequestQueue() {
 
       {showFilters && (
         <div className="bg-gray-800 rounded-lg p-4 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">Priority</label>
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full min-w-0 min-h-11 px-2 sm:px-3 py-2 text-base bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="all">All Priorities</option>
                 <option value="emergency">Emergency</option>
@@ -469,7 +469,7 @@ export function ServiceRequestQueue() {
               <select
                 value={filterSourceType}
                 onChange={(e) => setFilterSourceType(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full min-w-0 min-h-11 px-2 sm:px-3 py-2 text-base bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="all">All Sources</option>
                 <option value="punchlist">Customer Punchlist</option>
@@ -538,7 +538,8 @@ export function ServiceRequestQueue() {
           {filteredRequests.map((request) => (
             <div
               key={request.id}
-              className={`bg-gray-800 rounded-lg border transition-colors ${
+              data-testid={`service-request-${request.id}`}
+              className={`w-full max-w-full min-w-0 [overflow-wrap:anywhere] bg-gray-800 rounded-lg border transition-colors ${
                 selectedRequestIds.has(request.id)
                   ? 'border-orange-500 ring-2 ring-orange-500/40'
                   : request.status === 'needs_more_info'
@@ -548,7 +549,7 @@ export function ServiceRequestQueue() {
             >
               {/* Kickback warning banner */}
               {request.status === 'needs_more_info' && request.kickback_reason && (
-                <div className="flex items-start gap-3 px-4 py-3 bg-amber-500/10 border-b border-amber-500/30 rounded-t-lg">
+                <div className="flex flex-wrap items-start gap-2 px-3 py-3 bg-amber-500/10 border-b border-amber-500/30 rounded-t-lg">
                   <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-amber-400 mb-0.5">
@@ -614,23 +615,23 @@ export function ServiceRequestQueue() {
                     onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
                   >
                     {/* Top row: customer name + timestamp + desktop Convert button */}
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1.5">
                       {request.contact_id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
-                          className="customer-link font-semibold text-base leading-tight transition-colors text-left"
+                          className="customer-link min-w-0 max-w-full break-words font-semibold text-sm sm:text-base leading-tight transition-colors text-left"
                         >
                           {request.customer_name}
                         </button>
                       ) : (
-                        <div className="font-semibold text-white text-base leading-tight">{request.customer_name}</div>
+                        <div className="min-w-0 max-w-full break-words font-semibold text-white text-sm sm:text-base leading-tight">{request.customer_name}</div>
                       )}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-xs text-gray-500">
+                      <div className="flex min-w-0 max-w-full items-center gap-2 sm:shrink-0">
+                        <div className="flex flex-wrap sm:flex-col sm:items-end gap-x-2 gap-y-0.5 min-w-0">
+                          <span className="text-[11px] sm:text-xs text-gray-400 break-words">
                             {new Date(request.created_at).toLocaleDateString()} {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          <span className="text-xs text-gray-600">
+                          <span className="text-[11px] sm:text-xs text-gray-400 break-words">
                             {request.profiles?.full_name || 'Unknown'}
                           </span>
                         </div>
@@ -641,7 +642,7 @@ export function ServiceRequestQueue() {
                             className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap"
                           >
                             <ArrowRight className="w-3 h-3" />
-                            Convert
+                            Schedule
                           </button>
                         )}
                       </div>
@@ -678,11 +679,11 @@ export function ServiceRequestQueue() {
                     </div>
 
                     {/* Description preview */}
-                    <div className="text-sm text-gray-300 line-clamp-2 mb-1.5">{request.job_description}</div>
+                    <div className="text-sm text-gray-300 break-words line-clamp-2 mb-1.5">{request.job_description}</div>
 
                     {/* Meta row + mobile Convert button */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0 flex flex-wrap items-center gap-2 text-xs text-gray-400">
                         {request.estimated_duration && (
                           <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
@@ -704,12 +705,17 @@ export function ServiceRequestQueue() {
                       {expandedRequest !== request.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
-                          className="sm:hidden flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap shrink-0"
+                          className="sm:hidden flex items-center gap-1 min-h-11 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap shrink-0"
                         >
                           <ArrowRight className="w-3.5 h-3.5" />
-                          Convert
+                          Schedule
                         </button>
                       )}
+                      <button aria-label={expandedRequest === request.id ? 'Collapse request' : 'Expand request'}
+                        onClick={e => {e.stopPropagation();setExpandedRequest(expandedRequest === request.id ? null : request.id);}}
+                        className="shrink-0 min-h-11 px-2 text-gray-400 hover:text-white">
+                        {expandedRequest === request.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
                     </div>
 
                     {/* Expanded Details */}
@@ -752,7 +758,7 @@ export function ServiceRequestQueue() {
                               </a>
                             )}
                             {request.customer_email && (
-                              <a href={`mailto:${request.customer_email}`} className="flex items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700 transition-colors truncate">
+                              <a href={`mailto:${request.customer_email}`} className="flex min-w-0 items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700 transition-colors break-all">
                                 <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                 <span className="truncate">{request.customer_email}</span>
                               </a>
@@ -833,7 +839,7 @@ export function ServiceRequestQueue() {
                             className="col-span-2 sm:col-span-1 sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
                           >
                             <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-                            Convert to Work Order
+                            Schedule Work Order
                           </button>
 
                           <button
@@ -1020,7 +1026,7 @@ function KickbackModal({ serviceRequest, onClose, onSuccess }: KickbackModalProp
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 w-full max-w-lg rounded-2xl border border-gray-700 shadow-2xl">
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-700 bg-gray-800 rounded-t-2xl">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-gray-700 bg-gray-800 rounded-t-2xl">
           <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
             <MessageSquareWarning className="w-5 h-5 text-amber-400" />
           </div>
@@ -1070,7 +1076,7 @@ function KickbackModal({ serviceRequest, onClose, onSuccess }: KickbackModalProp
           </div>
         </div>
 
-        <div className="flex gap-3 px-6 pb-6">
+        <div className="flex gap-3 px-4 sm:px-6 pb-4 sm:pb-6">
           <button
             onClick={onClose}
             disabled={loading}
@@ -1180,10 +1186,10 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-stretch justify-center z-50 p-0 sm:p-4 sm:items-center">
-      <div className="bg-gray-900 w-full sm:rounded-2xl sm:max-w-7xl flex flex-col max-h-screen sm:max-h-[95vh] overflow-hidden shadow-2xl border border-gray-700">
+      <div className="bg-gray-900 w-full sm:rounded-2xl sm:max-w-7xl flex flex-col max-h-[100dvh] sm:max-h-[95dvh] overflow-hidden shadow-2xl border border-gray-700">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-700 shrink-0 bg-gray-800">
+        <div className="flex items-center justify-between px-4 sm:px-4 sm:px-6 py-4 border-b border-gray-700 shrink-0 bg-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-orange-600 flex items-center justify-center">
               <Layers className="w-5 h-5 text-white" />
