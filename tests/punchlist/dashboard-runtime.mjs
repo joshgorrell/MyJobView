@@ -54,10 +54,17 @@ button('Request Service').props.onClick();render();let batch=nodes(tree).find(n=
 let completed=false,scheduled;
 function runBatch(props){const source=fs.readFileSync('src/components/Production/PunchlistAdminDashboard.tsx','utf8')+'\nexport {BatchRequestModal};';
  const original=fs.readFileSync;fs.readFileSync=(path,...args)=>path==='batch.tsx'?source:original(path,...args);try{return harness('batch.tsx',{}, {'../../lib/punchlist':library.exports,'../../lib/supabase':{supabase},'../../contexts/AuthContext':{},'../Shared/Toast':{useToast:()=>toast},'../../hooks/usePunchlistUnseenCount':{},'./PunchlistInviteManager':{},'../Portal/PunchlistTaskDetailModal':{},'../Shared/ContactQuickViewModal':{}}).render(props,'BatchRequestModal');}finally{fs.readFileSync=original;}}
-let batchTree=runBatch({tasks:[rows[1]],mode:'request',onSuccess:()=>{completed=true;},onClose(){},onSchedule(){}});
+let batchTree=runBatch({tasks:[rows[1]],mode:'request',onSuccess:()=>{completed=true;},onClose(){},onSchedule(){throw Error('Request Service must hand off to the queue without opening the scheduler');}});
+assert.ok(text(batchTree).includes('Your service manager will assign a technician and schedule the work.'));
 await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Request Service (1)').props.onClick();assert.ok(completed);assert.deepEqual(Array.from(calls.find(c=>c[0]==='request_punchlist_service')[1].p_task_ids),['new']);
 batchTree=runBatch({tasks:[rows[3]],mode:'schedule',onSuccess(){},onClose(){},onSchedule:requests=>{scheduled=requests;}});
 await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Continue to Schedule').props.onClick();assert.equal(scheduled[0].id,'existing');assert.equal(calls.filter(c=>c[0]==='request_punchlist_service').length,1);
 batchTree=runBatch({tasks:[rows[0],rows[1]],mode:'schedule',onSuccess(){},onClose(){},onSchedule(){throw Error('Mixed customers must not schedule');}});
 await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Continue to Schedule').props.onClick();assert.ok(calls.some(c=>c[0]==='error'&&c[1].includes('one customer')));
 console.log('Newest/customer/search, visible selection, customer lock, request grouping, existing-request scheduling, and mixed-customer guard passed.');
+batch.props.onClose();render();button('new item').props.onClick();render();
+let detail=nodes(tree).find(n=>n.type==='Details');assert.ok(detail.props.onSchedule);detail.props.onSchedule();render();
+batch=nodes(tree).find(n=>typeof n.type==='function'&&n.type.name==='BatchRequestModal');assert.equal(batch.props.mode,'schedule');assert.equal(batch.props.tasks.length,1);assert.equal(batch.props.tasks[0].id,'new');
+batch.props.onClose();render();button('new item').props.onClick();render();detail=nodes(tree).find(n=>n.type==='Details');detail.props.onRequestService();render();
+batch=nodes(tree).find(n=>typeof n.type==='function'&&n.type.name==='BatchRequestModal');assert.equal(batch.props.mode,'request');assert.equal(batch.props.tasks.length,1);
+console.log('Dashboard detail actions open the existing flow for exactly the chosen item.');

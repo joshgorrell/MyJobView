@@ -67,6 +67,8 @@ interface PunchlistTaskDetailModalProps {
   isAdmin?: boolean;
   onClose: () => void;
   onTaskUpdated: () => void;
+  onSchedule?: () => void;
+  onRequestService?: () => void;
   onRecall?: (task: PunchlistTaskDetail) => void;
   onDelete?: (task: PunchlistTaskDetail) => void;
   onMarkComplete?: (task: PunchlistTaskDetail) => void;
@@ -90,6 +92,8 @@ export function PunchlistTaskDetailModal({
   isAdmin = false,
   onClose,
   onTaskUpdated,
+  onSchedule,
+  onRequestService,
   onRecall,
   onDelete,
   onMarkComplete,
@@ -407,7 +411,7 @@ export function PunchlistTaskDetailModal({
           </div>
 
           {/* Footer actions */}
-          {(onRecall || onDelete || onMarkComplete) && task.status !== 'completed' && (
+          {(onSchedule || onRequestService || onRecall || onDelete || onMarkComplete) && task.status !== 'completed' && (
             <div className="flex-shrink-0 border-t border-gray-200 px-4 sm:px-6 py-4">
               {isLocked ? (
                 <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
@@ -415,7 +419,18 @@ export function PunchlistTaskDetailModal({
                   A work order is scheduled — contact your Service Manager to cancel or make changes.
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2 justify-end">
+                <div className="space-y-2">
+                  {isAdmin && (task.status === 'draft' || canAct) && (onSchedule || onRequestService) && <div className="flex gap-2">
+                    {onSchedule && (!task.service_request || task.service_request.status === 'open') && <button onClick={onSchedule}
+                      className="flex-1 min-h-11 flex items-center justify-center gap-1.5 px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
+                      <Calendar className="w-4 h-4" />Schedule
+                    </button>}
+                    {onRequestService && task.status === 'draft' && !task.service_request_id && <button onClick={onRequestService}
+                      className="flex-1 min-h-11 flex items-center justify-center gap-1.5 px-2 py-2 bg-surface border border-strong text-primary rounded-lg text-sm font-semibold">
+                      <Send className="w-4 h-4" />Request Service
+                    </button>}
+                  </div>}
+                  <div className="flex flex-wrap gap-2 justify-end">
                   {onRecall && canAct && (
                     <button
                       onClick={() => onRecall(task)}
@@ -437,12 +452,13 @@ export function PunchlistTaskDetailModal({
                   {onMarkComplete && (
                     <button
                       onClick={() => onMarkComplete(task)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-elevated hover:bg-surface text-primary border border-subtle rounded-lg text-sm font-medium transition-colors"
                     >
                       <CheckCheck className="w-4 h-4" />
                       Mark Complete
                     </button>
                   )}
+                  </div>
                 </div>
               )}
             </div>

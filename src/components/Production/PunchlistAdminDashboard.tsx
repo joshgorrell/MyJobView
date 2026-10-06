@@ -180,11 +180,11 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
           if (error) throw error;
 
-          toast.success('The task has been marked as requested.', 'Service request created');
+          toast.success('Sent to the Work Order Request Queue for your service manager to schedule.', 'Service Requested');
           loadTasks();
         };
 
-        toast.confirm('This will create a service request for this punchlist item.', doRequest, 'Mark as Requested?');
+        toast.confirm('Send this item to the Work Order Request Queue for your service manager to schedule?', doRequest, 'Mark as Requested?');
       } else if (newStatus === 'scheduled') {
         const { error } = await supabase
           .from('punchlist_tasks')
@@ -303,6 +303,17 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     }
     setBatchMode(mode); setShowBatchRequestModal(true);
   };
+  const startDetailAction = (mode: 'request' | 'schedule') => {
+    const task = tasks.find(item => item.id === detailTask?.id);
+    if (!task || !canSchedulePunchlist(task) || (mode === 'request' && !canRequestPunchlist(task))) {
+      toast.warning('This item is already requested or scheduled. Refresh the list.'); return;
+    }
+    setContactFilter({id: task.contact_id, name: task.contact.full_name});
+    setSearchQuery(''); setSelectedFilter('all');
+    setSelectedTaskIds(new Set([task.id]));
+    setDetailTask(null); setBatchMode(mode); setShowBatchRequestModal(true);
+  };
+
 
   if (loading) {
     return (
@@ -819,6 +830,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           isAdmin={true}
           onClose={() => setDetailTask(null)}
           onTaskUpdated={loadTasks}
+          onSchedule={() => startDetailAction('schedule')}
+          onRequestService={() => startDetailAction('request')}
           onRecall={handleAdminRecallTask}
           onDelete={handleAdminDeleteTask}
           onMarkComplete={(t) => {
@@ -954,8 +967,8 @@ function BatchRequestModal({ tasks, onClose, onSuccess, mode, onSchedule }: Batc
         return;
       }
       toast.success(
-        `Created ${successCount} service request${successCount !== 1 ? 's' : ''} covering ${taskCount} task${taskCount !== 1 ? 's' : ''}.`,
-        'Service Requests Created'
+        `Sent ${successCount} request${successCount !== 1 ? 's' : ''} covering ${taskCount} item${taskCount !== 1 ? 's' : ''} to the Work Order Request Queue for your service manager to schedule.`,
+        'Sent to Service Queue'
       );
       onSuccess();
     } catch (error: any) {
@@ -991,7 +1004,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess, mode, onSchedule }: Batc
           <div className="flex items-start gap-2.5 bg-blue-900/30 border border-blue-700/50 rounded-lg p-3">
             <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
             <p className="text-xs text-blue-300 leading-relaxed">
-              {mode === 'schedule' ? 'Choose a technician and time in the work-order form for each request. Existing requests include all their linked items. If you close the scheduler, remaining items stay requested for later scheduling.' : 'All selected items belong to this customer and will be included in one service request.'}
+              {mode === 'schedule' ? 'Choose a technician and time in the work-order form for each request. Existing requests include all their linked items. If you close the scheduler, remaining items stay requested for later scheduling.' : 'Send these items as one request to the Work Order Request Queue. Your service manager will assign a technician and schedule the work.'}
             </p>
           </div>
 
