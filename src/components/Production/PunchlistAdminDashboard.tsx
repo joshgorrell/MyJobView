@@ -303,6 +303,17 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     }
     setBatchMode(mode); setShowBatchRequestModal(true);
   };
+  const startDetailAction = (mode: 'request' | 'schedule') => {
+    const task = tasks.find(item => item.id === detailTask?.id);
+    if (!task || !canSchedulePunchlist(task) || (mode === 'request' && !canRequestPunchlist(task))) {
+      toast.warning('This item is already requested or scheduled. Refresh the list.'); return;
+    }
+    setContactFilter({id: task.contact_id, name: task.contact.full_name});
+    setSearchQuery(''); setSelectedFilter('all');
+    setSelectedTaskIds(new Set([task.id]));
+    setDetailTask(null); setBatchMode(mode); setShowBatchRequestModal(true);
+  };
+
 
   if (loading) {
     return (
@@ -819,6 +830,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           isAdmin={true}
           onClose={() => setDetailTask(null)}
           onTaskUpdated={loadTasks}
+          onSchedule={() => startDetailAction('schedule')}
+          onRequestService={() => startDetailAction('request')}
           onRecall={handleAdminRecallTask}
           onDelete={handleAdminDeleteTask}
           onMarkComplete={(t) => {

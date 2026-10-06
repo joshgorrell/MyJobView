@@ -61,3 +61,9 @@ await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Continue to Schedul
 batchTree=runBatch({tasks:[rows[0],rows[1]],mode:'schedule',onSuccess(){},onClose(){},onSchedule(){throw Error('Mixed customers must not schedule');}});
 await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Continue to Schedule').props.onClick();assert.ok(calls.some(c=>c[0]==='error'&&c[1].includes('one customer')));
 console.log('Newest/customer/search, visible selection, customer lock, request grouping, existing-request scheduling, and mixed-customer guard passed.');
+batch.props.onClose();render();button('new item').props.onClick();render();
+let detail=nodes(tree).find(n=>n.type==='Details');assert.ok(detail.props.onSchedule);detail.props.onSchedule();render();
+batch=nodes(tree).find(n=>typeof n.type==='function'&&n.type.name==='BatchRequestModal');assert.equal(batch.props.mode,'schedule');assert.equal(batch.props.tasks.length,1);assert.equal(batch.props.tasks[0].id,'new');
+batch.props.onClose();render();button('new item').props.onClick();render();detail=nodes(tree).find(n=>n.type==='Details');detail.props.onRequestService();render();
+batch=nodes(tree).find(n=>typeof n.type==='function'&&n.type.name==='BatchRequestModal');assert.equal(batch.props.mode,'request');assert.equal(batch.props.tasks.length,1);
+console.log('Dashboard detail actions open the existing flow for exactly the chosen item.');

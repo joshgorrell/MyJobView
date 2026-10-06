@@ -18,7 +18,7 @@
     "test:flow:browser": "npm run build && node tests/flow/mobile-browser.mjs",
     "test:security-onboarding": "node tests/security-onboarding/database.mjs && node tests/security-onboarding/payments.mjs && node tests/security-onboarding/payment-edge.mjs && node tests/security-onboarding/charges.mjs && node tests/security-onboarding/worker.mjs && node tests/security-onboarding/commission.mjs && node tests/security-onboarding/invitations.mjs && node tests/security-onboarding/oauth.mjs && node tests/security-onboarding/qbo-setup.mjs && node tests/security-onboarding/printing.mjs",
     "test:reviews": "node tests/reviews/database.mjs && node tests/reviews/edge.mjs",
-    "test:punchlist": "node tests/punchlist/database.mjs && node tests/punchlist/dashboard-runtime.mjs",
+    "test:punchlist": "node tests/punchlist/database.mjs && node tests/punchlist/dashboard-runtime.mjs && node tests/punchlist/detail-actions.mjs",
     "test:punchlist:browser": "npm run build && node tests/punchlist/dashboard-browser.mjs",
     "test:work-orders": "node tests/work-orders/modal-runtime.mjs",
     "test:vip-plans": "node tests/vip-plans/flow.mjs",
