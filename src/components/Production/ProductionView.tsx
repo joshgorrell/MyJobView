@@ -153,7 +153,7 @@ export function ProductionView({ initialView }: ProductionViewProps) {
     <div className="h-full flex flex-col">
       {/* Navigation Tabs */}
       {!selectedWorkOrderId && (
-        <div className="border-b border-gray-200 bg-white">
+        <div className="border-b border-subtle bg-canvas">
           <div className="px-6">
             <nav className="flex gap-1 overflow-x-auto">
               {views.map(view => {
@@ -165,13 +165,13 @@ export function ProductionView({ initialView }: ProductionViewProps) {
                     className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap relative ${
                       activeView === view.id
                         ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                        : 'border-transparent text-secondary hover:text-primary hover:border-subtle'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                     {view.name}
                     {view.badge > 0 && (
-                      <span className="absolute -top-1 -right-1 px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] text-center">
+                      <span className="absolute -top-1 -right-1 px-2 py-0.5 bg-orange-500 text-primary text-xs font-bold rounded-full min-w-[1.25rem] text-center">
                         {view.badge}
                       </span>
                     )}
@@ -202,21 +202,21 @@ export function ProductionView({ initialView }: ProductionViewProps) {
             {activeView === 'parts_queue' && <PartsRequestManagement />}
             {activeView === 'change_orders' && <ChangeOrdersView />}
             {activeView === 'materials' && (
-              <div className="text-center text-gray-500 py-12">
-                <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <div className="text-center text-muted py-12">
+                <Package className="w-16 h-16 text-muted mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-primary mb-2">
                   Materials Tracking
                 </h3>
-                <p className="text-gray-300">Coming soon</p>
+                <p className="text-muted">Coming soon</p>
               </div>
             )}
             {activeView === 'punch_lists' && (
-              <div className="text-center text-gray-500 py-12">
-                <CheckSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <div className="text-center text-muted py-12">
+                <CheckSquare className="w-16 h-16 text-muted mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-primary mb-2">
                   Punch Lists
                 </h3>
-                <p className="text-gray-300">Coming soon</p>
+                <p className="text-muted">Coming soon</p>
               </div>
             )}
             {activeView === 'vip_program' && <VIPProgramView />}

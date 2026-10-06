@@ -737,7 +737,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onClick={() => setRequestType('service')}
                   className={`py-3 rounded-lg border font-semibold transition-all flex items-center justify-center gap-2 ${
                     requestType === 'service'
-                      ? 'bg-blue-600 text-white border-blue-600'
+                      ? 'bg-blue-600 text-primary border-blue-600'
                       : 'bg-surface text-secondary border-strong hover:border-blue-500'
                   }`}
                 >
@@ -749,7 +749,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onClick={() => setRequestType('project')}
                   className={`py-3 rounded-lg border font-semibold transition-all flex items-center justify-center gap-2 ${
                     requestType === 'project'
-                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      ? 'bg-emerald-600 text-primary border-emerald-600'
                       : 'bg-surface text-secondary border-strong hover:border-emerald-500'
                   }`}
                 >
@@ -1081,7 +1081,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onClick={() => setFormData(prev => ({ ...prev, billable_type: 'billable' }))}
                   className={`py-3 rounded-lg border font-semibold transition-all ${
                     formData.billable_type === 'billable'
-                      ? 'bg-green-600 text-white border-green-600'
+                      ? 'bg-green-600 text-primary border-green-600'
                       : 'bg-surface text-secondary border-strong hover:border-green-500'
                   }`}
                 >
@@ -1092,7 +1092,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onClick={() => setFormData(prev => ({ ...prev, billable_type: 'warranty' }))}
                   className={`py-3 rounded-lg border font-semibold transition-all ${
                     formData.billable_type === 'warranty'
-                      ? 'bg-blue-600 text-white border-blue-600'
+                      ? 'bg-blue-600 text-primary border-blue-600'
                       : 'bg-surface text-secondary border-strong hover:border-blue-500'
                   }`}
                 >
@@ -1144,8 +1144,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 onClick={() => setFormData(prev => ({ ...prev, priority: 'normal' }))}
                 className={`py-3 rounded-lg border font-semibold transition-all ${
                   formData.priority === 'normal'
-                    ? 'bg-gray-600 text-white border-gray-500'
-                    : 'bg-surface text-secondary border-strong hover:border-gray-500'
+                    ? 'bg-elevated text-primary border-strong'
+                    : 'bg-surface text-secondary border-strong hover:border-strong'
                 }`}
               >
                 Normal
@@ -1155,7 +1155,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 onClick={() => setFormData(prev => ({ ...prev, priority: 'urgent' }))}
                 className={`py-3 rounded-lg border font-semibold transition-all ${
                   formData.priority === 'urgent'
-                    ? 'bg-orange-600 text-white border-orange-600'
+                    ? 'bg-orange-600 text-primary border-orange-600'
                     : 'bg-surface text-secondary border-strong hover:border-orange-500'
                 }`}
               >
@@ -1238,7 +1238,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     <button
                       type="button"
                       onClick={() => removePhoto(i)}
-                      className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
+                      className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-primary rounded-full p-1 transition-colors"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -1275,8 +1275,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               disabled={!isValid || loading || uploadingPhotos || loadingLocations}
               className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
                 isEditMode
-                  ? 'bg-gradient-to-r from-amber-600 to-orange-700 text-white hover:opacity-90'
-                  : 'bg-gradient-to-r from-blue-600 to-cyan-700 text-white hover:opacity-90'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-700 text-primary hover:opacity-90'
+                  : 'bg-gradient-to-r from-blue-600 to-cyan-700 text-primary hover:opacity-90'
               }`}
             >
               {loading || uploadingPhotos ? (
@@ -1351,7 +1351,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     setShowSaveToContactPrompt(false);
                     await submitForm();
                   }}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-primary rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   {savingToContact ? 'Saving...' : 'Yes, save to contact'}

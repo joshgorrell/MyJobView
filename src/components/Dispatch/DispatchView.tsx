@@ -112,7 +112,7 @@ export function DispatchView({ initialView = 'calendar' }: DispatchViewProps) {
   return (
     <div className="space-y-4">
       {/* View Selector */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-4">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {views.map((view) => {
             const Icon = view.icon;
@@ -124,12 +124,12 @@ export function DispatchView({ initialView = 'calendar' }: DispatchViewProps) {
                 onClick={() => setActiveView(view.id)}
                 className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                    ? 'bg-blue-600 text-primary shadow-md'
+                    : 'bg-surface text-secondary hover:bg-surface'
                 }`}
                 title={view.description}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-600'}`} />
+                <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-secondary'}`} />
                 <span className="text-xs font-medium text-center leading-tight">
                   {view.name}
                 </span>

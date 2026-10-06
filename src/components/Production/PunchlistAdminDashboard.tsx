@@ -365,9 +365,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
             className="shrink-0 min-h-11 px-2 text-primary bg-elevated rounded-lg disabled:opacity-40"><CheckCheck className="w-4 h-4" /></button>
           {selectedTasks.length > 0 && <>
             <button aria-label="Clear selection" onClick={() => setSelectedTaskIds(new Set())} className="shrink-0 min-h-11 px-2 text-xs text-primary bg-elevated rounded-lg">{selectedTasks.length} ×</button>
-            <button onClick={() => startBatch('schedule')} className="shrink-0 min-h-11 px-2 flex items-center gap-1 text-xs bg-blue-600 text-white rounded-lg"><Calendar className="w-4 h-4" />Schedule</button>
+            <button onClick={() => startBatch('schedule')} className="shrink-0 min-h-11 px-2 flex items-center gap-1 text-xs bg-blue-600 text-primary rounded-lg"><Calendar className="w-4 h-4" />Schedule</button>
             <button onClick={() => startBatch('request')} disabled={!canRequestSelected} title={canRequestSelected ? 'Request service for selected items' : 'Selected items already have service requests; use Schedule'}
-              className="shrink-0 min-h-11 px-2 flex items-center gap-1 text-xs bg-blue-600 text-white rounded-lg disabled:opacity-40"><Send className="w-4 h-4" />Request Service</button>
+              className="shrink-0 min-h-11 px-2 flex items-center gap-1 text-xs bg-blue-600 text-primary rounded-lg disabled:opacity-40"><Send className="w-4 h-4" />Request Service</button>
           </>}
         </>)}
         <button onClick={handleSendInvite} aria-label="Send customer invite" title="Send customer invite" className="shrink-0 min-h-11 px-2 bg-elevated text-primary rounded-lg"><Mail className="w-4 h-4" /></button>
@@ -494,7 +494,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                                 className="w-full h-20 object-cover rounded border border-subtle"
                               />
                               {photo.caption && (
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b truncate">
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-primary text-xs p-1 rounded-b truncate">
                                   {photo.caption}
                                 </div>
                               )}
@@ -502,7 +502,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                                 href={photo.photo_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="absolute top-1 right-1 p-0.5 bg-black/70 hover:bg-black text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute top-1 right-1 p-0.5 bg-black/70 hover:bg-black text-primary rounded opacity-0 group-hover:opacity-100 transition-opacity"
                               >
                                 <Eye className="w-3 h-3" />
                               </a>
@@ -519,7 +519,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                         {task.status !== 'requested' && task.status !== 'scheduled' && task.status !== 'completed' && (
                           <button
                             onClick={() => updateTaskStatus(task.id, 'requested')}
-                            className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-primary rounded text-xs flex items-center gap-1"
                           >
                             <Send className="w-3.5 h-3.5" />
                             Create Service Request
@@ -536,21 +536,21 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                             <>
                               <button
                                 onClick={() => handleAdminRecallTask(task)}
-                                className="px-2.5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-xs flex items-center gap-1"
+                                className="px-2.5 py-1.5 bg-elevated hover:bg-elevated text-primary rounded text-xs flex items-center gap-1"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 Cancel Request for Item
                               </button>
                               <button
                                 onClick={() => updateTaskStatus(task.id, 'completed')}
-                                className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center gap-1"
+                                className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-primary rounded text-xs flex items-center gap-1"
                               >
                                 <CheckCheck className="w-3.5 h-3.5" />
                                 Mark Completed
                               </button>
                               <button
                                 onClick={() => handleAdminDeleteTask(task)}
-                                className="px-2.5 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded text-xs flex items-center gap-1"
+                                className="px-2.5 py-1.5 bg-red-700 hover:bg-red-600 text-primary rounded text-xs flex items-center gap-1"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Delete
@@ -561,7 +561,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                         {task.status !== 'requested' && task.status !== 'completed' && task.status !== 'draft' && (
                           <button
                             onClick={() => updateTaskStatus(task.id, 'completed')}
-                            className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-primary rounded text-xs flex items-center gap-1"
                           >
                             <CheckCheck className="w-3.5 h-3.5" />
                             Mark Completed
@@ -570,7 +570,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                         {task.status === 'completed' && (
                           <button
                             onClick={() => updateTaskStatus(task.id, 'draft')}
-                            className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-primary rounded text-xs flex items-center gap-1"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Reopen
@@ -580,7 +580,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     </div>
 
                     {/* Metadata - Timestamps */}
-                    <div className="space-y-1.5 pt-2 border-t border-gray-800">
+                    <div className="space-y-1.5 pt-2 border-t border-strong">
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         {task.requested_at && task.status !== 'draft' ? (
                           <span className="text-amber-400/80">
@@ -588,7 +588,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                             {new Date(task.requested_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </span>
                         ) : (
-                          <span className="text-gray-600 italic">Not yet requested</span>
+                          <span className="text-secondary italic">Not yet requested</span>
                         )}
                         {task.completed_at && (
                           <span className="text-green-400">
@@ -604,7 +604,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                         if (diffDays < 0) return null;
                         const label = diffDays === 0 ? 'same day as created' : diffDays === 1 ? '1 day after created' : `${diffDays} days after created`;
                         return (
-                          <div className="text-xs text-gray-600 italic">
+                          <div className="text-xs text-secondary italic">
                             Customer requested service {label}
                           </div>
                         );
@@ -645,7 +645,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         />
       )}
 
-      {scheduleQueue.length > 0 && <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center text-white">Loading scheduler…</div>}>
+      {scheduleQueue.length > 0 && <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center text-primary">Loading scheduler…</div>}>
         <CreateWorkOrderModal key={scheduleQueue[0].id} serviceRequest={scheduleQueue[0]}
           onClose={() => {setScheduleQueue([]);loadTasks();}}
           onSuccess={() => {setScheduleQueue(queue => queue.slice(1));loadTasks();}} />
@@ -654,27 +654,27 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
       {/* Help Modal */}
       {showHelp && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="bg-canvas rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-canvas border-b border-subtle px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <HelpCircle className="w-6 h-6 text-blue-600" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Punchlist Access Control Guide</h2>
+                <h2 className="text-xl font-bold text-primary">Punchlist Access Control Guide</h2>
               </div>
               <button
                 onClick={() => setShowHelp(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-surface rounded-lg transition-colors"
               >
-                <X className="w-5 h-5 text-gray-600" />
+                <X className="w-5 h-5 text-secondary" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Overview */}
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">What is the Punchlist System?</h3>
-                <p className="text-gray-700 leading-relaxed">
+                <h3 className="text-lg font-bold text-primary mb-3">What is the Punchlist System?</h3>
+                <p className="text-secondary leading-relaxed">
                   The Punchlist system provides customers with a dedicated portal to submit service requests, track warranty items,
                   and communicate directly with your service team. Customers can create tasks, upload photos, and monitor progress
                   in real-time. This system helps reduce phone calls, improves customer satisfaction, and streamlines your service operations.
@@ -683,8 +683,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
               {/* Access Methods */}
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">Three Ways Customers Get Portal Access</h3>
-                <p className="text-gray-700 leading-relaxed mb-4">
+                <h3 className="text-lg font-bold text-primary mb-3">Three Ways Customers Get Portal Access</h3>
+                <p className="text-secondary leading-relaxed mb-4">
                   Your system supports three distinct methods for granting customers access to the Punchlist portal. Each method
                   serves different business purposes and has different access durations:
                 </p>
@@ -693,22 +693,22 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                   {/* VIP Membership */}
                   <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-300 rounded-lg p-5">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 bg-amber-500 text-primary rounded-full flex items-center justify-center flex-shrink-0">
                         <Star className="w-6 h-6" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 mb-2 text-lg">1. VIP Membership (Ongoing Access)</h4>
-                        <p className="text-sm text-gray-700 mb-2">
+                        <h4 className="font-bold text-primary mb-2 text-lg">1. VIP Membership (Ongoing Access)</h4>
+                        <p className="text-sm text-secondary mb-2">
                           <strong>When:</strong> Customer enrolls in your VIP/recurring service plan
                         </p>
-                        <p className="text-sm text-gray-700 mb-2">
+                        <p className="text-sm text-secondary mb-2">
                           <strong>Duration:</strong> Active as long as subscription is current
                         </p>
-                        <p className="text-sm text-gray-700 mb-2">
+                        <p className="text-sm text-secondary mb-2">
                           <strong>How to Grant:</strong> Create a VIP subscription in the Finance → VIP Plans section. Access is automatically
                           granted when the subscription is active or in trial status.
                         </p>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-secondary">
                           <strong>Use Case:</strong> Premium customers who pay for ongoing service packages, maintenance plans, or security
                           monitoring subscriptions. This is your highest tier of service access.
                         </p>
@@ -719,27 +719,27 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                   {/* Test & Tune Program */}
                   <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-5">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-500 text-primary rounded-full flex items-center justify-center flex-shrink-0">
                         <TrendingUp className="w-6 h-6" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 mb-2 text-lg">2. Test & Tune Program (90 Days)</h4>
-                        <p className="text-sm text-gray-700 mb-2">
+                        <h4 className="font-bold text-primary mb-2 text-lg">2. Test & Tune Program (90 Days)</h4>
+                        <p className="text-sm text-secondary mb-2">
                           <strong>When:</strong> Sales order is marked as complete with Test & Tune enabled
                         </p>
-                        <p className="text-sm text-gray-700 mb-2">
+                        <p className="text-sm text-secondary mb-2">
                           <strong>Duration:</strong> 90 days from completion date
                         </p>
-                        <p className="text-sm text-gray-700 mb-2">
+                        <p className="text-sm text-secondary mb-2">
                           <strong>How to Grant:</strong> Automatically created when completing a sales order with "Start 90-Day Test & Tune Program"
                           checked. The system creates the access grant automatically, then you can optionally send a welcome email.
                           Can also be granted manually from the Customers tab.
                         </p>
-                        <p className="text-sm text-gray-700 mb-2">
+                        <p className="text-sm text-secondary mb-2">
                           <strong>Note:</strong> Customers who already have VIP access don't need a separate Test & Tune grant -
                           they already have punchlist access through their VIP membership.
                         </p>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-secondary">
                           <strong>Use Case:</strong> Post-installation warranty period for performance tracking and customer fine-tuning.
                           Allows customers to submit adjustments while field teams work toward labor efficiency targets.
                         </p>
@@ -752,51 +752,51 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
               {/* Access Priority */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-blue-600" />
                   Access Priority Order
                 </h4>
-                <p className="text-sm text-gray-700 mb-3">
+                <p className="text-sm text-secondary mb-3">
                   If a customer has multiple access types, the system follows this priority order:
                 </p>
-                <ol className="text-sm text-gray-700 space-y-2 ml-4">
+                <ol className="text-sm text-secondary space-y-2 ml-4">
                   <li><strong>1. VIP Membership</strong> - Highest priority, ongoing access</li>
                   <li><strong>2. Test & Tune</strong> - Project-based warranty access</li>
                 </ol>
-                <p className="text-sm text-gray-600 mt-3">
+                <p className="text-sm text-secondary mt-3">
                   The customer's portal will display their current access type and days remaining (if applicable).
                 </p>
               </div>
 
               {/* How to Send Invites */}
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">How Portal Access is Granted</h3>
+                <h3 className="text-lg font-bold text-primary mb-3">How Portal Access is Granted</h3>
                 <div className="space-y-3">
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h5 className="font-semibold text-gray-900 mb-2">From Sales Order Completion:</h5>
-                    <p className="text-sm text-gray-700 mb-2">
+                  <div className="border border-subtle rounded-lg p-4">
+                    <h5 className="font-semibold text-primary mb-2">From Sales Order Completion:</h5>
+                    <p className="text-sm text-secondary mb-2">
                       When marking a sales order as complete with "Start 90-Day Test & Tune Program" checked:
                     </p>
-                    <ul className="text-sm text-gray-700 space-y-1 ml-4 list-disc">
+                    <ul className="text-sm text-secondary space-y-1 ml-4 list-disc">
                       <li>The system <strong>automatically creates</strong> a Test & Tune access grant for the customer</li>
                       <li>Access is granted for 90 days, starting immediately</li>
                       <li>You can optionally send a welcome email with portal instructions (checkbox below)</li>
                       <li>If customer already has VIP access, no separate grant is created (they already have punchlist access)</li>
                     </ul>
-                    <p className="text-sm text-gray-600 mt-2 italic">
+                    <p className="text-sm text-secondary mt-2 italic">
                       The email is optional - access is created automatically regardless of whether you send the email.
                     </p>
                   </div>
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h5 className="font-semibold text-gray-900 mb-2">Manual Invitation:</h5>
-                    <p className="text-sm text-gray-700">
+                  <div className="border border-subtle rounded-lg p-4">
+                    <h5 className="font-semibold text-primary mb-2">Manual Invitation:</h5>
+                    <p className="text-sm text-secondary">
                       Go to the <strong>Customers</strong> tab → Click "Send Invite" → Select a customer → Choose access type
                       (Test & Tune or Test & Tune No Portal) → The system creates the database access grant and sends the invitation email automatically.
                     </p>
                   </div>
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h5 className="font-semibold text-gray-900 mb-2">VIP Membership:</h5>
-                    <p className="text-sm text-gray-700">
+                  <div className="border border-subtle rounded-lg p-4">
+                    <h5 className="font-semibold text-primary mb-2">VIP Membership:</h5>
+                    <p className="text-sm text-secondary">
                       Create a recurring subscription in <strong>Finance → VIP Plans</strong>. Portal access is automatically
                       granted when the subscription becomes active or enters trial status. No separate invite needed.
                     </p>
@@ -805,8 +805,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
               </div>
 
               {/* Contact Info */}
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-sm text-gray-600 text-center">
+              <div className="border-t border-subtle pt-4">
+                <p className="text-sm text-secondary text-center">
                   For technical support with the Punchlist system, contact your system administrator.
                 </p>
               </div>
@@ -986,7 +986,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess, mode, onSchedule }: Batc
         <div className="flex items-center justify-between px-6 py-4 border-b border-subtle bg-surface rounded-t-2xl shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Layers className="w-5 h-5 text-white" />
+              <Layers className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h3 className="text-base font-bold text-primary">{mode === 'schedule' ? 'Schedule Selected Items' : 'Request Service'}</h3>
@@ -1012,7 +1012,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess, mode, onSchedule }: Batc
           <div className="space-y-3">
             {groups.map((group) => (
               <div key={group.contactId} className="bg-surface border border-subtle rounded-lg overflow-hidden">
-                <div className="flex items-center gap-2.5 px-4 py-3 bg-gray-750 border-b border-subtle">
+                <div className="flex items-center gap-2.5 px-4 py-3 bg-elevated border-b border-subtle">
                   <User className="w-4 h-4 text-blue-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-primary truncate">{group.contactName}</div>
@@ -1067,7 +1067,7 @@ function BatchRequestModal({ tasks, onClose, onSuccess, mode, onSchedule }: Batc
             <button
               onClick={handleCreate}
               disabled={loading}
-              className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
+              className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-primary rounded-xl hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
             >
               <Send className="w-4 h-4" />
               {loading ? 'Preparing…' : mode === 'schedule' ? 'Continue to Schedule' : `Request Service (${tasks.length})`}

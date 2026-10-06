@@ -283,14 +283,14 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
           <div className="space-y-2">
             <button
               onClick={() => onNavigate?.('schedule_board')}
-              className="w-full flex items-center justify-between px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+              className="w-full flex items-center justify-between px-4 py-3 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
             >
               <span>Dispatch Scheduler</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => onNavigate?.('travel_bonus')}
-              className="w-full flex items-center justify-between px-4 py-3 bg-orange-700 text-white rounded-lg hover:bg-orange-800 transition-colors font-medium text-sm"
+              className="w-full flex items-center justify-between px-4 py-3 bg-orange-700 text-primary rounded-lg hover:bg-orange-800 transition-colors font-medium text-sm"
             >
               <span>Approve Travel Bonuses</span>
               {stats.travelBonusQueue > 0 && (
@@ -323,7 +323,7 @@ export function DispatchDashboard({ onNavigate }: DispatchDashboardProps) {
               <div
                 className={`h-2.5 rounded-full transition-all ${
                   stats.utilization >= 80 ? 'bg-green-500' :
-                  stats.utilization >= 50 ? 'bg-amber-400' : 'bg-gray-400'
+                  stats.utilization >= 50 ? 'bg-amber-400' : 'bg-elevated'
                 }`}
                 style={{ width: `${Math.min(stats.utilization, 100)}%` }}
               />

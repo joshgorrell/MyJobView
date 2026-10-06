@@ -12,8 +12,8 @@ export default function ProjectsList({ projects, onSelectProject }: ProjectsList
       case 'planning': return 'bg-infoSoft text-info border-blue-500/30';
       case 'active': return 'bg-successSoft text-success border-green-500/30';
       case 'complete': return 'bg-successSoft text-success border-teal-500/30';
-      case 'closed': return 'bg-elevated text-secondary border-gray-500/30';
-      default: return 'bg-elevated text-secondary border-gray-500/30';
+      case 'closed': return 'bg-elevated text-secondary border-strong';
+      default: return 'bg-elevated text-secondary border-strong';
     }
   };
 

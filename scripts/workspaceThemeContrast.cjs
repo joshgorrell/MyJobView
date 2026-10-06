@@ -19,7 +19,7 @@ scan(join(__dirname, '../tests/themes'));
 // Legacy utilities are adapted only in the signed-in workspace. Branding and
 // customer-facing artwork can opt out with data-theme-fixed.
 module.exports = plugin(({ addBase, e }) => {
-  const rules = {'.theme-workspace': {color:'rgb(var(--text-primary))'}};
+  const rules = {'.theme-workspace': {color:'rgb(var(--text-primary))',fontFamily:'var(--font-family)',fontSize:'var(--font-body)',lineHeight:'1.5'}};
   const foregroundVariables = ['text-primary','text-secondary','text-muted','brand-text','info-text','warning-text','success-text','danger-text','attention-text','accent-text'];
   // Snapshot at each theme root/chrome boundary so a nested neutral surface can
   // recover the workspace palette after a colored button or badge.
@@ -28,6 +28,10 @@ module.exports = plugin(({ addBase, e }) => {
   const excluded = ':not(:where([data-theme-fixed], [data-theme-fixed] *))';
   const selector = (name, state = '') =>
     `:is(.theme-workspace, .theme-workspace *)${excluded}.${e(name)}${state}`;
+  // Uniform semantic heading sizes; figures and branded artwork retain their own scale.
+  for (const [tag, role] of [['h1','page-title'],['h2','section-title'],['h3','card-title']]) {
+    rules[`.theme-workspace ${tag}${excluded}:not(:where([data-type-scale="display"], [data-type-scale="display"] *))`] = {fontSize:`var(--font-${role})`,fontWeight:'600',lineHeight:'1.4'};
+  }
   const states = [['', ''], ['hover:', ':hover'], ['focus:', ':focus'], ['focus-visible:', ':focus-visible'], ['active:', ':active'], ['disabled:', ':disabled'], ['placeholder:', '::placeholder']];
   const add = (name, declarations) => {
     for (const [prefix, state] of states) {
@@ -50,15 +54,21 @@ module.exports = plugin(({ addBase, e }) => {
       add(`bg-${family}-${shade}`, { ...resetForeground, backgroundColor: `rgb(var(--${shade >= 800 ? 'canvas' : shade >= 200 && shade <= 700 ? 'elevated' : 'surface'}) / var(--tw-bg-opacity, 1))` });
       for (const opacity of [10,15,20,25,30,40,50,60,70,75,80,90,95]) {
         add(`text-${family}-${shade}/${opacity}`, {color:`rgb(var(--text-muted))`});
-        add(`bg-${family}-${shade}/${opacity}`, {...resetForeground,backgroundColor:`rgb(var(--${shade >= 800 ? 'canvas' : shade >= 200 && shade <= 700 ? 'elevated' : 'surface'}) / ${opacity/100})`});
+        add(`bg-${family}-${shade}/${opacity}`, {...resetForeground,backgroundColor:`rgb(var(--${shade >= 800 ? 'canvas' : shade >= 200 && shade <= 700 ? 'elevated' : 'surface'}))`});
       }
+      if (usedClasses.has(`divide-${family}-${shade}`)) rules[selector(`divide-${family}-${shade}`)+' > :not([hidden]) ~ :not([hidden])'] = {borderColor:'rgb(var(--border-subtle))'};
       add(`border-${family}-${shade}`, { borderColor: `rgb(var(--border-${shade >= 400 ? 'strong' : 'subtle'}))` });
     }
   }
   for (const name of ['canvas','surface','elevated','infoSoft','warningSoft','successSoft','dangerSoft','attentionSoft','accentSoft']) add('bg-'+name, resetForeground);
   add('bg-white', { ...resetForeground, backgroundColor: 'rgb(var(--canvas) / var(--tw-bg-opacity, 1))' });
+  for (const opacity of [10,15,20,25,30,40,50,60,70,75,80,90,95]) add(`bg-white/${opacity}`, {...resetForeground,backgroundColor:'rgb(var(--canvas))'});
   for (const name of ['text-white', 'text-black']) add(name, { color: 'rgb(var(--text-primary))' });
   for (const opacity of [10,15,20,25,30,40,50,60,70,75,80,90,95]) add(`text-white/${opacity}`, {color:'rgb(var(--text-primary))'});
+  // Photo captions and dark overlays retain a white foreground in light themes.
+  const overlayForeground = Object.fromEntries(foregroundVariables.map(name=>['--'+name,'255 255 255']));
+  add('bg-black', {...overlayForeground,color:'rgb(255 255 255)'});
+  for (const opacity of [50,60,70,75,80,90,95]) add(`bg-black/${opacity}`, {...overlayForeground,color:'rgb(255 255 255)'});
   const roles = {blue:'info',sky:'info',cyan:'info',teal:'success',emerald:'success',green:'success',lime:'success',yellow:'warning',amber:'warning',orange:'attention',red:'danger',rose:'danger',pink:'accent',fuchsia:'accent',purple:'accent',violet:'accent',indigo:'accent'};
   const luminance = hex => hex.slice(1).match(/../g).map(x => parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((sum,x,i)=>sum+x*[.2126,.7152,.0722][i],0);
   for (const [family, role] of Object.entries(roles)) {
@@ -70,8 +80,8 @@ module.exports = plugin(({ addBase, e }) => {
       const foreground = (l+.05)/.05 >= 1.05/(l+.05) ? '0 0 0' : '255 255 255';
       const palette = Object.fromEntries(['text-primary','text-secondary','text-muted','brand-text',...new Set(Object.values(roles).map(x=>x+'-text'))].map(x=>['--'+x,foreground]));
       add(`bg-${family}-${shade}`, {...palette, color:`rgb(${foreground})`});
-      if (usedClasses.has(`bg-${family}-${shade}`)) rules[selector(`bg-${family}-${shade}`)+'[class*="bg-opacity-"]'] = {...resetForeground,backgroundColor:`rgb(var(--${role}-surface) / var(--tw-bg-opacity, 1))`};
-      for (const opacity of [10,15,20,25,30,40,50,60,70,75,80,90,95]) add(`bg-${family}-${shade}/${opacity}`, {...resetForeground,backgroundColor:`rgb(var(--${role}-surface) / ${opacity/100})`});
+      if (usedClasses.has(`bg-${family}-${shade}`)) rules[selector(`bg-${family}-${shade}`)+'[class*="bg-opacity-"]'] = {...resetForeground,backgroundColor:`rgb(var(--${role}-surface))`};
+      for (const opacity of [10,15,20,25,30,40,50,60,70,75,80,90,95]) add(`bg-${family}-${shade}/${opacity}`, {...resetForeground,backgroundColor:`rgb(var(--${role}-surface))`});
 
     }
   }
@@ -94,5 +104,9 @@ module.exports = plugin(({ addBase, e }) => {
   const control = `.theme-workspace :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]),textarea,select)${excluded}`;
   rules[control] = {...resetForeground, backgroundColor:'rgb(var(--canvas))',color:'rgb(var(--text-primary))',colorScheme:'inherit'};
   rules[control+'::placeholder'] = {color:'rgb(var(--text-muted))',opacity:'1'};
+  // Native autofill and options must follow the field palette too.
+  rules[control+' option'] = {backgroundColor:'rgb(var(--canvas))',color:'rgb(var(--text-primary))'};
+  rules[control+':-webkit-autofill'] = {WebkitTextFillColor:'rgb(var(--text-primary))',WebkitBoxShadow:'0 0 0 1000px rgb(var(--canvas)) inset'};
+  rules['@media (max-width: 639px)'] = {[control]: {fontSize:'16px'}};
   addBase(rules);
 });

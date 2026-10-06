@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: .875rem;
+  --font-helper: .75rem;
+  --font-page-title: 1.25rem;
+  --font-section-title: 1.125rem;
+  --font-card-title: 1rem;
+}
+@media (min-width: 640px) { :root { --font-page-title: 1.5rem; } }
+
 :root, [data-theme='dark'], [data-theme='classic'] {
   --workspace: 15 23 42;
   --canvas: 17 24 39;
@@ -268,13 +278,13 @@ html {
 }
 
 /* Catalog forms remain readable inside every workspace theme. */
-.product-form-controls { color-scheme: light; }
+.product-form-controls { color-scheme: inherit; }
 .product-form-controls input,
 .product-form-controls select,
 .product-form-controls textarea {
-  color-scheme: light;
-  background-color: #fff;
-  color: #000;
+  color-scheme: inherit;
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--text-primary));
   accent-color: #1d4ed8;
   min-width: 0;
   max-width: 100%;
@@ -282,11 +292,11 @@ html {
 }
 .product-form-controls textarea { resize: vertical; }
 .product-form-controls input::placeholder,
-.product-form-controls textarea::placeholder { color: #6b7280; opacity: 1; }
+.product-form-controls textarea::placeholder { color: rgb(var(--text-muted)); opacity: 1; }
 .product-form-controls input:-webkit-autofill {
-  -webkit-text-fill-color: #000;
-  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: rgb(var(--text-primary));
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--canvas)) inset;
 }
 .product-form-controls input:disabled,
 .product-form-controls select:disabled,
-.product-form-controls textarea:disabled { opacity: 1; color: #4b5563; }
+.product-form-controls textarea:disabled { opacity: 1; color: rgb(var(--text-secondary)); }

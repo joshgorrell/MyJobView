@@ -204,7 +204,7 @@ export default function SalesTVDashboard() {
   const expectedAnnualPace = (dayOfYear / daysInYear) * 100;
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-slate-950 text-white">
+    <div data-type-scale="display" className="fixed inset-0 overflow-hidden bg-slate-950 text-white">
       <div className="mx-auto flex h-full w-full max-w-[3840px] flex-col">
         <header className="flex h-[8vh] min-h-[82px] shrink-0 items-center justify-between border-b border-slate-800 px-[1.3vw]">
           <div className="flex items-center gap-[1vw]">

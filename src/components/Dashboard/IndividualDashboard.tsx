@@ -275,7 +275,7 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Loading your performance data...</p>
+          <p className="mt-2 text-secondary">Loading your performance data...</p>
         </div>
       </div>
     );
@@ -285,7 +285,7 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-12">
-          <p className="text-gray-300">No data available</p>
+          <p className="text-muted">No data available</p>
         </div>
       </div>
     );
@@ -296,22 +296,22 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-400">My Performance at a Glance</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-muted">My Performance at a Glance</h1>
+            <p className="text-sm text-muted mt-1">
               Last updated: {lastRefresh.toLocaleTimeString()}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={loadMetrics}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface text-secondary rounded-lg hover:bg-elevated transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
               Refresh
             </button>
             <button
               onClick={handleExport}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Download className="w-4 h-4" />
               Export CSV
@@ -324,8 +324,8 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
             onClick={() => setDateRange('7d')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               dateRange === '7d'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-blue-600 text-primary'
+                : 'bg-elevated text-secondary hover:bg-elevated'
             }`}
           >
             7 Days
@@ -334,8 +334,8 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
             onClick={() => setDateRange('30d')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               dateRange === '30d'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-blue-600 text-primary'
+                : 'bg-elevated text-secondary hover:bg-elevated'
             }`}
           >
             30 Days
@@ -344,8 +344,8 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
             onClick={() => setDateRange('90d')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               dateRange === '90d'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-blue-600 text-primary'
+                : 'bg-elevated text-secondary hover:bg-elevated'
             }`}
           >
             90 Days
@@ -354,119 +354,119 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <Users className="w-6 h-6 text-blue-600" />
-            <h3 className="font-semibold text-gray-900">Contacts Added</h3>
+            <h3 className="font-semibold text-primary">Contacts Added</h3>
           </div>
           <div className="flex items-baseline gap-4">
-            <div className="text-4xl font-bold text-gray-900">{metrics.contactsAdded30d}</div>
-            <div className="text-sm text-gray-500">
+            <div className="text-4xl font-bold text-primary">{metrics.contactsAdded30d}</div>
+            <div className="text-sm text-muted">
               {metrics.contactsAdded7d} in last 7d
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <Phone className="w-6 h-6 text-green-600" />
-            <h3 className="font-semibold text-gray-900">Connections Logged</h3>
+            <h3 className="font-semibold text-primary">Connections Logged</h3>
           </div>
           <div className="flex items-baseline gap-4">
-            <div className="text-4xl font-bold text-gray-900">{metrics.connectionsLogged30d}</div>
-            <div className="text-sm text-gray-500">
+            <div className="text-4xl font-bold text-primary">{metrics.connectionsLogged30d}</div>
+            <div className="text-sm text-muted">
               {metrics.connectionsLogged7d} in last 7d
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <Target className="w-6 h-6 text-orange-600" />
-            <h3 className="font-semibold text-gray-900">Avg Connections/Contact</h3>
+            <h3 className="font-semibold text-primary">Avg Connections/Contact</h3>
           </div>
-          <div className="text-4xl font-bold text-gray-900">
+          <div className="text-4xl font-bold text-primary">
             {metrics.avgConnectionsPerContact.toFixed(1)}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <TrendingUp className="w-6 h-6 text-blue-600" />
-            <h3 className="font-semibold text-gray-900">Leads Created</h3>
+            <h3 className="font-semibold text-primary">Leads Created</h3>
           </div>
           <div className="flex items-baseline gap-4">
-            <div className="text-4xl font-bold text-gray-900">{metrics.leadsCreated30d}</div>
-            <div className="text-sm text-gray-500">
+            <div className="text-4xl font-bold text-primary">{metrics.leadsCreated30d}</div>
+            <div className="text-sm text-muted">
               {metrics.leadsCreated7d} in last 7d
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <Target className="w-6 h-6 text-green-600" />
-            <h3 className="font-semibold text-gray-900">Contact→Lead Conversion</h3>
+            <h3 className="font-semibold text-primary">Contact→Lead Conversion</h3>
           </div>
           <div className="flex items-baseline gap-4">
-            <div className="text-4xl font-bold text-gray-900">
+            <div className="text-4xl font-bold text-primary">
               {metrics.contactToLeadConversion30d.toFixed(1)}%
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted">
               {metrics.contactToLeadConversion7d.toFixed(1)}% in last 7d
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <CheckCircle className="w-6 h-6 text-blue-600" />
-            <h3 className="font-semibold text-gray-900">Tasks Created</h3>
+            <h3 className="font-semibold text-primary">Tasks Created</h3>
           </div>
           <div className="flex items-baseline gap-4">
-            <div className="text-4xl font-bold text-gray-900">{metrics.tasksCreated30d}</div>
-            <div className="text-sm text-gray-500">
+            <div className="text-4xl font-bold text-primary">{metrics.tasksCreated30d}</div>
+            <div className="text-sm text-muted">
               {metrics.tasksCreated7d} in last 7d
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <CheckCircle className="w-6 h-6 text-green-600" />
-            <h3 className="font-semibold text-gray-900">Task Completion Rate</h3>
+            <h3 className="font-semibold text-primary">Task Completion Rate</h3>
           </div>
-          <div className="text-4xl font-bold text-gray-900">
+          <div className="text-4xl font-bold text-primary">
             {metrics.taskCompletionRate.toFixed(1)}%
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <AlertCircle className="w-6 h-6 text-orange-600" />
-            <h3 className="font-semibold text-gray-900">Open Tasks Aging</h3>
+            <h3 className="font-semibold text-primary">Open Tasks Aging</h3>
           </div>
-          <div className="text-4xl font-bold text-gray-900">
+          <div className="text-4xl font-bold text-primary">
             {metrics.openTasksAging.toFixed(0)} days
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <Calendar className="w-6 h-6 text-red-600" />
-            <h3 className="font-semibold text-gray-900">Stale Contacts</h3>
+            <h3 className="font-semibold text-primary">Stale Contacts</h3>
           </div>
-          <div className="text-4xl font-bold text-gray-900">{metrics.staleContacts}</div>
-          <p className="text-sm text-gray-500 mt-1">No contact in 30+ days</p>
+          <div className="text-4xl font-bold text-primary">{metrics.staleContacts}</div>
+          <p className="text-sm text-muted mt-1">No contact in 30+ days</p>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-canvas rounded-lg border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <Flame className="w-6 h-6 text-orange-600" />
-            <h3 className="font-semibold text-gray-900">Hot Streak</h3>
+            <h3 className="font-semibold text-primary">Hot Streak</h3>
           </div>
-          <div className="text-4xl font-bold text-gray-900">{metrics.hotStreak}</div>
-          <p className="text-sm text-gray-500 mt-1">Days with connections</p>
+          <div className="text-4xl font-bold text-primary">{metrics.hotStreak}</div>
+          <p className="text-sm text-muted mt-1">Days with connections</p>
         </div>
 
         <VehicleMileageWidget onNavigateToMileage={() => {
@@ -476,18 +476,18 @@ export function IndividualDashboard({ onNavigate }: { onNavigate?: (tab: string)
 
       <AwaitingContactWidget onNavigate={onNavigate} />
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Connection Mix</h3>
+      <div className="bg-canvas rounded-lg border border-subtle p-6">
+        <h3 className="font-semibold text-primary mb-4">Connection Mix</h3>
         <div className="space-y-3">
           {metrics.connectionMix.map((item) => (
             <div key={item.type}>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-700 capitalize">{item.type}</span>
-                <span className="text-gray-900 font-medium">
+                <span className="text-secondary capitalize">{item.type}</span>
+                <span className="text-primary font-medium">
                   {item.count} ({item.percentage.toFixed(1)}%)
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-elevated rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full"
                   style={{ width: `${item.percentage}%` }}

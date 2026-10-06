@@ -26,17 +26,17 @@ export function ThemeSelector() {
   return (
     <section className="rounded-xl border border-subtle bg-canvas p-3 sm:p-4 text-primary" aria-labelledby="appearance-title">
       <h2 id="appearance-title" className="font-semibold">Appearance</h2>
-      <p className="mt-1 text-sm text-muted">Choose your look. Your preference is remembered.</p>
-      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="Color theme" aria-busy={saving}>
+      <p className="mt-1 text-sm text-muted">Choose your look. Your theme is saved to your account across devices.</p>
+      <div className="mt-3 grid grid-cols-4 gap-2" role="group" aria-label="Color theme" aria-busy={saving}>
         {choices.map(({ value, label, description, icon: Icon, preview }) => (
           <button key={value} type="button" aria-pressed={preference === value} disabled={saving}
             onClick={() => select(value)}
-            className={`min-w-0 rounded-lg border p-2.5 sm:p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-wait ${preference === value ? 'border-brand bg-infoSoft text-primary' : 'border-subtle bg-surface text-primary hover:bg-elevated'}`}>
+            className={`min-w-0 rounded-lg border p-1.5 sm:p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-wait ${preference === value ? 'border-brand bg-infoSoft text-primary' : 'border-subtle bg-surface text-primary hover:bg-elevated'}`}>
             <span data-theme-fixed aria-hidden="true" className={`mb-2 flex h-7 items-center justify-end rounded-md bg-gradient-to-r ${preview} ${value === 'mjv' ? 'border-2 border-black' : ''}`}>
               {preference === value && <Check className="mr-1 h-5 w-5 rounded-full bg-blue-700 p-0.5 text-white" />}
             </span>
-            <span className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold leading-5"><Icon aria-hidden="true" className="h-4 w-4 shrink-0" />{label}</span>
-            <span className="mt-0.5 block text-xs text-muted">{description}</span>
+            <span className="flex flex-col sm:flex-row items-start gap-1 text-xs sm:text-sm font-semibold leading-4 sm:leading-5"><Icon aria-hidden="true" className="h-4 w-4 shrink-0" />{label}</span>
+            <span className="mt-0.5 hidden sm:block text-xs text-muted">{description}</span>
           </button>
         ))}
       </div>
