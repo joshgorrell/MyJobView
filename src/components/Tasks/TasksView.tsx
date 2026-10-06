@@ -338,7 +338,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
   }
 
   const priorityConfig = {
-    low: { color: 'text-gray-400', bg: 'bg-gray-500/20', label: 'Low' },
+    low: { color: 'text-muted', bg: 'bg-elevated', label: 'Low' },
     medium: { color: 'text-blue-400', bg: 'bg-blue-500/20', label: 'Medium' },
     high: { color: 'text-orange-400', bg: 'bg-orange-500/20', label: 'High' },
     urgent: { color: 'text-red-400', bg: 'bg-red-500/20', label: 'Urgent' },
@@ -348,7 +348,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
     pending: { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Pending' },
     in_progress: { color: 'text-blue-400', bg: 'bg-blue-500/20', label: 'In Progress' },
     completed: { color: 'text-green-400', bg: 'bg-green-500/20', label: 'Completed' },
-    cancelled: { color: 'text-gray-400', bg: 'bg-gray-500/20', label: 'Cancelled' },
+    cancelled: { color: 'text-muted', bg: 'bg-elevated', label: 'Cancelled' },
   };
 
   function calculateAging(createdAt: string, completedAt?: string | null): string {
@@ -411,7 +411,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       <div className="flex items-center justify-center py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading tasks...</p>
+          <p className="text-muted">Loading tasks...</p>
         </div>
       </div>
     );
@@ -427,8 +427,8 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               onClick={() => setViewFilter('my')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
                 viewFilter === 'my'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-blue-600 text-primary'
+                  : 'bg-elevated text-secondary hover:bg-elevated'
               }`}
             >
               My Tasks
@@ -438,8 +438,8 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 onClick={() => setViewFilter('all')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
                   viewFilter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    ? 'bg-blue-600 text-primary'
+                    : 'bg-elevated text-secondary hover:bg-elevated'
                 }`}
               >
                 All Tasks
@@ -447,7 +447,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
             )}
             <button
               onClick={() => setShowHelp(true)}
-              className="inline-flex items-center gap-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm"
+              className="inline-flex items-center gap-1 px-3 py-2 bg-elevated text-secondary rounded-lg hover:bg-elevated transition-colors font-medium text-sm"
               title="Help & Instructions"
             >
               <HelpCircle className="w-4 h-4" />
@@ -457,7 +457,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 setEditingTask(undefined);
                 setShowForm(true);
               }}
-              className="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm ml-auto"
+              className="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm ml-auto"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New Task</span>
@@ -468,7 +468,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           {/* Search bar - full width on mobile */}
           <div className="relative w-full">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+              <Search className="h-4 w-4 text-muted" />
             </div>
             <input
               type="text"
@@ -480,7 +480,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-secondary"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -493,7 +493,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 type="checkbox"
                 checked={showCompleted}
                 onChange={(e) => setShowCompleted(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                className="w-4 h-4 rounded border-subtle text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
               Show completed tasks
             </label>
@@ -503,7 +503,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
       {filteredTasks.length === 0 ? (
         <div className="text-center py-12 bg-surface rounded-lg border-2 border-dashed border-subtle">
-          <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+          <Clock className="w-12 h-12 mx-auto mb-3 text-muted" />
           <h3 className="text-lg font-medium text-primary mb-2">No tasks found</h3>
           <p className="text-muted">Create your first task to get started</p>
         </div>
@@ -534,12 +534,12 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 <div
                   key={task.id}
                   id={`task-${task.id}`}
-                  className={`bg-white rounded-lg border transition-all hover:shadow-sm ${
+                  className={`bg-canvas rounded-lg border transition-all hover:shadow-sm ${
                     task.status === 'completed'
                       ? 'border-green-200 bg-green-50/30'
                       : isOverdue
                       ? 'border-red-300 bg-red-50'
-                      : 'border-gray-200 hover:border-blue-300'
+                      : 'border-subtle hover:border-blue-300'
                   }`}
                 >
                   {/* Priority stripe */}
@@ -547,7 +547,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                     task.priority === 'urgent' ? 'bg-red-500' :
                     task.priority === 'high' ? 'bg-orange-400' :
                     task.priority === 'medium' ? 'bg-blue-400' :
-                    'bg-gray-200'
+                    'bg-elevated'
                   }`} />
 
                   <div className="px-3 py-2">
@@ -563,14 +563,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                           {task.status === 'completed' ? (
                             <CheckCircle2 className="w-4 h-4 text-green-500" />
                           ) : (
-                            <Circle className="w-4 h-4 text-gray-400 hover:text-green-500 transition-colors" />
+                            <Circle className="w-4 h-4 text-muted hover:text-green-500 transition-colors" />
                           )}
                         </button>
                       )}
 
                       {/* Title */}
                       <span className={`flex-1 min-w-0 text-sm font-medium leading-tight truncate ${
-                        task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-900'
+                        task.status === 'completed' ? 'line-through text-muted' : 'text-primary'
                       }`}>
                         {task.title}
                       </span>
@@ -581,7 +581,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                           task.priority === 'urgent' ? 'bg-red-100 text-red-700' :
                           task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
                           task.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-500'
+                          'bg-surface text-muted'
                         }`}>
                           <Flag className="w-2.5 h-2.5" />
                           {priority.label}
@@ -593,7 +593,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         )}
                         {task.due_date && (
                           <span className={`px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5 ${
-                            isOverdue ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                            isOverdue ? 'bg-red-100 text-red-700' : 'bg-surface text-muted'
                           }`}>
                             <Calendar className="w-2.5 h-2.5" />
                             {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -611,7 +611,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                           </span>
                         )}
                         {!(task as any).assigned_profile && !(task as any).assigned_department && task.status !== 'completed' && (
-                          <span className="px-1.5 py-0.5 rounded font-medium bg-gray-100 text-gray-600">
+                          <span className="px-1.5 py-0.5 rounded font-medium bg-surface text-secondary">
                             Anyone
                           </span>
                         )}
@@ -624,7 +624,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                       <div className="flex items-center gap-0.5 flex-shrink-0">
                         <button
                           onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                           title="Discuss"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
@@ -632,7 +632,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         {canEdit && (
                           <button
                             onClick={() => { setEditingTask(task); setSelectedLeadId(task.lead_id); setShowForm(true); }}
-                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="Edit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -641,25 +641,25 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         {canDelete && (
                           <button
                             onClick={() => setConfirmDelete({ id: task.id, isDiscussion: isDiscussionTask })}
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            className="p-1 text-muted hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="Delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        {expandedTaskId === task.id ? <ChevronUp className="w-3 h-3 text-gray-400" /> : null}
+                        {expandedTaskId === task.id ? <ChevronUp className="w-3 h-3 text-muted" /> : null}
                       </div>
                     </div>
 
                     {/* Secondary row: context + meta (compact) */}
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 pl-6 text-xs text-gray-400">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 pl-6 text-xs text-muted">
                       {(customerName || lead) && (
                         <span className="text-blue-600 font-medium truncate">
                           {customerName || lead?.company_name || lead?.contact_name}
                         </span>
                       )}
                       {task.profiles?.full_name && (
-                        <span className="text-gray-500">{task.profiles.full_name}</span>
+                        <span className="text-muted">{task.profiles.full_name}</span>
                       )}
                       <span>{createdDateStr}</span>
                       {/* Mobile badges */}
@@ -667,7 +667,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         task.priority === 'urgent' ? 'bg-red-100 text-red-700' :
                         task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
                         task.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-500'
+                        'bg-surface text-muted'
                       }`}>
                         <Flag className="w-2.5 h-2.5" />
                         {priority.label}
@@ -678,14 +678,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                     {/* Description - only shown if task expanded */}
                     {task.description && expandedTaskId === task.id && (
                       <p className={`text-xs mt-1.5 pl-6 leading-relaxed ${
-                        task.status === 'completed' ? 'text-gray-400' : 'text-gray-600'
+                        task.status === 'completed' ? 'text-muted' : 'text-secondary'
                       }`}>
                         {task.description}
                       </p>
                     )}
 
                     {expandedTaskId === task.id && (
-                      <div className="mt-3 pt-3 border-t border-gray-100 space-y-4">
+                      <div className="mt-3 pt-3 border-t border-subtle space-y-4">
                         <TaskWatchers taskId={task.id} />
                         <TaskComments taskId={task.id} />
                       </div>
@@ -720,17 +720,17 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
       {showHelp && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="bg-canvas rounded-xl shadow-2xl w-full max-w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-canvas border-b border-subtle px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <HelpCircle className="w-6 h-6 text-blue-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">Tasks Help & Instructions</h2>
+                <h2 className="text-2xl font-bold text-primary">Tasks Help & Instructions</h2>
               </div>
               <button
                 onClick={() => setShowHelp(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-secondary hover:bg-surface rounded-lg transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -738,34 +738,34 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
             <div className="p-6 space-y-6">
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Plus className="w-5 h-5 text-blue-600" />
                   Creating Tasks
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Click the <span className="font-semibold text-blue-600">New Task</span> button to create a new task. Fill in the title, description, priority, due date, and optionally assign it to a team member or link it to a lead.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Edit2 className="w-5 h-5 text-blue-600" />
                   Editing & Updating Tasks
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Click the <span className="font-semibold">Edit Task</span> button to modify a task. You can update any field including reassigning the task to someone else. Tasks created from Team Pulse discussions are now fully editable.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-blue-600" />
                   Task Discussions & Comments
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Click the <span className="font-semibold">Discuss</span> button on any task to expand the collaboration panel where you can:
                 </p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
                   <li><span className="font-semibold">Add Comments:</span> Share updates, ask questions, or provide feedback</li>
                   <li><span className="font-semibold">Edit Your Comments:</span> Use the edit icon to modify your comments</li>
                   <li><span className="font-semibold">Delete Comments:</span> Remove your own comments if needed</li>
@@ -774,14 +774,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <span className="text-cyan-400 font-bold text-xl">@</span>
                   Mentioning Team Members
                 </h3>
-                <p className="text-gray-700">
-                  Type <span className="font-mono bg-gray-100 px-2 py-1 rounded text-cyan-600">@</span> in any comment to see a dropdown of team members. Select someone to mention them:
+                <p className="text-secondary">
+                  Type <span className="font-mono bg-surface px-2 py-1 rounded text-cyan-600">@</span> in any comment to see a dropdown of team members. Select someone to mention them:
                 </p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
                   <li>Mentioned users receive instant notifications</li>
                   <li>They're automatically added as watchers on the task</li>
                   <li>Mentions are highlighted in cyan for easy visibility</li>
@@ -789,34 +789,34 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Circle className="w-5 h-5 text-blue-600" />
                   Watching Tasks
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Click the <span className="font-semibold">Watch</span> button to follow a task and receive notifications about all updates and comments.
                 </p>
-                <p className="text-gray-700 font-semibold">You're automatically added as a watcher when you:</p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                <p className="text-secondary font-semibold">You're automatically added as a watcher when you:</p>
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
                   <li>Create a task</li>
                   <li>Get assigned to a task</li>
                   <li>Comment on a task</li>
                   <li>Are mentioned in a task or comment</li>
                 </ul>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Click <span className="font-semibold">Unwatch</span> at any time to stop receiving notifications.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Filter className="w-5 h-5 text-blue-600" />
                   Filtering & Viewing
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Use the filter options to find specific tasks:
                 </p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
                   <li><span className="font-semibold">My Tasks:</span> See only tasks you created or are assigned to</li>
                   <li><span className="font-semibold">All Tasks:</span> View all company tasks (if you have permission)</li>
                   <li><span className="font-semibold">Filter by Lead:</span> Show tasks linked to a specific lead</li>
@@ -826,25 +826,25 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
                   Task Status & Completion
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Click <span className="font-semibold text-green-600">Mark as Complete</span> to finish a task, or <span className="font-semibold text-blue-600">Mark as Incomplete</span> to reopen it. Completed tasks show completion time and can be filtered out.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Flag className="w-5 h-5 text-red-600" />
                   Priority Levels
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Set task priority to help your team focus on what matters most:
                 </p>
                 <div className="flex flex-wrap gap-2 ml-4">
-                  <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm font-medium">Low</span>
+                  <span className="px-3 py-1 rounded-full bg-surface text-secondary text-sm font-medium">Low</span>
                   <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">Medium</span>
                   <span className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm font-medium">High</span>
                   <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-medium">Urgent</span>
@@ -862,10 +862,10 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               </section>
             </div>
 
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+            <div className="sticky bottom-0 bg-surface border-t border-subtle px-6 py-4">
               <button
                 onClick={() => setShowHelp(false)}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                className="w-full px-6 py-3 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-semibold"
               >
                 Got it, thanks!
               </button>

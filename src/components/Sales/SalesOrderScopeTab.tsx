@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { supabase } from '../../lib/supabase';
 import { Package, Wrench, Tag, FileText, ChevronDown, ChevronRight, CreditCard as Edit2, Check, X, Plus, Eye, EyeOff, Trash2, Save, Lock, Receipt, TrendingDown, TrendingUp, Percent as PercentIcon, GripVertical, Columns2 as Columns, Wifi, WifiOff, Loader2, Pencil, ListChecks } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
@@ -947,7 +947,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           </div>
 
           {/* Portal content — scrollable */}
-          <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div data-theme-fixed data-theme="light" className="flex-1 overflow-y-auto bg-gray-50">
             <PortalProposalDetail
               proposalId={order.proposal_id}
               onBack={() => setShowPortalPreview(false)}

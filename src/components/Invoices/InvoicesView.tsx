@@ -200,7 +200,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading invoices...</p>
+          <p className="text-muted">Loading invoices...</p>
         </div>
       </div>
     );
@@ -210,13 +210,13 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white">Invoices</h2>
-          <p className="text-sm sm:text-base text-gray-300">Manage customer invoices and payments</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-primary">Invoices</h2>
+          <p className="text-sm sm:text-base text-muted">Manage customer invoices and payments</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowSelectCustomer(true)}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-green-600 text-primary rounded-lg hover:bg-green-700 active:bg-green-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
           >
             <DollarSign className="w-4 h-4" />
             <span className="hidden sm:inline">Apply Payment</span>
@@ -224,7 +224,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           </button>
           <button
             onClick={() => setShowCreateFromWorkOrderModal(true)}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 active:bg-teal-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-teal-600 text-primary rounded-lg hover:bg-teal-700 active:bg-teal-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
           >
             <Wrench className="w-4 h-4" />
             <span className="hidden sm:inline">From Work Order</span>
@@ -232,7 +232,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Create Invoice</span>
@@ -324,7 +324,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
               {!searchTerm && statusFilter === 'all' && (
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Create Invoice
@@ -371,7 +371,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                         <OpenedCell stats={openStats[invoice.id]} />
                       </div>
                     )}
-                    <div className="flex items-center justify-end gap-1 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1 pt-2 border-t border-subtle" onClick={(e) => e.stopPropagation()}>
                       {invoice.status !== 'paid' && (
                         <button onClick={(e) => { e.stopPropagation(); setRecordingPaymentInvoice(invoice); }} className="p-2 text-green-600 hover:bg-green-50 rounded-lg touch-manipulation" aria-label="Record Payment">
                           <DollarSign className="w-4 h-4" />
@@ -608,7 +608,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
               <button
                 onClick={confirmAndSend}
                 disabled={!sendEmailOverride.trim()}
-                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2 transition-colors"
               >
                 <Send className="w-4 h-4" />
                 Send Email
@@ -619,7 +619,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
       )}
 
       {sendSuccess && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-4">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-green-600 text-primary px-5 py-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-4">
           <CheckCircle className="w-5 h-5 flex-shrink-0" />
           <span className="text-sm font-medium">Invoice {sendSuccess} sent successfully</span>
         </div>

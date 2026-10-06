@@ -1129,9 +1129,9 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         meeting: 'text-green-600 bg-green-50',
         site_visit: 'text-cyan-600 bg-cyan-50',
         casual_conversation: 'text-teal-600 bg-teal-50',
-        other: 'text-gray-600 bg-gray-50'
+        other: 'text-secondary bg-surface'
       };
-      return connectionColors[connectionType] || 'text-gray-600 bg-gray-50';
+      return connectionColors[connectionType] || 'text-secondary bg-surface';
     }
 
     // For other activity types
@@ -1140,9 +1140,9 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       proposal_created: 'text-emerald-600 bg-emerald-50',
       proposal_updated: 'text-blue-600 bg-blue-50',
       lead_created: 'text-orange-600 bg-orange-50',
-      lead_updated: 'text-gray-600 bg-gray-50'
+      lead_updated: 'text-secondary bg-surface'
     };
-    return colors[type] || 'text-gray-600 bg-gray-50';
+    return colors[type] || 'text-secondary bg-surface';
   }
 
   function getDaysRemaining(): number {
@@ -1311,14 +1311,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-900/30 mb-4">
             <AlertCircle className="w-8 h-8 text-red-400" />
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Failed to Load Dashboard</h2>
-          <p className="text-gray-400 mb-6">{loadError}</p>
+          <h2 className="text-xl font-semibold text-primary mb-2">Failed to Load Dashboard</h2>
+          <p className="text-muted mb-6">{loadError}</p>
           <button
             onClick={() => {
               setLoadError(null);
               loadDashboardData();
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Try Again
@@ -1331,7 +1331,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading your dashboard...</div>
+        <div className="text-muted">Loading your dashboard...</div>
       </div>
     );
   }
@@ -1349,14 +1349,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">
+            <h1 className="text-2xl font-bold text-primary mb-1">
               {viewingRepName
                 ? `${viewingRepName}'s Dashboard`
                 : isComparingMultiple
                 ? 'Rep Comparison'
                 : 'My Sales Dashboard'}
             </h1>
-            <p className="text-gray-300">
+            <p className="text-muted">
               {viewingRepName
                 ? 'Viewing this rep\'s performance stats'
                 : isComparingMultiple
@@ -1367,7 +1367,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           <button
             onClick={loadDashboardData}
             disabled={refreshing}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors disabled:opacity-50 sm:w-auto w-full"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-canvas/10 hover:bg-canvas/20 text-primary rounded-lg transition-colors disabled:opacity-50 sm:w-auto w-full"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -1388,21 +1388,21 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               onClick={() => handleDateRangeChange(option.value)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 dateRange === option.value
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
+                  ? 'bg-blue-600 text-primary shadow-md'
+                  : 'bg-canvas text-muted hover:bg-elevated border border-strong'
               }`}
             >
               {option.label}
             </button>
           ))}
           {isAdmin && (
-            <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-xl p-1 ml-auto">
+            <div className="flex gap-1 bg-canvas border border-strong rounded-xl p-1 ml-auto">
               <button
                 onClick={() => setActiveView('dashboard')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   activeView === 'dashboard'
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                    ? 'bg-blue-600 text-primary shadow'
+                    : 'text-muted hover:text-primary hover:bg-elevated'
                 }`}
               >
                 <BarChart3 className="w-4 h-4" />
@@ -1412,8 +1412,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 onClick={() => setActiveView('offices')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   activeView === 'offices'
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                    ? 'bg-blue-600 text-primary shadow'
+                    : 'text-muted hover:text-primary hover:bg-elevated'
                 }`}
               >
                 <Building2 className="w-4 h-4" />
@@ -1435,9 +1435,9 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       {/* Rep Selector — visible to admin/manager/sales_manager only */}
       {isAdmin && salesRepsForSelector.length > 0 && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 px-4 py-3">
+        <div className="bg-canvas rounded-xl border border-strong px-4 py-3">
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium shrink-0">
+            <div className="flex items-center gap-1.5 text-xs text-muted font-medium shrink-0">
               <Users className="w-3.5 h-3.5" />
               <span>View Rep:</span>
             </div>
@@ -1445,8 +1445,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               onClick={clearRepSelection}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                 selectedRepIds.length === 0
-                  ? 'bg-gray-600 border-gray-500 text-white'
-                  : 'bg-transparent border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300'
+                  ? 'bg-elevated border-strong text-primary'
+                  : 'bg-transparent border-strong text-muted hover:border-strong hover:text-muted'
               }`}
             >
               My Stats
@@ -1460,7 +1460,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   onClick={() => toggleRepSelection(rep.id)}
                   title={rep.display_name}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                    selected ? 'text-white' : 'bg-transparent text-gray-400 hover:text-gray-200'
+                    selected ? 'text-primary' : 'bg-transparent text-muted hover:text-muted'
                   }`}
                   style={
                     selected
@@ -1473,7 +1473,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               );
             })}
             {selectedRepIds.length > 0 && (
-              <span className="ml-auto text-xs text-gray-500">
+              <span className="ml-auto text-xs text-muted">
                 {selectedRepIds.length === 1
                   ? `Viewing ${viewingRepName}`
                   : `Comparing ${selectedRepIds.length} reps`}
@@ -1501,24 +1501,24 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       {viewingRepId && repPerfMetrics ? (
         <div className="space-y-4">
           {repMonthlyStatsLoading ? (
-            <div className="bg-gray-800 rounded-xl border border-gray-700 p-8 flex items-center justify-center">
-              <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mr-2" />
-              <span className="text-gray-400">Loading performance data…</span>
+            <div className="bg-canvas rounded-xl border border-strong p-8 flex items-center justify-center">
+              <RefreshCw className="w-5 h-5 text-muted animate-spin mr-2" />
+              <span className="text-muted">Loading performance data…</span>
             </div>
           ) : (
             <>
               {/* Top KPI Row */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* This Month */}
-                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-1">
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">This Month</div>
-                  <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                <div className="bg-canvas rounded-xl border border-strong p-5 flex flex-col gap-1">
+                  <div className="text-xs text-muted font-medium uppercase tracking-wide">This Month</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-primary tabular-nums">
                     {formatCurrency(repPerfMetrics.thisMonthTotal)}
                   </div>
                   {repPerfMetrics.monthVsLastMonthPct !== null && (
                     <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${
                       repPerfMetrics.monthVsLastMonthPct > 0 ? 'text-green-400' :
-                      repPerfMetrics.monthVsLastMonthPct < 0 ? 'text-red-400' : 'text-gray-400'
+                      repPerfMetrics.monthVsLastMonthPct < 0 ? 'text-red-400' : 'text-muted'
                     }`}>
                       {repPerfMetrics.monthVsLastMonthPct > 0
                         ? <TrendingUp className="w-3 h-3" />
@@ -1531,17 +1531,17 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 </div>
 
                 {/* This Year YTD */}
-                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-1">
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                <div className="bg-canvas rounded-xl border border-strong p-5 flex flex-col gap-1">
+                  <div className="text-xs text-muted font-medium uppercase tracking-wide">
                     {new Date().getFullYear()} YTD
                   </div>
-                  <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                  <div className="text-2xl sm:text-3xl font-bold text-primary tabular-nums">
                     {formatCurrency(repPerfMetrics.ytdTotal)}
                   </div>
                   {repPerfMetrics.ytdVsPriorPct !== null && (
                     <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${
                       repPerfMetrics.ytdVsPriorDir === 'up' ? 'text-green-400' :
-                      repPerfMetrics.ytdVsPriorDir === 'down' ? 'text-red-400' : 'text-gray-400'
+                      repPerfMetrics.ytdVsPriorDir === 'down' ? 'text-red-400' : 'text-muted'
                     }`}>
                       {repPerfMetrics.ytdVsPriorDir === 'up'
                         ? <TrendingUp className="w-3 h-3" />
@@ -1554,29 +1554,29 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 </div>
 
                 {/* Last Year Full */}
-                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-1">
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                <div className="bg-canvas rounded-xl border border-strong p-5 flex flex-col gap-1">
+                  <div className="text-xs text-muted font-medium uppercase tracking-wide">
                     {new Date().getFullYear() - 1} Full Year
                   </div>
-                  <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                  <div className="text-2xl sm:text-3xl font-bold text-primary tabular-nums">
                     {formatCurrency(repPerfMetrics.prevYearFull)}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-muted mt-1">
                     vs {formatCurrency(repPerfMetrics.prevYearSamePeriod)} same period
                   </div>
                 </div>
 
                 {/* Annual Quota Progress */}
-                <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-2">
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                <div className="bg-canvas rounded-xl border border-strong p-5 flex flex-col gap-2">
+                  <div className="text-xs text-muted font-medium uppercase tracking-wide">
                     {new Date().getFullYear()} Quota Progress
                   </div>
                   {repQuota > 0 ? (
                     <>
-                      <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+                      <div className="text-2xl sm:text-3xl font-bold text-primary tabular-nums">
                         {repPerfMetrics.quotaProgress ?? 0}%
                       </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2.5">
+                      <div className="w-full bg-elevated rounded-full h-2.5">
                         <div
                           className={`h-2.5 rounded-full transition-all duration-700 ${
                             (repPerfMetrics.quotaProgress || 0) >= 100 ? 'bg-green-500' :
@@ -1586,19 +1586,19 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                           style={{ width: `${Math.min(repPerfMetrics.quotaProgress || 0, 100)}%` }}
                         />
                       </div>
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-muted">
                         {formatCurrency(repPerfMetrics.ytdTotal)} of {formatCurrency(repQuota)}
                       </div>
                     </>
                   ) : (
-                    <div className="text-sm text-gray-500 mt-1">No quota set</div>
+                    <div className="text-sm text-muted mt-1">No quota set</div>
                   )}
                 </div>
               </div>
 
               {/* Rolling Trend Indicators */}
-              <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-                <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+              <div className="bg-canvas rounded-xl border border-strong p-5">
+                <h3 className="text-sm font-semibold text-muted mb-4 flex items-center gap-2">
                   <Activity className="w-4 h-4 text-blue-400" />
                   Rolling Sales Trend
                 </h3>
@@ -1609,21 +1609,21 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                     { label: '12-Month', data: repPerfMetrics.rolling12 },
                   ] as const).map(({ label, data }) => (
                     <div key={label} className="text-center">
-                      <div className="text-xs text-gray-500 mb-1">{label}</div>
-                      <div className="text-lg font-bold text-white tabular-nums">
+                      <div className="text-xs text-muted mb-1">{label}</div>
+                      <div className="text-lg font-bold text-primary tabular-nums">
                         {formatCurrency(data.total)}
                       </div>
                       {data.pct !== null ? (
                         <div className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded mt-1 ${
                           data.dir === 'up' ? 'bg-green-500/20 text-green-400' :
                           data.dir === 'down' ? 'bg-red-500/20 text-red-400' :
-                          'bg-gray-700 text-gray-400'
+                          'bg-elevated text-muted'
                         }`}>
                           {data.dir === 'up' ? <TrendingUp className="w-3 h-3" /> : data.dir === 'down' ? <TrendingDown className="w-3 h-3" /> : null}
                           {data.pct > 0 ? '+' : ''}{data.pct}% vs prior
                         </div>
                       ) : (
-                        <div className="text-xs text-gray-600 mt-1">No prior data</div>
+                        <div className="text-xs text-secondary mt-1">No prior data</div>
                       )}
                     </div>
                   ))}
@@ -1631,8 +1631,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               </div>
 
               {/* 24-Month Bar Chart */}
-              <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-                <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+              <div className="bg-canvas rounded-xl border border-strong p-5">
+                <h3 className="text-sm font-semibold text-muted mb-4 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-blue-400" />
                   Last 24 Months
                 </h3>
@@ -1648,13 +1648,13 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                                 ? 'bg-blue-500'
                                 : bar.aboveAvg
                                 ? 'bg-emerald-500/70 group-hover:bg-emerald-400'
-                                : 'bg-gray-600 group-hover:bg-gray-500'
+                                : 'bg-elevated group-hover:bg-elevated'
                             }`}
                             style={{ height: `${Math.max((bar.total / maxVal) * 100, bar.total > 0 ? 3 : 0)}%` }}
                           />
                           {/* Tooltip */}
                           <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
-                            <div className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white whitespace-nowrap shadow-lg">
+                            <div className="bg-canvas border border-strong rounded px-2 py-1 text-xs text-primary whitespace-nowrap shadow-lg">
                               <div className="font-semibold">{bar.label}</div>
                               <div>{formatCurrency(bar.total)}</div>
                             </div>
@@ -1666,14 +1666,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 })() : (
                   <div className="h-36 flex items-center justify-center text-center">
                     <div>
-                      <BarChart3 className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">No sales recorded in the last 24 months</p>
+                      <BarChart3 className="w-8 h-8 text-secondary mx-auto mb-2" />
+                      <p className="text-sm text-muted">No sales recorded in the last 24 months</p>
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                <div className="flex items-center gap-4 mt-3 text-xs text-muted">
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500/70 inline-block" /> Above avg</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-gray-600 inline-block" /> Below avg</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-elevated inline-block" /> Below avg</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" /> Current month</span>
                 </div>
               </div>
@@ -1681,27 +1681,27 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               {/* Year-by-Year Cards + Peak Stats */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Year cards */}
-                <div className="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700 p-5">
-                  <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                <div className="lg:col-span-2 bg-canvas rounded-xl border border-strong p-5">
+                  <h3 className="text-sm font-semibold text-muted mb-4 flex items-center gap-2">
                     <BarChart3 className="w-4 h-4 text-blue-400" />
                     Year-over-Year
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
                     {repYearCards.map(card => (
-                      <div key={card.year} className="bg-gray-900/60 rounded-lg p-3">
-                        <div className="text-xs text-gray-400 mb-1">{card.year}</div>
-                        <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(card.total)}</div>
+                      <div key={card.year} className="bg-canvas rounded-lg p-3">
+                        <div className="text-xs text-muted mb-1">{card.year}</div>
+                        <div className="text-lg font-bold text-primary tabular-nums">{formatCurrency(card.total)}</div>
                         {card.yoy !== null ? (
                           <div className={`inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded mt-1.5 ${
                             card.dir === 'up' ? 'bg-green-500/20 text-green-400' :
                             card.dir === 'down' ? 'bg-red-500/20 text-red-400' :
-                            'bg-gray-700 text-gray-400'
+                            'bg-elevated text-muted'
                           }`}>
                             {card.dir === 'up' ? <TrendingUp className="w-3 h-3" /> : card.dir === 'down' ? <TrendingDown className="w-3 h-3" /> : null}
                             {card.yoy > 0 ? '+' : ''}{card.yoy}%
                           </div>
                         ) : (
-                          <div className="text-xs text-gray-600 mt-1.5">Baseline</div>
+                          <div className="text-xs text-secondary mt-1.5">Baseline</div>
                         )}
                       </div>
                     ))}
@@ -1710,36 +1710,36 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
                 {/* Peak / career stats */}
                 {repPeakStats && repPerfMetrics && (
-                  <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex flex-col gap-4">
-                    <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                  <div className="bg-canvas rounded-xl border border-strong p-5 flex flex-col gap-4">
+                    <h3 className="text-sm font-semibold text-muted flex items-center gap-2">
                       <Star className="w-4 h-4 text-yellow-400" />
                       Career Highlights
                     </h3>
                     <div>
-                      <div className="text-xs text-gray-500 mb-0.5">Best Single Month</div>
-                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPeakStats.bestMonth.total)}</div>
-                      <div className="text-xs text-gray-400">{repPeakStats.bestMonth.month} {repPeakStats.bestMonth.year}</div>
+                      <div className="text-xs text-muted mb-0.5">Best Single Month</div>
+                      <div className="text-lg font-bold text-primary tabular-nums">{formatCurrency(repPeakStats.bestMonth.total)}</div>
+                      <div className="text-xs text-muted">{repPeakStats.bestMonth.month} {repPeakStats.bestMonth.year}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-0.5">Best Full Year</div>
-                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPeakStats.bestYear.total)}</div>
-                      <div className="text-xs text-gray-400">{repPeakStats.bestYear.year}</div>
+                      <div className="text-xs text-muted mb-0.5">Best Full Year</div>
+                      <div className="text-lg font-bold text-primary tabular-nums">{formatCurrency(repPeakStats.bestYear.total)}</div>
+                      <div className="text-xs text-muted">{repPeakStats.bestYear.year}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-0.5">Career Monthly Avg</div>
-                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPeakStats.careerAvg)}</div>
-                      <div className="text-xs text-gray-400">over {repPeakStats.monthsOfData} months</div>
+                      <div className="text-xs text-muted mb-0.5">Career Monthly Avg</div>
+                      <div className="text-lg font-bold text-primary tabular-nums">{formatCurrency(repPeakStats.careerAvg)}</div>
+                      <div className="text-xs text-muted">over {repPeakStats.monthsOfData} months</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-0.5">All-Time Total</div>
-                      <div className="text-lg font-bold text-white tabular-nums">{formatCurrency(repPerfMetrics.allTimeTotal)}</div>
+                      <div className="text-xs text-muted mb-0.5">All-Time Total</div>
+                      <div className="text-lg font-bold text-primary tabular-nums">{formatCurrency(repPerfMetrics.allTimeTotal)}</div>
                     </div>
                   </div>
                 )}
 
                 {/* Goal Progress Card for viewed rep */}
                 {repPerfMetrics && (
-                  <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl border border-blue-500/30 p-5 flex flex-col gap-3 text-white">
+                  <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl border border-blue-500/30 p-5 flex flex-col gap-3 text-primary">
                     <h3 className="text-sm font-semibold flex items-center gap-2">
                       <Target className="w-4 h-4 text-blue-300" />
                       Goal Progress — {repPerfMetrics.repName}
@@ -1786,7 +1786,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       ) : !viewingRepId ? (
         <>
       {/* Monthly Goal Hero Card */}
-      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl p-4 sm:p-6 text-white shadow-lg">
+      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl p-4 sm:p-6 text-primary shadow-lg">
         <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
           <div>
             <h2 className="text-base sm:text-lg font-semibold mb-1 flex items-center gap-2">
@@ -1798,7 +1798,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
             )}
           </div>
           {teamRank && (
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
+            <div className="bg-canvas/20 backdrop-blur-sm rounded-lg px-3 py-2">
               <div className="text-2xl font-bold">#{teamRank.rank}</div>
               <div className="text-xs text-blue-100">of {teamRank.total}</div>
             </div>
@@ -1832,13 +1832,13 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
             <span className="text-blue-100">Progress</span>
             <span className="font-bold">{metrics.targetProgress}%</span>
           </div>
-          <div className="w-full bg-white/20 rounded-full h-3">
+          <div className="w-full bg-canvas/20 rounded-full h-3">
             <div
               className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
               style={{ width: `${Math.min(metrics.targetProgress, 100)}%` }}
             >
               {metrics.targetProgress >= 10 && (
-                <Sparkles className="w-3 h-3 text-white" />
+                <Sparkles className="w-3 h-3 text-primary" />
               )}
             </div>
           </div>
@@ -1875,13 +1875,13 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       {/* Multi-Rep Comparison Grid — shown when 2+ reps selected */}
       {isComparingMultiple && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+        <div className="bg-canvas rounded-xl border border-strong p-5">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-blue-400" />
-            <h2 className="text-base font-bold text-white">Rep Comparison — {getDateRangeLabel()}</h2>
+            <h2 className="text-base font-bold text-primary">Rep Comparison — {getDateRangeLabel()}</h2>
             {repComparisonLoading && (
               <div className="ml-auto">
-                <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+                <RefreshCw className="w-4 h-4 text-muted animate-spin" />
               </div>
             )}
           </div>
@@ -1895,42 +1895,42 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 return (
                   <div
                     key={rep.repId}
-                    className="bg-gray-900/60 rounded-lg border border-gray-700/60 p-4 flex flex-col gap-3"
+                    className="bg-canvas rounded-lg border border-strong p-4 flex flex-col gap-3"
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                      <span className="font-semibold text-white text-sm truncate">{rep.name}</span>
+                      <span className="font-semibold text-primary text-sm truncate">{rep.name}</span>
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <div className="text-xs text-gray-500 mb-0.5">Sales Orders</div>
-                        <div className="text-xl font-bold text-white tabular-nums">
+                        <div className="text-xs text-muted mb-0.5">Sales Orders</div>
+                        <div className="text-xl font-bold text-primary tabular-nums">
                           {formatCurrency(rep.salesOrdersRevenue)}
                         </div>
-                        <div className="text-xs text-gray-400">{rep.salesOrdersCount} orders</div>
+                        <div className="text-xs text-muted">{rep.salesOrdersCount} orders</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500 mb-0.5">Proposals Out</div>
+                        <div className="text-xs text-muted mb-0.5">Proposals Out</div>
                         <div className="text-lg font-bold text-blue-400 tabular-nums">{rep.proposalsOut}</div>
                       </div>
                       {rep.monthlyTarget > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <div className="text-xs text-gray-500">Target Progress</div>
+                            <div className="text-xs text-muted">Target Progress</div>
                             <div className="text-xs font-semibold" style={{ color }}>{rep.targetProgress}%</div>
                           </div>
-                          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-2 bg-elevated rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full transition-all duration-700"
                               style={{ width: `${progressClamped}%`, backgroundColor: color }}
                             />
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">of {formatCurrency(rep.monthlyTarget)}/mo</div>
+                          <div className="text-xs text-muted mt-1">of {formatCurrency(rep.monthlyTarget)}/mo</div>
                         </div>
                       )}
                       <div>
-                        <div className="text-xs text-gray-500 mb-0.5">Win Rate</div>
-                        <div className={`text-lg font-bold tabular-nums ${rep.winRate >= 50 ? 'text-green-400' : rep.winRate >= 25 ? 'text-yellow-400' : 'text-gray-300'}`}>
+                        <div className="text-xs text-muted mb-0.5">Win Rate</div>
+                        <div className={`text-lg font-bold tabular-nums ${rep.winRate >= 50 ? 'text-green-400' : rep.winRate >= 25 ? 'text-yellow-400' : 'text-muted'}`}>
                           {rep.winRate}%
                         </div>
                       </div>
@@ -1940,14 +1940,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               })}
             </div>
           ) : !repComparisonLoading ? (
-            <div className="text-center py-8 text-gray-500 text-sm">No data for the selected period.</div>
+            <div className="text-center py-8 text-muted text-sm">No data for the selected period.</div>
           ) : null}
         </div>
       )}
 
       {/* Key Performance Indicators */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white shadow-md">
+        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-primary shadow-md">
           <div className="flex items-center justify-between mb-2">
             <DollarSign className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
             <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 opacity-60" />
@@ -1957,7 +1957,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           <div className="text-xs text-green-200 mt-1 opacity-80">{metrics.proposalsOut} out with customers</div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white shadow-md">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-primary shadow-md">
           <div className="flex items-center justify-between mb-2">
             <ShoppingCart className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
             <span className="text-xl sm:text-2xl font-bold opacity-60">{metrics.salesOrdersCount}</span>
@@ -1967,7 +1967,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           <div className="text-xs text-blue-200 mt-1 opacity-80">{metrics.salesOrdersActive} active · {metrics.salesOrdersCompleted} completed</div>
         </div>
 
-        <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg p-4 text-white shadow-md">
+        <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg p-4 text-primary shadow-md">
           <div className="flex items-center justify-between mb-2">
             <FileText className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
             <span className="text-xl sm:text-2xl font-bold opacity-60">{metrics.proposalsCreated}</span>
@@ -1977,7 +1977,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           <div className="text-xs text-teal-200 mt-1 opacity-80">{metrics.proposalsCreated} created this period</div>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-white shadow-md">
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-primary shadow-md">
           <div className="flex items-center justify-between mb-2">
             <BarChart3 className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
             <span className="text-xl sm:text-2xl font-bold opacity-60">{metrics.winRate}%</span>
@@ -1990,7 +1990,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       {/* Average Sale & Profit Margin KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg p-4 text-white shadow-md">
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg p-4 text-primary shadow-md">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <DollarSign className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
@@ -2005,19 +2005,19 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           <div className="text-xs text-emerald-200 mt-1 opacity-80">{salesKpis.salesOrderCount} orders</div>
         </div>
 
-        <div className={`bg-gradient-to-br ${salesKpis.averageMarginPct >= 40 ? 'from-green-500 to-green-600' : salesKpis.averageMarginPct >= 25 ? 'from-amber-500 to-amber-600' : 'from-red-500 to-red-600'} rounded-lg p-4 text-white shadow-md`}>
+        <div className={`bg-gradient-to-br ${salesKpis.averageMarginPct >= 40 ? 'from-green-500 to-green-600' : salesKpis.averageMarginPct >= 25 ? 'from-amber-500 to-amber-600' : 'from-red-500 to-red-600'} rounded-lg p-4 text-primary shadow-md`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Percent className="w-7 h-7 sm:w-8 sm:h-8 opacity-80" />
-              <span className="text-sm font-medium text-white/90">Avg Profit Margin</span>
+              <span className="text-sm font-medium text-primary/90">Avg Profit Margin</span>
             </div>
             <TrendingUpIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-60" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold mb-1 tabular-nums">
             {salesKpisLoading ? '...' : `${salesKpis.averageMarginPct.toFixed(1)}%`}
           </div>
-          <div className="text-xs text-white/80">Avg Margin Across Sales Orders — {getDateRangeLabel()}</div>
-          <div className="text-xs text-white/70 mt-1 opacity-80">
+          <div className="text-xs text-primary/80">Avg Margin Across Sales Orders — {getDateRangeLabel()}</div>
+          <div className="text-xs text-primary/70 mt-1 opacity-80">
             {salesKpis.averageMarginPct >= 40 ? 'Above target' : salesKpis.averageMarginPct >= 25 ? 'Near target' : 'Below target'}
           </div>
         </div>
@@ -2030,52 +2030,52 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       <StaffSalesComparison filteredRepIds={selectedRepIds.length > 0 ? selectedRepIds : undefined} />
 
       {/* Proposals & Sales Orders Volume */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+      <div className="bg-canvas rounded-xl border border-strong p-5">
         <div className="flex items-center gap-2 mb-4">
           <Layers className="w-5 h-5 text-blue-400" />
-          <h2 className="text-base font-bold text-white">Activity & Volume — {getDateRangeLabel()}</h2>
+          <h2 className="text-base font-bold text-primary">Activity & Volume — {getDateRangeLabel()}</h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-3">
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Proposals</div>
-            <div className="text-2xl font-bold text-white tabular-nums">{metrics.proposalsCreated}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><FileText className="w-3 h-3" />Created</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Proposals</div>
+            <div className="text-2xl font-bold text-primary tabular-nums">{metrics.proposalsCreated}</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><FileText className="w-3 h-3" />Created</div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">With Customer</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">With Customer</div>
             <div className="text-2xl font-bold text-blue-400 tabular-nums">{metrics.proposalsOut}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Eye className="w-3 h-3" />Sent/Viewed</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><Eye className="w-3 h-3" />Sent/Viewed</div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Win Rate</div>
-            <div className={`text-2xl font-bold tabular-nums ${metrics.winRate >= 50 ? 'text-green-400' : metrics.winRate >= 25 ? 'text-yellow-400' : 'text-gray-300'}`}>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Win Rate</div>
+            <div className={`text-2xl font-bold tabular-nums ${metrics.winRate >= 50 ? 'text-green-400' : metrics.winRate >= 25 ? 'text-yellow-400' : 'text-muted'}`}>
               {metrics.winRate}%
             </div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Won / Closed</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Won / Closed</div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Sales Orders</div>
-            <div className="text-2xl font-bold text-white tabular-nums">{metrics.salesOrdersCount}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><ShoppingCart className="w-3 h-3" />Booked</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Sales Orders</div>
+            <div className="text-2xl font-bold text-primary tabular-nums">{metrics.salesOrdersCount}</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><ShoppingCart className="w-3 h-3" />Booked</div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Active Orders</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Active Orders</div>
             <div className="text-2xl font-bold text-teal-400 tabular-nums">{metrics.salesOrdersActive}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><ClipboardList className="w-3 h-3" />In Progress</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><ClipboardList className="w-3 h-3" />In Progress</div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Contracted</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Contracted</div>
             <div className="text-lg font-bold text-green-400 tabular-nums leading-tight">{formatCurrency(metrics.salesOrdersRevenue)}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><DollarSign className="w-3 h-3" />Revenue</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><DollarSign className="w-3 h-3" />Revenue</div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Expired</div>
-            <div className={`text-2xl font-bold tabular-nums ${metrics.proposalsExpired > 0 ? 'text-orange-400' : 'text-gray-500'}`}>{metrics.proposalsExpired}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />Proposals</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Expired</div>
+            <div className={`text-2xl font-bold tabular-nums ${metrics.proposalsExpired > 0 ? 'text-orange-400' : 'text-muted'}`}>{metrics.proposalsExpired}</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />Proposals</div>
           </div>
           <div className="bg-rose-950/30 rounded-lg p-3 border border-rose-900/40">
             <div className="text-xs text-rose-400/70 uppercase tracking-wide mb-1">Declined</div>
-            <div className={`text-2xl font-bold tabular-nums ${(metrics.proposalsDeclined + metrics.proposalsCancelled) > 0 ? 'text-rose-400' : 'text-gray-500'}`}>
+            <div className={`text-2xl font-bold tabular-nums ${(metrics.proposalsDeclined + metrics.proposalsCancelled) > 0 ? 'text-rose-400' : 'text-muted'}`}>
               {metrics.proposalsDeclined + metrics.proposalsCancelled}
             </div>
             <div className="text-xs text-rose-400/50 mt-1 flex items-center gap-1">
@@ -2083,40 +2083,40 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               {metrics.proposalsDeclined} declined · {metrics.proposalsCancelled} cancelled
             </div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Contacts</div>
-            <div className="text-2xl font-bold text-white tabular-nums">{metrics.contactsAdded}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Users className="w-3 h-3" />Added</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Contacts</div>
+            <div className="text-2xl font-bold text-primary tabular-nums">{metrics.contactsAdded}</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><Users className="w-3 h-3" />Added</div>
           </div>
-          <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Connections</div>
-            <div className="text-2xl font-bold text-white tabular-nums">{metrics.connectionsLogged}</div>
-            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Logged</div>
+          <div className="bg-canvas rounded-lg p-3 border border-strong">
+            <div className="text-xs text-muted uppercase tracking-wide mb-1">Connections</div>
+            <div className="text-2xl font-bold text-primary tabular-nums">{metrics.connectionsLogged}</div>
+            <div className="text-xs text-muted mt-1 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Logged</div>
           </div>
         </div>
 
         {/* Volume bar: proposal funnel */}
         {metrics.proposalsCreated > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-700/50">
-            <div className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Proposal Funnel</div>
+          <div className="mt-4 pt-4 border-t border-strong">
+            <div className="text-xs text-muted mb-2 uppercase tracking-wide">Proposal Funnel</div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-gray-500" />
-                <span className="text-xs text-gray-400">{metrics.proposalsCreated} created</span>
+                <div className="w-2.5 h-2.5 rounded-full bg-elevated" />
+                <span className="text-xs text-muted">{metrics.proposalsCreated} created</span>
               </div>
-              <ArrowRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
+              <ArrowRight className="w-3 h-3 text-secondary flex-shrink-0" />
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                <span className="text-xs text-gray-400">{metrics.proposalsOut} with customer</span>
+                <span className="text-xs text-muted">{metrics.proposalsOut} with customer</span>
               </div>
-              <ArrowRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
+              <ArrowRight className="w-3 h-3 text-secondary flex-shrink-0" />
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                <span className="text-xs text-gray-400">{metrics.salesOrdersCount} sales orders</span>
+                <span className="text-xs text-muted">{metrics.salesOrdersCount} sales orders</span>
               </div>
               {metrics.proposalsExpired > 0 && (
                 <>
-                  <ArrowRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
+                  <ArrowRight className="w-3 h-3 text-secondary flex-shrink-0" />
                   <div className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
                     <span className="text-xs text-orange-400">{metrics.proposalsExpired} expired</span>
@@ -2125,7 +2125,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               )}
               {(metrics.proposalsDeclined + metrics.proposalsCancelled) > 0 && (
                 <>
-                  <ArrowRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
+                  <ArrowRight className="w-3 h-3 text-secondary flex-shrink-0" />
                   <div className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
                     <span className="text-xs text-rose-400">{metrics.proposalsDeclined + metrics.proposalsCancelled} lost</span>
@@ -2142,23 +2142,23 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
             </div>
             {/* Funnel bar */}
             <div className="mt-2 space-y-1.5">
-              <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div className="absolute inset-y-0 left-0 bg-gray-500 rounded-full" style={{ width: '100%' }} />
+              <div className="relative h-2 bg-elevated rounded-full overflow-hidden">
+                <div className="absolute inset-y-0 left-0 bg-elevated rounded-full" style={{ width: '100%' }} />
               </div>
-              <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div className="relative h-2 bg-elevated rounded-full overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 bg-blue-500 rounded-full transition-all duration-700"
                   style={{ width: `${metrics.proposalsCreated > 0 ? Math.min(100, (metrics.proposalsOut / metrics.proposalsCreated) * 100) : 0}%` }}
                 />
               </div>
-              <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div className="relative h-2 bg-elevated rounded-full overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 bg-green-500 rounded-full transition-all duration-700"
                   style={{ width: `${metrics.proposalsCreated > 0 ? Math.min(100, (metrics.salesOrdersCount / metrics.proposalsCreated) * 100) : 0}%` }}
                 />
               </div>
               {metrics.proposalsExpired > 0 && (
-                <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div className="relative h-2 bg-elevated rounded-full overflow-hidden">
                   <div
                     className="absolute inset-y-0 left-0 bg-orange-500 rounded-full transition-all duration-700"
                     style={{ width: `${metrics.proposalsCreated > 0 ? Math.min(100, (metrics.proposalsExpired / metrics.proposalsCreated) * 100) : 0}%` }}
@@ -2166,7 +2166,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 </div>
               )}
               {(metrics.proposalsDeclined + metrics.proposalsCancelled) > 0 && (
-                <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div className="relative h-2 bg-elevated rounded-full overflow-hidden">
                   <div
                     className="absolute inset-y-0 left-0 bg-rose-600 rounded-full transition-all duration-700"
                     style={{ width: `${metrics.proposalsCreated > 0 ? Math.min(100, ((metrics.proposalsDeclined + metrics.proposalsCancelled) / metrics.proposalsCreated) * 100) : 0}%` }}
@@ -2180,11 +2180,11 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       {/* Decline / Lost Deals Breakdown */}
       {declineBreakdown.length > 0 && (
-        <div className="bg-gray-800 rounded-xl border border-rose-900/40 p-5">
+        <div className="bg-canvas rounded-xl border border-rose-900/40 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Ban className="w-5 h-5 text-rose-400" />
-            <h2 className="text-base font-bold text-white">Lost Deals Breakdown — {getDateRangeLabel()}</h2>
-            <span className="ml-auto text-xs text-gray-500">
+            <h2 className="text-base font-bold text-primary">Lost Deals Breakdown — {getDateRangeLabel()}</h2>
+            <span className="ml-auto text-xs text-muted">
               {metrics.proposalsDeclined} declined · {metrics.proposalsCancelled} cancelled
             </span>
           </div>
@@ -2197,7 +2197,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               return (
                 <div key={item.reason} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className={`font-medium ${isSensitive ? 'text-rose-300' : 'text-gray-300'}`}>
+                    <span className={`font-medium ${isSensitive ? 'text-rose-300' : 'text-muted'}`}>
                       {label}
                       {isSensitive && <span className="ml-1.5 text-xs text-rose-500/70">(private)</span>}
                     </span>
@@ -2206,12 +2206,12 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                         <span className="text-blue-400">{item.byCustomer} customer</span>
                       )}
                       {item.byRep > 0 && (
-                        <span className="text-gray-400">{item.byRep} rep</span>
+                        <span className="text-muted">{item.byRep} rep</span>
                       )}
-                      <span className="text-white font-bold tabular-nums w-6 text-right">{item.count}</span>
+                      <span className="text-primary font-bold tabular-nums w-6 text-right">{item.count}</span>
                     </div>
                   </div>
-                  <div className="relative h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="relative h-1.5 bg-elevated rounded-full overflow-hidden">
                     <div
                       className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${isSensitive ? 'bg-rose-600' : 'bg-rose-500'}`}
                       style={{ width: `${pct}%` }}
@@ -2222,12 +2222,12 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
             })}
           </div>
           {metrics.winRate > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-700/50 flex items-center gap-3">
-              <div className="text-xs text-gray-500">Win Rate (closed universe)</div>
+            <div className="mt-4 pt-4 border-t border-strong flex items-center gap-3">
+              <div className="text-xs text-muted">Win Rate (closed universe)</div>
               <div className={`text-sm font-bold tabular-nums ${metrics.winRate >= 50 ? 'text-green-400' : metrics.winRate >= 25 ? 'text-yellow-400' : 'text-rose-400'}`}>
                 {metrics.winRate}%
               </div>
-              <div className="flex-1 relative h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div className="flex-1 relative h-1.5 bg-elevated rounded-full overflow-hidden">
                 <div
                   className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${metrics.winRate >= 50 ? 'bg-green-500' : metrics.winRate >= 25 ? 'bg-yellow-500' : 'bg-rose-500'}`}
                   style={{ width: `${metrics.winRate}%` }}
@@ -2240,25 +2240,25 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       {/* Historical Performance Section — hidden when viewing a specific rep (shown inline in rep section) */}
       {!viewingRepId && (historicalSales.length > 0 || isAdmin) && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+        <div className="bg-canvas rounded-lg border border-strong p-6">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <h2 className="text-lg font-bold text-primary flex items-center gap-2">
               <BarChart3 className="w-5 h-5" />
               Historical Performance
               {isAdmin && (
-                <span className="text-xs font-normal text-gray-400 ml-1">
+                <span className="text-xs font-normal text-muted ml-1">
                   — {historicalView === 'company' ? 'Company-wide' : 'My Numbers'}
                 </span>
               )}
             </h2>
             {isAdmin && (
-              <div className="flex items-center gap-1 bg-gray-900 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-canvas rounded-lg p-1">
                 <button
                   onClick={() => setHistoricalView('personal')}
                   className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
                     historicalView === 'personal'
-                      ? 'bg-emerald-600 text-white shadow'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-emerald-600 text-primary shadow'
+                      : 'text-muted hover:text-primary'
                   }`}
                 >
                   My Numbers
@@ -2267,8 +2267,8 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   onClick={() => setHistoricalView('company')}
                   className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
                     historicalView === 'company'
-                      ? 'bg-emerald-600 text-white shadow'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-emerald-600 text-primary shadow'
+                      : 'text-muted hover:text-primary'
                   }`}
                 >
                   Company-wide
@@ -2277,7 +2277,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
             )}
           </div>
           {historicalSales.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 text-sm">
+            <div className="text-center py-8 text-muted text-sm">
               No historical data available{historicalView === 'company' ? ' company-wide' : ' for your account'} yet.
             </div>
           ) : null}
@@ -2286,21 +2286,21 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
             {historicalSales.map((record, index) => (
               <div
                 key={record.year}
-                className={`rounded-lg p-4 hover:bg-gray-900 transition-colors ${
+                className={`rounded-lg p-4 hover:bg-canvas transition-colors ${
                   record.isHistoricalImport
-                    ? 'bg-gray-900/30 border border-dashed border-gray-600/50'
-                    : 'bg-gray-900/50'
+                    ? 'bg-canvas border border-dashed border-strong'
+                    : 'bg-canvas'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-gray-400">{record.year}</div>
+                  <div className="text-sm text-muted">{record.year}</div>
                   {record.isHistoricalImport && (
-                    <span className="text-xs text-gray-500 bg-gray-700/50 rounded px-1.5 py-0.5 leading-tight">
+                    <span className="text-xs text-muted bg-elevated rounded px-1.5 py-0.5 leading-tight">
                       Imported
                     </span>
                   )}
                 </div>
-                <div className="text-xl font-bold text-white mb-3">
+                <div className="text-xl font-bold text-primary mb-3">
                   {formatCurrency(record.total_revenue)}
                 </div>
                 {record.yoy_growth !== undefined && record.yoy_direction !== 'neutral' ? (
@@ -2317,7 +2317,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                     <span>{Math.abs(record.yoy_growth)}%</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded bg-gray-700/50 text-gray-400">
+                  <div className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded bg-elevated text-muted">
                     <span>Baseline</span>
                   </div>
                 )}
@@ -2330,10 +2330,10 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                 <div className="text-sm text-blue-300 mb-2 font-medium">
                   {yearComparison.current_year} YTD vs {yearComparison.previous_year}
                 </div>
-                <div className="text-xl font-bold text-white mb-1">
+                <div className="text-xl font-bold text-primary mb-1">
                   {formatCurrency(yearComparison.current_ytd)}
                 </div>
-                <div className="text-xs text-gray-400 mb-3">
+                <div className="text-xs text-muted mb-3">
                   vs {formatCurrency(yearComparison.previous_total)}
                 </div>
                 <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded ${
@@ -2341,7 +2341,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                     ? 'bg-green-500/20 text-green-400'
                     : yearComparison.direction === 'down'
                     ? 'bg-red-500/20 text-red-400'
-                    : 'bg-gray-700/50 text-gray-400'
+                    : 'bg-elevated text-muted'
                 }`}>
                   {yearComparison.direction === 'up' ? (
                     <>
@@ -2366,28 +2366,28 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       {/* Action Items Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Hot Opportunities */}
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+        <div className="bg-canvas rounded-lg border border-strong p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <h3 className="text-lg font-bold text-primary flex items-center gap-2">
               <Flame className="w-5 h-5 text-orange-500" />
               Hot Opportunities
             </h3>
-            <span className="text-sm text-gray-400">{hotLeads.length} leads</span>
+            <span className="text-sm text-muted">{hotLeads.length} leads</span>
           </div>
           <div className="space-y-3">
             {hotLeads.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No hot leads at the moment</p>
+              <p className="text-center text-muted py-8 text-sm">No hot leads at the moment</p>
             ) : (
               hotLeads.map(lead => (
                 <div
                   key={lead.id}
                   onClick={() => setSelectedLeadId(lead.id)}
-                  className="bg-gray-900/50 rounded-lg p-3 hover:bg-gray-900 transition-colors cursor-pointer border border-transparent hover:border-orange-500"
+                  className="bg-canvas rounded-lg p-3 hover:bg-canvas transition-colors cursor-pointer border border-transparent hover:border-orange-500"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h4 className="font-semibold text-white text-sm">{lead.contact_name}</h4>
-                      <p className="text-xs text-gray-400">{lead.company_name}</p>
+                      <h4 className="font-semibold text-primary text-sm">{lead.contact_name}</h4>
+                      <p className="text-xs text-muted">{lead.company_name}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                       lead.priority === 'critical'
@@ -2401,7 +2401,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                     <span className="text-sm font-bold text-green-400">
                       {formatCurrency(parseFloat(lead.estimated_value || '0'))}
                     </span>
-                    <ArrowRight className="w-4 h-4 text-gray-500" />
+                    <ArrowRight className="w-4 h-4 text-muted" />
                   </div>
                 </div>
               ))
@@ -2410,17 +2410,17 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         </div>
 
         {/* Stale Leads Needing Attention */}
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+        <div className="bg-canvas rounded-lg border border-strong p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <h3 className="text-lg font-bold text-primary flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-yellow-500" />
               Needs Attention
             </h3>
-            <span className="text-sm text-gray-400">{staleLeads.length} stale</span>
+            <span className="text-sm text-muted">{staleLeads.length} stale</span>
           </div>
           <div className="space-y-3">
             {staleLeads.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">All leads are up to date!</p>
+              <p className="text-center text-muted py-8 text-sm">All leads are up to date!</p>
             ) : (
               staleLeads.map(lead => {
                 const lastContact = lead.last_contact_date || lead.created_at;
@@ -2429,20 +2429,20 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   <div
                     key={lead.id}
                     onClick={() => setSelectedLeadId(lead.id)}
-                    className="bg-gray-900/50 rounded-lg p-3 hover:bg-gray-900 transition-colors cursor-pointer border border-transparent hover:border-yellow-500"
+                    className="bg-canvas rounded-lg p-3 hover:bg-canvas transition-colors cursor-pointer border border-transparent hover:border-yellow-500"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h4 className="font-semibold text-white text-sm">{lead.contact_name}</h4>
-                        <p className="text-xs text-gray-400">{lead.company_name}</p>
+                        <h4 className="font-semibold text-primary text-sm">{lead.contact_name}</h4>
+                        <p className="text-xs text-muted">{lead.company_name}</p>
                       </div>
                       <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">
                         {daysAgo}d ago
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Last contact: {daysAgo} days ago</span>
-                      <ArrowRight className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-muted">Last contact: {daysAgo} days ago</span>
+                      <ArrowRight className="w-4 h-4 text-muted" />
                     </div>
                   </div>
                 );
@@ -2455,15 +2455,15 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       {/* Recent Activity and Quick Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity Feed */}
-        <div className="lg:col-span-2 bg-gray-800 rounded-lg border border-gray-700 p-6">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <div className="lg:col-span-2 bg-canvas rounded-lg border border-strong p-6">
+          <h3 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5" />
             Recent Activity
           </h3>
           <div className="space-y-2">
             {recentActivities.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-400 text-sm mb-3">No recent activity</p>
+                <p className="text-muted text-sm mb-3">No recent activity</p>
                 <div className="flex items-center justify-center gap-2">
                   <button
                     onClick={() => window.location.href = '?tab=connections'}
@@ -2471,7 +2471,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   >
                     Log a connection
                   </button>
-                  <span className="text-gray-600">•</span>
+                  <span className="text-secondary">•</span>
                   <button
                     onClick={() => window.location.href = '?tab=pipeline'}
                     className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
@@ -2508,19 +2508,19 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   <button
                     key={activity.id}
                     onClick={handleActivityClick}
-                    className="w-full flex items-start gap-3 p-3 bg-gray-900/50 rounded-lg hover:bg-gray-900 transition-colors cursor-pointer border border-transparent hover:border-blue-500/50"
+                    className="w-full flex items-start gap-3 p-3 bg-canvas rounded-lg hover:bg-canvas transition-colors cursor-pointer border border-transparent hover:border-blue-500/50"
                   >
                     <div className={`p-2 rounded-lg ${colorClasses} flex-shrink-0`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
-                      <p className="text-sm text-white font-medium">
+                      <p className="text-sm text-primary font-medium">
                         {activity.title}
                       </p>
-                      <p className="text-xs text-gray-400 truncate">{activity.description}</p>
-                      <p className="text-xs text-gray-500 mt-1">{timeAgo}</p>
+                      <p className="text-xs text-muted truncate">{activity.description}</p>
+                      <p className="text-xs text-muted mt-1">{timeAgo}</p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-gray-500 flex-shrink-0 mt-1" />
+                    <ArrowRight className="w-4 h-4 text-muted flex-shrink-0 mt-1" />
                   </button>
                 );
               })
@@ -2531,7 +2531,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         {/* Quick Stats */}
         <div className="space-y-4">
           {/* Fishbowl Leads */}
-          <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg p-4 text-white shadow-md">
+          <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg p-4 text-primary shadow-md">
             <div className="flex items-center justify-between mb-2">
               <Users className="w-6 h-6 opacity-80" />
               <span className="text-3xl font-bold">{fishbowlCount}</span>
@@ -2541,15 +2541,15 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
               onClick={() => {
                 window.location.href = '?tab=fishbowl';
               }}
-              className="text-xs text-teal-100 hover:text-white flex items-center gap-1 transition-colors"
+              className="text-xs text-teal-100 hover:text-primary flex items-center gap-1 transition-colors"
             >
               Claim leads <ArrowRight className="w-3 h-3" />
             </button>
           </div>
 
           {/* Recent Proposals */}
-          <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-            <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+          <div className="bg-canvas rounded-lg border border-strong p-4">
+            <h4 className="text-sm font-bold text-primary mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Recent Proposals
             </h4>
@@ -2560,14 +2560,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                   onClick={() => {
                     window.location.href = `?tab=proposals&id=${proposal.id}`;
                   }}
-                  className="w-full flex items-center justify-between text-xs p-2 rounded-lg hover:bg-gray-900/50 transition-colors cursor-pointer border border-transparent hover:border-blue-500/50"
+                  className="w-full flex items-center justify-between text-xs p-2 rounded-lg hover:bg-canvas transition-colors cursor-pointer border border-transparent hover:border-blue-500/50"
                 >
                   <div className="flex flex-col flex-1 mr-2">
-                    <span className="text-white font-medium truncate">
+                    <span className="text-primary font-medium truncate">
                       {proposal.proposal_number}
                     </span>
                     {proposal.contact && (
-                      <span className="text-gray-500 text-xs truncate">
+                      <span className="text-muted text-xs truncate">
                         {proposal.contact.full_name || proposal.contact.company_name}
                       </span>
                     )}
@@ -2577,14 +2577,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
                       ? 'bg-green-500/20 text-green-400'
                       : proposal.status === 'sent' || proposal.status === 'portal'
                       ? 'bg-blue-500/20 text-blue-400'
-                      : 'bg-gray-500/20 text-gray-400'
+                      : 'bg-elevated text-muted'
                   }`}>
                     {proposal.status.replace('_', ' ')}
                   </span>
                 </button>
               ))}
               {recentProposals.length === 0 && (
-                <p className="text-xs text-gray-500 text-center py-2">No proposals yet</p>
+                <p className="text-xs text-muted text-center py-2">No proposals yet</p>
               )}
             </div>
           </div>

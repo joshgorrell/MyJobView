@@ -1,6 +1,6 @@
 import LaborRemovalChoice, { itemHasLabor } from './LaborRemovalChoice';
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { createPortal } from 'react-dom';
+import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
@@ -7130,7 +7130,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               Close Preview
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div data-theme-fixed data-theme="light" className="flex-1 overflow-y-auto bg-gray-50">
             <Suspense fallback={null}><PortalProposalDetail
               proposalId={proposalId}
               onBack={() => setShowPortalPreview(false)}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Profile, CompanySettings } from '../lib/types';
@@ -10,6 +10,7 @@ interface AuthContextType {
   profile: Profile | null;
   companySettings: CompanySettings | null;
   setProfileAvatar: (url: string | null) => void;
+  setProfileTheme: (userId: string, theme: Profile['ui_theme']) => void;
   loading: boolean;
   isPasswordRecovery: boolean;
   isPortalUser: boolean;
@@ -27,6 +28,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const setProfileAvatar = (url: string | null) => setProfile(current => current ? { ...current, avatar_url: url } : current);
+  const setProfileTheme = useCallback((userId: string, theme: Profile['ui_theme']) => {
+    setProfile(current => current?.id === userId ? { ...current, ui_theme: theme } : current);
+  }, []);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -451,7 +455,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, companySettings, setProfileAvatar, loading, isPasswordRecovery, isPortalUser, signIn, signUp, signOut, resetPassword, resendConfirmation, updatePassword }}>
+    <AuthContext.Provider value={{ user, profile, companySettings, setProfileAvatar, setProfileTheme, loading, isPasswordRecovery, isPortalUser, signIn, signUp, signOut, resetPassword, resendConfirmation, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

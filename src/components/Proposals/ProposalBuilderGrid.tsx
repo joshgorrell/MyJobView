@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { supabase } from '../../lib/supabase';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { ArrowLeft, Plus, Settings, ExternalLink, LayoutGrid, List, Trash2, Copy, CreditCard as Edit2, Eye, DollarSign, Package, User, ChevronRight, CheckCircle2, Maximize2, GripVertical, FileText, X, AlignJustify, GitBranch, Target, Zap, Receipt, ChevronDown, ChevronUp, XCircle, ThumbsUp, MoreHorizontal } from 'lucide-react';

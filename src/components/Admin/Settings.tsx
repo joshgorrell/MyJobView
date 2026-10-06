@@ -65,22 +65,22 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1 flex items-center gap-2">
+        <h2 className="text-xl sm:text-2xl font-bold text-primary mb-1 flex items-center gap-2">
           <SettingsIcon className="w-6 h-6" />
           Settings
         </h2>
-        <p className="text-gray-300">Manage users, business cards, and company information</p>
+        <p className="text-muted">Manage users, business cards, and company information</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border-2 border-gray-200">
-        <div className="border-b border-gray-200 bg-white">
+      <div className="bg-canvas rounded-lg shadow-sm border-2 border-subtle">
+        <div className="border-b border-subtle bg-canvas">
           <nav className="flex gap-2 sm:gap-4 px-4 sm:px-6 overflow-x-auto">
             <button
               onClick={() => setActiveTab('users')}
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'users'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-1 sm:gap-2">
@@ -93,7 +93,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'sessions'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-1 sm:gap-2">
@@ -106,7 +106,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'roles'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-1 sm:gap-2">
@@ -119,7 +119,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'permissions'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-1 sm:gap-2">
@@ -132,7 +132,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'cards'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -145,7 +145,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'company'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -158,7 +158,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'departments'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'integrations'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -184,7 +184,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'salestax'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -197,7 +197,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'salestargets'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -210,7 +210,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'suggestions'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -223,7 +223,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'contracts'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -237,7 +237,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
                 className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                   activeTab === 'products'
                     ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                    : 'text-secondary hover:text-primary'
                 }`}
               >
                 <div className="flex items-center gap-1 sm:gap-2">
@@ -251,7 +251,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'catalog'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-1 sm:gap-2">
@@ -264,7 +264,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'rewards'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -277,7 +277,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'priorities'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -290,7 +290,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'emails'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -303,7 +303,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'messages'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -316,7 +316,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'travel'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -329,7 +329,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'timeclock'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -342,7 +342,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'proposals'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -356,7 +356,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'labor'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -369,7 +369,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'classes'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -382,7 +382,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
               className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === 'orphaned'
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -396,7 +396,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
                 className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                   activeTab === 'kiosk'
                     ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                    : 'text-secondary hover:text-primary'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -411,7 +411,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
                 className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
                   activeTab === 'contact_import'
                     ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                    : 'text-secondary hover:text-primary'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -423,7 +423,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
           </nav>
         </div>
 
-        <div className="p-4 sm:p-6 bg-white">
+        <div className="p-4 sm:p-6 bg-canvas">
           <Suspense fallback={<SettingsLoadingFallback />}>
             {activeTab === 'work_orders' && <WorkOrderSettings />}
             {activeTab === 'users' && <UserManagement onNavigate={onNavigate} />}

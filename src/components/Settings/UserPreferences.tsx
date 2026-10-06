@@ -418,7 +418,7 @@ export function UserPreferences() {
               <button
                 onClick={() => setConfirmModal({ title: 'Disable Push Notifications', message: 'Are you sure you want to disable push notifications?', onConfirm: handleDisablePushNotifications })}
                 disabled={enablingPush}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-red-600 text-primary rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <XCircle className="w-4 h-4" />
                 {enablingPush ? 'Disabling...' : 'Disable Push Notifications'}
@@ -436,7 +436,7 @@ export function UserPreferences() {
               <button
                 onClick={handleEnablePushNotifications}
                 disabled={enablingPush}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Smartphone className="w-4 h-4" />
                 {enablingPush ? 'Enabling...' : 'Enable Push Notifications'}
@@ -458,7 +458,7 @@ export function UserPreferences() {
 
           <div className="bg-canvas border border-subtle rounded-lg p-6 space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-secondary mb-3">
                 What can you see?
               </label>
               <div className="space-y-3">
@@ -526,7 +526,7 @@ export function UserPreferences() {
 
             {(visibilityScope === 'office_only' || visibilityScope === 'selected_offices') && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   <Building2 className="w-4 h-4 inline mr-1" />
                   Primary Office
                 </label>
@@ -547,7 +547,7 @@ export function UserPreferences() {
 
             {visibilityScope === 'selected_offices' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Additional Offices
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-subtle rounded-lg p-3">
@@ -575,7 +575,7 @@ export function UserPreferences() {
             <button
               onClick={handleSaveVisibility}
               disabled={saving}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Visibility Settings'}
@@ -609,7 +609,7 @@ export function UserPreferences() {
               <button
                 onClick={() => setConfirmModal({ title: 'Disconnect Google Calendar', message: 'Are you sure you want to disconnect your Google Calendar? Future reminders will not be synced.', onConfirm: handleDisconnectCalendar })}
                 disabled={disconnecting}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-red-600 text-primary rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <XCircle className="w-4 h-4" />
                 {disconnecting ? 'Disconnecting...' : 'Disconnect Calendar'}
@@ -627,7 +627,7 @@ export function UserPreferences() {
               <button
                 onClick={handleConnectCalendar}
                 disabled={connecting}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Calendar className="w-4 h-4" />
                 {connecting ? 'Connecting...' : 'Connect Google Calendar'}
@@ -754,7 +754,7 @@ export function UserPreferences() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-3 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Preferences'}

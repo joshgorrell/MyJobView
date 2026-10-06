@@ -1157,7 +1157,7 @@ export function CompanySettings() {
           <div className="rounded-xl border border-gray-200 p-4 space-y-3">
             <h4 className="font-semibold text-gray-900">Business Card Artwork</h4>
             <p className="text-sm text-gray-600">A separate banner beneath your logo and behind each employee's profile photo. Applies to all your dealer's business cards.</p>
-            <div className="max-w-sm overflow-hidden rounded-2xl bg-[#111729]" aria-label="Business card artwork preview">
+            <div data-theme-fixed className="max-w-sm overflow-hidden rounded-2xl bg-[#111729]" aria-label="Business card artwork preview">
               <BusinessCardIdentity fullName="Your Team" title="Business Card Preview" email="" phone="" company={{ company_name: companyName, company_logo_url: logoUrl, website: null, business_card_banner_url: cardBannerUrl } satisfies CardBranding} />
             </div>
             <input ref={cardBannerInputRef} id="business-card-artwork" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadCardBanner} disabled={uploadingCardBanner} className="hidden" />

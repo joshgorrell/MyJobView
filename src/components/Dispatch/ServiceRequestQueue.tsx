@@ -284,7 +284,7 @@ export function ServiceRequestQueue() {
       case 'needs_more_info':
         return 'text-amber-400 bg-amber-500/10';
       default:
-        return 'text-gray-400 bg-gray-500/10';
+        return 'text-muted bg-elevated';
     }
   }
 
@@ -342,7 +342,7 @@ export function ServiceRequestQueue() {
       case 'customer_portal':
         return 'text-green-400 bg-green-500/10 border-green-500/20';
       default:
-        return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
+        return 'text-muted bg-elevated border-strong';
     }
   }
 
@@ -379,7 +379,7 @@ export function ServiceRequestQueue() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading service requests...</div>
+        <div className="text-muted">Loading service requests...</div>
       </div>
     );
   }
@@ -388,8 +388,8 @@ export function ServiceRequestQueue() {
     <div className="space-y-3 sm:space-y-4 w-full max-w-full min-w-0">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h2 className="text-base sm:text-2xl font-bold text-white">Work Order Request Queue</h2>
-          <p className="text-gray-400 text-sm mt-1">
+          <h2 className="text-base sm:text-2xl font-bold text-primary">Work Order Request Queue</h2>
+          <p className="text-muted text-sm mt-1">
             {queueRequests.length} active {queueRequests.length === 1 ? 'request' : 'requests'}
             {needsInfoRequests.length > 0 && (
               <span className="text-amber-400 ml-2">· {needsInfoRequests.length} awaiting more info</span>
@@ -399,7 +399,7 @@ export function ServiceRequestQueue() {
 
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="shrink-0 min-h-11 flex items-center gap-1.5 px-2 sm:px-4 py-2 text-xs sm:text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          className="shrink-0 min-h-11 flex items-center gap-1.5 px-2 sm:px-4 py-2 text-xs sm:text-sm bg-canvas text-primary rounded-lg hover:bg-elevated transition-colors"
         >
           <Filter className="w-4 h-4" />
           Filters
@@ -408,20 +408,20 @@ export function ServiceRequestQueue() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-800 rounded-lg w-full max-w-full min-w-0 sm:w-fit">
+      <div className="flex gap-1 p-1 bg-canvas rounded-lg w-full max-w-full min-w-0 sm:w-fit">
         <button
           onClick={() => setActiveTab('queue')}
           className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'queue'
-              ? 'bg-orange-600 text-white'
-              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              ? 'bg-orange-600 text-primary'
+              : 'text-muted hover:text-primary hover:bg-elevated'
           }`}
         >
           <ClipboardList className="w-4 h-4" />
           <span className="sm:hidden">Active</span><span className="hidden sm:inline">Active Queue</span>
           {queueRequests.length > 0 && (
             <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-              activeTab === 'queue' ? 'bg-orange-500/40 text-orange-100' : 'bg-gray-700 text-gray-300'
+              activeTab === 'queue' ? 'bg-orange-500/40 text-orange-100' : 'bg-elevated text-muted'
             }`}>
               {queueRequests.length}
             </span>
@@ -431,8 +431,8 @@ export function ServiceRequestQueue() {
           onClick={() => setActiveTab('needs_info')}
           className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'needs_info'
-              ? 'bg-amber-600 text-white'
-              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              ? 'bg-amber-600 text-primary'
+              : 'text-muted hover:text-primary hover:bg-elevated'
           }`}
         >
           <MessageSquareWarning className="w-4 h-4" />
@@ -448,14 +448,14 @@ export function ServiceRequestQueue() {
       </div>
 
       {showFilters && (
-        <div className="bg-gray-800 rounded-lg p-4 space-y-3">
+        <div className="bg-canvas rounded-lg p-4 space-y-3">
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Priority</label>
+              <label className="block text-sm font-medium text-muted mb-2">Priority</label>
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className="w-full min-w-0 min-h-11 px-2 sm:px-3 py-2 text-base bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full min-w-0 min-h-11 px-2 sm:px-3 py-2 text-base bg-canvas border border-strong rounded-lg text-primary focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="all">All Priorities</option>
                 <option value="emergency">Emergency</option>
@@ -465,11 +465,11 @@ export function ServiceRequestQueue() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Source</label>
+              <label className="block text-sm font-medium text-muted mb-2">Source</label>
               <select
                 value={filterSourceType}
                 onChange={(e) => setFilterSourceType(e.target.value)}
-                className="w-full min-w-0 min-h-11 px-2 sm:px-3 py-2 text-base bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full min-w-0 min-h-11 px-2 sm:px-3 py-2 text-base bg-canvas border border-strong rounded-lg text-primary focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="all">All Sources</option>
                 <option value="punchlist">Customer Punchlist</option>
@@ -486,7 +486,7 @@ export function ServiceRequestQueue() {
       {selectedRequestIds.size >= 2 && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 bg-orange-900/40 border-2 border-orange-500 rounded-lg">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+            <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center text-primary text-sm font-bold shrink-0">
               {selectedRequestIds.size}
             </div>
             <div>
@@ -501,13 +501,13 @@ export function ServiceRequestQueue() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSelectedRequestIds(new Set())}
-              className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+              className="px-3 py-2 text-xs bg-elevated hover:bg-elevated text-muted rounded-lg transition-colors"
             >
               Clear
             </button>
             <button
               onClick={() => setShowCombineModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-orange-600 hover:bg-orange-500 text-primary rounded-lg font-semibold transition-colors"
             >
               <Layers className="w-3.5 h-3.5" />
               Combine into Work Order
@@ -518,18 +518,18 @@ export function ServiceRequestQueue() {
       )}
 
       {filteredRequests.length === 0 ? (
-        <div className="bg-gray-800 rounded-lg p-12 text-center">
+        <div className="bg-canvas rounded-lg p-12 text-center">
           {activeTab === 'needs_info' ? (
             <>
               <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">All Clear</h3>
-              <p className="text-gray-400">No requests are waiting on more information.</p>
+              <h3 className="text-xl font-semibold text-primary mb-2">All Clear</h3>
+              <p className="text-muted">No requests are waiting on more information.</p>
             </>
           ) : (
             <>
               <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Queue Empty</h3>
-              <p className="text-gray-400">All service requests have been scheduled!</p>
+              <h3 className="text-xl font-semibold text-primary mb-2">Queue Empty</h3>
+              <p className="text-muted">All service requests have been scheduled!</p>
             </>
           )}
         </div>
@@ -539,12 +539,12 @@ export function ServiceRequestQueue() {
             <div
               key={request.id}
               data-testid={`service-request-${request.id}`}
-              className={`w-full max-w-full min-w-0 [overflow-wrap:anywhere] bg-gray-800 rounded-lg border transition-colors ${
+              className={`w-full max-w-full min-w-0 [overflow-wrap:anywhere] bg-canvas rounded-lg border transition-colors ${
                 selectedRequestIds.has(request.id)
                   ? 'border-orange-500 ring-2 ring-orange-500/40'
                   : request.status === 'needs_more_info'
                   ? 'border-amber-500/40 hover:border-amber-500/60'
-                  : 'border-gray-700 hover:border-gray-600'
+                  : 'border-strong hover:border-strong'
               }`}
             >
               {/* Kickback warning banner */}
@@ -573,7 +573,7 @@ export function ServiceRequestQueue() {
                         e.stopPropagation();
                         setResubmitTarget(request);
                       }}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white rounded-lg text-xs font-semibold transition-colors"
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-primary rounded-lg text-xs font-semibold transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       Update & Resubmit
@@ -596,12 +596,12 @@ export function ServiceRequestQueue() {
                             toggleRequestSelection(request.id);
                           }}
                           title="Select to combine with other requests from this customer"
-                          className="w-4 h-4 rounded border-gray-600 text-orange-600 focus:ring-orange-500 focus:ring-offset-0 cursor-pointer"
+                          className="w-4 h-4 rounded border-strong text-orange-600 focus:ring-orange-500 focus:ring-offset-0 cursor-pointer"
                         />
                       ) : constraintContactId && request.contact_id !== constraintContactId ? (
                         <span
                           title={`Can only combine requests from the same customer. Currently selecting requests from ${selectedRequests[0]?.customer_name}`}
-                          className="flex items-center justify-center w-4 h-4 text-gray-600 cursor-not-allowed"
+                          className="flex items-center justify-center w-4 h-4 text-secondary cursor-not-allowed"
                         >
                           <CheckSquare className="w-4 h-4 opacity-30" />
                         </span>
@@ -624,14 +624,14 @@ export function ServiceRequestQueue() {
                           {request.customer_name}
                         </button>
                       ) : (
-                        <div className="min-w-0 max-w-full break-words font-semibold text-white text-sm sm:text-base leading-tight">{request.customer_name}</div>
+                        <div className="min-w-0 max-w-full break-words font-semibold text-primary text-sm sm:text-base leading-tight">{request.customer_name}</div>
                       )}
                       <div className="flex min-w-0 max-w-full items-center gap-2 sm:shrink-0">
                         <div className="flex flex-wrap sm:flex-col sm:items-end gap-x-2 gap-y-0.5 min-w-0">
-                          <span className="text-[11px] sm:text-xs text-gray-400 break-words">
+                          <span className="text-[11px] sm:text-xs text-muted break-words">
                             {new Date(request.created_at).toLocaleDateString()} {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          <span className="text-[11px] sm:text-xs text-gray-400 break-words">
+                          <span className="text-[11px] sm:text-xs text-muted break-words">
                             {request.profiles?.full_name || 'Unknown'}
                           </span>
                         </div>
@@ -639,7 +639,7 @@ export function ServiceRequestQueue() {
                         {expandedRequest !== request.id && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
-                            className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap"
+                            className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap"
                           >
                             <ArrowRight className="w-3 h-3" />
                             Schedule
@@ -679,11 +679,11 @@ export function ServiceRequestQueue() {
                     </div>
 
                     {/* Description preview */}
-                    <div className="text-sm text-gray-300 break-words line-clamp-2 mb-1.5">{request.job_description}</div>
+                    <div className="text-sm text-muted break-words line-clamp-2 mb-1.5">{request.job_description}</div>
 
                     {/* Meta row + mobile Convert button */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                      <div className="min-w-0 flex flex-wrap items-center gap-2 text-xs text-muted">
                         {request.estimated_duration && (
                           <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
@@ -705,7 +705,7 @@ export function ServiceRequestQueue() {
                       {expandedRequest !== request.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
-                          className="sm:hidden flex items-center gap-1 min-h-11 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap shrink-0"
+                          className="sm:hidden flex items-center gap-1 min-h-11 px-3 py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap shrink-0"
                         >
                           <ArrowRight className="w-3.5 h-3.5" />
                           Schedule
@@ -713,23 +713,23 @@ export function ServiceRequestQueue() {
                       )}
                       <button aria-label={expandedRequest === request.id ? 'Collapse request' : 'Expand request'}
                         onClick={e => {e.stopPropagation();setExpandedRequest(expandedRequest === request.id ? null : request.id);}}
-                        className="shrink-0 min-h-11 px-2 text-gray-400 hover:text-white">
+                        className="shrink-0 min-h-11 px-2 text-muted hover:text-primary">
                         {expandedRequest === request.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                     </div>
 
                     {/* Expanded Details */}
                     {expandedRequest === request.id && (
-                      <div className="mt-3 space-y-3 pt-3 border-t border-gray-700">
+                      <div className="mt-3 space-y-3 pt-3 border-t border-strong">
                         {/* Address */}
                         <div className="flex items-start gap-2.5">
-                          <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                          <MapPin className="w-4 h-4 text-muted mt-0.5 shrink-0" />
                           <div>
-                            <div className="text-xs font-medium text-gray-400 mb-0.5">Address</div>
-                            <div className="text-sm text-white leading-snug">
+                            <div className="text-xs font-medium text-muted mb-0.5">Address</div>
+                            <div className="text-sm text-primary leading-snug">
                               {request.job_location_address}
                               {(request.job_location_city || request.job_location_state || request.job_location_zip) && (
-                                <span className="text-gray-400">
+                                <span className="text-muted">
                                   {request.job_location_city && `, ${request.job_location_city}`}
                                   {request.job_location_state && `, ${request.job_location_state}`}
                                   {request.job_location_zip && ` ${request.job_location_zip}`}
@@ -741,10 +741,10 @@ export function ServiceRequestQueue() {
 
                         {/* Full description */}
                         <div className="flex items-start gap-2.5">
-                          <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                          <FileText className="w-4 h-4 text-muted mt-0.5 shrink-0" />
                           <div>
-                            <div className="text-xs font-medium text-gray-400 mb-0.5">Full Description</div>
-                            <div className="text-sm text-white whitespace-pre-wrap">{request.job_description}</div>
+                            <div className="text-xs font-medium text-muted mb-0.5">Full Description</div>
+                            <div className="text-sm text-primary whitespace-pre-wrap">{request.job_description}</div>
                           </div>
                         </div>
 
@@ -752,27 +752,27 @@ export function ServiceRequestQueue() {
                         {(request.customer_phone || request.customer_email || request.requested_date || request.attachments?.length > 0) && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {request.customer_phone && (
-                              <a href={`tel:${request.customer_phone}`} className="flex items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700 transition-colors">
-                                <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <a href={`tel:${request.customer_phone}`} className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted hover:text-primary hover:bg-elevated transition-colors">
+                                <Phone className="w-3.5 h-3.5 text-muted shrink-0" />
                                 {request.customer_phone}
                               </a>
                             )}
                             {request.customer_email && (
-                              <a href={`mailto:${request.customer_email}`} className="flex min-w-0 items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700 transition-colors break-all">
-                                <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <a href={`mailto:${request.customer_email}`} className="flex min-w-0 items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted hover:text-primary hover:bg-elevated transition-colors break-all">
+                                <Mail className="w-3.5 h-3.5 text-muted shrink-0" />
                                 <span className="truncate">{request.customer_email}</span>
                               </a>
                             )}
                             {request.requested_date && (
-                              <div className="flex items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg text-xs text-gray-300">
-                                <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted">
+                                <Calendar className="w-3.5 h-3.5 text-muted shrink-0" />
                                 {new Date(request.requested_date).toLocaleDateString()}
                                 {request.requested_time && ` · ${request.requested_time}`}
                               </div>
                             )}
                             {request.attachments && request.attachments.length > 0 && (
-                              <div className="flex items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg text-xs text-gray-300">
-                                <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted">
+                                <Paperclip className="w-3.5 h-3.5 text-muted shrink-0" />
                                 {request.attachments.length} attachment{request.attachments.length !== 1 ? 's' : ''}
                               </div>
                             )}
@@ -784,7 +784,7 @@ export function ServiceRequestQueue() {
                           <div className="flex items-center gap-2 px-3 py-2 bg-emerald-900/30 rounded-lg border border-emerald-700/40">
                             <Briefcase className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                             <div className="text-xs text-emerald-300">
-                              <span className="text-white font-medium">{request.projects.name}</span>
+                              <span className="text-primary font-medium">{request.projects.name}</span>
                               <span className="text-emerald-400/70"> ({request.projects.project_number})</span>
                             </div>
                           </div>
@@ -792,19 +792,19 @@ export function ServiceRequestQueue() {
 
                         {/* Contact record */}
                         {request.contacts && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg">
-                            <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                            <div className="text-xs text-gray-300">
-                              <span className="text-white">{request.contacts.full_name}</span>
-                              {request.contacts.company_name && <span className="text-gray-400"> · {request.contacts.company_name}</span>}
+                          <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg">
+                            <User className="w-3.5 h-3.5 text-muted shrink-0" />
+                            <div className="text-xs text-muted">
+                              <span className="text-primary">{request.contacts.full_name}</span>
+                              {request.contacts.company_name && <span className="text-muted"> · {request.contacts.company_name}</span>}
                             </div>
                           </div>
                         )}
 
                         {request.notes && (
-                          <div className="p-3 bg-gray-900 rounded-lg border border-gray-700">
-                            <div className="text-xs font-medium text-gray-400 mb-1">Notes</div>
-                            <div className="text-sm text-gray-300 whitespace-pre-wrap">{request.notes}</div>
+                          <div className="p-3 bg-canvas rounded-lg border border-strong">
+                            <div className="text-xs font-medium text-muted mb-1">Notes</div>
+                            <div className="text-sm text-muted whitespace-pre-wrap">{request.notes}</div>
                           </div>
                         )}
 
@@ -812,11 +812,11 @@ export function ServiceRequestQueue() {
                         <div className={`flex items-start gap-2.5 p-3 rounded-lg border ${
                           request.customer_contact_confirmed_at
                             ? 'bg-emerald-500/10 border-emerald-500/20'
-                            : 'bg-gray-900 border-gray-700'
+                            : 'bg-canvas border-strong'
                         }`}>
-                          <PhoneCall className={`w-4 h-4 mt-0.5 shrink-0 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-gray-500'}`} />
+                          <PhoneCall className={`w-4 h-4 mt-0.5 shrink-0 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-muted'}`} />
                           <div>
-                            <div className={`text-xs font-medium mb-0.5 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-gray-400'}`}>
+                            <div className={`text-xs font-medium mb-0.5 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-muted'}`}>
                               Customer Contact
                             </div>
                             {request.customer_contact_confirmed_at ? (
@@ -827,7 +827,7 @@ export function ServiceRequestQueue() {
                                 )}
                               </div>
                             ) : (
-                              <div className="text-xs text-gray-500">Not yet confirmed</div>
+                              <div className="text-xs text-muted">Not yet confirmed</div>
                             )}
                           </div>
                         </div>
@@ -836,7 +836,7 @@ export function ServiceRequestQueue() {
                         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1">
                           <button
                             onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
-                            className="col-span-2 sm:col-span-1 sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
+                            className="col-span-2 sm:col-span-1 sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
                           >
                             <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                             Schedule Work Order
@@ -849,7 +849,7 @@ export function ServiceRequestQueue() {
                             className={`sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                               request.customer_contact_confirmed_at
                                 ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                : 'bg-elevated text-muted hover:bg-elevated'
                             }`}
                           >
                             <PhoneCall className="w-3.5 h-3.5 shrink-0" />
@@ -1025,34 +1025,34 @@ function KickbackModal({ serviceRequest, onClose, onSuccess }: KickbackModalProp
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 w-full max-w-lg rounded-2xl border border-gray-700 shadow-2xl">
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-gray-700 bg-gray-800 rounded-t-2xl">
+      <div className="bg-canvas w-full max-w-lg rounded-2xl border border-strong shadow-2xl">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-strong bg-canvas rounded-t-2xl">
           <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
             <MessageSquareWarning className="w-5 h-5 text-amber-400" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-white">Request More Information</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              This will notify <span className="text-white">{serviceRequest.profiles?.full_name || 'the submitter'}</span> to update their request
+            <h3 className="text-base font-semibold text-primary">Request More Information</h3>
+            <p className="text-xs text-muted mt-0.5">
+              This will notify <span className="text-primary">{serviceRequest.profiles?.full_name || 'the submitter'}</span> to update their request
             </p>
           </div>
           <button
             onClick={onClose}
-            className="ml-auto p-1.5 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+            className="ml-auto p-1.5 hover:bg-elevated rounded-lg transition-colors text-muted hover:text-primary"
           >
             <XCircle className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
-            <div className="text-xs text-gray-500 mb-0.5">Service Request</div>
-            <div className="font-medium text-white text-sm">{serviceRequest.customer_name}</div>
-            <div className="text-xs text-gray-400 mt-0.5 line-clamp-2">{serviceRequest.job_description}</div>
+          <div className="bg-canvas rounded-xl p-3 border border-strong">
+            <div className="text-xs text-muted mb-0.5">Service Request</div>
+            <div className="font-medium text-primary text-sm">{serviceRequest.customer_name}</div>
+            <div className="text-xs text-muted mt-0.5 line-clamp-2">{serviceRequest.job_description}</div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white mb-2">
+            <label className="block text-sm font-medium text-primary mb-2">
               What information is missing or unclear? <span className="text-red-400">*</span>
             </label>
             <textarea
@@ -1060,10 +1060,10 @@ function KickbackModal({ serviceRequest, onClose, onSuccess }: KickbackModalProp
               onChange={(e) => setReason(e.target.value)}
               rows={4}
               placeholder="e.g., Need the exact system model number, customer hasn't confirmed if they have an existing service contract, unclear if this is a new install or a repair..."
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 bg-canvas border border-strong rounded-xl text-primary text-sm placeholder-gray-500 focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
               autoFocus
             />
-            <p className="text-xs text-gray-500 mt-1.5">
+            <p className="text-xs text-muted mt-1.5">
               Be specific — this message will be sent directly to {serviceRequest.profiles?.full_name || 'the submitter'} so they know exactly what to update.
             </p>
           </div>
@@ -1080,14 +1080,14 @@ function KickbackModal({ serviceRequest, onClose, onSuccess }: KickbackModalProp
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 px-4 py-2.5 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors text-sm font-medium"
+            className="flex-1 px-4 py-2.5 bg-elevated text-primary rounded-xl hover:bg-elevated transition-colors text-sm font-medium"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading || !reason.trim()}
-            className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-primary rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold flex items-center justify-center gap-2"
           >
             <MessageSquareWarning className="w-4 h-4" />
             {loading ? 'Sending...' : 'Send Back for More Info'}
@@ -1186,17 +1186,17 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-stretch justify-center z-50 p-0 sm:p-4 sm:items-center">
-      <div className="bg-gray-900 w-full sm:rounded-2xl sm:max-w-7xl flex flex-col max-h-[100dvh] sm:max-h-[95dvh] overflow-hidden shadow-2xl border border-gray-700">
+      <div className="bg-canvas w-full sm:rounded-2xl sm:max-w-7xl flex flex-col max-h-[100dvh] sm:max-h-[95dvh] overflow-hidden shadow-2xl border border-strong">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-4 sm:px-6 py-4 border-b border-gray-700 shrink-0 bg-gray-800">
+        <div className="flex items-center justify-between px-4 sm:px-4 sm:px-6 py-4 border-b border-strong shrink-0 bg-canvas">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-orange-600 flex items-center justify-center">
-              <Layers className="w-5 h-5 text-white" />
+              <Layers className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg sm:text-xl font-bold text-white">Combine into One Work Order</h3>
-              <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+              <h3 className="text-lg sm:text-xl font-bold text-primary">Combine into One Work Order</h3>
+              <p className="text-xs sm:text-sm text-muted mt-0.5">
                 {serviceRequests.length} service requests from {customer.customer_name}
               </p>
             </div>
@@ -1204,7 +1204,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+            className="p-2 hover:bg-elevated rounded-lg transition-colors text-muted hover:text-primary"
           >
             <XCircle className="w-5 h-5" />
           </button>
@@ -1214,7 +1214,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
         <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
 
           {/* Left panel — scrollable form */}
-          <div className="w-full lg:w-[360px] xl:w-[400px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-700 overflow-y-auto max-h-[45vh] lg:max-h-none">
+          <div className="w-full lg:w-[360px] xl:w-[400px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-strong overflow-y-auto max-h-[45vh] lg:max-h-none">
             <div className="p-4 sm:p-5 space-y-4">
 
               {/* Info banner */}
@@ -1227,10 +1227,10 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
 
               {/* Selected requests summary */}
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
                   Requests Being Combined
                 </label>
-                <div className="bg-gray-800 border border-gray-700 rounded-lg divide-y divide-gray-700">
+                <div className="bg-canvas border border-strong rounded-lg divide-y divide-gray-700">
                   {serviceRequests.map((sr) => (
                     <div key={sr.id} className="px-3 py-2.5">
                       <div className="flex items-start gap-2">
@@ -1241,7 +1241,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
                         }`}>
                           {sr.priority}
                         </span>
-                        <p className="text-xs text-gray-300 line-clamp-2 flex-1">{sr.job_description}</p>
+                        <p className="text-xs text-muted line-clamp-2 flex-1">{sr.job_description}</p>
                       </div>
                     </div>
                   ))}
@@ -1252,14 +1252,14 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
               <div className="flex items-start gap-3 bg-orange-500/10 border border-orange-500/20 rounded-xl p-3">
                 <MapPin className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <div className="font-semibold text-white text-sm">{customer.customer_name}</div>
-                  <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                  <div className="font-semibold text-primary text-sm">{customer.customer_name}</div>
+                  <div className="text-xs text-muted mt-0.5 leading-relaxed">
                     {customer.job_location_address}
                     {customer.job_location_city && `, ${customer.job_location_city}`}
                     {customer.job_location_state && `, ${customer.job_location_state}`}
                   </div>
                   {customer.customer_phone && (
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                    <div className="flex items-center gap-1 text-xs text-muted mt-1">
                       <Phone className="w-3 h-3" />
                       {customer.customer_phone}
                     </div>
@@ -1269,7 +1269,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
 
               {/* Combined Description */}
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
                   Combined Job Description *
                 </label>
                 <textarea
@@ -1277,31 +1277,31 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
                   placeholder="Enter combined job description..."
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 bg-canvas border border-strong rounded-lg text-primary text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                 />
               </div>
 
               {/* Technician selector */}
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
                   Assign Technicians *
                 </label>
-                <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+                <div className="bg-canvas border border-strong rounded-lg overflow-hidden">
                   {techs.map((tech, idx) => (
                     <label
                       key={tech.id}
-                      className={`flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-gray-700 ${
-                        idx < techs.length - 1 ? 'border-b border-gray-700' : ''
+                      className={`flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-elevated ${
+                        idx < techs.length - 1 ? 'border-b border-strong' : ''
                       } ${selectedTechs.includes(tech.id) ? 'bg-orange-500/10' : ''}`}
                     >
                       <input
                         type="checkbox"
                         checked={selectedTechs.includes(tech.id)}
                         onChange={() => toggleTechSelection(tech.id)}
-                        className="w-4 h-4 text-orange-600 bg-gray-700 border-gray-600 rounded focus:ring-orange-500"
+                        className="w-4 h-4 text-orange-600 bg-elevated border-strong rounded focus:ring-orange-500"
                       />
-                      <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      <span className={`text-sm flex-1 ${selectedTechs.includes(tech.id) ? 'text-white font-medium' : 'text-gray-300'}`}>
+                      <User className="w-3.5 h-3.5 text-muted shrink-0" />
+                      <span className={`text-sm flex-1 ${selectedTechs.includes(tech.id) ? 'text-primary font-medium' : 'text-muted'}`}>
                         {tech.full_name}
                       </span>
                     </label>
@@ -1315,45 +1315,45 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
               </div>
 
               {/* Schedule */}
-              <div className="bg-gray-800 border border-gray-700 rounded-xl p-3 space-y-3">
+              <div className="bg-canvas border border-strong rounded-xl p-3 space-y-3">
                 <div className="flex items-center gap-2">
-                  <Calendar className={`w-4 h-4 shrink-0 ${scheduledDate ? 'text-orange-400' : 'text-gray-500'}`} />
+                  <Calendar className={`w-4 h-4 shrink-0 ${scheduledDate ? 'text-orange-400' : 'text-muted'}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-400 font-medium">Scheduled</div>
-                    <div className={`text-sm font-semibold truncate ${scheduledDate ? 'text-white' : 'text-gray-500'}`}>
+                    <div className="text-xs text-muted font-medium">Scheduled</div>
+                    <div className={`text-sm font-semibold truncate ${scheduledDate ? 'text-primary' : 'text-muted'}`}>
                       {formatDateTime()}
                     </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Date *</label>
+                    <label className="block text-[10px] text-muted mb-1">Date *</label>
                     <input
                       type="date"
                       value={scheduledDate}
                       onChange={(e) => setScheduledDate(e.target.value)}
-                      className="w-full px-2 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs focus:ring-1 focus:ring-orange-500"
+                      className="w-full px-2 py-2 bg-elevated border border-strong rounded-lg text-primary text-xs focus:ring-1 focus:ring-orange-500"
                     />
                   </div>
                   <div className="col-span-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Time</label>
+                    <label className="block text-[10px] text-muted mb-1">Time</label>
                     <input
                       type="time"
                       step="1800"
                       value={scheduledTime}
                       onChange={(e) => setScheduledTime(e.target.value)}
-                      className="w-full px-2 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs focus:ring-1 focus:ring-orange-500"
+                      className="w-full px-2 py-2 bg-elevated border border-strong rounded-lg text-primary text-xs focus:ring-1 focus:ring-orange-500"
                     />
                   </div>
                   <div className="col-span-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Est. Hours</label>
+                    <label className="block text-[10px] text-muted mb-1">Est. Hours</label>
                     <input
                       type="number"
                       step="0.5"
                       min="0.5"
                       value={estimatedHours}
                       onChange={(e) => setEstimatedHours(e.target.value)}
-                      className="w-full px-2 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs focus:ring-1 focus:ring-orange-500"
+                      className="w-full px-2 py-2 bg-elevated border border-strong rounded-lg text-primary text-xs focus:ring-1 focus:ring-orange-500"
                     />
                   </div>
                 </div>
@@ -1361,7 +1361,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
 
               {/* Internal notes */}
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
                   Internal Notes
                 </label>
                 <textarea
@@ -1369,7 +1369,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
                   onChange={(e) => setInternalNotes(e.target.value)}
                   rows={2}
                   placeholder="Notes for the technician..."
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 bg-canvas border border-strong rounded-lg text-primary text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                 />
               </div>
             </div>
@@ -1378,12 +1378,12 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
           {/* Right panel — scheduling calendar */}
           <div className="flex-1 min-h-0 flex flex-col min-h-[300px] lg:min-h-0">
             {selectedTechs.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-900/50">
-                <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4">
-                  <Calendar className="w-8 h-8 text-gray-600" />
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-canvas">
+                <div className="w-16 h-16 rounded-full bg-canvas flex items-center justify-center mb-4">
+                  <Calendar className="w-8 h-8 text-secondary" />
                 </div>
-                <p className="text-gray-400 font-medium">Select technicians to view their schedule</p>
-                <p className="text-gray-600 text-sm mt-1">Tap a time slot to schedule the work order</p>
+                <p className="text-muted font-medium">Select technicians to view their schedule</p>
+                <p className="text-secondary text-sm mt-1">Tap a time slot to schedule the work order</p>
               </div>
             ) : (
               <SchedulingCalendar
@@ -1401,8 +1401,8 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-gray-700 bg-gray-800">
-          <div className="text-xs text-gray-500 hidden sm:block">
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-strong bg-canvas">
+          <div className="text-xs text-muted hidden sm:block">
             {canSubmit
               ? `Ready to combine ${serviceRequests.length} requests into 1 work order for ${formatDateTime()}`
               : 'Select techs + date to continue'}
@@ -1412,7 +1412,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 sm:flex-none px-4 py-3 sm:py-2.5 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors text-sm font-medium"
+              className="flex-1 sm:flex-none px-4 py-3 sm:py-2.5 bg-elevated text-primary rounded-xl hover:bg-elevated transition-colors text-sm font-medium"
             >
               Cancel
             </button>
@@ -1420,7 +1420,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
               type="button"
               onClick={handleCombine}
               disabled={loading || !canSubmit}
-              className="flex-1 sm:flex-none px-4 sm:px-6 py-3 sm:py-2.5 bg-orange-600 text-white rounded-xl hover:bg-orange-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-semibold shadow-lg shadow-orange-900/30"
+              className="flex-1 sm:flex-none px-4 sm:px-6 py-3 sm:py-2.5 bg-orange-600 text-primary rounded-xl hover:bg-orange-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-semibold shadow-lg shadow-orange-900/30"
             >
               <Layers className="w-4 h-4 shrink-0" />
               {loading ? 'Creating...' : `Combine ${serviceRequests.length} into 1 Work Order`}

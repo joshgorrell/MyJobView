@@ -193,8 +193,8 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#FDFDFD]">
-        <div className="text-[#222222]">Loading proposal...</div>
+      <div className="h-full flex items-center justify-center bg-canvas">
+        <div className="text-primary">Loading proposal...</div>
       </div>
     );
   }
@@ -218,37 +218,37 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#FDFDFD] text-[#222222] relative overflow-hidden">
+    <div className="h-full flex flex-col bg-canvas text-primary relative overflow-hidden">
       {/* Top Bar - 48px */}
-      <div className="h-12 bg-[#FAFAFA] border-b border-[#E5E5E5] flex items-center justify-between px-6 flex-shrink-0">
+      <div className="h-12 bg-surface border-b border-subtle flex items-center justify-between px-6 flex-shrink-0">
         <div className="flex items-baseline gap-4">
           <button
             onClick={onBack}
-            className="p-1.5 hover:bg-[#F0F0F0] rounded transition-all duration-200"
+            className="p-1.5 hover:bg-elevated rounded transition-all duration-200"
             title="Back to Proposals List"
           >
-            <ArrowLeft className="w-4 h-4 text-[#666666]" />
+            <ArrowLeft className="w-4 h-4 text-secondary" />
           </button>
           <input
             type="text"
             value={proposal?.title || ''}
             onChange={(e) => setProposal({ ...proposal, title: e.target.value })}
-            className="text-xl font-bold bg-transparent border-none outline-none text-[#111111] hover:text-[#0A1A2F] focus:text-[#0A1A2F] transition-colors"
+            className="text-xl font-bold bg-transparent border-none outline-none text-primary hover:text-brand focus:text-brand transition-colors"
             style={{ width: `${(proposal?.title?.length || 8) * 12}px` }}
           />
-          <span className="text-sm text-[#666666]">
+          <span className="text-sm text-secondary">
             {proposal?.contacts?.full_name || proposal?.contacts?.company_name || 'Customer'}
           </span>
         </div>
 
-        <div className="text-xs text-[#999999]">
+        <div className="text-xs text-muted">
           All changes saved • {lastSaved.toLocaleTimeString()}
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowMultiAreaItemModal(true)}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-blue-600 text-primary text-sm rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center gap-1.5"
             title="Add item to multiple areas"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -256,55 +256,55 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
           </button>
           <button
             onClick={() => setShowExpirationModal(true)}
-            className="p-2 hover:bg-[#F0F0F0] rounded-lg transition-all duration-200"
+            className="p-2 hover:bg-elevated rounded-lg transition-all duration-200"
             title="Set Expiration Date"
           >
-            <Calendar className="w-4 h-4 text-[#666666]" />
+            <Calendar className="w-4 h-4 text-secondary" />
           </button>
           {proposal?.status !== 'designing' && (
             <button
               onClick={() => setShowActivityModal(true)}
-              className="p-2 hover:bg-[#F0F0F0] rounded-lg transition-all duration-200"
+              className="p-2 hover:bg-elevated rounded-lg transition-all duration-200"
               title="View Customer Activity"
             >
-              <Activity className="w-4 h-4 text-[#666666]" />
+              <Activity className="w-4 h-4 text-secondary" />
             </button>
           )}
           <button
             onClick={() => setShowSettings(true)}
-            className="p-2 hover:bg-[#F0F0F0] rounded-lg transition-all duration-200"
+            className="p-2 hover:bg-elevated rounded-lg transition-all duration-200"
             title="Proposal Settings"
           >
-            <Settings className="w-4 h-4 text-[#666666]" />
+            <Settings className="w-4 h-4 text-secondary" />
           </button>
           <button
             onClick={() => setShowPreview(true)}
-            className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-all duration-200 flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-gray-600 text-primary text-sm rounded-lg hover:bg-gray-700 transition-all duration-200 flex items-center gap-1.5"
             title="Preview as Customer"
           >
             <Eye className="w-3.5 h-3.5" />
             Preview
           </button>
-          <button className="px-3 py-1.5 bg-[#0A1A2F] text-white text-sm rounded-lg hover:bg-[#0D2342] transition-all duration-200">
+          <button className="px-3 py-1.5 bg-infoSoft text-primary text-sm rounded-lg hover:bg-infoSoft transition-all duration-200">
             <Share2 className="w-3.5 h-3.5 inline mr-1.5" />
             Share with Customer
           </button>
-          <button className="p-2 hover:bg-[#F0F0F0] rounded-lg transition-all duration-200">
-            <MoreVertical className="w-4 h-4 text-[#666666]" />
+          <button className="p-2 hover:bg-elevated rounded-lg transition-all duration-200">
+            <MoreVertical className="w-4 h-4 text-secondary" />
           </button>
         </div>
       </div>
 
       {/* Global Scope Section */}
-      <div className={`bg-white border-b border-[#E5E5E5] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      <div className={`bg-canvas border-b border-subtle transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         scopeCollapsed ? 'h-12' : 'h-32'
       }`}>
         <div
           className="h-12 px-6 flex items-center justify-between cursor-pointer"
           onClick={() => setScopeCollapsed(!scopeCollapsed)}
         >
-          <span className="text-sm font-medium text-[#666666]">Project Summary</span>
-          <ChevronDown className={`w-4 h-4 text-[#999999] transition-transform duration-300 ${
+          <span className="text-sm font-medium text-secondary">Project Summary</span>
+          <ChevronDown className={`w-4 h-4 text-muted transition-transform duration-300 ${
             scopeCollapsed ? 'rotate-180' : ''
           }`} />
         </div>
@@ -314,7 +314,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
               value={proposal?.notes || ''}
               onChange={(e) => setProposal({ ...proposal, notes: e.target.value })}
               placeholder="Add project overview, scope of work, or special notes for the customer..."
-              className="w-full h-16 px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm text-[#222222] resize-none focus:outline-none focus:ring-1 focus:ring-[#0A1A2F] focus:border-transparent transition-all duration-200"
+              className="w-full h-16 px-3 py-2 border border-subtle rounded-lg text-sm text-primary resize-none focus:outline-none focus:ring-1 focus:ring-brand focus:border-transparent transition-all duration-200"
             />
           </div>
         )}
@@ -323,27 +323,27 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       {/* Main Grid */}
       <div className="flex-1 overflow-auto relative" style={{ paddingBottom: footerState === 'full' ? '250px' : footerState === 'compact' ? '48px' : '0px' }}>
         <table className="min-w-full">
-          <thead className="sticky top-0 bg-[#FAFAFA] z-20">
-            <tr className="border-b border-[#E5E5E5]">
-              <th className="text-left py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide w-8"></th>
-              <th className="text-left py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide w-48">Area</th>
-              <th className="text-center py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide w-20">Qty</th>
-              <th className="text-left py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide">Product / Description</th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide w-28">Cost</th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide w-24">Margin %</th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide w-32">Sell Price</th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-[#666666] uppercase tracking-wide w-32">Total Sell</th>
+          <thead className="sticky top-0 bg-surface z-20">
+            <tr className="border-b border-subtle">
+              <th className="text-left py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide w-8"></th>
+              <th className="text-left py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide w-48">Area</th>
+              <th className="text-center py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide w-20">Qty</th>
+              <th className="text-left py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide">Product / Description</th>
+              <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide w-28">Cost</th>
+              <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide w-24">Margin %</th>
+              <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide w-32">Sell Price</th>
+              <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wide w-32">Total Sell</th>
             </tr>
           </thead>
           <tbody>
             {rooms.map((room) => (
               <React.Fragment key={room.id}>
                 {/* Area Header Row */}
-                <tr className="bg-[#0A1A2F] h-16">
+                <tr className="bg-infoSoft h-16">
                   <td colSpan={8} className="px-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="text-white font-semibold">{room.name}</span>
+                        <span className="text-primary font-semibold">{room.name}</span>
                         {room.description && (
                           <span className="px-2 py-1 bg-blue-500/20 text-blue-200 text-xs rounded flex items-center gap-1">
                             <FileText className="w-3 h-3" />
@@ -354,7 +354,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setEditingScopeRoomId(room.id)}
-                          className="text-white/70 hover:text-white text-sm flex items-center gap-1 transition-colors duration-200"
+                          className="text-primary/70 hover:text-primary text-sm flex items-center gap-1 transition-colors duration-200"
                           title="Edit Scope of Work"
                         >
                           <FileText className="w-3.5 h-3.5" />
@@ -365,7 +365,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
                             setSelectedRoomId(room.id);
                             setShowAddItemModal(true);
                           }}
-                          className="text-white/70 hover:text-white text-sm flex items-center gap-1 transition-colors duration-200"
+                          className="text-primary/70 hover:text-primary text-sm flex items-center gap-1 transition-colors duration-200"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           Add Item
@@ -385,10 +385,10 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
                   return (
                     <tr
                       key={item.id}
-                      className={`h-[52px] border-b border-[#F0F0F0] cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                        isSelected ? 'bg-[#0A1A2F]/5 border-l-2 border-l-[#0A1A2F]' :
-                        isHovered ? 'bg-[#0A1A2F]/4 shadow-sm translate-y-[-1px]' :
-                        'bg-white hover:bg-[#0A1A2F]/4'
+                      className={`h-[52px] border-b border-elevated cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        isSelected ? 'bg-infoSoft border-l-2 border-l-[#0A1A2F]' :
+                        isHovered ? 'bg-infoSoft shadow-sm translate-y-[-1px]' :
+                        'bg-canvas hover:bg-infoSoft'
                       }`}
                       onMouseEnter={() => setHoveredItemId(item.id)}
                       onMouseLeave={() => setHoveredItemId(null)}
@@ -397,20 +397,20 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
                       <td className="px-4">
                         <GripVertical className="w-4 h-4 text-[#CCCCCC] opacity-0 group-hover:opacity-100" />
                       </td>
-                      <td className="px-4 text-sm text-[#999999]">{room.name}</td>
+                      <td className="px-4 text-sm text-muted">{room.name}</td>
                       <td className="px-4 text-center">
                         <input
                           type="number"
                           value={item.quantity}
-                          className="w-16 text-center bg-transparent border-none text-[#222222] font-mono tabular-nums"
+                          className="w-16 text-center bg-transparent border-none text-primary font-mono tabular-nums"
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>
                       <td className="px-4">
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
-                            <div className="text-sm font-medium text-[#111111]">{item.description}</div>
-                            {item.sku && <div className="text-xs text-[#999999] mt-0.5">{item.sku}</div>}
+                            <div className="text-sm font-medium text-primary">{item.description}</div>
+                            {item.sku && <div className="text-xs text-muted mt-0.5">{item.sku}</div>}
                           </div>
                           <button
                             onClick={(e) => {
@@ -426,18 +426,18 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 text-right font-mono tabular-nums text-sm text-[#666666]">
+                      <td className="px-4 text-right font-mono tabular-nums text-sm text-secondary">
                         ${(item.cost || 0).toFixed(2)}
                       </td>
                       <td className={`px-4 text-right font-mono tabular-nums text-sm font-medium ${
-                        marginPercent >= 40 ? 'text-[#227700]' : marginPercent >= 25 ? 'text-[#666666]' : 'text-[#CC3300]'
+                        marginPercent >= 40 ? 'text-[#227700]' : marginPercent >= 25 ? 'text-secondary' : 'text-[#CC3300]'
                       }`}>
                         {marginPercent.toFixed(1)}%
                       </td>
-                      <td className="px-4 text-right font-mono tabular-nums text-sm text-[#222222]">
+                      <td className="px-4 text-right font-mono tabular-nums text-sm text-primary">
                         ${item.unit_price.toFixed(2)}
                       </td>
-                      <td className="px-4 text-right font-mono tabular-nums font-semibold text-[#111111]">
+                      <td className="px-4 text-right font-mono tabular-nums font-semibold text-primary">
                         ${item.line_total.toFixed(2)}
                       </td>
                     </tr>
@@ -447,11 +447,11 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
             ))}
 
             {/* Add Area Row */}
-            <tr className="h-16 bg-[#FAFAFA] border-t border-[#E5E5E5]">
+            <tr className="h-16 bg-surface border-t border-subtle">
               <td colSpan={8} className="px-4">
                 <button
                   onClick={() => setShowAddAreaModal(true)}
-                  className="w-full text-left text-[#666666] hover:text-[#0A1A2F] flex items-center gap-2 transition-colors duration-200"
+                  className="w-full text-left text-secondary hover:text-brand flex items-center gap-2 transition-colors duration-200"
                 >
                   <Plus className="w-4 h-4" />
                   <span className="text-sm font-medium">Add Area</span>
@@ -463,7 +463,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       </div>
 
       {/* Detail Card - Slides from Right */}
-      <div className={`fixed top-0 right-0 w-full sm:w-[380px] h-full bg-white shadow-2xl transition-transform duration-[240ms] ease-[cubic-bezier(0.16,1,0.3,1)] z-30 ${
+      <div className={`fixed top-0 right-0 w-full sm:w-[380px] h-full bg-canvas shadow-2xl transition-transform duration-[240ms] ease-[cubic-bezier(0.16,1,0.3,1)] z-30 ${
         detailItem ? 'translate-x-0' : 'translate-x-full'
       }`}>
         {detailItem && (
@@ -480,57 +480,57 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
             {/* Content */}
             <div className="flex-1 overflow-auto p-6 space-y-6">
               <div>
-                <h3 className="text-lg font-bold text-[#111111] mb-1">{detailItem.description}</h3>
+                <h3 className="text-lg font-bold text-primary mb-1">{detailItem.description}</h3>
                 {detailItem.sku && (
-                  <p className="text-sm text-[#999999]">SKU: {detailItem.sku}</p>
+                  <p className="text-sm text-muted">SKU: {detailItem.sku}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <div className="text-xs text-[#999999] uppercase tracking-wide mb-1">Quantity</div>
-                  <div className="font-mono text-[#222222]">{detailItem.quantity}</div>
+                  <div className="text-xs text-muted uppercase tracking-wide mb-1">Quantity</div>
+                  <div className="font-mono text-primary">{detailItem.quantity}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-[#999999] uppercase tracking-wide mb-1">Unit</div>
-                  <div className="font-mono text-[#222222]">{detailItem.unit || 'EA'}</div>
+                  <div className="text-xs text-muted uppercase tracking-wide mb-1">Unit</div>
+                  <div className="font-mono text-primary">{detailItem.unit || 'EA'}</div>
                 </div>
               </div>
 
-              <div className="border-t border-[#E5E5E5] pt-4 space-y-3">
+              <div className="border-t border-subtle pt-4 space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#666666]">Cost per unit</span>
-                  <span className="font-mono text-[#222222]">{formatCurrency(detailItem.cost || 0)}</span>
+                  <span className="text-sm text-secondary">Cost per unit</span>
+                  <span className="font-mono text-primary">{formatCurrency(detailItem.cost || 0)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#666666]">Sell price</span>
-                  <span className="font-mono font-semibold text-[#111111]">{formatCurrency(detailItem.unit_price)}</span>
+                  <span className="text-sm text-secondary">Sell price</span>
+                  <span className="font-mono font-semibold text-primary">{formatCurrency(detailItem.unit_price)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#666666]">Margin</span>
+                  <span className="text-sm text-secondary">Margin</span>
                   <span className="font-mono font-semibold text-[#227700]">
                     {detailItem.unit_price > 0 ? (((detailItem.unit_price - (detailItem.cost || 0)) / detailItem.unit_price) * 100).toFixed(1) : 0}%
                   </span>
                 </div>
               </div>
 
-              <div className="border-t border-[#E5E5E5] pt-4">
-                <div className="text-xs text-[#999999] uppercase tracking-wide mb-2">Line Total</div>
-                <div className="text-3xl font-bold text-[#0A1A2F] font-mono">{formatCurrency(detailItem.line_total)}</div>
+              <div className="border-t border-subtle pt-4">
+                <div className="text-xs text-muted uppercase tracking-wide mb-2">Line Total</div>
+                <div className="text-3xl font-bold text-brand font-mono">{formatCurrency(detailItem.line_total)}</div>
               </div>
 
               {selectedItem && (
                 <div className="space-y-2">
                   <button
                     onClick={() => setEditingTaskItemId(detailItem.id)}
-                    className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-primary rounded-lg transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2"
                   >
                     <Wrench className="w-4 h-4" />
                     {detailItem.task_notes ? 'Edit' : 'Add'} Install Instructions
                   </button>
                   <button
                     onClick={() => setSelectedItemId(null)}
-                    className="w-full py-2.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] text-[#222222] rounded-lg transition-all duration-200 text-sm font-medium"
+                    className="w-full py-2.5 bg-[#F5F5F5] hover:bg-subtle text-primary rounded-lg transition-all duration-200 text-sm font-medium"
                   >
                     Close
                   </button>
@@ -542,32 +542,32 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       </div>
 
       {/* The Money Bar - Footer */}
-      <div className={`fixed bottom-0 left-0 right-0 bg-[#0A1A2F] text-white transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-20 ${
+      <div className={`fixed bottom-0 left-0 right-0 bg-infoSoft text-primary transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-20 ${
         footerState === 'full' ? 'h-[250px]' : footerState === 'compact' ? 'h-12' : 'h-0'
       }`}>
         {footerState === 'compact' && (
           <div className="h-12 px-6 flex items-center justify-between">
             <div className="flex items-center gap-8 font-mono">
               <div>
-                <span className="text-white/60 text-xs mr-2">Total Sell</span>
-                <span className="text-white font-bold text-lg">{formatCurrency(totalSell)}</span>
+                <span className="text-primary/60 text-xs mr-2">Total Sell</span>
+                <span className="text-primary font-bold text-lg">{formatCurrency(totalSell)}</span>
               </div>
               <div>
-                <span className="text-white/60 text-xs mr-2">Cost</span>
-                <span className="text-white">{formatCurrency(totalCost)}</span>
+                <span className="text-primary/60 text-xs mr-2">Cost</span>
+                <span className="text-primary">{formatCurrency(totalCost)}</span>
               </div>
               <div>
-                <span className="text-white/60 text-xs mr-2">Margin</span>
+                <span className="text-primary/60 text-xs mr-2">Margin</span>
                 <span className="text-[#88DD66] font-semibold">{totalMarginPercent.toFixed(1)}%</span>
               </div>
               <div>
-                <span className="text-white/60 text-xs mr-2">Profit</span>
+                <span className="text-primary/60 text-xs mr-2">Profit</span>
                 <span className="text-[#88DD66] font-semibold">{formatCurrency(totalProfit)}</span>
               </div>
             </div>
             <button
               onClick={() => setFooterState(footerState === 'compact' ? 'full' : 'compact')}
-              className="p-2 hover:bg-white/10 rounded transition-colors duration-200"
+              className="p-2 hover:bg-canvas/10 rounded transition-colors duration-200"
             >
               <ChevronUp className="w-4 h-4" />
             </button>
@@ -578,14 +578,14 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
           <div className="h-full flex flex-col">
             <div className="h-12 px-6 flex items-center justify-between border-b border-white/10">
               <div className="flex gap-6">
-                <button className="text-sm font-medium text-white border-b-2 border-white pb-3">Overview</button>
-                <button className="text-sm text-white/60 hover:text-white pb-3 transition-colors duration-200">By Area</button>
-                <button className="text-sm text-white/60 hover:text-white pb-3 transition-colors duration-200">By Class</button>
-                <button className="text-sm text-white/60 hover:text-white pb-3 transition-colors duration-200">By Labor Phase</button>
+                <button className="text-sm font-medium text-primary border-b-2 border-white pb-3">Overview</button>
+                <button className="text-sm text-primary/60 hover:text-primary pb-3 transition-colors duration-200">By Area</button>
+                <button className="text-sm text-primary/60 hover:text-primary pb-3 transition-colors duration-200">By Class</button>
+                <button className="text-sm text-primary/60 hover:text-primary pb-3 transition-colors duration-200">By Labor Phase</button>
               </div>
               <button
                 onClick={() => setFooterState('compact')}
-                className="p-2 hover:bg-white/10 rounded transition-colors duration-200"
+                className="p-2 hover:bg-canvas/10 rounded transition-colors duration-200"
               >
                 <ChevronDown className="w-4 h-4" />
               </button>
@@ -593,19 +593,19 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
             <div className="flex-1 p-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                 <div className="text-center">
-                  <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Total Sell</div>
+                  <div className="text-xs text-primary/60 uppercase tracking-wide mb-2">Total Sell</div>
                   <div className="text-4xl font-bold font-mono">{formatCurrency(totalSell)}</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Total Cost</div>
+                  <div className="text-xs text-primary/60 uppercase tracking-wide mb-2">Total Cost</div>
                   <div className="text-4xl font-bold font-mono">{formatCurrency(totalCost)}</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Margin %</div>
+                  <div className="text-xs text-primary/60 uppercase tracking-wide mb-2">Margin %</div>
                   <div className="text-4xl font-bold font-mono text-[#88DD66]">{totalMarginPercent.toFixed(1)}%</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xs text-white/60 uppercase tracking-wide mb-2">Profit</div>
+                  <div className="text-xs text-primary/60 uppercase tracking-wide mb-2">Profit</div>
                   <div className="text-4xl font-bold font-mono text-[#88DD66]">{formatCurrency(totalProfit)}</div>
                 </div>
               </div>
@@ -618,7 +618,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       {footerState === 'hidden' && (
         <button
           onClick={() => setFooterState('compact')}
-          className="fixed bottom-4 right-4 px-4 py-2 bg-[#0A1A2F] text-white text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+          className="fixed bottom-4 right-4 px-4 py-2 bg-infoSoft text-primary text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
         >
           Show Totals
         </button>
@@ -799,8 +799,8 @@ function AddAreaModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: s
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-[#111111] mb-4">Add Areas</h2>
+      <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold text-primary mb-4">Add Areas</h2>
 
         {loading ? (
           <div className="py-8 text-center text-gray-500">Loading areas...</div>
@@ -821,8 +821,8 @@ function AddAreaModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: s
                         onClick={() => toggleArea(template.name)}
                         className={`px-4 py-2 border rounded-lg text-left transition-colors ${
                           selectedAreas.includes(template.name)
-                            ? 'bg-[#0A1A2F] text-white border-[#0A1A2F]'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            ? 'bg-infoSoft text-primary border-brand'
+                            : 'bg-canvas text-gray-700 border-gray-300 hover:bg-gray-50'
                         }`}
                       >
                         {template.name}
@@ -842,7 +842,7 @@ function AddAreaModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: s
                   value={customAreaName}
                   onChange={(e) => setCustomAreaName(e.target.value)}
                   placeholder="Enter custom area name"
-                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#0A1A2F] focus:border-transparent"
+                  className="w-full px-4 py-3 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
                 />
               </div>
 
@@ -866,14 +866,14 @@ function AddAreaModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: s
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] text-[#222222] rounded-lg transition-colors duration-200 font-medium"
+                className="flex-1 px-4 py-2.5 bg-[#F5F5F5] hover:bg-subtle text-primary rounded-lg transition-colors duration-200 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!hasSelection}
-                className="flex-1 px-4 py-2.5 bg-[#0A1A2F] hover:bg-[#0D2342] text-white rounded-lg transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 bg-infoSoft hover:bg-infoSoft text-primary rounded-lg transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Area{selectedAreas.length > 1 || (selectedAreas.length === 1 && customAreaName.trim()) ? 's' : ''}
               </button>
@@ -917,38 +917,38 @@ function AddLineItemModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-[#111111] mb-4">Add Line Item</h2>
+      <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold text-primary mb-4">Add Line Item</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#666666] mb-1">Description</label>
+            <label className="block text-sm font-medium text-secondary mb-1">Description</label>
             <input
               type="text"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Product or service description"
-              className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#0A1A2F] focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
               autoFocus
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[#666666] mb-1">SKU (optional)</label>
+              <label className="block text-sm font-medium text-secondary mb-1">SKU (optional)</label>
               <input
                 type="text"
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                 placeholder="Product SKU"
-                className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#0A1A2F] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#666666] mb-1">Unit</label>
+              <label className="block text-sm font-medium text-secondary mb-1">Unit</label>
               <select
                 value={formData.unit}
                 onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#0A1A2F] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
               >
                 <option value="EA">Each</option>
                 <option value="SF">Square Foot</option>
@@ -962,50 +962,50 @@ function AddLineItemModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[#666666] mb-1">Quantity</label>
+              <label className="block text-sm font-medium text-secondary mb-1">Quantity</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#0A1A2F] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#666666] mb-1">Cost</label>
+              <label className="block text-sm font-medium text-secondary mb-1">Cost</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={formData.cost}
                 onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#0A1A2F] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#666666] mb-1">Sell Price</label>
+              <label className="block text-sm font-medium text-secondary mb-1">Sell Price</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={formData.unit_price}
                 onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#0A1A2F] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
               />
             </div>
           </div>
 
-          <div className="bg-[#FAFAFA] p-4 rounded-lg space-y-2">
+          <div className="bg-surface p-4 rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-[#666666]">Margin:</span>
-              <span className={`font-mono font-semibold ${marginPercent >= 40 ? 'text-[#227700]' : marginPercent >= 25 ? 'text-[#666666]' : 'text-[#CC3300]'}`}>
+              <span className="text-secondary">Margin:</span>
+              <span className={`font-mono font-semibold ${marginPercent >= 40 ? 'text-[#227700]' : marginPercent >= 25 ? 'text-secondary' : 'text-[#CC3300]'}`}>
                 {marginPercent.toFixed(1)}%
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#666666]">Line Total:</span>
-              <span className="font-mono font-bold text-[#0A1A2F] text-lg">
+              <span className="text-secondary">Line Total:</span>
+              <span className="font-mono font-bold text-brand text-lg">
                 ${(formData.quantity * formData.unit_price).toFixed(2)}
               </span>
             </div>
@@ -1015,14 +1015,14 @@ function AddLineItemModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] text-[#222222] rounded-lg transition-colors duration-200 font-medium"
+              className="flex-1 px-4 py-2.5 bg-[#F5F5F5] hover:bg-subtle text-primary rounded-lg transition-colors duration-200 font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!formData.description.trim()}
-              className="flex-1 px-4 py-2.5 bg-[#0A1A2F] hover:bg-[#0D2342] text-white rounded-lg transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2.5 bg-infoSoft hover:bg-infoSoft text-primary rounded-lg transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add Item
             </button>
@@ -1074,40 +1074,40 @@ function AddItemToMultipleAreasModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-[#111111] mb-4">Add Item to Multiple Areas</h2>
+      <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold text-primary mb-4">Add Item to Multiple Areas</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Item Details */}
           <div className="space-y-4 pb-4 border-b border-gray-200">
             <div>
-              <label className="block text-sm font-medium text-[#666666] mb-1">Description</label>
+              <label className="block text-sm font-medium text-secondary mb-1">Description</label>
               <input
                 type="text"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Product or service description"
-                className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 autoFocus
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[#666666] mb-1">SKU (optional)</label>
+                <label className="block text-sm font-medium text-secondary mb-1">SKU (optional)</label>
                 <input
                   type="text"
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   placeholder="Product SKU"
-                  className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#666666] mb-1">Unit</label>
+                <label className="block text-sm font-medium text-secondary mb-1">Unit</label>
                 <select
                   value={formData.unit}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 >
                   <option value="EA">Each</option>
                   <option value="SF">Square Foot</option>
@@ -1121,49 +1121,49 @@ function AddItemToMultipleAreasModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[#666666] mb-1">Quantity</label>
+                <label className="block text-sm font-medium text-secondary mb-1">Quantity</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#666666] mb-1">Cost</label>
+                <label className="block text-sm font-medium text-secondary mb-1">Cost</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={formData.cost}
                   onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#666666] mb-1">Sell Price</label>
+                <label className="block text-sm font-medium text-secondary mb-1">Sell Price</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={formData.unit_price}
                   onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-subtle rounded-lg text-primary focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 />
               </div>
             </div>
 
-            <div className="bg-[#FAFAFA] p-4 rounded-lg space-y-2">
+            <div className="bg-surface p-4 rounded-lg space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-[#666666]">Margin:</span>
-                <span className={`font-mono font-semibold ${marginPercent >= 40 ? 'text-[#227700]' : marginPercent >= 25 ? 'text-[#666666]' : 'text-[#CC3300]'}`}>
+                <span className="text-secondary">Margin:</span>
+                <span className={`font-mono font-semibold ${marginPercent >= 40 ? 'text-[#227700]' : marginPercent >= 25 ? 'text-secondary' : 'text-[#CC3300]'}`}>
                   {marginPercent.toFixed(1)}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#666666]">Line Total:</span>
+                <span className="text-secondary">Line Total:</span>
                 <span className="font-mono font-bold text-blue-600 text-lg">
                   ${(formData.quantity * formData.unit_price).toFixed(2)}
                 </span>
@@ -1173,7 +1173,7 @@ function AddItemToMultipleAreasModal({
 
           {/* Area Selection */}
           <div>
-            <label className="block text-sm font-medium text-[#666666] mb-2">
+            <label className="block text-sm font-medium text-secondary mb-2">
               Select areas to add this item to:
             </label>
             {rooms.length === 0 ? (
@@ -1189,8 +1189,8 @@ function AddItemToMultipleAreasModal({
                     onClick={() => toggleRoom(room.id)}
                     className={`px-4 py-2 border rounded-lg text-left transition-colors ${
                       selectedRoomIds.includes(room.id)
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        ? 'bg-blue-600 text-primary border-blue-600'
+                        : 'bg-canvas text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
                     {room.name}
@@ -1215,14 +1215,14 @@ function AddItemToMultipleAreasModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] text-[#222222] rounded-lg transition-colors duration-200 font-medium"
+              className="flex-1 px-4 py-2.5 bg-[#F5F5F5] hover:bg-subtle text-primary rounded-lg transition-colors duration-200 font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!formData.description.trim() || selectedRoomIds.length === 0}
-              className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-primary rounded-lg transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add to {selectedRoomIds.length || 0} Area{selectedRoomIds.length !== 1 ? 's' : ''}
             </button>
@@ -1258,7 +1258,7 @@ function ExpirationDateModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
+      <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-md p-6">
         <div className="flex items-center gap-3 mb-4">
           <Calendar className="w-6 h-6 text-blue-600" />
           <h2 className="text-xl font-bold text-gray-900">Set Expiration Date</h2>
@@ -1312,7 +1312,7 @@ function ExpirationDateModal({
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+              className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-primary rounded-lg transition-colors font-medium"
             >
               Save
             </button>
@@ -1404,7 +1404,7 @@ function ProposalActivityModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Activity className="w-6 h-6 text-blue-600" />
@@ -1572,7 +1572,7 @@ function CustomerPreview({
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-canvas border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -1594,7 +1594,7 @@ function CustomerPreview({
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-5xl mx-auto">
           {/* Proposal Header */}
-          <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
+          <div className="bg-canvas rounded-lg shadow-sm p-8 mb-6">
             <div className="border-b border-gray-200 pb-6 mb-6">
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{proposal?.title}</h2>
               <div className="flex items-center justify-between text-sm text-gray-600">
@@ -1621,7 +1621,7 @@ function CustomerPreview({
             {/* Areas and Items */}
             {rooms.map((room) => (
               <div key={room.id} className="mb-6">
-                <div className="bg-blue-600 text-white px-4 py-3 rounded-t-lg">
+                <div className="bg-blue-600 text-primary px-4 py-3 rounded-t-lg">
                   <h3 className="text-lg font-semibold">{room.name}</h3>
                 </div>
                 <div className="border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
@@ -1663,24 +1663,24 @@ function CustomerPreview({
           </div>
 
           {/* Customer Actions (Simulated) */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-canvas rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Actions</h3>
             <div className="flex gap-4">
               <button
                 disabled
-                className="flex-1 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg opacity-50 cursor-not-allowed"
+                className="flex-1 px-6 py-3 bg-green-600 text-primary font-semibold rounded-lg opacity-50 cursor-not-allowed"
               >
                 ✓ Accept Proposal
               </button>
               <button
                 disabled
-                className="flex-1 px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg opacity-50 cursor-not-allowed"
+                className="flex-1 px-6 py-3 bg-gray-600 text-primary font-semibold rounded-lg opacity-50 cursor-not-allowed"
               >
                 📥 Download PDF
               </button>
               <button
                 disabled
-                className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg opacity-50 cursor-not-allowed"
+                className="flex-1 px-6 py-3 bg-blue-600 text-primary font-semibold rounded-lg opacity-50 cursor-not-allowed"
               >
                 💬 Ask Question
               </button>

@@ -188,7 +188,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading users...</div>
+        <div className="text-muted">Loading users...</div>
       </div>
     );
   }
@@ -199,13 +199,13 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         <div className="flex items-center gap-2 text-blue-800">
           <Users className="w-5 h-5" />
           <h2 className="text-lg font-semibold">User Management</h2>
-          <span className="ml-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+          <span className="ml-2 bg-blue-600 text-primary text-xs font-bold px-2 py-1 rounded-full">
             {users.length}
           </span>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+          className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-primary rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
         >
           <Plus className="w-4 h-4" />
           Add New User
@@ -236,13 +236,13 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                 </thead>
                 <tbody className="divide-y divide-amber-200">
                   {unclassified.map(u => (
-                    <tr key={u.id} className="bg-white/50">
-                      <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
+                    <tr key={u.id} className="bg-canvas/50">
+                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
+                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
                       <td className="px-3 py-2 text-right">
                         <button
                           onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-700 transition-colors"
+                          className="px-3 py-1 bg-amber-600 text-primary rounded text-xs font-medium hover:bg-amber-700 transition-colors"
                         >
                           Review
                         </button>
@@ -283,13 +283,13 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                 </thead>
                 <tbody className="divide-y divide-blue-200">
                   {unreviewed.map(u => (
-                    <tr key={u.id} className="bg-white/50">
-                      <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
+                    <tr key={u.id} className="bg-canvas/50">
+                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
+                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
                       <td className="px-3 py-2 text-right">
                         <button
                           onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+                          className="px-3 py-1 bg-blue-600 text-primary rounded text-xs font-medium hover:bg-blue-700 transition-colors"
                         >
                           Review
                         </button>
@@ -303,44 +303,44 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         );
       })()}
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-canvas rounded-lg shadow-sm border border-subtle overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-surface border-b border-subtle">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">User</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Created</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
+                <tr key={user.id} className="hover:bg-surface">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className={`p-1.5 rounded-lg flex-shrink-0 ${
-                        user.is_active ? 'bg-blue-100' : 'bg-gray-100'
+                        user.is_active ? 'bg-blue-100' : 'bg-surface'
                       }`}>
                         {user.role === 'admin' ? (
-                          <Shield className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <Shield className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-muted'}`} />
                         ) : (
-                          <User className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <User className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-muted'}`} />
                         )}
                       </div>
                       <div className="min-w-0">
                         <div className={`font-medium text-sm ${
-                          user.is_active ? 'text-gray-900' : 'text-gray-400'
+                          user.is_active ? 'text-primary' : 'text-muted'
                         }`}>
                           {user.full_name}
                         </div>
                         <div className={`text-xs truncate ${
-                          user.is_active ? 'text-gray-500' : 'text-gray-400'
+                          user.is_active ? 'text-muted' : 'text-muted'
                         }`}>
                           {user.email}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-muted mt-1">
                           {accountStatusError ? 'Welcome status unavailable' : accountStatuses.get(user.id)?.activated_at ? 'Account Activated' : accountStatuses.get(user.id)?.welcome_sent_at ? `Welcome sent ${new Date(accountStatuses.get(user.id)!.welcome_sent_at!).toLocaleString()}` : 'Welcome: Never Sent'}
                         </div>
                         {(accountStatuses.get(user.id)?.welcome_error || accountStatuses.get(user.id)?.reset_error) && (
@@ -359,7 +359,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       String(user.role) === 'project_manager' ? 'bg-cyan-100 text-cyan-700' :
                       user.role === 'sales' ? 'bg-green-100 text-green-700' :
                       user.role === 'tech' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-700'
+                      'bg-surface text-secondary'
                     }`}>
                       {formatRoleName(user.role)}
                     </span>
@@ -379,7 +379,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                         </span>
                       )}
                       {(user as any).employment_classification === 'non_employee' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-surface text-secondary">
                           Non-Employee
                         </span>
                       )}
@@ -398,7 +398,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       {formatDistanceToNow(user.created_at)}
                     </span>
                   </td>
@@ -455,8 +455,8 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
       </div>
 
       {users.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+        <div className="text-center py-12 text-muted">
+          <Users className="w-12 h-12 mx-auto mb-3 text-muted" />
           <p>No users found</p>
         </div>
       )}
