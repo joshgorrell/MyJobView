@@ -41,6 +41,7 @@ function buildTestTuneEmail(params: {
   accentColor: string;
 }): string {
   const { contactName, companyName, companyEmail, companyLogoUrl, portalUrl, projectName, expirationDate, offices, accentColor } = params;
+  const escapeDetail = (value: string) => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]!));
 
   const logoBlock = companyLogoUrl
     ? `<img src="${companyLogoUrl}" alt="${companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
@@ -84,7 +85,7 @@ function buildTestTuneEmail(params: {
         <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 24px 0;">Hi ${contactName},</p>
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0 0 20px 0;">
-          Congratulations&mdash;your project is now substantially complete.
+          Congratulations&mdash;${escapeDetail(projectName)} is now substantially complete. Your complimentary VIP access through Test &amp; Tune ends ${escapeDetail(expirationDate)}.
         </p>
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0 0 20px 0;">
@@ -636,7 +637,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { invite_id, contact_email, contact_name, project_name, expiration_date, access_type, preview, magic_link_only } = body;
+    const { invite_id, contact_email, contact_name, project_name, expiration_date, access_type, preview, magic_link_only, plan_id } = body;
 
     if (!contact_name) {
       throw new Error("contact_name is required");
@@ -666,10 +667,11 @@ Deno.serve(async (req: Request) => {
     const needsMagicLink = !isTestAndTuneNoPortal && !preview && !!contact_email;
 
     let resolvedPortalUrl = portalUrl;
-    let resolvedSignupUrl = `${portalUrl}/membership`;
+    const signupDestination = plan_id ? `${portalUrl}/signup?plan=${encodeURIComponent(plan_id)}` : `${portalUrl}/membership`;
+    let resolvedSignupUrl = signupDestination;
 
     if (needsMagicLink) {
-      const magicLinkRedirect = isVIPSignup ? `${portalUrl}/membership` : `${portalUrl}?redirect=/portal/punchlist`;
+      const magicLinkRedirect = isVIPSignup ? signupDestination : `${portalUrl}?redirect=/portal/punchlist`;
       const magicLink = await generateMagicLink(supabaseClient, contact_email, magicLinkRedirect);
       if (magicLink) {
         if (isVIPSignup) {
@@ -790,6 +792,13 @@ Deno.serve(async (req: Request) => {
           accentColor,
         });
       }
+    } else if (access_type === 'vip_comped') {
+      const escape = (value: string) => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]!));
+      subject = `Your Complimentary VIP Membership — ${settings.company_name}`;
+      emailHtml = wrapInEmailLayout(
+        `<p>Hello ${escape(contact_name)},</p><p>Your VIP membership has been provided at no charge through ${escape(resolvedExpiration)}.</p><p>Use your customer portal to submit tasks, request service, and stay connected with our team.</p><p><a href="${escape(resolvedPortalUrl)}">Open Your VIP Portal</a></p><p>This complimentary term will not automatically bill or renew.</p>`,
+        settings.company_name, settings.company_email, accentColor, settings.company_logo_url, settings.offices,
+      );
     } else if (isTestAndTune) {
       const testTuneTemplate = await getEmailTemplate(
         'punchlist_test_and_tune',

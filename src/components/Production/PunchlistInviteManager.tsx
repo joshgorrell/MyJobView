@@ -457,7 +457,25 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
   const [vipSignupLinkCopied, setVipSignupLinkCopied] = useState(false);
   const [showManualSendConfirmation, setShowManualSendConfirmation] = useState(false);
   const [manualInviteEmail, setManualInviteEmail] = useState('');
-  const [manualInviteType, setManualInviteType] = useState<'test_and_tune' | 'test_and_tune_no_portal' | 'vip_signup' | 'vip_trial' | null>(null);
+  const [manualInviteType, setManualInviteType] = useState<'test_and_tune' | 'vip_signup' | null>(null);
+  const [manualVIPFunding, setManualVIPFunding] = useState<'paid' | 'comped'>('paid');
+  const [manualVIPPlanId, setManualVIPPlanId] = useState('');
+  const [manualVIPEndDate, setManualVIPEndDate] = useState('');
+  const [manualVIPPlans, setManualVIPPlans] = useState<{id: string; plan_name: string; show_on_portal: boolean}[]>([]);
+  useEffect(() => {
+    if (!showCreateInvite) return;
+    setManualVIPFunding('paid');
+    setManualVIPPlanId('');
+    setManualVIPEndDate('');
+    let cancelled = false;
+    supabase.from('recurring_plans').select('id,plan_name,show_on_portal').eq('plan_type', 'vip_plan').eq('is_active', true).order('plan_name')
+      .then(({data, error}) => {
+        if (cancelled) return;
+        if (error) toast.error(error.message, 'Could not load VIP plans');
+        setManualVIPPlans(data || []);
+      });
+    return () => { cancelled = true; };
+  }, [showCreateInvite]);
   const [manualProjectId,setManualProjectId]=useState('');
   const [manualProjects,setManualProjects]=useState<{id:string;name:string;substantial_completion_date:string|null}[]>([]);
   useEffect(()=>{let cancelled=false;setManualProjectId('');setManualProjects([]);if(selectedContact?.id)supabase.from('projects').select('id,name,substantial_completion_date').eq('contact_id',selectedContact.id).not('substantial_completion_date','is',null).then(({data})=>{if(!cancelled)setManualProjects(data||[]);});return()=>{cancelled=true;};},[selectedContact?.id]);
@@ -1044,14 +1062,18 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
       return;
     }
 
-    if ((manualInviteType === 'test_and_tune' || manualInviteType === 'test_and_tune_no_portal') && !manualProjectId) { toast.warning('Select the substantially completed project'); return; }
+    if (manualInviteType === 'test_and_tune' && !manualProjectId) { toast.warning('Select the substantially completed project'); return; }
+    if (manualInviteType === 'vip_signup' && !manualVIPPlanId) { toast.warning('Select a VIP plan'); return; }
+    if (manualInviteType === 'vip_signup' && manualVIPFunding === 'comped' && (!manualVIPEndDate || manualVIPEndDate < new Date().toISOString().slice(0, 10))) {
+      toast.warning('Choose a current or future end date for the comped membership'); return;
+    }
     setShowManualSendConfirmation(true);
   }
 
   async function confirmManualInvite() {
     if (!selectedContact || !manualInviteType) return;
 
-    if (manualInviteType === 'vip_signup') {
+    if (manualInviteType === 'vip_signup' && manualVIPFunding === 'paid') {
       if (!manualInviteEmail.trim() || !manualInviteEmail.includes('@')) {
         toast.error('Please enter a valid email address');
         return;
@@ -1071,15 +1093,13 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
             contact_email: manualInviteEmail.trim(),
             contact_name: selectedContact.full_name,
             access_type: 'vip_signup',
+            plan_id: manualVIPPlanId,
           }
         });
-        if (emailResult.data?.error) {
-          toast.warning(emailResult.data.error);
-        } else if (emailResult.error) {
-          toast.error(emailResult.error.message, 'Email sending error');
-        }
+        if (emailResult.data?.error || emailResult.error) throw new Error(emailResult.data?.error || emailResult.error?.message);
       } catch (emailError: any) {
         toast.error(emailError.message, 'Email could not be sent');
+        return;
       } finally {
         setSendingManualInvite(false);
       }
@@ -1120,17 +1140,24 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
       }
 
 
-      const {data:grantId,error:grantError}=await supabase.rpc('grant_customer_program',{
-        p_contact_id:selectedContact.id,p_program:manualInviteType==='vip_trial'?'vip_trial':'test_and_tune',
-        p_project_id:manualInviteType==='vip_trial'?null:manualProjectId,p_days:90
-      });
-      const {data:accessGrant}=grantError?{data:null}:await supabase.from('punchlist_access_grants').select('id,expiration_date').eq('id',grantId).single();
-      if (grantError) {
-        console.error('[Punchlist] Access grant creation error:', grantError);
-        throw grantError;
+      let expirationDate: string;
+      if (manualInviteType === 'vip_signup') {
+        const {data: subscriptionId, error} = await supabase.rpc('grant_comped_vip_membership', {
+          p_contact_id: selectedContact.id, p_plan_id: manualVIPPlanId,
+          p_end_date: manualVIPEndDate, p_notes: inviteNotes.trim() || null,
+        });
+        if (error) throw error;
+        if (!subscriptionId) throw new Error('Membership activation did not return a subscription');
+        expirationDate = manualVIPEndDate;
+      } else {
+        const {data: grantId, error} = await supabase.rpc('grant_customer_program', {
+          p_contact_id: selectedContact.id, p_program: 'test_and_tune', p_project_id: manualProjectId, p_days: 90,
+        });
+        if (error) throw error;
+        const {data: accessGrant, error: detailsError} = await supabase.from('punchlist_access_grants').select('expiration_date').eq('id', grantId).single();
+        if (detailsError || !accessGrant) throw new Error('Access granted. Refresh the customer record before sending again.');
+        expirationDate = accessGrant.expiration_date;
       }
-      if (!accessGrant) throw new Error('Access was granted, but its details could not be loaded. Refresh the customer record before sending again.');
-      console.log('[Punchlist] Access grant created:', accessGrant.id);
 
       console.log('[Punchlist] Sending email notification...');
       try {
@@ -1138,9 +1165,10 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
           body: {
             contact_email: manualInviteEmail.trim(),
             contact_name: selectedContact.full_name,
-            project_name: null,
-            expiration_date: accessGrant.expiration_date,
-            access_type: manualInviteType === 'vip_trial' ? 'promotional' : manualInviteType
+            project_name: manualProjects.find(project => project.id === manualProjectId)?.name,
+            expiration_date: expirationDate,
+            access_type: manualInviteType === 'vip_signup' ? 'vip_comped' : 'test_and_tune',
+            plan_id: manualVIPPlanId || undefined
           }
         });
 
@@ -1158,7 +1186,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
 
       console.log('[Punchlist] Invite process completed successfully');
       const sentName = selectedContact.full_name;
-      const capturedInviteType = manualInviteType;
+      const capturedInviteType = manualInviteType === 'vip_signup' ? 'vip_comped' : manualInviteType;
       setShowManualSendConfirmation(false);
       setShowCreateInvite(false);
       setSelectedContact(null);
@@ -1397,7 +1425,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
           <div className="p-4 sm:p-6 flex items-center justify-between bg-gray-750 border-b border-gray-700">
             <div className="flex items-center gap-2">
               <Send className="w-5 h-5 text-blue-400" />
-              <h4 className="text-lg font-semibold text-white">Send Invite</h4>
+              <h4 className="text-lg font-semibold text-white">Send Customer Invite</h4>
             </div>
             <button
               onClick={() => {
@@ -1591,80 +1619,38 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Invite Type <span className="text-red-400">*</span>
               </label>
-              {(manualInviteType==='test_and_tune'||manualInviteType==='test_and_tune_no_portal')&&<label className="block text-sm text-gray-300 mb-3">Project<select value={manualProjectId} onChange={e=>setManualProjectId(e.target.value)} className="block w-full min-h-11 mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg p-2"><option value="">Select a substantially completed project…</option>{manualProjects.map(project=><option key={project.id} value={project.id}>{project.name} · {project.substantial_completion_date}</option>)}</select><span className="text-xs">Access ends 90 days after substantial completion.</span></label>}
-              <div className="space-y-2">
-                <button onClick={()=>setManualInviteType('vip_trial')} className={`w-full text-left p-3 rounded-xl border-2 ${manualInviteType==='vip_trial'?'border-yellow-500 bg-yellow-900/20':'border-gray-700'}`}>
-                  <span className="font-semibold text-yellow-400">90-Day VIP Trial</span><p className="text-sm text-gray-300 mt-1">Optional promotional access. Separate from the project's Test &amp; Tune period.</p>
-                </button>
-                <button
-                  onClick={() => setManualInviteType('test_and_tune')}
-                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
-                    manualInviteType === 'test_and_tune'
-                      ? 'border-cyan-500 bg-cyan-900/20'
-                      : 'border-gray-700 bg-gray-900 hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${manualInviteType === 'test_and_tune' ? 'bg-cyan-600' : 'bg-gray-700'}`}>
-                      <TrendingUp className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">Test &amp; Tune</span>
-                        <span className="text-xs px-1.5 py-0.5 bg-cyan-900/50 text-cyan-300 rounded-full border border-cyan-700">90 Days Free</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">For completed projects — sends welcome email with portal link.</p>
-                    </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1 ${manualInviteType === 'test_and_tune' ? 'border-cyan-500 bg-cyan-500' : 'border-gray-600'}`} />
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setManualInviteType('vip_signup')}
-                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
-                    manualInviteType === 'vip_signup'
-                      ? 'border-yellow-500 bg-yellow-900/20'
-                      : 'border-gray-700 bg-gray-900 hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${manualInviteType === 'vip_signup' ? 'bg-yellow-600' : 'bg-gray-700'}`}>
-                      <Star className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">VIP Signup</span>
-                        <span className="text-xs px-1.5 py-0.5 bg-yellow-900/50 text-yellow-300 rounded-full border border-yellow-700">Paid Plan</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">Share a signup link directing the customer to choose a VIP plan.</p>
-                    </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1 ${manualInviteType === 'vip_signup' ? 'border-yellow-500 bg-yellow-500' : 'border-gray-600'}`} />
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setManualInviteType('test_and_tune_no_portal')}
-                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
-                    manualInviteType === 'test_and_tune_no_portal'
-                      ? 'border-cyan-500 bg-cyan-900/20'
-                      : 'border-gray-700 bg-gray-900 hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${manualInviteType === 'test_and_tune_no_portal' ? 'bg-cyan-700' : 'bg-gray-700'}`}>
-                      <CheckCheck className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">Test &amp; Tune (No Portal)</span>
-                        <span className="text-xs px-1.5 py-0.5 bg-cyan-900/50 text-cyan-300 rounded-full border border-cyan-800">Email Only</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">Sends the T&T welcome email without including the portal link.</p>
-                    </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1 ${manualInviteType === 'test_and_tune_no_portal' ? 'border-cyan-500 bg-cyan-500' : 'border-gray-600'}`} />
-                  </div>
-                </button>
+              <div className="grid grid-cols-2 gap-2">
+                {(['test_and_tune', 'vip_signup'] as const).map(type => (
+                  <button key={type} type="button" onClick={() => setManualInviteType(type)} aria-pressed={manualInviteType === type}
+                    className={`min-h-20 p-3 text-left rounded-xl border-2 ${manualInviteType === type ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 bg-gray-900'}`}>
+                    <span className="block font-semibold text-white">{type === 'test_and_tune' ? 'Test & Tune' : 'VIP'}</span>
+                    <span className="block text-xs text-gray-300 mt-1">{type === 'test_and_tune' ? '90 Days Included' : 'Membership Plan'}</span>
+                  </button>
+                ))}
               </div>
+              {manualInviteType === 'test_and_tune' && <label className="block text-sm text-gray-300 mt-3">Project
+                <select value={manualProjectId} onChange={e => setManualProjectId(e.target.value)} className="block w-full min-h-11 mt-1 bg-gray-900 text-white border border-gray-700 rounded-lg p-2 text-base">
+                  <option value="">Select a substantially completed project…</option>
+                  {manualProjects.map(project => <option key={project.id} value={project.id}>{project.name} · {project.substantial_completion_date}</option>)}
+                </select>
+                <span className="block text-xs mt-2">Complimentary VIP access ends 90 days after substantial completion.</span>
+              </label>}
+              {manualInviteType === 'vip_signup' && <div className="mt-3 space-y-3">
+                <div className="flex gap-2">{(['paid', 'comped'] as const).map(funding => <button key={funding} type="button" aria-pressed={manualVIPFunding === funding}
+                  onClick={() => { setManualVIPFunding(funding); setManualVIPPlanId(''); }}
+                  className={`flex-1 min-h-11 rounded-lg border text-sm ${manualVIPFunding === funding ? 'border-blue-500 bg-blue-900/30 text-white' : 'border-gray-600 text-gray-300'}`}>
+                  {funding === 'paid' ? 'Paid' : 'Comped'}</button>)}</div>
+                <label className="block text-sm text-gray-300">VIP Plan
+                  <select value={manualVIPPlanId} onChange={e => setManualVIPPlanId(e.target.value)} className="block w-full min-h-11 mt-1 bg-gray-900 text-white border border-gray-700 rounded-lg p-2 text-base">
+                    <option value="">Select a VIP plan…</option>
+                    {manualVIPPlans.filter(plan => manualVIPFunding === 'comped' || plan.show_on_portal).map(plan => <option key={plan.id} value={plan.id}>{plan.plan_name}</option>)}
+                  </select>
+                </label>
+                {manualVIPFunding === 'comped' ? <label className="block text-sm text-gray-300">Comped Through
+                  <input type="date" value={manualVIPEndDate} onChange={e => setManualVIPEndDate(e.target.value)} className="block w-full min-h-11 mt-1 bg-gray-900 border border-gray-700 rounded-lg p-2 text-base text-white" />
+                  <span className="block text-xs mt-2">Activate the selected plan at no charge. No automatic billing or renewal.</span>
+                </label> : <p className="text-xs text-gray-300">Send the selected plan’s signup and payment link. Access activates after signup.</p>}
+              </div>}
             </div>
 
             <div>
@@ -2328,7 +2314,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
 
       {showManualSendConfirmation && selectedContact && manualInviteType && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-md w-full p-6">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-md w-full p-4 sm:p-6 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Send className="w-5 h-5" />
@@ -2345,7 +2331,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
             <div className="space-y-4">
               <div className="p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
                 <div className="text-sm text-blue-300 mb-2">
-                  You are about to send a punchlist invite to:
+                  You are about to send a customer invite to:
                 </div>
                 <div className="font-medium text-white">{selectedContact.full_name}</div>
                 {selectedContact.company_name && (
@@ -2364,40 +2350,17 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                     <div className="text-sm font-semibold text-cyan-400">Test &amp; Tune (90 Days Free)</div>
                   </div>
                   <ul className="text-sm text-gray-300 space-y-1">
-                    <li>• Grant 90-day Test &amp; Tune portal access</li>
+                    <li>• Grant VIP access through 90 days after substantial completion</li>
                     <li>• Send personalized welcome email with portal link</li>
                     <li>• Allow customer to submit service requests and adjustments</li>
                   </ul>
                 </div>
               )}
 
-              {manualInviteType === 'test_and_tune_no_portal' && (
-                <div className="p-3 border rounded-lg bg-cyan-900/30 border-cyan-700">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCheck className="w-4 h-4 text-cyan-400" />
-                    <div className="text-sm font-semibold text-cyan-400">Test &amp; Tune — Email Only</div>
-                  </div>
-                  <ul className="text-sm text-gray-300 space-y-1">
-                    <li>• Grant 90-day Test &amp; Tune portal access (silently)</li>
-                    <li>• Send welcome email <span className="font-medium text-cyan-300">without</span> a portal link</li>
-                    <li>• Portal access can be shared with the customer later if needed</li>
-                  </ul>
-                </div>
-              )}
-
-              {manualInviteType === 'vip_signup' && (
-                <div className="p-3 border rounded-lg bg-yellow-900/30 border-yellow-600">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Star className="w-4 h-4 text-yellow-400" />
-                    <div className="text-sm font-semibold text-yellow-400">VIP Signup Invite</div>
-                  </div>
-                  <ul className="text-sm text-gray-300 space-y-1">
-                    <li>• Send email with VIP portal information and signup link</li>
-                    <li>• No portal access grant created &mdash; customer chooses their plan</li>
-                    <li>• Customer activates access through the membership signup page</li>
-                  </ul>
-                </div>
-              )}
+              {manualInviteType === 'vip_signup' && <div className="p-3 border border-yellow-600 rounded-lg text-sm text-gray-300">
+                <p className="font-semibold text-white">{manualVIPPlans.find(plan => plan.id === manualVIPPlanId)?.plan_name} · {manualVIPFunding === 'comped' ? 'Comped VIP' : 'Paid VIP'}</p>
+                <p className="mt-2">{manualVIPFunding === 'comped' ? `Activate at no charge through ${manualVIPEndDate} and send a portal welcome email.` : 'Send the selected plan’s signup and payment link.'}</p>
+              </div>}
 
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
@@ -3005,7 +2968,8 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                 {(() => {
                   const isResend = sendSuccessOverlay.type === 'resend';
                   const accessType = sendSuccessOverlay.accessType;
-                  const isVIP = accessType === 'vip_signup';
+                  const isCompedVIP = accessType === 'vip_comped';
+                  const isVIP = accessType === 'vip_signup' || isCompedVIP;
                   const isNoPortal = accessType === 'test_and_tune_no_portal';
 
                   const iconBg = isResend ? 'bg-blue-900/40 border-blue-500' : isVIP ? 'bg-amber-900/40 border-amber-400' : 'bg-cyan-900/40 border-cyan-500';
@@ -3014,7 +2978,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
                   const subtitle = isResend
                     ? 'A fresh 30-day login link was emailed'
                     : isVIP
-                    ? 'VIP membership invitation delivered'
+                    ? (isCompedVIP ? 'Complimentary VIP membership activated' : 'VIP membership invitation delivered')
                     : isNoPortal
                     ? 'Test & Tune project access activated'
                     : 'Test & Tune project access activated';

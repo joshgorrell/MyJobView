@@ -189,6 +189,36 @@ await db.exec(`RESET ROLE;SET ROLE anon;`);
 await assert.rejects(() =>
   db.query(`SELECT * FROM get_punchlist_access_info('${id(20)}')`),
 );
+await db.exec(`RESET ROLE;
+ALTER TABLE recurring_plans ADD COLUMN organization_id uuid, ADD COLUMN is_active boolean DEFAULT true;
+ALTER TABLE recurring_subscriptions ADD COLUMN custom_amount numeric;
+INSERT INTO recurring_plans(id,plan_name,plan_type,organization_id) VALUES('${id(40)}','VIP Gold','vip_plan','${id(1)}'),('${id(41)}','Other tenant VIP','vip_plan','${id(2)}'),('${id(42)}','Monitoring','security','${id(1)}');
+`);
+await db.exec(await readFile('supabase/migrations/20261006004224_simplify_customer_invites_comped_vip.sql','utf8'));
+await denied(id(11), `SELECT grant_comped_vip_membership('${id(20)}','${id(40)}',CURRENT_DATE+365)`);
+await denied(id(13), `SELECT grant_comped_vip_membership('${id(20)}','${id(40)}',CURRENT_DATE+365)`);
+await denied(id(10), `SELECT grant_comped_vip_membership('${id(21)}','${id(40)}',CURRENT_DATE+365)`);
+await denied(id(10), `SELECT grant_comped_vip_membership('${id(20)}','${id(41)}',CURRENT_DATE+365)`);
+await denied(id(10), `SELECT grant_comped_vip_membership('${id(20)}','${id(42)}',CURRENT_DATE+365)`);
+await denied(id(10), `SELECT grant_comped_vip_membership('${id(20)}','${id(40)}',CURRENT_DATE-1)`);
+const comp = (await as(id(10), `SELECT grant_comped_vip_membership('${id(20)}','${id(40)}',CURRENT_DATE+365,'Customer appreciation') AS id`)).rows[0].id;
+const membership = (await as(id(10), `SELECT * FROM recurring_subscriptions WHERE id='${comp}'`)).rows[0];
+assert.equal(membership.plan_id,id(40));
+assert.equal(membership.status,'active');
+assert.equal(Number(membership.custom_amount),0);
+assert.equal(membership.auto_invoice,false);
+assert.equal(membership.auto_send,false);
+assert.equal(membership.auto_renew,false);
+assert.equal(membership.comped_by,id(10));
+assert.equal(membership.comp_reason,'Customer appreciation');
+assert.ok(membership.comped_at);
+assert.equal((await as(id(13),`SELECT * FROM get_punchlist_access_info('${id(20)}')`)).rows[0].access_type,'vip_membership');
+await denied(id(10), `SELECT grant_comped_vip_membership('${id(20)}','${id(40)}',CURRENT_DATE+365)`);
+await as(id(10), `UPDATE recurring_subscriptions SET end_date=CURRENT_DATE-1 WHERE id='${comp}'`);
+assert.notEqual((await as(id(13),`SELECT * FROM get_punchlist_access_info('${id(20)}')`)).rows[0].access_type,'vip_membership');
+assert.ok(!(await as(id(10),`SELECT * FROM get_all_punchlist_customers()`)).rows.some(row=>row.access_type==='vip_membership'));
+await db.exec('RESET ROLE;SET ROLE anon;');
+await assert.rejects(()=>db.query(`SELECT grant_comped_vip_membership('${id(20)}','${id(40)}',CURRENT_DATE+365)`));
 await db.close();
 console.log(
   "Dealer configuration RLS, canonical workflows, and separate program access tests passed.",
