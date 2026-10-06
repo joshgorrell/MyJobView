@@ -422,13 +422,13 @@ export function ServiceRequestAnalytics() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full min-w-0 space-y-4 sm:space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <BarChart2 className="w-6 h-6 text-blue-400" />
-            <h1 className="text-2xl font-bold text-white">SR Response Analytics</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-white">SR Response Analytics</h1>
           </div>
           <p className="text-sm text-gray-400">
             Track service request response times: scheduling, customer contact, and completion
@@ -483,16 +483,16 @@ export function ServiceRequestAnalytics() {
           </div>
 
           {dateRange === 'custom' && (
-            <div className="flex items-center gap-2">
-              <div>
+            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto min-w-0">
+              <div className="min-w-0">
                 <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
                 <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-                  className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg" />
+                  className="w-full min-w-0 min-h-11 px-2 py-1.5 text-base sm:text-sm border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
                 <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-                  className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg" />
+                  className="w-full min-w-0 min-h-11 px-2 py-1.5 text-base sm:text-sm border border-gray-300 rounded-lg" />
               </div>
             </div>
           )}
@@ -607,7 +607,7 @@ export function ServiceRequestAnalytics() {
           <span className="text-sm text-gray-500">{sorted.length} total</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>

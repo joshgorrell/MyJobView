@@ -27,8 +27,8 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab || 'queue');
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
+    <div className="w-full max-w-full min-w-0 space-y-2 sm:space-y-4">
+      <div className="flex items-center gap-1 min-w-0 max-w-full pb-1">
         {TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -36,7 +36,7 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 min-h-11 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
