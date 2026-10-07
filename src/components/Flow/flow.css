@@ -66,7 +66,7 @@
 .flow.flow-quick-composer{--flow-bg:rgb(var(--canvas));--flow-muted:rgb(var(--surface));--flow-text:rgb(var(--text-primary));--flow-secondary:rgb(var(--text-secondary));--flow-line:rgb(var(--border-subtle));--flow-hover:rgb(var(--surface));--flow-accent:rgb(var(--brand-text));min-width:0}
 @media(max-width:640px){.flow-quick-composer .flow-composer{padding:16px}.flow-quick-composer .flow-composer-footer{flex-direction:column;align-items:stretch}.flow-quick-composer .flow-composer-footer button{min-height:44px}.flow-quick-composer .flow-kind select{max-width:100%}}
 
-/* Keep mobile controls in two predictable rows; reveal search and details on demand. */
+/* Reveal supplementary controls on demand. */
 .flow-mobile-label,.flow .flow-search-toggle,.flow .flow-help-toggle,.flow-filters .flow-mobile-control{display:none}
 .flow-meta-actions{display:flex;align-items:center;gap:2px}
 .flow{color-scheme:light}
@@ -173,3 +173,26 @@
 .theme-workspace .flow .flow-kind-label { color: var(--flow-accent); }
 
 .theme-workspace .flow .flow-heading h2 { font-size: var(--font-section-title); font-weight: 600; line-height: 1.4; }
+
+/* A single toolbar responds to the card width, including embedded record views. */
+.flow { container-type:inline-size; position:relative; }
+.flow .flow-toolbar { display:flex; flex-wrap:nowrap; align-items:center; gap:4px; padding:0 10px 8px; position:relative; }
+.flow-toolbar > * { flex-shrink:0; }
+.flow .flow-view-tabs { margin:0 auto 0 0; padding:0; border:0; gap:2px; overflow:visible; }
+.flow .flow-view-tabs button { padding:5px 7px; white-space:nowrap; }
+.flow .flow-view-select { display:none; }
+.flow .flow-toolbar button { white-space:nowrap; }
+.flow .flow-search-toggle { display:inline-flex; min-width:32px; }
+.flow .flow-search { display:none; position:absolute; z-index:10; top:100%; right:10px; left:10px; margin:0; min-width:0; background:var(--flow-bg); box-shadow:0 4px 12px #0002; }
+.flow .flow-search--open { display:flex; }
+.flow .flow-search input { min-height:40px; font-size:16px; }
+.flow-filter-quick-controls { display:none; }
+@container (max-width:1000px) {
+  .flow .flow-toolbar > .flow-today,.flow .flow-toolbar > .flow-mentions,.flow .flow-toolbar > .flow-unread { display:none; }
+  .flow-filter-quick-controls { display:flex; flex-basis:100%; gap:6px; flex-wrap:wrap; }
+}
+@container (max-width:700px) {
+  .flow .flow-view-tabs { display:none; }
+  .flow .flow-view-select { display:block; flex:1; min-width:0; min-height:36px; }
+  .flow .flow-toolbar { gap:4px; }
+}
