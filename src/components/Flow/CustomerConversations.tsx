@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Plus, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react';
+import { MessageSquare, Plus, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, AlertCircle, HelpCircle } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { insertFlowTag, useFlowTags, TagChoice } from '../Flow/useFlowTags';
+import { insertFlowTag, useFlowTags, TagChoice } from './useFlowTags';
 
 interface EnrichedThread {
   id: string;
@@ -27,6 +27,8 @@ interface EnrichedThread {
   rep_name: string;
   unread_count: number;
   last_rep_response_at: string | null;
+  last_customer_message_at?: string | null;
+  related_context_name?: string;
   context_label: string | null;
   attachment_url: string | null;
   attachment_type: string | null;
@@ -54,11 +56,15 @@ interface Contact {
   contact_name: string;
 }
 
-interface MessagesViewProps {
+export interface CustomerConversationsProps {
+  contactId?: string;
+  projectId?: string;
+  workOrderId?: string;
   createRequested?: boolean;
   onCreateOpened?: () => void;
   openThreadId?: string | null;
   onThreadOpened?: () => void;
+  onThreadSelected?: (threadId: string) => void;
   onOpenProposal?: (proposalId: string, threadId?: string) => void;
 }
 
@@ -113,21 +119,24 @@ function formatTime(dateString: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function MessagesView({ createRequested, onCreateOpened, openThreadId, onThreadOpened, onOpenProposal }: MessagesViewProps = {}) {
+export function CustomerConversations({ createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const [threads, setThreads] = useState<EnrichedThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<EnrichedThread | null>(null);
+  const activeThreadId = useRef<string | null>(null);
+  activeThreadId.current = selectedThread?.id || null;
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [messageCursor, setMessageCursor] = useState(0);
   const [mentionHighlight, setMentionHighlight] = useState(0);
   const messageInput = useRef<HTMLTextAreaElement>(null);
-  const { tag: messageTag, choices: messageChoices } = useFlowTags(newMessage, messageCursor, profile?.organization_id);
+  const { tag: messageTag, choices: messageChoices } = useFlowTags(newMessage, messageCursor, profile?.organization_id || undefined);
   const [showNewThread, setShowNewThread] = useState(false);
   useEffect(() => {
     if (createRequested) { setShowNewThread(true); onCreateOpened?.(); }
   }, [createRequested, onCreateOpened]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'customer' | 'proposals' | 'internal'>('all');
@@ -141,6 +150,8 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
   }
   const [uploading, setUploading] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
+  const [firstImage, setFirstImage] = useState<File | null>(null);
+  const [contactSearch, setContactSearch] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [relatedRecords, setRelatedRecords] = useState<{id: string; label: string}[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
@@ -149,6 +160,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
   const [showQuestionSummary, setShowQuestionSummary] = useState(true);
   const [newThreadForm, setNewThreadForm] = useState({
     subject: '',
+    contact_id: contactId || '',
     context_type: 'contact' as 'contact' | 'proposal' | 'project',
     context_id: '',
     visibility: 'public' as 'internal' | 'public',
@@ -158,17 +170,19 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
   useEffect(() => {
     let cancelled = false;
     setRelatedRecords([]);
-    if (!showNewThread || newThreadForm.context_type === 'contact' || !profile?.organization_id) return;
+    if (!showNewThread || newThreadForm.context_type === 'contact' || !newThreadForm.contact_id || !profile?.organization_id) return;
     setLoadingRelated(true);
     const table = newThreadForm.context_type === 'proposal' ? 'proposals' : 'projects';
     const columns = table === 'proposals' ? 'id, proposal_number, title' : 'id, name';
-    supabase.from(table).select(columns).eq('organization_id', profile.organization_id).then(({data, error}) => {
+    supabase.from(table).select(columns).eq('organization_id', profile.organization_id).eq('contact_id', newThreadForm.contact_id).then(({data, error}) => {
       if (cancelled) return;
       setRelatedRecords(error ? [] : (data || []).map((record: any) => ({id: record.id, label: record.name || [record.proposal_number, record.title].filter(Boolean).join(' — ') || record.id})));
       setLoadingRelated(false);
     });
     return () => { cancelled = true; };
-  }, [showNewThread, newThreadForm.context_type, profile?.organization_id]);
+  }, [showNewThread, newThreadForm.context_type, newThreadForm.contact_id, profile?.organization_id]);
+
+  useEffect(() => { setSelectedThread(null); openedRequest.current = null; }, [contactId, projectId, workOrderId]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,6 +194,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
     }
     try {
       setLoading(true);
+      setLoadError('');
 
       let query = supabase
         .from('message_threads')
@@ -189,6 +204,14 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
         `)
         .eq('organization_id', profile.organization_id)
         .order('last_message_at', { ascending: false });
+
+      if (contactId) query = query.eq('contact_id', contactId);
+      if (projectId && !workOrderId) {
+        const { data: orders, error: ordersError } = await supabase.from('work_orders').select('id').eq('project_id', projectId).eq('organization_id', profile.organization_id);
+        if (ordersError) throw ordersError;
+        query = query.in('context_type', ['project', 'work_order']).in('context_id', [projectId, ...(orders || []).map(w => w.id)]);
+      }
+      if (workOrderId) query = query.eq('context_type', 'work_order').eq('context_id', workOrderId);
 
       // Row-level security resolves customer, project, service, and executive access.
       // Filtering here by the assigned sales rep would hide a rep's other customer threads.
@@ -214,7 +237,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
 
         const { data: customerMsgs } = await supabase
           .from('messages')
-          .select('id, is_read')
+          .select('id, is_read, created_at')
           .eq('thread_id', thread.id)
           .eq('author_type', 'customer')
           .eq('is_internal', false);
@@ -226,6 +249,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
           .select('created_at')
           .eq('thread_id', thread.id)
           .eq('author_type', 'staff')
+          .eq('is_internal', false)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -259,6 +283,12 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
           }
         }
 
+        let relatedContextName = '';
+        if (thread.context_id && ['project', 'work_order'].includes(thread.context_type)) {
+          const table = thread.context_type === 'project' ? 'projects' : 'work_orders';
+          const { data: context } = await supabase.from(table).select(table === 'projects' ? 'name' : 'title,work_order_number').eq('id', thread.context_id).maybeSingle();
+          relatedContextName = (context as any)?.name || [(context as any)?.work_order_number, (context as any)?.title].filter(Boolean).join(' · ');
+        }
         enriched.push({
           id: thread.id,
           subject: thread.subject || '',
@@ -281,6 +311,8 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
           rep_name: repName,
           unread_count: unreadCount,
           last_rep_response_at: lastRepResponse?.created_at || null,
+          last_customer_message_at: customerMsgs?.map(m => m.created_at).sort().reverse()[0] || null,
+          related_context_name: relatedContextName,
           context_label: lastMsg?.context_label || null,
           attachment_url: lastMsg?.attachment_url || null,
           attachment_type: lastMsg?.attachment_type || null,
@@ -288,18 +320,21 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
       }
 
       setThreads(enriched);
+      return enriched;
     } catch (error) {
       console.error('Error loading threads:', error);
+      setLoadError('Unable to load conversations. Please try again.');
       setThreads([]);
     } finally {
       setLoading(false);
     }
-  }, [profile?.id, profile?.organization_id]);
+  }, [profile?.id, profile?.organization_id, contactId, projectId, workOrderId]);
 
   async function loadContacts() {
     const { data } = await supabase
       .from('contacts')
       .select('id, contact_name, full_name')
+      .eq('organization_id', profile?.organization_id)
       .order('full_name');
     if (data) setContacts(data.map(c => ({ id: c.id, contact_name: c.full_name || c.contact_name || '' })));
   }
@@ -318,7 +353,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
     if (!profile?.organization_id) return;
 
     const channel = supabase
-      .channel('messages_view_realtime')
+      .channel(`flow-conversations-${contactId || projectId || workOrderId || 'all'}-${profile.id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },
@@ -334,20 +369,30 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
     return () => { supabase.removeChannel(channel); };
   }, [profile?.organization_id, loadThreads]);
 
-  // Load messages when a thread is selected
+  // Clear drafts between conversations and guard late responses from another thread.
   useEffect(() => {
-    if (selectedThread) {
-      loadMessages(selectedThread.id);
-    } else {
-      setMessages([]);
-    }
-  }, [selectedThread]);
+    setMessages([]); setNewMessage(''); setPendingAttachment(null); setReplyContextLabel(null);
+    setIsInternal(selectedThread?.visibility === 'internal');
+    if (!selectedThread) return;
+    let cancelled = false;
+    const reload = async () => {
+      const { data, error } = await supabase.from('messages').select('*')
+        .eq('thread_id', selectedThread.id).order('created_at', { ascending: true });
+      if (!cancelled && !error) setMessages((data || []) as Message[]);
+    };
+    void reload();
+    const channel = supabase.channel(`flow-thread-${selectedThread.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `thread_id=eq.${selectedThread.id}` }, () => void reload()).subscribe();
+    return () => { cancelled = true; void supabase.removeChannel(channel); };
+  }, [selectedThread?.id]);
 
+  const openedRequest = useRef<string | null>(null);
   // Auto-select thread when openThreadId is provided
   useEffect(() => {
-    if (openThreadId && threads.length > 0 && !selectedThread) {
+    if (openThreadId && threads.length > 0 && openedRequest.current !== openThreadId) {
       const thread = threads.find(t => t.id === openThreadId);
       if (thread) {
+        openedRequest.current = openThreadId;
         setSelectedThread(thread);
         onThreadOpened?.();
       }
@@ -371,7 +416,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      if (data) setMessages(data as Message[]);
+      if (data && activeThreadId.current === threadId) setMessages(data as Message[]);
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -381,10 +426,12 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
     if (!selectedThread) return;
     const unreadMessages = messages.filter(m => m.author_type !== 'staff' && !m.is_read);
     if (unreadMessages.length > 0) {
-      await supabase
+      const { error } = await supabase
         .from('messages')
         .update({ is_read: true })
         .in('id', unreadMessages.map(m => m.id));
+      if (error) return;
+      if (activeThreadId.current === selectedThread.id) setMessages(old => old.map(m => unreadMessages.some(u => u.id === m.id) ? { ...m, is_read: true } : m));
       loadThreads();
     }
   }
@@ -401,7 +448,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
         .upload(path, file, { contentType: file.type });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('message-attachments').getPublicUrl(path);
-      setPendingAttachment({ url: urlData.publicUrl, type: 'image' });
+      if (activeThreadId.current === selectedThread.id) setPendingAttachment({ url: urlData.publicUrl, type: 'image' });
     } catch (error) {
       console.error('Error uploading image:', error);
       alert('Failed to upload image. Please try again.');
@@ -431,7 +478,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
         author_name: profile.full_name,
         author_type: 'staff',
         body,
-        is_internal: isInternal,
+        is_internal: selectedThread.visibility === 'internal' || isInternal,
         is_read: true,
         attachment_url: attachmentUrl,
         attachment_type: attachmentType,
@@ -440,11 +487,13 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
 
       if (error) throw error;
 
-      setNewMessage('');
-      setIsInternal(false);
-      setPendingAttachment(null);
-      setReplyContextLabel(null);
-      await loadMessages(selectedThread.id);
+      if (activeThreadId.current === selectedThread.id) {
+        setNewMessage('');
+        setIsInternal(selectedThread.visibility === 'internal');
+        setPendingAttachment(null);
+        setReplyContextLabel(null);
+        await loadMessages(selectedThread.id);
+      }
       await loadThreads();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -455,7 +504,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
   }
 
   async function handleCreateThread() {
-    if (!newThreadForm.subject.trim() || !newThreadForm.context_id || !newThreadForm.first_message.trim() || !profile) {
+    if (!newThreadForm.subject.trim() || !(newThreadForm.context_id || (newThreadForm.context_type === 'contact' && newThreadForm.contact_id)) || !newThreadForm.first_message.trim() || !profile) {
       alert('Please fill in all fields');
       return;
     }
@@ -464,7 +513,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
     try {
       let contactId = null;
       if (newThreadForm.context_type === 'contact') {
-        contactId = newThreadForm.context_id;
+        contactId = newThreadForm.contact_id || newThreadForm.context_id;
       } else if (newThreadForm.context_type === 'proposal') {
         const { data: proposal } = await supabase
           .from('proposals')
@@ -482,7 +531,8 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
         .insert({
           subject: newThreadForm.subject.trim(),
           context_type: newThreadForm.context_type,
-          context_id: newThreadForm.context_id,
+          context_id: newThreadForm.context_id || newThreadForm.contact_id,
+          proposal_id: newThreadForm.context_type === 'proposal' ? newThreadForm.context_id : null,
           contact_id: contactId,
           visibility: newThreadForm.visibility,
           created_by: profile.id,
@@ -494,6 +544,15 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
 
       if (threadError) throw threadError;
 
+      let firstAttachment = extractUrl(newThreadForm.first_message);
+      let firstAttachmentType: 'image' | 'link' | null = firstAttachment ? 'link' : null;
+      if (firstImage) {
+        const path = `${profile.organization_id}/${thread.id}/${crypto.randomUUID()}.${firstImage.name.split('.').pop() || 'png'}`;
+        const { error: uploadError } = await supabase.storage.from('message-attachments').upload(path, firstImage, { contentType: firstImage.type });
+        if (uploadError) throw uploadError;
+        firstAttachment = supabase.storage.from('message-attachments').getPublicUrl(path).data.publicUrl;
+        firstAttachmentType = 'image';
+      }
       const { error: messageError } = await supabase.from('messages').insert({
         thread_id: thread.id,
         author_id: profile.id,
@@ -502,25 +561,19 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
         body: newThreadForm.first_message.trim(),
         is_internal: newThreadForm.visibility === 'internal',
         is_read: true,
+        attachment_url: firstAttachment,
+        attachment_type: firstAttachmentType,
       });
 
       if (messageError) throw messageError;
 
       setShowNewThread(false);
-      setNewThreadForm({ subject: '', context_type: 'contact', context_id: '', visibility: 'public', first_message: '' });
-      await loadThreads();
-      if (thread) {
-        const enriched = (await supabase
-          .from('message_threads')
-          .select(`id, subject, context_type, context_id, proposal_id, visibility, created_by, last_message_at, assigned_sales_rep_id, organization_id, contact_id`)
-          .eq('id', thread.id)
-          .maybeSingle()
-        ).data;
-        if (enriched) {
-          setSelectedThread({ ...enriched, message_count: 1, last_message_preview: newThreadForm.first_message, last_message_author_type: 'staff', contact_name: '', proposal_number: '', proposal_title: '', proposal_status: '', rep_name: profile.full_name, unread_count: 0, last_rep_response_at: new Date().toISOString(), context_label: null, attachment_url: null, attachment_type: null } as EnrichedThread);
-          await loadMessages(thread.id);
-        }
-      }
+      setFirstImage(null);
+      setNewThreadForm({ subject: '', contact_id: '', context_type: 'contact', context_id: '', visibility: 'public', first_message: '' });
+      const enriched = await loadThreads();
+      const created = enriched?.find(t => t.id === thread.id);
+      if (created) { setSelectedThread(created); onThreadSelected?.(created.id); }
+
     } catch (error) {
       console.error('Error creating thread:', error);
       alert('Failed to create thread');
@@ -550,7 +603,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
 
   const stats = {
     total: threads.length,
-    unanswered: threads.filter(t => !t.last_rep_response_at && t.last_message_author_type === 'customer').length,
+    unanswered: threads.filter(t => !!t.last_customer_message_at && (!t.last_rep_response_at || t.last_customer_message_at > t.last_rep_response_at)).length,
     unread: threads.filter(t => t.unread_count > 0).length,
   };
 
@@ -567,6 +620,8 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+      {loadError && <div role="alert" className="p-3 text-red-600">{loadError} <button onClick={() => void loadThreads()}>Retry</button></div>}
+      {openThreadId && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert">This conversation is unavailable or you do not have access.</p>}
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
         <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
@@ -598,14 +653,14 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
         </div>
       </div>
 
-      <div className="h-[calc(100vh-18rem)] flex flex-col sm:flex-row gap-2 sm:gap-4">
+      <div className="h-[min(650px,70dvh)] min-h-[320px] flex flex-col sm:flex-row gap-2 sm:gap-4">
         {/* Threads List */}
-        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-96 bg-white rounded-lg shadow-sm border border-gray-200 flex-col`}>
+        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-80 lg:w-96 sm:flex-shrink-0 min-w-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col`}>
           <div className="p-3 sm:p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-blue-600" />
-                Messages
+                Customer conversations
               </h2>
               <button
                 onClick={() => setShowNewThread(true)}
@@ -672,13 +727,13 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
             ) : (
               <div className="divide-y divide-gray-200">
                 {filteredThreads.map((thread) => {
-                  const hasResponse = !!thread.last_rep_response_at;
-                  const isUrgent = !hasResponse && thread.last_message_author_type === 'customer' && new Date().getTime() - new Date(thread.last_message_at).getTime() > 3600000;
+                  const hasResponse = !thread.last_customer_message_at || (!!thread.last_rep_response_at && thread.last_rep_response_at >= thread.last_customer_message_at);
+                  const isUrgent = !hasResponse && new Date().getTime() - new Date(thread.last_message_at).getTime() > 3600000;
 
                   return (
                     <button
                       key={thread.id}
-                      onClick={() => { setSelectedThread(thread); setShowQuestionSummary(true); }}
+                      onClick={() => { setSelectedThread(thread); onThreadSelected?.(thread.id); setShowQuestionSummary(true); }}
                       className={`w-full p-3 sm:p-4 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation ${
                         selectedThread?.id === thread.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                       } ${thread.unread_count > 0 ? 'bg-blue-50/50' : ''}`}
@@ -705,6 +760,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
                         <p className="text-xs font-medium text-blue-600 mb-1">{thread.proposal_number}</p>
                       )}
 
+                      {thread.related_context_name && <p className="text-xs text-gray-600 mb-1">{thread.related_context_name}</p>}
                       {thread.contact_name && (
                         <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
                           <User className="w-3 h-3" />
@@ -725,12 +781,12 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
                         {thread.attachment_type === 'image' && thread.attachment_url && (
                           <img src={thread.attachment_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                         )}
-                        <p className="text-sm text-gray-500 line-clamp-2">{thread.last_message_preview}</p>
+                        <p className="text-sm text-gray-500 line-clamp-2">{thread.last_message_author_type === 'customer' ? 'Customer: ' : 'Staff: '}{thread.last_message_preview}</p>
                       </div>
 
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center gap-2">
-                          {!hasResponse && thread.last_message_author_type === 'customer' && (
+                          {!hasResponse && (
                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                               isUrgent ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
                             }`}>
@@ -825,7 +881,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
                 const customerMessages = messages.filter(m => m.author_type === 'customer' && !m.is_internal);
                 const lastStaffIdx = (() => {
                   for (let i = messages.length - 1; i >= 0; i--) {
-                    if (messages[i].author_type === 'staff') return i;
+                    if (messages[i].author_type === 'staff' && !messages[i].is_internal) return i;
                   }
                   return -1;
                 })();
@@ -946,7 +1002,8 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
                   <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={isInternal}
+                      checked={selectedThread.visibility === 'internal' || isInternal}
+                      disabled={selectedThread.visibility === 'internal'}
                       onChange={(e) => setIsInternal(e.target.checked)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
@@ -1017,7 +1074,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
 
       {/* New Thread Modal */}
       {showNewThread && (
-        <QuickActionModal title="New Message" subtitle="Start a customer or internal conversation"
+        <QuickActionModal title="New Message" subtitle="Start a customer conversation or add an internal customer note"
           icon={<MessageSquare className="w-5 h-5" />} accentColor="from-teal-600 to-cyan-700"
           onClose={() => setShowNewThread(false)} scrollBody={false}>
             <div className="qam-scroll flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
@@ -1045,16 +1102,17 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
                 </select>
               </div>
 
-              {newThreadForm.context_type === 'contact' && (
+              {(
                 <div>
                   <label className="block text-sm font-medium text-secondary mb-1.5">Contact</label>
+                  <input aria-label="Search customers" placeholder="Search customers…" className="w-full px-3 py-2 mb-2 border rounded-lg" value={contactSearch} onChange={e => setContactSearch(e.target.value)} />
                   <select
-                    value={newThreadForm.context_id}
-                    onChange={(e) => setNewThreadForm({ ...newThreadForm, context_id: e.target.value })}
+                    value={newThreadForm.contact_id}
+                    onChange={(e) => setNewThreadForm({ ...newThreadForm, contact_id: e.target.value, context_id: '' })}
                     className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select a contact...</option>
-                    {contacts.map((contact) => (
+                    {contacts.filter(c => c.contact_name.toLowerCase().includes(contactSearch.toLowerCase())).map((contact) => (
                       <option key={contact.id} value={contact.id}>{contact.contact_name}</option>
                     ))}
                   </select>
@@ -1067,7 +1125,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
                   <select value={newThreadForm.context_id} disabled={loadingRelated}
                     onChange={(e) => setNewThreadForm({...newThreadForm, context_id: e.target.value})}
                     className="w-full px-3 py-2.5 text-base bg-surface text-primary border border-strong rounded-lg">
-                    <option value="">{loadingRelated ? 'Loading…' : 'Select a record…'}</option>
+                    <option value="">{loadingRelated ? 'Loading…' : newThreadForm.contact_id ? 'Select a record…' : 'Choose a customer first'}</option>
                     {relatedRecords.map(record => <option key={record.id} value={record.id}>{record.label}</option>)}
                   </select>
                   {!loadingRelated && !relatedRecords.length && <p className="text-sm text-muted mt-1">No accessible records found.</p>}
@@ -1096,6 +1154,9 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
                   placeholder="Type your message..."
                 />
               </div>
+              <label className="block text-sm text-secondary">Attach image
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => setFirstImage(e.target.files?.[0] || null)} className="block w-full mt-1" />
+              </label>
             </div>
 
             <div className="flex gap-3 p-4 sm:p-6 border-t border-subtle flex-shrink-0">
@@ -1107,7 +1168,7 @@ export function MessagesView({ createRequested, onCreateOpened, openThreadId, on
               </button>
               <button
                 onClick={handleCreateThread}
-                disabled={sending || !newThreadForm.subject.trim() || !newThreadForm.context_id || !newThreadForm.first_message.trim()}
+                disabled={sending || !newThreadForm.subject.trim() || !(newThreadForm.context_id || (newThreadForm.context_type === 'contact' && newThreadForm.contact_id)) || !newThreadForm.first_message.trim()}
                 className="flex-1 px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               >
                 {sending ? 'Creating...' : 'Create Thread'}

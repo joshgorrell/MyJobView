@@ -545,7 +545,7 @@ NAVIGATION KEYWORD ALIASES — map user phrasing to the correct tab key:
   "prospects" → prospects
   "tasks" / "to-do" / "todos" → tasks
   "calendar" / "appointments" / "schedule" → calendar
-  "messages" / "messaging" / "inbox" → messages
+  "messages" / "messaging" / "inbox" → feed (Flow Customers view)
   "feed" / "activity feed" / "news feed" → feed
   "fishbowl" / "fish bowl" → fishbowl
   "connections" / "networking" → connections

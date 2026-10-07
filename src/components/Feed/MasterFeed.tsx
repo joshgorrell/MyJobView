@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import Flow from '../Flow/Flow';
+import type { CustomerConversationsProps } from '../Flow/CustomerConversations';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { AtSign, Search, ChevronDown, ChevronUp, Hash, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { DiscussionFeed } from './DiscussionFeed';
 import { DiscussionPostForm } from './DiscussionPostForm';
 
-interface MasterFeedProps {
+interface MasterFeedProps extends CustomerConversationsProps {
   onLeadClick: (leadId: string) => void;
 }
 
@@ -186,12 +187,12 @@ function LegacyDiscussionFeed({ onLeadClick, focusPostId }: MasterFeedProps & { 
   );
 }
 
-export function MasterFeed({ onLeadClick }: MasterFeedProps) {
+export function MasterFeed({ onLeadClick, ...conversationProps }: MasterFeedProps) {
   const focusPostId = new URLSearchParams(window.location.search).get('postId');
 
   // Flow is now the primary communication surface. Keep the legacy discussion
   // detail only for existing deep links so historical replies remain reachable.
-  if (focusPostId) {
+  if (focusPostId && !conversationProps.openThreadId && !conversationProps.createRequested) {
     return <div className="space-y-3">
       <a href="?tab=feed" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white text-gray-700 border border-gray-200 hover:bg-gray-50">
         <FlowWaveIcon className="text-base" /> Back to Flow
@@ -200,5 +201,5 @@ export function MasterFeed({ onLeadClick }: MasterFeedProps) {
     </div>;
   }
 
-  return <Flow />;
+  return <Flow {...conversationProps} />;
 }

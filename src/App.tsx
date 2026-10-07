@@ -93,7 +93,6 @@ const TeamLeaderboard = lazy(() => import('./components/Dashboard/TeamLeaderboar
 const ProjectsView = lazy(() => import('./components/Projects/ProjectsView'));
 const InvoicesView = lazy(() => import('./components/Invoices/InvoicesView').then(m => ({ default: m.InvoicesView })));
 const CommissionsPage = lazy(() => import('./components/Commissions/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
-const MessagesView = lazy(() => import('./components/Messages/MessagesView').then(m => ({ default: m.MessagesView })));
 const PunchlistAdminDashboard = lazy(() => import('./components/Production/PunchlistAdminDashboard').then(m => ({ default: m.PunchlistAdminDashboard })));
 const TestTunePerformanceDashboard = lazy(() => import('./components/Production/TestTunePerformanceDashboard').then(m => ({ default: m.TestTunePerformanceDashboard })));
 const VIPPlanManagement = lazy(() => import('./components/Finance/VIPPlanManagement').then(m => ({ default: m.VIPPlanManagement })));
@@ -183,7 +182,7 @@ function AppContent() {
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showMessageForm, setShowMessageForm] = useState(false);
+  const [createCustomerMessageRequested, setCreateCustomerMessageRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -194,7 +193,7 @@ function AppContent() {
   const [showTellUsModal, setShowTellUsModal] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  const [openFlowThreadId, setOpenFlowThreadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('threadId'));
   const [openProposalId, setOpenProposalId] = useState<string | null>(null);
   const [aiProposalPrefill, setAiProposalPrefill] = useState<ProposalPrefill | null>(null);
   const [aiServiceRequestPrefill, setAiServiceRequestPrefill] = useState<ServiceRequestPrefill | null>(null);
@@ -213,7 +212,8 @@ function AppContent() {
     // First check URL parameters, then localStorage, default to 'feed'
     const urlParams = new URLSearchParams(window.location.search);
     const urlTab = urlParams.get('tab');
-    return urlTab || localStorage.getItem('activeTab') || 'feed';
+    const savedTab = urlTab || localStorage.getItem('activeTab') || 'feed';
+    return savedTab === 'messages' ? 'feed' : savedTab;
   });
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('departmentSidebarOpen');
@@ -305,7 +305,7 @@ function AppContent() {
     if (urlProposalId) setOpenProposalId(urlProposalId);
     if (urlLeadId) setSelectedLeadId(urlLeadId);
     if (urlTaskId) setOpenTaskId(urlTaskId);
-    if (urlThreadId) setOpenThreadId(urlThreadId);
+    if (urlThreadId) setOpenFlowThreadId(urlThreadId);
     if (urlCoId) setOpenChangeOrderId(urlCoId);
     if (urlSalesOrderId) setOpenSalesOrderId(urlSalesOrderId);
   }, []);
@@ -356,7 +356,7 @@ function AppContent() {
       const urlWorkOrderId = urlParams.get('workOrderId');
 
       if (urlTab) {
-        setActiveTab(urlTab);
+        setActiveTab(urlTab === 'messages' ? 'feed' : urlTab);
       } else {
         setActiveTab('feed');
       }
@@ -364,7 +364,7 @@ function AppContent() {
       setOpenProposalId(urlProposalId);
       setSelectedLeadId(urlLeadId);
       setOpenTaskId(urlTaskId);
-      setOpenThreadId(urlThreadId);
+      setOpenFlowThreadId(urlThreadId);
       setOpenChangeOrderId(urlCoId);
       setOpenSalesOrderId(urlSalesOrderId);
       setSelectedWorkOrderId(urlWorkOrderId);
@@ -420,8 +420,8 @@ function AppContent() {
       urlParams.delete('taskId');
     }
 
-    if (openThreadId) {
-      urlParams.set('threadId', openThreadId);
+    if (openFlowThreadId) {
+      urlParams.set('threadId', openFlowThreadId);
     } else {
       urlParams.delete('threadId');
     }
@@ -447,13 +447,13 @@ function AppContent() {
     // Update the URL without reloading the page
     const newUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams.toString()}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
-  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath]);
+  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath]);
 
   // Close all modals when switching tabs to prevent overlay issues
   useEffect(() => {
     setShowContactForm(false);
     setShowLeadForm(false);
-    setShowMessageForm(false);
+    if (activeTab !== 'feed') setCreateCustomerMessageRequested(false);
     setShowServiceRequestForm(false);
     setShowTaskForm(false);
     setShowJobMediaUpload(false);
@@ -874,7 +874,7 @@ function AppContent() {
           <Header
             onCreateContact={() => setShowContactForm(true)}
             onCreateLead={() => setShowLeadForm(true)}
-            onCreateMessage={() => { setShowMessageForm(true); setActiveTab('messages'); }}
+            onCreateMessage={() => { setCreateCustomerMessageRequested(true); setActiveTab('feed'); }}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
             onCreateServiceRequest={() => setShowServiceRequestForm(true)}
             onCreateTask={() => {
@@ -889,8 +889,8 @@ function AppContent() {
               setActiveTab('tasks');
             }}
             onMessageClick={(threadId) => {
-              setOpenThreadId(threadId);
-              setActiveTab('messages');
+              setOpenFlowThreadId(threadId);
+              setActiveTab('feed');
             }}
             onProposalClick={(proposalId) => {
               setOpenProposalId(proposalId);
@@ -949,7 +949,26 @@ function AppContent() {
             />
           )}
           {activeTab === 'leads' && checkModuleAccess('leads') && <LeadsHistory key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
-          {activeTab === 'feed' && checkModuleAccess('feed') && <MasterFeed key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
+          {activeTab === 'feed' && (checkModuleAccess('feed') || checkModuleAccess('messages')) && (
+            <MasterFeed
+              key={activeTab}
+              onLeadClick={setSelectedLeadId}
+              createRequested={createCustomerMessageRequested}
+              onCreateOpened={() => setCreateCustomerMessageRequested(false)}
+              openThreadId={openFlowThreadId}
+              onThreadSelected={setOpenFlowThreadId}
+              onOpenProposal={(proposalId, threadId) => {
+                setOpenProposalId(proposalId);
+                setActiveTab('proposals');
+                if (threadId) {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('openQA', 'true');
+                  url.searchParams.set('threadId', threadId);
+                  window.history.pushState({}, '', url);
+                }
+              }}
+            />
+          )}
           {activeTab === 'fishbowl' && checkModuleAccess('fishbowl') && <FishbowlView key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
           {activeTab === 'connections' && checkModuleAccess('connections') && <ConnectionsView key={activeTab} />}
           {(activeTab === 'proposals' || activeTab === 'sales') && checkModuleAccess('proposals') && (
@@ -967,25 +986,6 @@ function AppContent() {
               onNavigateToSalesStats={() => setActiveTab('sales_dashboard')}
               autoOpenQA={typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('openQA') === 'true'}
               autoThreadId={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('threadId') : null}
-            />
-          )}
-          {activeTab === 'messages' && checkModuleAccess('messages') && (
-            <MessagesView
-              key={activeTab}
-              createRequested={showMessageForm}
-              onCreateOpened={() => setShowMessageForm(false)}
-              openThreadId={openThreadId}
-              onThreadOpened={() => setOpenThreadId(null)}
-              onOpenProposal={(proposalId, threadId) => {
-                setOpenProposalId(proposalId);
-                setActiveTab('proposals');
-                if (threadId) {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set('openQA', 'true');
-                  url.searchParams.set('threadId', threadId);
-                  window.history.pushState({}, '', url);
-                }
-              }}
             />
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
@@ -1353,8 +1353,8 @@ function AppContent() {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);
             } else if (action.type === 'CREATE_MESSAGE') {
-              setShowMessageForm(true);
-              setActiveTab('messages');
+              setCreateCustomerMessageRequested(true);
+              setActiveTab('feed');
             } else if (action.type === 'CREATE_PROPOSAL') {
               if (action.prefill) setAiProposalPrefill(action.prefill as ProposalPrefill);
               setActiveTab('proposals');
@@ -1362,7 +1362,7 @@ function AppContent() {
               if (action.prefill) setAiSecurityContractPrefill(action.prefill as SecurityContractPrefill);
               setShowAiSecurityContractModal(true);
             } else if (action.type === 'NAVIGATE_TO' && action.tab) {
-              setActiveTab(action.tab);
+              setActiveTab(action.tab === 'messages' ? 'feed' : action.tab);
             } else if (action.type === 'OPEN_PROPOSAL' && action.proposalId) {
               setOpenProposalId(action.proposalId);
               setActiveTab('proposals');
