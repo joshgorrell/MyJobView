@@ -372,23 +372,36 @@ Deno.serve(async (req) => {
       if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);
       if (!["sales", "owner"].includes(b.variant)) return json({ error: "Choose a follow-up version." }, 400);
       if (b.variant === "owner" && !isAdmin) return json({ error: "Only company administrators can send the owner version." }, 403);
-      const proposal = await checked(await client.from("proposals").select("id,contact_id,created_by,status,sent_at,title")
-        .eq("id", b.proposal_id).eq("organization_id", org).single());
-      if (!proposal.sent_at || !["sent", "viewed"].includes(proposal.status)) return json({ error: "Choose an open proposal that has been sent to the customer." }, 400);
-      const contact = await checked(await client.from("contacts").select("first_name,contact_name,email")
-        .eq("id", proposal.contact_id).eq("organization_id", org).single());
+      const mode = b.recipient_mode || (b.proposal_id ? "proposal" : b.contact_id ? "customer" : "manual");
+      if (!["proposal", "customer", "manual"].includes(mode)) return json({ error: "Choose a recipient." }, 400);
+      let proposal: any = null;
+      let contact: any;
+      if (mode === "proposal") {
+        proposal = await checked(await client.from("proposals").select("id,contact_id,created_by,status,sent_at,title")
+          .eq("id", b.proposal_id).eq("organization_id", org).single());
+        if (!proposal.sent_at || !["sent", "viewed"].includes(proposal.status)) return json({ error: "Choose an open proposal that has been sent to the customer." }, 400);
+      }
+      if (mode === "manual") {
+        const name = typeof b.recipient_name === "string" ? b.recipient_name.trim() : "";
+        const email = typeof b.recipient_email === "string" ? b.recipient_email.trim() : "";
+        if (!name || name.length > 200 || /[\r\n]/.test(name) || email.length > 254 || !/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(email)) return json({ error: "Enter a customer name and a valid email address." }, 400);
+        contact = { first_name: name.split(/\s+/)[0], contact_name: name, email };
+      } else {
+        contact = await checked(await client.from("contacts").select("first_name,contact_name,email")
+          .eq("id", proposal?.contact_id || b.contact_id).eq("organization_id", org).single());
+      }
       if (!contact.email) return json({ error: "This customer needs an email address." }, 400);
       const settings = await checked(await admin.from("company_settings").select("company_name,company_email,company_logo_url,from_email,app_url")
         .eq("organization_id", org).single());
       const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).single());
       const rep = await checked(await admin.from("profiles").select("first_name,last_name,email,is_active")
-        .eq("id", proposal.created_by).eq("organization_id", org).single());
+        .eq("id", proposal?.created_by || user.id).eq("organization_id", org).single());
       const owner = b.variant === "owner";
       if (owner && organization.subdomain !== "elife") return json({ error: "Owner follow-up is currently configured for Electronic Life only." }, 400);
       const sender = { owner, name: owner ? "Josh Gorrell" : [rep.first_name, rep.last_name].filter(Boolean).join(" "),
         email: owner ? "josh@electroniclife.com" : rep.email,
         photo: owner ? "https://elife.myjobview.com/images/josh-gorrell-email.jpg" : undefined };
-      if (!sender.name || !sender.email || (!owner && !rep.is_active)) return json({ error: "Configure the proposal salesperson’s name and email before sending." }, 400);
+      if (!sender.name || !sender.email || (!owner && !rep.is_active)) return json({ error: "Configure the sender’s name and email before sending." }, 400);
       const html = proposalFollowUpEmail({ ...settings, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" }, contact, sender);
       const subject = owner ? "A quick note from the owner" : "How are we doing?";
       if (b.action === "proposal_preview") return json({ html, subject, recipient: contact.email, reply_to: sender.email, sender: sender.name });
