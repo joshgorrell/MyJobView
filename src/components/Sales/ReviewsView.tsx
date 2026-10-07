@@ -1069,8 +1069,13 @@ export default function ReviewsView() {
         <p className="mt-2 text-sm text-gray-300">Review the work. Check the proposal. Learn from lost opportunities.</p>
       </div>
 
+      {canRequestGoogleReviews && <div className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 to-gray-900 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3"><Star className="mt-0.5 h-6 w-6 shrink-0 fill-amber-400 text-amber-400" /><div><h2 className="font-bold text-white">Ask for a Google Review</h2><p className="mt-1 text-sm text-gray-300">Quick access to email, text, or share your Google review link.</p></div></div>
+        <button type="button" onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 py-2 font-semibold text-gray-950 hover:bg-amber-300 sm:shrink-0"><Star className="h-4 w-4" />Ask for a Google Review</button>
+      </div>}
+
       <nav aria-label="Feedback sections" className="grid gap-3 sm:grid-cols-3">
-        {(canViewCustomerFeedback || canRequestGoogleReviews || canManageCustomerFeedback) && <button type="button" onClick={() => {
+        {(canViewCustomerFeedback || canManageCustomerFeedback) && <button type="button" onClick={() => {
           if (canViewCustomerFeedback) setActiveTab('dashboard');
           else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }
         }} aria-current={activeTab === 'dashboard' || activeTab === 'send' ? 'page' : undefined} className={`min-w-0 rounded-xl border p-4 text-left transition ${activeTab === 'dashboard' || activeTab === 'send' ? 'border-amber-400 bg-amber-950/30' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
@@ -1084,7 +1089,7 @@ export default function ReviewsView() {
         </button>}
       </nav>
 
-      {(activeTab === 'dashboard' || activeTab === 'send') && <section aria-label="Job Reviews" className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5">
+      {(activeTab === 'dashboard' || activeTab === 'send') && (canViewCustomerFeedback || canManageCustomerFeedback) && <section aria-label="Job Reviews" className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-bold text-white">Job Reviews</h2><p className="mt-1 text-sm text-gray-300">Customers can rate their experience, send feedback privately, or leave a Google review. Ratings and review statistics belong here.</p></div>
           <div className="flex flex-wrap gap-2 sm:shrink-0">
             {canViewCustomerFeedback && <button type="button" onClick={() => setActiveTab('dashboard')} aria-pressed={activeTab === 'dashboard'} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium ${activeTab === 'dashboard' ? 'bg-amber-400 text-gray-950' : 'border border-gray-600 text-gray-200'}`}>Stats &amp; History</button>}
@@ -1147,6 +1152,7 @@ export default function ReviewsView() {
                   className="min-h-11 w-full min-w-0 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-base text-white">
                   <option value="manual">Job Review & Private Feedback</option>
                   <option value="job_completion">Job Completion Feedback · Day 0</option>
+                  <option value="test_tune_welcome">Test &amp; Tune Welcome · Day 7</option>
                   <option value="post_test_tune">Post-Test &amp; Tune Feedback</option>
                   <option value="one_year">1-Year Check-In</option>
                 </select>
