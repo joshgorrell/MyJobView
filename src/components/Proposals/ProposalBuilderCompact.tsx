@@ -1471,7 +1471,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       return (
         <button
           onClick={() => setShowUnlockWarningModal(true)}
-          className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+          className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
           title="Proposal is locked and live — click to unlock"
         >
           <Lock className="w-3 h-3" />
@@ -1492,7 +1492,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     return (
       <button
         onClick={() => setShowUnlockWarningModal(true)}
-        className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+        className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
         title="Proposal is locked — click to unlock"
       >
         <Lock className="w-3 h-3" />
@@ -1949,6 +1949,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
 
   function openPortalPreview() {
+    setPreviewHideCosts(false);
     setShowPortalPreview(true);
     setShowPortalDropdown(false);
   }
@@ -3330,7 +3331,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   <h1 className="text-base font-semibold text-primary truncate">
                     {proposal?.title || proposal?.proposal_number || 'Proposal Builder'}
                   </h1>
-                  {proposal?.status && getStatusBadge(proposal.status)}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
                   <User className="w-3 h-3 flex-shrink-0" />
@@ -3342,37 +3342,26 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           </div>
 
           {/* Right: Badges + All Actions */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-wrap justify-end min-w-0">
               {/* Combined Locked/Live Badge */}
               {getCombinedStatusBadge()}
 
-              {/* Portal Version Badge */}
-              {(proposal?.current_portal_version ?? 0) > 0 && (
-                <button
-                  onClick={() => setShowPortalVersionHistory(true)}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
-                  title="View portal version history"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span className="hidden sm:inline">v{proposal.current_portal_version}</span>
-                </button>
-              )}
-
               {/* Expiration Badge */}
               {(proposal?.status === 'sent' || proposal?.status === 'portal' || proposal?.status === 'expired') && proposal?.sent_at && (() => {
-                const expiresAt = new Date(proposal.sent_at);
-                expiresAt.setDate(expiresAt.getDate() + 30);
+                const expiresAt = proposal.expires_at
+                  ? new Date(proposal.expires_at)
+                  : new Date(new Date(proposal.sent_at).getTime() + 30 * 24 * 60 * 60 * 1000);
                 const now = new Date();
                 const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
                 const isExpired = daysUntilExpiration <= 0;
 
                 return (
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                  <span title={`Expires ${expiresAt.toLocaleDateString()}`} className={`inline-flex items-center gap-1 text-xs font-medium ${
                     isExpired
-                      ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      ? 'text-red-400'
                       : daysUntilExpiration <= 7
-                        ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                        : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                        ? 'text-orange-400'
+                        : 'text-blue-400'
                   }`}>
                     <Clock className="w-3 h-3" />
                     <span className="hidden sm:inline">{isExpired ? 'Expired' : `${daysUntilExpiration}d left`}</span>
@@ -3599,7 +3588,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     title={proposalReadiness?.isReady ? "Status Actions" : `Complete proposal settings before approving (${proposalReadiness?.overallProgress ?? 0}% ready)`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Status</span>
+                    <span>{proposal?.status?.replaceAll("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) || "Status"}</span>
                     <ChevronDown className="w-3 h-3" />
                   </button>
 
@@ -3670,6 +3659,17 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </div>
             )}
 
+            {proposal?.status === 'approved' && getStatusBadge(proposal.status)}
+            <button
+              type="button"
+              onClick={openPortalPreview}
+              className="p-2 shrink-0 text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
+              title="Preview as Customer"
+              aria-label="Preview as Customer"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+
             {/* Add Item Button */}
             <button
               onClick={() => {
@@ -3696,6 +3696,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMoreOptionsMenu(false)} />
                   <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
+                    {(proposal?.current_portal_version ?? 0) > 0 && (
+                      <button
+                        onClick={() => { setShowPortalVersionHistory(true); setShowMoreOptionsMenu(false); }}
+                        className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Portal Version History
+                      </button>
+                    )}
                     {/* Customer Section */}
                     {proposal?.contact_id && (
                       <>
@@ -7085,9 +7094,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {showPortalPreview && createPortal(
         <div className="fixed inset-0 z-[9999] flex flex-col bg-gray-950">
           <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 bg-canvas border-b border-subtle shrink-0 flex-wrap">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
               <Eye className={`w-4 h-4 ${proposal?.is_portal_visible ? 'text-green-400' : 'text-blue-400'}`} />
-              <span className="text-sm font-semibold text-primary">Customer Portal Preview</span>
+              <span className="text-sm font-semibold text-primary">Customer Preview</span>
+              <span className="text-xs text-muted">Read only — customer actions disabled</span>
             </div>
             {proposal?.is_portal_visible ? (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/30">
