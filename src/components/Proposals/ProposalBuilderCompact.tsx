@@ -3346,8 +3346,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               {/* Combined Locked/Live Badge */}
               {getCombinedStatusBadge()}
 
-              {/* Expiration Badge */}
-              {(proposal?.status === 'sent' || proposal?.status === 'portal' || proposal?.status === 'expired') && proposal?.sent_at && (() => {
+              {/* Expiration Badge — countdown only for sent/portal; expired status is shown in the status control */}
+              {(proposal?.status === 'sent' || proposal?.status === 'portal') && proposal?.sent_at && (() => {
                 const expiresAt = proposal.expires_at
                   ? new Date(proposal.expires_at)
                   : new Date(new Date(proposal.sent_at).getTime() + 30 * 24 * 60 * 60 * 1000);
