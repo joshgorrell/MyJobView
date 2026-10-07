@@ -1,18 +1,29 @@
 import { wrapInEmailLayout } from '../_shared/emailTemplates.ts';
 const esc = (v: string) => v.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
-export function proposalFollowUpEmail(settings: any, contact: any, sender: { name: string; email: string; owner: boolean; photo?: string }) {
+
+export function proposalFollowUpContent(settings: any, contact: any, sender: { name: string; email: string; owner: boolean; photo?: string }) {
   const company = esc(settings.company_name || 'Our team');
   const name = esc(sender.name);
   const button = sender.owner ? `Reply to ${esc(sender.name.split(' ')[0])}` : 'Let Us Know';
-  const content = `<p style="font-size:16px;line-height:1.8">Hi ${esc(contact.first_name || contact.contact_name || 'there')},</p>
-  <p style="font-size:16px;line-height:1.8">${sender.owner ? `I’m <strong>${name}, the owner of ${company}</strong>, and I wanted to personally thank you for giving our team the opportunity to work with you on your project. I know you’ve received a proposal from us, and I wanted to check in personally.` : `Thank you again for giving <strong>${company}</strong> the opportunity to put together a proposal for your project. We appreciate the chance to earn your business. I wanted to check in and make sure we’re doing everything we can to help.`}</p>
+  return `<p style="font-size:16px;line-height:1.8">Hi ${esc(contact.first_name || contact.contact_name || 'there')},</p>
+  <p style="font-size:16px;line-height:1.8">${sender.owner ? `I'm <strong>${name}, the owner of ${company}</strong>, and I wanted to personally thank you for giving our team the opportunity to work with you on your project. I know you've received a proposal from us, and I wanted to check in personally.` : `Thank you again for giving <strong>${company}</strong> the opportunity to put together a proposal for your project. We appreciate the chance to earn your business. I wanted to check in and make sure we're doing everything we can to help.`}</p>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;background:#ecfeff;border-radius:12px"><tr><td style="padding:28px 20px;text-align:center"><span style="font-size:11px;letter-spacing:2px;color:#0e7490;font-weight:700">YOUR EXPERIENCE MATTERS</span><h1 style="font-size:30px;line-height:1.2;color:#164e63;margin:12px 0 0">How are we doing?</h1></td></tr></table>
-  <p style="font-size:16px;line-height:1.8">${sender.owner ? 'My team works hard to make sure we’re recommending the right solution, communicating clearly, and providing a great experience from the very beginning. If we’ve missed the mark somewhere—or if there’s something we could do differently to earn your business—I’d like to know.' : 'If you have questions about the proposal, would like to explore different options, need something adjusted, or there’s simply something we could do better to earn your business, please let me know.'}</p>
-  <p style="font-size:16px;line-height:1.8">${sender.owner ? 'Maybe you have a question that hasn’t been answered. Maybe something in the proposal needs to change. Or maybe you’re comparing us with another option and there’s something we could do better.' : 'Our goal isn’t just to send you a proposal—it’s to make sure we’ve put together the <strong>right solution for you.</strong>'}</p>
+  <p style="font-size:16px;line-height:1.8">${sender.owner ? `My team works hard to make sure we're recommending the right solution, communicating clearly, and providing a great experience from the very beginning. If we've missed the mark somewhere—or if there's something we could do differently to earn your business—I'd like to know.` : `If you have questions about the proposal, would like to explore different options, need something adjusted, or there's simply something we could do better to earn your business, please let me know.`}</p>
+  <p style="font-size:16px;line-height:1.8">${sender.owner ? `Maybe you have a question that hasn't been answered. Maybe something in the proposal needs to change. Or maybe you're comparing us with another option and there's something we could do better.` : `Our goal isn't just to send you a proposal—it's to make sure we've put together the <strong>right solution for you.</strong>`}</p>
   <p style="font-size:18px;line-height:1.6;font-weight:700;color:#164e63">${sender.owner ? 'Whatever it is, you can reply directly to me.' : 'Is there anything we can do to win your business?'}</p>
   <p style="text-align:center;margin:28px 0"><a href="mailto:${esc(sender.email)}" style="display:inline-block;background:#0e7490;color:#fff;padding:16px 28px;border-radius:8px;font-size:16px;font-weight:700;text-decoration:none">${button} →</a></p>
-  <p style="font-size:14px;text-align:center;color:#64748b">Or simply reply to this email. ${sender.owner ? 'Your reply comes directly to me.' : 'I’m happy to help.'}</p>
+  <p style="font-size:14px;text-align:center;color:#64748b">Or simply reply to this email. ${sender.owner ? `Your reply comes directly to me.` : `I'm happy to help.`}</p>
   <p style="font-size:16px;line-height:1.8">${sender.owner ? 'I appreciate the opportunity to earn your business, and whether you choose us or not, I appreciate your feedback.' : 'Thank you again for the opportunity.'}</p>
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:28px"><tr>${sender.photo ? `<td style="padding-right:16px"><img src="${esc(sender.photo)}" width="72" alt="${name}" style="display:block;border-radius:10px" /></td>` : ''}<td style="line-height:1.7">Thank you,<br><strong style="font-size:17px;color:#164e63">${name}</strong><br>${sender.owner ? 'Owner | ' : ''}${company}<br>${settings.slogan ? `<em style="font-size:13px;color:#64748b">${esc(settings.slogan)}</em>` : ''}</td></tr></table>`;
+}
+
+export function proposalFollowUpEmail(settings: any, contact: any, sender: { name: string; email: string; owner: boolean; photo?: string }) {
+  const company = esc(settings.company_name || 'Our team');
+  const content = proposalFollowUpContent(settings, contact, sender);
+  return wrapInEmailLayout(content, company, esc(settings.company_email || ''), '#0e7490', settings.company_logo_url || '', [], 'light').replace('You received this email because you recently worked with us.<br>Thank you for your business.', 'Thank you for giving us the opportunity to earn your business.');
+}
+
+export function wrapProposalContent(settings: any, content: string) {
+  const company = esc(settings.company_name || 'Our team');
   return wrapInEmailLayout(content, company, esc(settings.company_email || ''), '#0e7490', settings.company_logo_url || '', [], 'light').replace('You received this email because you recently worked with us.<br>Thank you for your business.', 'Thank you for giving us the opportunity to earn your business.');
 }

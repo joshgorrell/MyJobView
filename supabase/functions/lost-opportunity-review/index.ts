@@ -1,4 +1,4 @@
-import { proposalFollowUpEmail } from "./proposalFollowUp.ts";
+import { proposalFollowUpEmail, proposalFollowUpContent, wrapProposalContent } from "./proposalFollowUp.ts";
 import { sendSystemEmail } from '../_shared/system-email.ts';
 import { validateAssessment } from "./adminReview.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -406,10 +406,15 @@ Deno.serve(async (req) => {
         email: owner ? "josh@electroniclife.com" : rep.email,
         photo: owner ? "https://elife.myjobview.com/images/josh-gorrell-email.jpg" : undefined };
       if (!sender.name || !sender.email || (!owner && !rep.is_active)) return json({ error: "Configure the sender’s name and email before sending." }, 400);
-      const html = proposalFollowUpEmail({ ...settings, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" }, contact, sender);
-      const subject = owner ? "A quick note from the owner" : "How are we doing?";
-      if (b.action === "proposal_preview") return json({ html, subject, recipient: contact.email, reply_to: sender.email, sender: sender.name });
+      const extendedSettings = { ...settings, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" };
+      const defaultContent = proposalFollowUpContent(extendedSettings, contact, sender);
+      const defaultSubject = owner ? "A quick note from the owner" : "How are we doing?";
+      if (b.action === "proposal_preview") return json({ html: proposalFollowUpEmail(extendedSettings, contact, sender), content: defaultContent, subject: defaultSubject, recipient: contact.email, reply_to: sender.email, sender: sender.name });
       if (typeof b.send_key !== "string" || !/^[0-9a-f-]{36}$/.test(b.send_key)) return json({ error: "Preview the email before sending." }, 400);
+      const editedSubject = typeof b.edited_subject === "string" ? b.edited_subject.trim().slice(0, 300) : "";
+      const editedContent = typeof b.edited_content === "string" ? b.edited_content.slice(0, 200000) : "";
+      const subject = editedSubject || defaultSubject;
+      const html = editedContent ? wrapProposalContent(extendedSettings, editedContent) : proposalFollowUpEmail(extendedSettings, contact, sender);
       const from = settings.from_email || settings.company_email;
       if (!from || !Deno.env.get("RESEND_API_KEY")) return json({ error: "Configure email delivery before sending." }, 503);
       const result = await sendSystemEmail({ headers: { "Idempotency-Key": `proposal-follow-up-${org}-${b.send_key}` },
