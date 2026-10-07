@@ -110,8 +110,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setUser(session.user);
         setIsPasswordRecovery(false);
-        setLoading(true);
-        loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
+        // Only flip loading to true on the initial mount. If the app is
+        // already loaded (e.g. a token refresh re-fires INITIAL_SESSION
+        // after the tab regains focus), keep the current UI mounted so
+        // users don't lose unsaved form state.
+        if (!profile && !loadingProfile) {
+          setLoading(true);
+          loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
+        }
         if (window.location.hash) {
           window.history.replaceState(null, '', window.location.pathname);
         }
