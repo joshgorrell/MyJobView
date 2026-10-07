@@ -99,14 +99,14 @@ export function UserSetupTabs({
 }) {
   return (
     <div className="flex-shrink-0">
-      <nav aria-label="User settings" className="flex overflow-x-auto border-b border-gray-700">
+      <nav aria-label="User settings" className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border-b border-gray-700">
         {[...setupSections, { key: 'review' as const, label: 'Review / User Card' }].map((s) => (
           <button
             type="button"
             key={s.key}
             onClick={() => onSelect(s.key)}
             aria-current={active === s.key ? 'step' : undefined}
-            className={`px-4 py-3 text-sm whitespace-nowrap border-b-2 ${active === s.key ? 'text-cyan-300 border-cyan-400 bg-gray-800' : 'text-gray-300 border-transparent'}`}
+            className={`min-h-11 px-2 py-2 text-xs sm:text-sm border-b-2 ${active === s.key ? 'text-cyan-300 border-cyan-400 bg-gray-800' : 'text-gray-300 border-transparent'}`}
           >
             {s.label}
             {guided && s.key !== 'review' && (

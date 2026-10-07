@@ -16,7 +16,7 @@ const modules=departments.flatMap(d=>Array.from({length:8},(_,i)=>({id:d.id+'mod
 const records={roles:[{id:'role',role_key:'sales',display_name:'Sales',description:'Sales role'},{id:'adminrole',role_key:'admin',display_name:'Administrator',description:'Admin role'}],company_offices:[{id:'office',office_name:'Topeka'}],departments,role_department_access:departments.map(d=>({department_id:d.id,has_access:true})),department_modules:modules,role_module_access:modules.map(m=>({module_id:m.id,has_access:true})),pay_schedules:[{id:'schedule',name:'Weekly',frequency:'weekly',is_active:true}],profiles:[profile],employees:[{id:'emp',user_id:'employee',hire_date:'2026-01-01',employment_status:'active',termination_date:null,employee_number:'100'}],employee_payroll_configs:[config],user_offices:[{office_id:'office'}],user_setup_reviews:[{user_id:'employee',reviewed_sections:['profile','access','permissions','notifications','pay','sales']}]};
 export const supabase={from(table){let one=false;let operation='select';let input;let columns='*';const filters=[];const result=()=>{let data=records[table]||[];if(table==='profiles'&&filters.some(f=>f[0]==='id'&&f[1]==='admin'))data=[{id:'admin',role:'admin'}];if(operation!=='select')window.calls.push({table,operation,input});if(window.fixtureFail===table)return Promise.resolve({data:null,error:{message:'Fixture failure'}});if(operation==='upsert'&&table==='user_setup_reviews')records[table]=[input];return Promise.resolve({data:one?(data[0]||null):data,error:null});};const q=new Proxy({},{get(_,k){if(k==='then')return (done,fail)=>result().then(done,fail);if(k==='single'||k==='maybeSingle')return ()=>{one=true;return result()};if(k==='select')return c=>{columns=c;return q};if(k==='eq')return (k,v)=>{filters.push([k,v]);return q};if(['update','insert','delete','upsert'].includes(k))return v=>{operation=k;input=v;return q};return()=>q}});return q},auth:{getUser:async()=>({data:{user:{id:'admin'}}}),getSession:async()=>({data:{session:{access_token:'fixture'}}})},rpc:async(name,input)=>{window.calls.push({rpc:name,input});return {error:null}}};
 export {profile};`;
-const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {AddUserForm} from './src/components/Admin/AddUserForm';import {EditUserForm} from './src/components/Admin/EditUserForm';import {profile} from 'fixture';window.fetch=async()=>{window.calls.push({create:true});return {ok:true,json:async()=>({user:{id:'newuser'}})}};createRoot(document.getElementById('root')).render(location.search.includes('edit')?<EditUserForm user={profile} onClose={()=>{}} onSuccess={()=>{window.saved=true}}/>:<AddUserForm onClose={()=>{}} onSuccess={()=>{window.created=true}}/>);`;
+const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {AddUserForm} from './src/components/Admin/AddUserForm';import {EditUserForm} from './src/components/Admin/EditUserForm';import {profile} from 'fixture';window.fetch=async()=>{window.calls.push({create:true});return {ok:true,json:async()=>({user:{id:'newuser'}})}};createRoot(document.getElementById('root')).render(location.search.includes('edit')?<EditUserForm user={profile} onClose={()=>{window.closed=true}} onSuccess={()=>{window.saved=true}}/>:<AddUserForm onClose={()=>{}} onSuccess={()=>{window.created=true}}/>);`;
 let browser;
 const server = createServer(async (req, res) => {
   try {
@@ -113,7 +113,7 @@ try {
   const effective = page.locator('input[type="date"]');
   await effective.fill('2026-11-01');
   await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
-  await page.waitForFunction(() => window.saved);
+  await page.waitForFunction(() => window.saved && window.closed);
   assert.ok(
     await page.evaluate(() =>
       window.calls.some(
@@ -185,6 +185,12 @@ try {
   await printPage.close();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Permissions', exact: true }).click();
+  for (const section of ['Profile', 'Access & Employment', 'Permissions']) {
+    const button = page.getByRole('button', { name: section, exact: true });
+    const box = await button.boundingBox();
+    assert.ok(box && box.x >= 0 && box.x + box.width <= 390, 'Every section remains visible on mobile');
+    await button.click();
+  }
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   if (process.env.USER_SETUP_SCREENSHOT_DIR)
     await page.screenshot({ path: join(resolve(process.env.USER_SETUP_SCREENSHOT_DIR), 'mobile.png') });

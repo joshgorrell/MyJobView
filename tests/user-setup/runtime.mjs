@@ -44,7 +44,12 @@ try {
     expected_weekly_hours: '40',
   };
   assert.equal(validateSetup('profile', profile, 'employee', emp, true), null);
-  assert.ok(validateSetup('profile', { ...profile, email: 'bad' }, 'employee', emp, true));
+  for (const email of ['sherri@electroniclife.com', 'josh@electroniclife.com', 'susan@example.com']) {
+    assert.equal(validateSetup('profile', { ...profile, email }, 'employee', emp, true), null);
+  }
+  for (const email of ['bad', 'name example.com', 'name@exampleXcom', 'name @example.com']) {
+    assert.ok(validateSetup('profile', { ...profile, email }, 'employee', emp, true));
+  }
   assert.ok(validateSetup('access', { ...profile, password: '' }, 'employee', emp, true));
   assert.ok(validateSetup('permissions', profile, 'employee', emp, false));
   assert.ok(validateSetup('pay', profile, '', emp, true));
