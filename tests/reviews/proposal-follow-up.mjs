@@ -5,7 +5,7 @@ const moduleFrom = source => import('data:text/javascript;base64,' + Buffer.from
 const layout = await moduleFrom((await readFile('supabase/functions/_shared/emailTemplates.ts', 'utf8')).replace(/^import[^;]+;\n/gm, ''));
 globalThis.__layout = layout.wrapInEmailLayout;
 const template = (await readFile('supabase/functions/lost-opportunity-review/proposalFollowUp.ts', 'utf8')).replace(/^import[^;]+;\n/gm, '');
-const { proposalFollowUpEmail } = await moduleFrom('const wrapInEmailLayout = globalThis.__layout;\n' + template);
+const { proposalFollowUpEmail, proposalFollowUpContent, wrapProposalContent } = await moduleFrom('const wrapInEmailLayout = globalThis.__layout;\n' + template);
 const settings = { company_name: 'Electronic Life', company_email: 'office@example.com', company_logo_url: 'https://example.com/logo.png', slogan: 'Innovate. Integrate. Inspire.' };
 for (const owner of [false, true]) {
   const html = proposalFollowUpEmail(settings, { first_name: '<script>Bad</script>' }, { name: owner ? 'Josh Gorrell' : 'Aaron Koker', email: owner ? 'josh@electroniclife.com' : 'aaron@example.com', owner });
@@ -27,12 +27,12 @@ function from(table) {
     if (table === 'company_settings') return { data: { ...settings, from_email: 'verified@example.com' } };
     if (table === 'organizations') return { data: { subdomain: tenant } };
     throw new Error(table);
-  } }; return q;
+  } }; q.maybeSingle = q.single; return q;
 }
 const client = { from, auth: { getUser: async () => ({data:{ user:{id:'employee',email:authenticatedEmail} }}) }, rpc: async () => ({data:moduleAccess}) };
-globalThis.__deps = { proposalFollowUpEmail, createClient: () => client, sendSystemEmail: async init => { emails.push(JSON.parse(init.body)); return new Response('{}'); } };
+globalThis.__deps = { proposalFollowUpContent, wrapProposalContent, sendTrackedProposalCheck: async (_db, transport, v) => { await transport({ body: JSON.stringify({from:v.from_address,to:v.recipient_email,reply_to:v.reply_to,subject:v.subject,html:v.email_html}) }); return {success:true}; }, proposalFollowUpEmail, createClient: () => client, sendSystemEmail: async init => { emails.push(JSON.parse(init.body)); return new Response('{}'); } };
 const source = (await readFile('supabase/functions/lost-opportunity-review/index.ts','utf8')).replace(/^import[^;]+;\n/gm,'');
-await moduleFrom(`const {proposalFollowUpEmail,createClient,sendSystemEmail}=globalThis.__deps;const Deno={env:{get:()=> 'test'},serve:f=>globalThis.handler=f};\n${source}`);
+await moduleFrom(`const {proposalFollowUpContent,wrapProposalContent,sendTrackedProposalCheck,proposalFollowUpEmail,createClient,sendSystemEmail}=globalThis.__deps;const Deno={env:{get:()=> 'test'},serve:f=>globalThis.handler=f};\n${source}`);
 async function call(extra={}) { const r = await globalThis.handler(new Request('https://example.com', { method:'POST', body:JSON.stringify({ action:'proposal_preview',proposal_id:'proposal',variant:'owner',...extra }) })); return {status:r.status,body:await r.json()}; }
 assert.equal((await call()).body.reply_to,'josh@electroniclife.com');
 assert.equal(emails.length,0,'Preview must never send');
