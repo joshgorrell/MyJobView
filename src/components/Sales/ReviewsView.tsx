@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Shared/Toast';
 import { Star, Mail, QrCode, TrendingUp, Users, ExternalLink, Send, Check, Eye, X, Search, Calendar, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, ClipboardList, ThumbsUp, ChevronDown, CheckCircle, Lock } from 'lucide-react';
+import ProposalFollowUps from '../Reviews/ProposalFollowUps';
 import LostOpportunityReviews from '../Reviews/LostOpportunityReviews';
 import { CustomerSatisfactionDashboard } from './CustomerSatisfactionDashboard';
 
@@ -260,10 +261,10 @@ export default function ReviewsView() {
   const canViewCustomerFeedback = isAdmin || ((profile as any)?.can_view_customer_feedback ?? canSeeAllRequests);
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  type ReviewTab = 'dashboard' | 'send' | 'lost';
+  type ReviewTab = 'dashboard' | 'send' | 'lost' | 'proposal';
   const getReviewTabFromUrl = (): ReviewTab => {
     const tab = new URLSearchParams(window.location.search).get('reviewType');
-    return tab === 'send' || tab === 'lost' || tab === 'dashboard' ? tab : 'dashboard';
+    return tab === 'proposal' || tab === 'send' || tab === 'lost' || tab === 'dashboard' ? tab : 'dashboard';
   };
   const [activeTab, setActiveTabState] = useState<ReviewTab>(getReviewTabFromUrl);
   const setActiveTab = useCallback((tab: ReviewTab, options?: { replace?: boolean }) => {
@@ -1107,8 +1108,11 @@ export default function ReviewsView() {
           <Send className="w-4 h-4 inline mr-2" />
           Ask / Send
         </button>}
+        {canManageCustomerFeedback && <button onClick={() => setActiveTab('proposal')} className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium ${activeTab === 'proposal' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Proposal Follow-Up</button>}
         {canViewLostOpportunities && <button onClick={() => setActiveTab('lost')} className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium [overflow-wrap:normal] ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>}
       </div>
+
+      {activeTab === 'proposal' && canManageCustomerFeedback && <ProposalFollowUps />}
 
       {activeTab === 'lost' && canViewLostOpportunities && <LostOpportunityReviews />}
 
