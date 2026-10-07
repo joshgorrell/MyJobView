@@ -240,7 +240,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       }
 
       const starred = starredSource
-        .filter(s => s.module && checkAccess(s.module.module_key))
+        .filter(s => s.module && (s.module as any).module_key !== 'messages' && checkAccess(s.module.module_key))
         .slice(0, 6)
         .map(s => ({
           ...(s.module as any),
@@ -265,7 +265,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
       // Load quick access suggestions (calculate after maps are set)
       const suggestions = mods.filter(m => {
-        if (!m.is_quick_access) return false;
+        if (!m.is_quick_access || m.module_key === 'messages') return false;
         return checkModuleAccess(m);
       });
       setQuickAccessSuggestions(suggestions);
@@ -278,7 +278,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
   function getUserModules(departmentId: string): DepartmentModule[] {
     return modules.filter(mod => {
-      if (mod.department_id !== departmentId) return false;
+      if (mod.department_id !== departmentId || mod.module_key === 'messages') return false;
       return hasModuleAccess(mod);
     });
   }

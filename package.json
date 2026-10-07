@@ -16,6 +16,7 @@
     "test:business-card": "node tests/business-card/database.mjs && node tests/business-card/runtime.mjs",
     "test:ai-assistant": "node tests/ai-assistant/permissions.mjs",
     "test:flow": "node tests/flow/database.mjs",
+    "test:flow:conversations": "node tests/flow/customer-conversations-browser.mjs",
     "test:flow:browser": "npm run build && node tests/flow/mobile-browser.mjs",
     "test:security-onboarding": "node tests/security-onboarding/database.mjs && node tests/security-onboarding/payments.mjs && node tests/security-onboarding/payment-edge.mjs && node tests/security-onboarding/charges.mjs && node tests/security-onboarding/worker.mjs && node tests/security-onboarding/commission.mjs && node tests/security-onboarding/invitations.mjs && node tests/security-onboarding/oauth.mjs && node tests/security-onboarding/qbo-setup.mjs && node tests/security-onboarding/printing.mjs",
     "test:reviews": "node tests/reviews/database.mjs && node tests/reviews/edge.mjs",
