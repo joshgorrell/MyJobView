@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Profile, CompanySettings } from '../lib/types';
@@ -37,6 +37,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [isPortalUser, setIsPortalUser] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // Refs mirror the state values so the onAuthStateChange closure (which
+  // is created once on mount) can read the *current* profile/loading state
+  // instead of the stale captured values. Without this, INITIAL_SESSION
+  // re-fires (e.g. when a tab regains focus) see profile as always-null
+  // and flip loading back to true, unmounting the entire app.
+  const profileRef = useRef<Profile | null>(null);
+  const loadingProfileRef = useRef(false);
+  profileRef.current = profile;
+  loadingProfileRef.current = loadingProfile;
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -114,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // already loaded (e.g. a token refresh re-fires INITIAL_SESSION
         // after the tab regains focus), keep the current UI mounted so
         // users don't lose unsaved form state.
-        if (!profile && !loadingProfile) {
+        if (!profileRef.current && !loadingProfileRef.current) {
           setLoading(true);
           loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
         }
