@@ -7,7 +7,7 @@ import {
   saveSetupReview,
   useSetupReview,
 } from './UserSetup';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   X,
   Key,
@@ -124,6 +124,7 @@ interface EditUserFormProps {
 export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserFormProps) {
   const [dataLoadFailed, setDataLoadFailed] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+  const contentRef = useRef<HTMLFormElement>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
   const { reviewed, setReviewed, reviewError } = useSetupReview(user.id);
@@ -804,8 +805,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           : reviewed,
       );
       setSuccessMessage('User updated successfully! Closing...');
-      await new Promise((resolve) => setTimeout(resolve, 1500));
       onSuccess();
+      onClose();
     } catch (err: any) {
       console.error('Error during update:', err);
       setError(err.message || 'Failed to update user');
@@ -880,6 +881,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Edit User"
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
           >
@@ -887,7 +890,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={setActiveTab} reviewed={reviewed} />
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); contentRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} />
         {/* Messages */}
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
@@ -915,9 +918,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
         {/* Tab content */}
         <form
+          id="edit-user-form"
+          ref={contentRef}
           onSubmit={handleSubmit}
           onChange={() => setReviewed((prev) => prev.filter((k) => k !== activeTab))}
-          className="flex-1 overflow-y-auto"
+          className="min-h-0 flex-1 overflow-y-auto"
         >
           <div className="p-4 sm:p-6 space-y-5">
             {reviewError && <p className="text-red-300">{reviewError}</p>}
@@ -2015,7 +2020,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           </button>
           <button
             type="submit"
-            onClick={handleSubmit}
+            form="edit-user-form"
             disabled={loading || dataLoading || dataLoadFailed}
             className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all font-medium disabled:opacity-50"
           >
