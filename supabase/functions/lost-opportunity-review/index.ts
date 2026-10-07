@@ -1,4 +1,5 @@
 import { proposalFollowUpEmail, proposalFollowUpContent, wrapProposalContent } from "./proposalFollowUp.ts";
+import { sendTrackedProposalCheck } from "./proposalCheckDelivery.ts";
 import { sendSystemEmail } from '../_shared/system-email.ts';
 import { validateAssessment } from "./adminReview.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -417,10 +418,14 @@ Deno.serve(async (req) => {
       const html = editedContent ? wrapProposalContent(extendedSettings, editedContent) : proposalFollowUpEmail(extendedSettings, contact, sender);
       const from = settings.from_email || settings.company_email;
       if (!from || !Deno.env.get("RESEND_API_KEY")) return json({ error: "Configure email delivery before sending." }, 503);
-      const result = await sendSystemEmail({ headers: { "Idempotency-Key": `proposal-follow-up-${org}-${b.send_key}` },
-        body: JSON.stringify({ from: `${sender.name.replace(/[<>\r\n]/g, "")} <${from}>`, to: contact.email, reply_to: sender.email, subject, html }) });
-      if (!result.ok) return json({ error: "Email could not be delivered. Please try again." }, 502);
-      return json({ success: true });
+      return json(await sendTrackedProposalCheck(admin, sendSystemEmail, {
+        organization_id: org, send_key: b.send_key, sent_by: user.id,
+        contact_id: mode === "manual" ? null : proposal?.contact_id || b.contact_id,
+        proposal_id: proposal?.id || null, variant: b.variant,
+        recipient_name: contact.contact_name || contact.first_name || contact.email,
+        recipient_email: contact.email, sender_name: sender.name,
+        reply_to: sender.email, from_address: `${sender.name.replace(/[<>\r\n]/g, "")} <${from}>`, subject, email_html: html,
+      }, Deno.env.get("SUPABASE_URL")!));
     }
     if (["create", "preview"].includes(b.action)) {
       if (!profile.can_send_lost_opportunity_reviews) {
