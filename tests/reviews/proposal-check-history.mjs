@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import ts from 'typescript';
+import { PGlite } from '@electric-sql/pglite';
+const moduleFrom = s => import('data:text/javascript;base64,' + Buffer.from(ts.transpileModule(s, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText).toString('base64'));
+const { sendTrackedProposalCheck } = await moduleFrom(await readFile('supabase/functions/lost-opportunity-review/proposalCheckDelivery.ts','utf8'));
+let row = null, deliveries = [], fail = false;
+const db = { from() {
+  let insert, update; const filters={};
+  const result = () => {
+    if (insert) { row = { id: 'record', ...insert }; return {data:row}; }
+    if (update && row && Object.entries(filters).every(([k,v]) => row[k] === v)) row={...row,...update};
+    return {data:row};
+  };
+  const q={select:()=>q,eq:(k,v)=>{filters[k]=v;return q;},insert:v=>{insert=v;return q;},update:v=>{update=v;return q;},single:async()=>result(),maybeSingle:async()=>result(),then:(a,b)=>Promise.resolve(result()).then(a,b)};return q;
+}};
+const transport=async init=>{ deliveries.push(JSON.parse(init.body)); return new Response(JSON.stringify({id:'provider'}),{status:fail?500:200}); };
+const input={ organization_id:'org',send_key:crypto.randomUUID(),sent_by:'sender',recipient_name:'Customer',recipient_email:'customer@example.com',sender_name:'Josh',reply_to:'josh@electroniclife.com',from_address:'Josh <verified@example.com>',subject:'Hello',email_html:'<html><body>Exact email</body></html>',variant:'owner',proposal_id:null,contact_id:null };
+await sendTrackedProposalCheck(db,transport,input,'https://example.supabase.co');
+assert.equal(row.status,'sent'); assert.ok(row.sent_at); assert.equal(row.provider_message_id,'provider');
+assert.equal(row.email_html,input.email_html,'Saved preview excludes tracking image');
+assert.ok(deliveries[0].html.includes('/functions/v1/proposal-check-open?token='));
+await sendTrackedProposalCheck(db,transport,input,'https://example.supabase.co');
+assert.equal(deliveries.length,1,'Repeat successful sends do not resend');
+await assert.rejects(()=>sendTrackedProposalCheck(db,transport,{...input,recipient_email:'other@example.com'},'https://example.supabase.co'),/changed/);
+row=null;fail=true;await assert.rejects(()=>sendTrackedProposalCheck(db,transport,input,'https://example.supabase.co'),/failed attempt/);
+assert.equal(row.status,'failed');const token=row.open_token;fail=false;
+await sendTrackedProposalCheck(db,transport,input,'https://example.supabase.co');assert.equal(row.open_token,token,'Retries retain tracking identity');
+let openRow={open_token:token,opened_at:null,status:'sent'},writes=0;
+const openDB={from(){let filters={};const q={update:v=>{q.value=v;return q;},eq:(k,v)=>{filters[k]=v;return q;},is:(k,v)=>{filters[k]=v;return q;},neq:(k,v)=>{q.excluded=[k,v];return q;},then:a=>{if(Object.entries(filters).every(([k,v])=>openRow[k]===v)&&openRow[q.excluded[0]]!==q.excluded[1]){openRow={...openRow,...q.value};writes++;}return Promise.resolve({error:null}).then(a);}};return q;}};
+const openSource=(await readFile('supabase/functions/proposal-check-open/index.ts','utf8')).replace(/^import[^;]+;\n/gm,'').replace(/Deno\.serve[\s\S]*$/,'');
+const {handleOpen}=await moduleFrom(openSource);
+const request=new Request('https://example.com?token='+token);
+assert.equal((await handleOpen(request,openDB)).headers.get('content-type'),'image/gif');
+const first=openRow.opened_at;await handleOpen(request,openDB);assert.equal(writes,1);assert.equal(openRow.opened_at,first);
+await handleOpen(new Request('https://example.com?token=invalid'),openDB);assert.equal(writes,1);
+await handleOpen(new Request(request.url,{method:'HEAD'}),openDB);assert.equal(writes,1);
+const sql = new PGlite();
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+await sql.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;CREATE SCHEMA auth;CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('test.uid',true),'')::uuid $$;
+CREATE TABLE organizations(id uuid PRIMARY KEY);CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,role text,is_active boolean,can_manage_customer_feedback boolean,can_see_all_review_requests boolean);CREATE TABLE contacts(id uuid PRIMARY KEY);CREATE TABLE proposals(id uuid PRIMARY KEY);
+CREATE FUNCTION get_user_org_id() RETURNS uuid LANGUAGE sql AS $$ SELECT organization_id FROM profiles WHERE id=auth.uid() $$;
+CREATE FUNCTION flow_has_module_access(text) RETURNS boolean LANGUAGE sql AS $$ SELECT coalesce(current_setting('test.access',true),'true')='true' $$;
+GRANT USAGE ON SCHEMA public,auth TO authenticated,anon;GRANT SELECT ON profiles TO authenticated;
+INSERT INTO organizations VALUES('${id(1)}'),('${id(2)}');INSERT INTO profiles VALUES('${id(10)}','${id(1)}','sales',true,true,false),('${id(11)}','${id(1)}','sales',true,true,false),('${id(12)}','${id(1)}','manager',true,true,true),('${id(20)}','${id(2)}','admin',true,true,true);`);
+await sql.exec(await readFile('supabase/migrations/20261007214346_proposal_check_history.sql','utf8'));
+await sql.exec(`INSERT INTO proposal_check_emails(organization_id,sent_by,send_key,variant,recipient_name,recipient_email,sender_name,from_address,reply_to,subject,email_html,open_token) VALUES('${id(1)}','${id(10)}','${id(30)}','sales','Test','customer@example.com','Sender','sender@example.com','sender@example.com','Test','Snapshot','secret');`);
+async function count(user,access='true'){await sql.exec(`RESET ROLE;SELECT set_config('test.uid','${id(user)}',false);SELECT set_config('test.access','${access}',false);SET ROLE authenticated;`);return (await sql.query('SELECT id FROM proposal_check_emails')).rows.length;}
+assert.equal(await count(10),1);assert.equal(await count(11),0);assert.equal(await count(12),1);assert.equal(await count(20),0);assert.equal(await count(10,'false'),0);
+await sql.exec(`RESET ROLE;UPDATE profiles SET is_active=false WHERE id='${id(10)}'`);assert.equal(await count(10),0);
+await sql.exec(`RESET ROLE;UPDATE profiles SET is_active=true,can_manage_customer_feedback=false WHERE id='${id(10)}'`);assert.equal(await count(10),0);
+await sql.exec(`RESET ROLE;UPDATE profiles SET can_manage_customer_feedback=true WHERE id='${id(10)}'`);
+await count(10);await assert.rejects(()=>sql.query('SELECT open_token FROM proposal_check_emails'),/permission denied/);await assert.rejects(()=>sql.exec("UPDATE proposal_check_emails SET status='sent'"),/permission denied/);
+await sql.exec('RESET ROLE;SET ROLE anon');await assert.rejects(()=>sql.query('SELECT id FROM proposal_check_emails'),/permission denied/);
+await sql.close();console.log('Proposal history: snapshots, retry identity, first open, invalid tokens, HEAD requests, tenant/module/own-history isolation and token/write restrictions passed.');
