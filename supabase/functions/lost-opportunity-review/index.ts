@@ -1,3 +1,4 @@
+import { proposalFollowUpEmail } from "./proposalFollowUp.ts";
 import { sendSystemEmail } from '../_shared/system-email.ts';
 import { validateAssessment } from "./adminReview.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -352,7 +353,7 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "Unauthorized" }, 401);
     const profile = await checked(
       await admin.from("profiles").select(
-        "organization_id,role,is_active,can_send_lost_opportunity_reviews,can_view_lost_opportunity_submissions",
+        "organization_id,role,is_active,can_send_lost_opportunity_reviews,can_view_lost_opportunity_submissions,can_manage_customer_feedback,first_name,last_name,email",
       ).eq(
         "id",
         user.id,
@@ -366,6 +367,39 @@ Deno.serve(async (req) => {
     );
     if (!access) return json({ error: "Reviews access required" }, 403);
     const org = profile.organization_id;
+    if (["proposal_preview", "proposal_send"].includes(b.action)) {
+      const isAdmin = ["admin", "owner", "super_admin"].includes(profile.role);
+      if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);
+      if (!["sales", "owner"].includes(b.variant)) return json({ error: "Choose a follow-up version." }, 400);
+      if (b.variant === "owner" && !isAdmin) return json({ error: "Only company administrators can send the owner version." }, 403);
+      const proposal = await checked(await client.from("proposals").select("id,contact_id,created_by,status,sent_at,title")
+        .eq("id", b.proposal_id).eq("organization_id", org).single());
+      if (!proposal.sent_at || !["sent", "viewed"].includes(proposal.status)) return json({ error: "Choose an open proposal that has been sent to the customer." }, 400);
+      const contact = await checked(await client.from("contacts").select("first_name,contact_name,email")
+        .eq("id", proposal.contact_id).eq("organization_id", org).single());
+      if (!contact.email) return json({ error: "This customer needs an email address." }, 400);
+      const settings = await checked(await admin.from("company_settings").select("company_name,company_email,company_logo_url,from_email,app_url")
+        .eq("organization_id", org).single());
+      const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).single());
+      const rep = await checked(await admin.from("profiles").select("first_name,last_name,email,is_active")
+        .eq("id", proposal.created_by).eq("organization_id", org).single());
+      const owner = b.variant === "owner";
+      if (owner && organization.subdomain !== "elife") return json({ error: "Owner follow-up is currently configured for Electronic Life only." }, 400);
+      const sender = { owner, name: owner ? "Josh Gorrell" : [rep.first_name, rep.last_name].filter(Boolean).join(" "),
+        email: owner ? "josh@electroniclife.com" : rep.email,
+        photo: owner ? "https://elife.myjobview.com/images/josh-gorrell-email.jpg" : undefined };
+      if (!sender.name || !sender.email || (!owner && !rep.is_active)) return json({ error: "Configure the proposal salesperson’s name and email before sending." }, 400);
+      const html = proposalFollowUpEmail({ ...settings, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" }, contact, sender);
+      const subject = owner ? "A quick note from the owner" : "How are we doing?";
+      if (b.action === "proposal_preview") return json({ html, subject, recipient: contact.email, reply_to: sender.email, sender: sender.name });
+      if (typeof b.send_key !== "string" || !/^[0-9a-f-]{36}$/.test(b.send_key)) return json({ error: "Preview the email before sending." }, 400);
+      const from = settings.from_email || settings.company_email;
+      if (!from || !Deno.env.get("RESEND_API_KEY")) return json({ error: "Configure email delivery before sending." }, 503);
+      const result = await sendSystemEmail({ headers: { "Idempotency-Key": `proposal-follow-up-${org}-${b.send_key}` },
+        body: JSON.stringify({ from: `${sender.name.replace(/[<>\r\n]/g, "")} <${from}>`, to: contact.email, reply_to: sender.email, subject, html }) });
+      if (!result.ok) return json({ error: "Email could not be delivered. Please try again." }, 502);
+      return json({ success: true });
+    }
     if (["create", "preview"].includes(b.action)) {
       if (!profile.can_send_lost_opportunity_reviews) {
         return json({
