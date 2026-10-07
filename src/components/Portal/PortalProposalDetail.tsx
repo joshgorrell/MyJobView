@@ -922,9 +922,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       )}
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 items-start gap-6 xl:gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="xl:col-span-2 min-w-0 space-y-6">
             {/* Revision Notice */}
             {proposal.revision_notes && proposal.renewal_count > 0 && (
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-xl p-4 sm:p-6 shadow-md">
@@ -1224,7 +1224,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           </div>
 
           {/* Sidebar */}
-          <div className="lg:sticky lg:top-20 lg:self-start space-y-6">
+          <div className="min-w-0 space-y-6">
             {/* Proposal Summary Card */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
