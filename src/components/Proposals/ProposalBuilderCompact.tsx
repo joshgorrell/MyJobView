@@ -3588,7 +3588,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     title={proposalReadiness?.isReady ? "Status Actions" : `Complete proposal settings before approving (${proposalReadiness?.overallProgress ?? 0}% ready)`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{proposal?.status?.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()) || "Status"}</span>
+                    <span>{proposal?.status?.replaceAll("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) || "Status"}</span>
                     <ChevronDown className="w-3 h-3" />
                   </button>
 
