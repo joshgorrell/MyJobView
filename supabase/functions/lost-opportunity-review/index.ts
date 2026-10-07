@@ -371,7 +371,7 @@ Deno.serve(async (req) => {
       const isAdmin = ["admin", "owner", "super_admin"].includes(profile.role);
       if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);
       if (!["sales", "owner"].includes(b.variant)) return json({ error: "Choose a follow-up version." }, 400);
-      if (b.variant === "owner" && !isAdmin) return json({ error: "Only company administrators can send the owner version." }, 403);
+      if (b.variant === "owner" && user.email?.toLowerCase() !== "josh@electroniclife.com") return json({ error: "Only Josh Gorrell can send the owner version." }, 403);
       const mode = b.recipient_mode || (b.proposal_id ? "proposal" : b.contact_id ? "customer" : "manual");
       if (!["proposal", "customer", "manual"].includes(mode)) return json({ error: "Choose a recipient." }, 400);
       let proposal: any = null;

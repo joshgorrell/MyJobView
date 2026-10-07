@@ -16,6 +16,7 @@ for (const owner of [false, true]) {
   if (owner) await writeFile('/tmp/mjv-owner-followup-preview.html', html);
 }
 let role = 'admin', moduleAccess = true, permission = true, tenant = 'elife', status = 'sent', sentAt = '2026-10-01';
+let authenticatedEmail = 'josh@electroniclife.com';
 const emails = [];
 function from(table) {
   const filters = {};
@@ -28,17 +29,17 @@ function from(table) {
     throw new Error(table);
   } }; return q;
 }
-const client = { from, auth: { getUser: async () => ({data:{ user:{id:'employee'} }}) }, rpc: async () => ({data:moduleAccess}) };
+const client = { from, auth: { getUser: async () => ({data:{ user:{id:'employee',email:authenticatedEmail} }}) }, rpc: async () => ({data:moduleAccess}) };
 globalThis.__deps = { proposalFollowUpEmail, createClient: () => client, sendSystemEmail: async init => { emails.push(JSON.parse(init.body)); return new Response('{}'); } };
 const source = (await readFile('supabase/functions/lost-opportunity-review/index.ts','utf8')).replace(/^import[^;]+;\n/gm,'');
 await moduleFrom(`const {proposalFollowUpEmail,createClient,sendSystemEmail}=globalThis.__deps;const Deno={env:{get:()=> 'test'},serve:f=>globalThis.handler=f};\n${source}`);
 async function call(extra={}) { const r = await globalThis.handler(new Request('https://example.com', { method:'POST', body:JSON.stringify({ action:'proposal_preview',proposal_id:'proposal',variant:'owner',...extra }) })); return {status:r.status,body:await r.json()}; }
 assert.equal((await call()).body.reply_to,'josh@electroniclife.com');
 assert.equal(emails.length,0,'Preview must never send');
-role='employee'; assert.equal((await call()).status,403);
+role='employee'; authenticatedEmail='other@example.com'; assert.equal((await call()).status,403);
 assert.equal((await call({variant:'sales'})).body.reply_to,'aaron@example.com');
 permission=false; assert.equal((await call({variant:'sales'})).status,403);
-role='admin'; tenant='other'; assert.equal((await call()).status,400);
+role='admin'; assert.equal((await call()).status,403, 'Other admins cannot send Josh’s owner email'); authenticatedEmail='josh@electroniclife.com'; tenant='other'; assert.equal((await call()).status,400);
 tenant='elife'; status='approved'; assert.equal((await call()).status,400);
 status='sent'; sentAt=null; assert.equal((await call()).status,400);
 sentAt='2026-10-01'; moduleAccess=false; assert.equal((await call()).status,403);
