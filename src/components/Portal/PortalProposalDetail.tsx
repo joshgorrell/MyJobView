@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw, Edit3 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
 import { ProposalReactivationRequest } from './ProposalReactivationRequest';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
-import AreaScopeEditor from '../Proposals/AreaScopeEditor';
 
 interface ProposalRecording {
   id: string;
@@ -236,7 +235,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const [showReactivationModal, setShowReactivationModal] = useState(false);
   const [reactivationSent, setReactivationSent] = useState(false);
-  const [editingScopeRoom, setEditingScopeRoom] = useState<ProposalRoom | null>(null);
 
   useEffect(() => {
     loadProposalDetails();
@@ -313,6 +311,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   async function trackProposalView() {
+    if (previewMode) return;
     try {
       // Get client IP and device information from edge function
       let clientInfo = {
@@ -560,6 +559,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   function handleApprove() {
+    if (previewMode) return;
     setShowApprovalModal(true);
   }
 
@@ -569,6 +569,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   async function handleInvoicePayment(invoice: PortalInvoice) {
+    if (previewMode) return;
     if (!invoice.qbo_invoice_id) {
       setPaymentUnavailableInvoice(invoice);
       return;
@@ -636,6 +637,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   async function handleDecline() {
+    if (previewMode) return;
     if (!proposal) return;
     if (!declineReason) {
       alert('Please select a reason for declining this proposal.');
@@ -677,6 +679,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   async function handleSubmitChangeRequest() {
+    if (previewMode) return;
     if (!proposal || !comment.trim() || comment === 'open') return;
 
     setSubmitting(true);
@@ -839,6 +842,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   </button>
                   <button
                     onClick={() => setShowReactivationModal(true)}
+                    disabled={previewMode}
+                    title={previewMode ? "Customer actions are disabled in preview" : undefined}
                     className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors w-full sm:w-auto flex items-center justify-center gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -849,7 +854,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             )}
           </div>
         </div>
-        {showReactivationModal && proposal && (
+        {!previewMode && showReactivationModal && proposal && (
           <ProposalReactivationRequest
             proposalId={proposal.id}
             proposalNumber={proposal.proposal_number}
@@ -985,16 +990,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <Package className="w-5 h-5 text-blue-400" />
                       </div>
                       <h3 className="text-lg sm:text-xl font-bold text-white flex-1">{room.name}</h3>
-                      {previewMode && proposal?.status === 'draft' && (
-                        <button
-                          onClick={() => setEditingScopeRoom(room)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-300 hover:text-white hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-400 rounded-lg transition-all"
-                          title="Edit scope of work for this area"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">{room.description ? 'Edit Scope' : 'Add Scope'}</span>
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -1264,6 +1259,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               <div className="space-y-3">
                 <button
                   onClick={() => setShowQA(true)}
+                  disabled={previewMode}
+                  title={previewMode ? "Customer actions are disabled in preview" : undefined}
                   className="w-full px-4 py-3.5 border-2 border-blue-500 text-blue-600 rounded-xl hover:bg-blue-50 flex items-center justify-center gap-2 font-bold transition-all duration-200 hover:scale-105"
                 >
                   <MessageSquare className="w-5 h-5" />
@@ -1274,7 +1271,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   <>
                     <button
                       onClick={handleApprove}
-                      disabled={submitting}
+                      disabled={previewMode || submitting}
                       className="w-full px-4 py-3.5 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold transition-colors shadow-sm"
                     >
                       <CheckCircle className="w-5 h-5" />
@@ -1283,6 +1280,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       onClick={() => setComment(comment ? '' : 'open')}
+                      disabled={previewMode}
+                      title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 font-bold transition-all duration-200"
                     >
                       <MessageSquare className="w-5 h-5" />
@@ -1291,6 +1290,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       onClick={() => setDeclineReason(declineReason ? '' : 'open')}
+                      disabled={previewMode}
+                      title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 flex items-center justify-center gap-2 font-medium transition-all duration-200"
                     >
                       <XCircle className="w-5 h-5" />
@@ -1346,7 +1347,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 />
                 <button
                   onClick={handleSubmitChangeRequest}
-                  disabled={submitting || !comment.trim() || comment === 'open'}
+                  disabled={previewMode || submitting || !comment.trim() || comment === 'open'}
                   className="w-full mt-3 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 font-bold transition-colors"
                 >
                   {submitting ? 'Sending...' : 'Submit Feedback'}
@@ -1400,7 +1401,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   </button>
                   <button
                     onClick={handleDecline}
-                    disabled={submitting || !declineReason || declineReason === 'open'}
+                    disabled={previewMode || submitting || !declineReason || declineReason === 'open'}
                     className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50 font-bold text-sm transition-colors"
                   >
                     {submitting ? 'Submitting...' : 'Confirm Decline'}
@@ -1444,6 +1445,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                       </div>
                       <button
                         onClick={() => depositInvoice && handleInvoicePayment(depositInvoice)}
+                        disabled={previewMode}
+                        title={previewMode ? "Customer actions are disabled in preview" : undefined}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
                       >
                         <CreditCard className="w-4 h-4" />
@@ -1541,6 +1544,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                           {!isPaid && (
                             <button
                               onClick={() => handleInvoicePayment(inv)}
+                              disabled={previewMode}
+                              title={previewMode ? "Customer actions are disabled in preview" : undefined}
                               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors"
                             >
                               <CreditCard className="w-3.5 h-3.5" />
@@ -1571,7 +1576,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       </main>
 
       {/* Approval Modal */}
-      {showApprovalModal && proposal && (
+      {!previewMode && showApprovalModal && proposal && (
         <ProposalApprovalModal
           proposalId={proposalId}
           proposalNumber={proposal.proposal_number}
@@ -1581,7 +1586,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       )}
 
       {/* Q&A Chat */}
-      {showQA && (
+      {!previewMode && showQA && (
         <ProposalQA
           proposalId={proposalId}
           isPortal={true}
@@ -1617,23 +1622,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               Close
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Scope of Work editor — only in preview/draft mode, rendered above the preview overlay */}
-      {editingScopeRoom && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-          <AreaScopeEditor
-            roomId={editingScopeRoom.id}
-            roomName={editingScopeRoom.name}
-            currentDescription={editingScopeRoom.description}
-            currentShowScope={editingScopeRoom.show_scope}
-            onClose={() => setEditingScopeRoom(null)}
-            onSave={() => {
-              setEditingScopeRoom(null);
-              loadProposalDetails();
-            }}
-          />
         </div>
       )}
 
