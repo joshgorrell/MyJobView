@@ -158,6 +158,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     can_create_work_orders: (user as any).can_create_work_orders ?? false,
     can_edit_products: (user as any).can_edit_products ?? true,
     can_see_all_review_requests: (user as any).can_see_all_review_requests ?? false,
+    can_request_google_reviews: (user as any).can_request_google_reviews ?? true,
+    can_view_customer_feedback: (user as any).can_view_customer_feedback ?? ((user as any).can_see_all_review_requests ?? false),
+    can_manage_customer_feedback: (user as any).can_manage_customer_feedback ?? false,
     can_send_lost_opportunity_reviews: user.can_send_lost_opportunity_reviews ?? false,
     can_view_lost_opportunity_submissions: user.can_view_lost_opportunity_submissions ?? false,
     notify_lost_opportunity_submissions: user.notify_lost_opportunity_submissions ?? false,
@@ -698,6 +701,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         can_create_work_orders: formData.can_create_work_orders,
         can_edit_products: formData.can_edit_products,
         can_see_all_review_requests: formData.can_see_all_review_requests,
+        can_request_google_reviews: formData.can_request_google_reviews,
+        can_view_customer_feedback: formData.can_view_customer_feedback,
+        can_manage_customer_feedback: formData.can_manage_customer_feedback,
         can_send_lost_opportunity_reviews: formData.can_send_lost_opportunity_reviews,
         can_view_lost_opportunity_submissions: formData.can_view_lost_opportunity_submissions,
         notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
@@ -1197,6 +1203,29 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
               </div>
             )}
             {activeTab === 'permissions' && (
+              <section aria-label="Feedback Access" className="rounded-xl border border-cyan-800 bg-gray-800/50 p-4 space-y-3">
+                <h3 className="text-lg font-semibold text-white">Feedback Access</h3>
+                <p className="text-sm text-gray-300">Choose what this user can view and send within Feedback. Also enable the Feedback module under department/module access below.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    ['can_request_google_reviews', 'Ask for Google Reviews', 'Send Google review requests.'],
+                    ['can_view_customer_feedback', 'View Customer Feedback', 'View the customer feedback dashboard and responses.'],
+                    ['can_manage_customer_feedback', 'Manage Feedback & Send Proposal Follow-Ups', 'Send customer feedback requests and regular proposal follow-ups.'],
+                    ['can_send_lost_opportunity_reviews', 'Send Lost Opportunity Reviews', 'Send private feedback requests for lost opportunities.'],
+                    ['can_view_lost_opportunity_submissions', 'View Lost Opportunity Responses', 'Read private responses and competing bids.'],
+                    ['can_see_all_review_requests', 'See All Company Review Requests', 'View company-wide request history instead of only this user’s requests.'],
+                  ].map(([key, label, description]) => (
+                    <label key={key} className="flex items-start gap-3 rounded-lg border border-gray-700 bg-gray-800 p-3 cursor-pointer">
+                      <input type="checkbox" className={checkboxClass} checked={Boolean((formData as any)[key])} onChange={e => setFormData({ ...formData, [key]: e.target.checked })} />
+                      <span><span className="block font-medium text-white">{label}</span><span className="block text-xs text-gray-400 mt-1">{description}</span></span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-cyan-200">Owner Proposal Follow-Up is available only to Josh Gorrell. These permissions do not grant access to that email.</p>
+              </section>
+            )}
+
+            {activeTab === 'permissions' && (
               <div className="space-y-5">
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Permissions</h3>
@@ -1261,24 +1290,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         icon: Shield,
                         label: 'Can Edit Contacts',
                         desc: 'Add, edit, and delete contacts',
-                      },
-                      {
-                        key: 'can_send_lost_opportunity_reviews',
-                        icon: Shield,
-                        label: 'Can Send Lost Opportunity Reviews',
-                        desc: 'Send private feedback requests to customers',
-                      },
-                      {
-                        key: 'can_view_lost_opportunity_submissions',
-                        icon: Shield,
-                        label: 'Can View Lost Opportunity Responses',
-                        desc: 'Read private customer responses and competing bids',
-                      },
-                      {
-                        key: 'can_see_all_review_requests',
-                        icon: Shield,
-                        label: 'Can See All Review Requests',
-                        desc: 'See all company review requests (off = own only)',
                       },
                       {
                         key: 'has_calendar_access',
