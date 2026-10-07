@@ -1,3 +1,4 @@
+import type { SecurityDealerBranding } from '../../supabase/functions/_shared/security-agreement-branding';
 import { supabase } from './supabase';
 
 // Initial commitment is independent of the month-to-month renewal interval.
@@ -19,7 +20,7 @@ export interface SecurityAgreementDocument {
   renewal_term_months: number | null;
   cancellation_notice_days: number | null;
   template: { name: string; contract_terms: string } | null;
-  dealer: {
+  dealer: SecurityDealerBranding & {
     company_name: string; company_email: string;
     annual_billing_enabled: boolean; default_billing_preference: 'monthly' | 'annual';
     annual_discount_type: 'percentage' | 'flat'; annual_discount_percentage: number;

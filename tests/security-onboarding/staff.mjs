@@ -44,6 +44,22 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  await db.exec(await readFile(new URL('../../supabase/migrations/20261004175855_security_mailed_invoice_accounting_sync.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261004180433_security_monitoring_catalog_staff_scope.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261005143631_security_onboarding_sender_contact.sql',import.meta.url),'utf8'));
+ // Exercise dealer branding against the actual authorized workflow functions.
+ await db.exec(`ALTER TABLE company_settings ADD COLUMN company_logo_url text; ALTER TABLE company_settings ADD COLUMN website text;
+ ALTER TABLE company_offices ADD COLUMN phone text; ALTER TABLE company_offices ADD COLUMN address_line1 text; ALTER TABLE company_offices ADD COLUMN address_line2 text; ALTER TABLE company_offices ADD COLUMN city text; ALTER TABLE company_offices ADD COLUMN state text; ALTER TABLE company_offices ADD COLUMN zip text;
+ UPDATE company_settings SET company_logo_url='https://dealer.example/logo.png',website='https://dealer.example';
+ UPDATE company_offices SET phone='5551234567',address_line1='1 Dealer Way',city='Topeka',state='KS',zip='66604';`);
+ const beforeBranding=(await db.query('select onboarding_agreement_snapshot from security_contracts where id=$1',[id(5)])).rows[0].onboarding_agreement_snapshot;
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261007100951_security_agreement_dealer_branding.sql',import.meta.url),'utf8'));
+ await db.exec("update company_settings set print_accent_color='#cc0000'");
+ assert.deepEqual((await db.query('select onboarding_agreement_snapshot from security_contracts where id=$1',[id(5)])).rows[0].onboarding_agreement_snapshot,beforeBranding,'Branding must not rewrite accepted evidence');
+ const branded=(await db.query('select private.security_document_branding($1,$2) d',[JSON.stringify({dealer:{company_name:'Saved Dealer',company_email:'saved@example.com'},template:{contract_terms:'Original accepted wording'}}),org])).rows[0].d;
+ assert.equal(branded.dealer.company_name,'Saved Dealer');assert.equal(branded.dealer.company_email,'saved@example.com');assert.equal(branded.dealer.company_logo_url,'https://dealer.example/logo.png');assert.equal(branded.dealer.address,'1 Dealer Way, Topeka, KS 66604');assert.equal(branded.dealer.print_accent_color,'#cc0000');assert.equal(branded.template.contract_terms,'Original accepted wording');
+ const otherBrand=(await db.query('select private.security_document_branding($1,$2) d',[JSON.stringify({dealer:{company_name:'Other'}}),id(999)])).rows[0].d;
+ assert.equal(otherBrand.dealer.company_logo_url,null,'Missing tenant settings never use another dealer');
+ await assert.rejects(db.exec("update company_settings set print_accent_color='red;invalid'"));
+ await role('anon');await assert.rejects(db.query('select private.security_document_branding($1,$2)',[JSON.stringify({}),org]),'Anonymous callers cannot choose an organization for branding');
+ await role('postgres');
  const staff=async(action,cid=null,payload={})=>(await db.query('select public.staff_security_onboarding($1,$2,$3) result',[action,cid,JSON.stringify(payload)])).rows[0].result;
  const create={request_id:id(71),template_id:template,contact_id:contact,service_ids:[id(70)],term_months:12,account_type:'residential'};
  await role('authenticated',id(12));await assert.rejects(staff('create',null,create),'Organization membership does not grant onboarding access');
@@ -57,7 +73,7 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  let view=await staff('get',created.id);assert.equal(view.document.term_months,12);assert.equal(view.document.services[0].service_id,id(70));
  await role('postgres');const printBefore=(await db.query('select (select count(*) from contacts) customers,(select count(*) from security_contracts) contracts')).rows[0];
  await role('authenticated',id(11));
- for (const term of [12,24,36,48,60]) { const blank=await staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:term});assert.equal(blank.term_months,term);assert.equal(blank.monthly_price,35);assert.ok(blank.autopay_authorization); }
+ for (const term of [12,24,36,48,60]) { const blank=await staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:term});assert.equal(blank.term_months,term);assert.equal(blank.monthly_price,35);assert.equal(blank.dealer.company_logo_url,'https://dealer.example/logo.png');assert.equal(blank.dealer.print_accent_color,'#cc0000');assert.ok(blank.autopay_authorization.includes('provider identified in this agreement')); }
  await assert.rejects(staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:18}));
  await assert.rejects(staff('print_form',null,{template_id:id(71),service_ids:[id(70)],term_months:36}));
  await role('authenticated',id(12));await assert.rejects(staff('print_form',null,{template_id:template,service_ids:[id(70)],term_months:36}));
@@ -86,6 +102,7 @@ export async function testStaff(db, {id,org,contact,otherContact,template,form,r
  const originalMandate=(await rpc('get',id(5))).document.autopay_authorization;
  assert.ok(originalMandate.includes('Billing begins when monitoring is activated'),'Existing signed mandate stays intact');
  const customerDoc=(await rpc('get',created.id)).document;
+ assert.equal(customerDoc.dealer.company_logo_url,'https://dealer.example/logo.png');assert.equal(customerDoc.dealer.phone,'5551234567');
  assert.equal(customerDoc.monthly_price,35);assert.deepEqual(customerDoc.services,[{name:'Monitoring'}],'Customer receives names and overall price, never service allocation');
  const portalMandate=customerDoc.autopay_authorization;
  assert.ok(portalMandate.includes('Completing this form does not activate monitoring'),'New customer mandate explains staff scheduling');

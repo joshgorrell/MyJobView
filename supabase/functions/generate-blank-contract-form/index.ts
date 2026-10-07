@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { securityAgreementBranding } from '../_shared/security-agreement-branding.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 function escapeHtml(value: unknown): string {
@@ -67,12 +68,13 @@ Deno.serve(async (req: Request) => {
       ? Math.round(annualBase * Number(contract.dealer.annual_discount_percentage || 0)) / 100
       : Math.min(annualBase, Number(contract.dealer?.annual_discount_flat_amount || 0));
     const annualTotal = annualBase - annualDiscount + Number(contract.mail_invoice_fee || 0) * 12;
+    const branding = securityAgreementBranding(contract.dealer);
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Security Monitoring Contract - ${escapeHtml(contract.contract_number || 'Assigned when entered online')}</title>
+<title>Security Monitoring Agreement - ${escapeHtml(contract.contract_number || 'Assigned when entered online')}</title>
 <style>
   @page {
     size: letter;
@@ -318,6 +320,7 @@ Deno.serve(async (req: Request) => {
     .checkbox-field { margin-top: 6px; }
     .signature-block { margin-top: 20px; }
   }
+${branding.css}
 </style>
 </head>
 <body>
@@ -325,11 +328,9 @@ Deno.serve(async (req: Request) => {
 <button class="print-btn no-print" onclick="window.print()">Print Form</button>
 
 <div class="page">
-  <div class="header">
-    <h1>Security Monitoring Contract</h1>
+  <div class="header dealer-header">
+    ${branding.header}
     <div class="contract-number">Contract Number: ${escapeHtml(contract.contract_number || 'Assigned when entered online')}</div>
-    <div class="template-name">${escapeHtml(contract.dealer?.company_name || '')} ${escapeHtml(contract.dealer?.company_email || '')}</div>
-    <div class="template-name">${escapeHtml(contract.template?.name || 'Standard Contract')}</div>
   </div>
 
   <p style="margin-bottom:16px">Complete this form by hand and return it to our staff. We will enter your information through web onboarding. Printing this form does not create an account or complete onboarding.</p>
@@ -539,7 +540,7 @@ Deno.serve(async (req: Request) => {
 </div>
 
 <script>
-  window.onload = function() { setTimeout(function() { window.print(); }, 500); };
+  window.onload = function() { Promise.all(Array.from(document.images).map(function(img) { return img.decode().catch(function() {}); })).then(function() { window.print(); }); };
 </script>
 </body>
 </html>`;
