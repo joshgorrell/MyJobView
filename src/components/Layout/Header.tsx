@@ -160,9 +160,9 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
   return (
     <header className="theme-chrome theme-header bg-canvas border-b border-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 gap-0 sm:gap-4">
+        <div className="relative flex items-center justify-between h-14 gap-0 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}
-          <div className="flex items-center gap-1 sm:gap-3">
+          <div className="absolute left-0 flex items-center gap-1 sm:left-0 sm:gap-3">
             {onMenuToggle && (
               <button
                 onClick={onMenuToggle}
