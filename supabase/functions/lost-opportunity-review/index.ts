@@ -388,14 +388,18 @@ Deno.serve(async (req) => {
         contact = { first_name: name.split(/\s+/)[0], contact_name: name, email };
       } else {
         contact = await checked(await client.from("contacts").select("first_name,contact_name,email")
-          .eq("id", proposal?.contact_id || b.contact_id).eq("organization_id", org).single());
+          .eq("id", proposal?.contact_id || b.contact_id).eq("organization_id", org).maybeSingle());
+        if (!contact) return json({ error: "Could not find that customer. They may have been deleted." }, 400);
       }
       if (!contact.email) return json({ error: "This customer needs an email address." }, 400);
       const settings = await checked(await admin.from("company_settings").select("company_name,company_email,company_logo_url,from_email,app_url")
-        .eq("organization_id", org).single());
-      const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).single());
+        .eq("organization_id", org).maybeSingle());
+      if (!settings) return json({ error: "Company settings are not configured. Set up company email before sending follow-ups." }, 400);
+      const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).maybeSingle());
+      if (!organization) return json({ error: "Organization not found." }, 400);
       const rep = await checked(await admin.from("profiles").select("first_name,last_name,email,is_active")
-        .eq("id", proposal?.created_by || user.id).eq("organization_id", org).single());
+        .eq("id", proposal?.created_by || user.id).eq("organization_id", org).maybeSingle());
+      if (!rep) return json({ error: "Could not find the salesperson for this proposal. They may have been removed." }, 400);
       const owner = b.variant === "owner";
       if (owner && organization.subdomain !== "elife") return json({ error: "Owner follow-up is currently configured for Electronic Life only." }, 400);
       const sender = { owner, name: owner ? "Josh Gorrell" : [rep.first_name, rep.last_name].filter(Boolean).join(" "),
@@ -676,8 +680,9 @@ Deno.serve(async (req) => {
     return json({ error: "Unknown action" }, 400);
   } catch (e) {
     console.error("Lost review request failed", e);
+    const message = e instanceof Error ? e.message : "Unable to process this request. Please try again.";
     return json(
-      { error: "Unable to process this request. Please try again." },
+      { error: message },
       400,
     );
   }
