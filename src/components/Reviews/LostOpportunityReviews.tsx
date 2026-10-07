@@ -376,7 +376,7 @@ export default function LostOpportunityReviews(
             onClick={() => setCreating(!creating)}
             className="min-h-11 bg-cyan-700 text-white rounded-lg px-4 py-2 text-sm"
           >
-            {creating ? "Cancel" : "Create Review Request"}
+            {creating ? "Cancel" : "Send Lost Opportunity Email"}
           </button>
         </div>
       </div>
