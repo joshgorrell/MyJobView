@@ -1,0 +1,66 @@
+/* Shared viewport bounds for legacy dialogs. Match a dimmed fixed overlay with
+   a rounded direct panel, leaving drawers, menus and full-screen viewers alone. */
+:is(.responsive-modal-overlay, .fixed.inset-0[class*="bg-black"]:has(> [class*="rounded"][class*="bg-"])) {
+  --dialog-gap: 12px;
+  --dialog-height: calc(100dvh - max(env(safe-area-inset-top), var(--dialog-gap)) - max(env(safe-area-inset-bottom), var(--dialog-gap)));
+  box-sizing: border-box;
+  height: 100dvh;
+  padding: max(env(safe-area-inset-top), var(--dialog-gap)) max(env(safe-area-inset-right), var(--dialog-gap)) max(env(safe-area-inset-bottom), var(--dialog-gap)) max(env(safe-area-inset-left), var(--dialog-gap));
+  overflow: hidden;
+}
+:is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  max-height: var(--dialog-height, calc(100dvh - 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+/* Existing header/body/footer dialogs can shrink the body independently. */
+:is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]):has(> [class*="border-b"]):has(> [class*="border-t"]) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+:is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) > :is([class*="border-b"], [class*="border-t"]) {
+  flex-shrink: 0;
+}
+:is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) > [class*="overflow-y-auto"],
+:is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]):has(> [class*="border-b"]):has(> [class*="border-t"]) > :not([class*="border-b"]):not([class*="border-t"]) {
+  min-height: 0;
+  flex-shrink: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* QuickActionModal provides focus, keyboard, and visualViewport handling. */
+.qam-sheet {
+  --qam-max-height: calc(100dvh - max(env(safe-area-inset-top), 12px) - max(env(safe-area-inset-bottom), 12px)) !important;
+}
+.duplicate-proposal { max-height: inherit; }
+.duplicate-proposal-body { overscroll-behavior: contain; }
+@media (max-width: 1024px) {
+  :is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) > :is([class*="p-6"], [class*="p-8"]) { padding: 12px; }
+  :is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) input:not([type="checkbox"]):not([type="radio"]),
+  :is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) select,
+  :is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) textarea { font-size: max(16px, 1em); max-width: 100%; }
+}
+@media (max-width: 639px) {
+  :is(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) button { min-height: 44px; }
+  .duplicate-proposal button { min-height: 44px; }
+
+}
+@media (max-height: 500px) and (min-width: 640px) {
+  .duplicate-proposal-body { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .duplicate-proposal-body > * { margin-top: 0 !important; min-width: 0; }
+}
+
+/* Nested legacy wrappers participate in the same panel bounds. */
+.responsive-modal-overlay { display: flex; align-items: center; justify-content: center; }
+.responsive-modal-layout { display: contents; }
+.responsive-modal-panel { margin-block: 0; width: 100%; }
+dialog[open].fixed.inset-0 {
+  max-height: calc(100dvh - max(env(safe-area-inset-top), 12px) - max(env(safe-area-inset-bottom), 12px));
+  max-width: calc(100dvw - max(env(safe-area-inset-left), 12px) - max(env(safe-area-inset-right), 12px));
+  overscroll-behavior: contain;
+}

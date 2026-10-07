@@ -3,6 +3,7 @@ import App from './App.tsx';
 import { PortalProposalEngagement } from './components/Portal/PortalProposalEngagement';
 import './index.css';
 import './proposal-workflow.css';
+import './responsive-modals.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
