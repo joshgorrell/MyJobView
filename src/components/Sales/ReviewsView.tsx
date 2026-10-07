@@ -1102,7 +1102,7 @@ export default function ReviewsView() {
         </div>}
       </section>}
 
-      {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><div className="rounded-xl border border-cyan-800/50 bg-cyan-950/20 p-4 sm:p-5"><h2 className="text-xl font-bold text-white">Proposal Check</h2><p className="mt-1 text-sm text-gray-300">A conversation before the decision: questions, changes, and anything that would help us earn the job. Customer replies go directly to the email sender.</p><p className="mt-2 text-xs text-gray-400">Sent history and open tracking are not available for Proposal Check yet.</p></div><ProposalFollowUps /></section>}
+      {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><div className="rounded-xl border border-cyan-800/50 bg-cyan-950/20 p-4 sm:p-5"><h2 className="text-xl font-bold text-white">Proposal Check</h2><p className="mt-1 text-sm text-gray-300">A conversation before the decision: questions, changes, and anything that would help us earn the job. Customer replies go directly to the email sender.</p></div><ProposalFollowUps /></section>}
 
       {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><div className="rounded-xl border border-violet-800/50 bg-violet-950/20 p-4 sm:p-5"><h2 className="text-xl font-bold text-white">Lost Opportunities</h2><p className="mt-1 text-sm text-gray-300">Ask why we lost the job, review the customer’s response, and identify an opportunity to recover it.</p></div><LostOpportunityReviews /></section>}
 
