@@ -1,3 +1,4 @@
+import { securityAgreementBranding } from '../../supabase/functions/_shared/security-agreement-branding';
 import type { SecurityAgreementDocument, SecurityDraftForm, SecurityContractSummary } from './securityOnboarding';
 
 export function escapeAgreementText(value: unknown): string {
@@ -19,6 +20,7 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
   form?: Pick<SecurityDraftForm, 'personalInfo' | 'propertyInfo'>, signature?: string | null, signedAt?: string | null,
   billingPreference?: 'monthly' | 'annual', schedule?: Pick<SecurityContractSummary,'start_date'|'first_payment_date'|'first_payment_made_at'>): string {
   const esc = escapeAgreementText;
+  const branding = securityAgreementBranding(document.dealer);
   const personal = document.personalInfo || form?.personalInfo;
   const property = document.propertyInfo || form?.propertyInfo;
   const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(v) || 0);
@@ -35,8 +37,8 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     @page{size:letter;margin:0.7in}body{font-family:Arial,sans-serif;color:#111;line-height:1.5;max-width:800px;margin:30px auto;padding:0 20px}
     h1{font-size:22px}h2{font-size:17px;margin-top:24px}p,td,th{font-size:11pt}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:8px;border-bottom:1px solid #ddd}
     .terms{white-space:pre-wrap;font-size:11pt;overflow-wrap:anywhere}.signature{max-width:260px;max-height:100px}h2,thead{break-after:avoid}tr,.sign{break-inside:avoid}
-    @media print{body{max-width:none;margin:0;padding:0}}</style></head><body>
-    <h1>${esc(document.dealer?.company_name || 'Security monitoring')} — Security agreement</h1>
+    @media print{body{max-width:none;margin:0;padding:0}}${branding.css}</style></head><body>
+    <header class="dealer-header">${branding.header}</header>
     <p>Agreement ${esc(document.contract_number)} · ${document.staff_corrected_at ? 'Staff-corrected copy — original customer submission retained' : signed ? 'Signed copy' : document.accepted_at ? 'Customer agreement recorded by staff' : 'For review — unsigned'}</p>
     ${document.staff_corrected_at ? `<p>Corrected by staff: ${esc(new Date(document.staff_corrected_at).toLocaleString())}. The customer signature below belongs to the original submission unless a replacement was captured during correction.</p>` : ''}
     <p>Customer: ${esc(personal?.full_name || 'To be completed')}<br>Email: ${esc(personal?.email)}<br>Phone: ${esc(personal?.phone)}</p>

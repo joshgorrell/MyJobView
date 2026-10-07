@@ -19,6 +19,7 @@ export function CompanySettings() {
   const geocodeTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const [companyName, setCompanyName] = useState('');
+  const [printAccentColor, setPrintAccentColor] = useState('#334155');
   const [website, setWebsite] = useState('');
   const [portalUrl, setPortalUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -112,6 +113,7 @@ export function CompanySettings() {
         setWebsite(data.website || '');
         setPortalUrl(data.portal_url || '');
         setLogoUrl(data.company_logo_url || '');
+        setPrintAccentColor(data.print_accent_color || '#334155');
         setCardBannerUrl(data.business_card_banner_url ?? null);
         setFromEmail(data.from_email || '');
         setFromName(data.from_name || '');
@@ -424,6 +426,7 @@ export function CompanySettings() {
           .from('company_settings')
           .update({
             company_name: companyName,
+            print_accent_color: printAccentColor,
             website: website,
             portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
             company_logo_url: logoUrl || null,
@@ -477,6 +480,7 @@ export function CompanySettings() {
           .from('company_settings')
           .insert({
             company_name: companyName,
+            print_accent_color: printAccentColor,
             website: website,
             portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
             company_logo_url: logoUrl || null,
@@ -767,6 +771,12 @@ export function CompanySettings() {
             onChange={(e) => setCompanyName(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+        </div>
+
+        <div>
+          <label htmlFor="print-accent-color" className="block text-sm font-medium text-gray-700 mb-1">Agreement print accent color</label>
+          <input id="print-accent-color" type="color" value={printAccentColor} onChange={e => setPrintAccentColor(e.target.value)} className="h-10 w-20 cursor-pointer border border-gray-300 rounded" />
+          <p className="text-xs text-gray-500 mt-1">Used on security monitoring agreements. Choose your dealer's primary brand color.</p>
         </div>
 
         <div>
