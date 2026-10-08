@@ -1084,28 +1084,25 @@ export default function ReviewsView() {
         </button>}
       </nav>
 
-      {(activeTab === 'dashboard' || activeTab === 'send') && (canViewCustomerFeedback || canManageCustomerFeedback) && <section aria-label="Job Reviews" className="border-b border-gray-700 pb-3">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-bold text-white">Job Reviews</h2><p className="mt-1 text-sm text-gray-300">Ratings, private feedback, and Google reviews. Stats and history are below.</p></div>
+      {(activeTab === 'dashboard' || (activeTab === 'send' && !googleOnlyMode)) && (canViewCustomerFeedback || canManageCustomerFeedback) && <section aria-label="Job Reviews" className="border-b border-gray-700 pb-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-bold text-white">Job Reviews</h2></div>
           <div className="flex flex-wrap gap-2 sm:shrink-0">
-            {(canManageCustomerFeedback || canRequestGoogleReviews) && <button type="button" onClick={() => { if (activeTab === 'send') setActiveTab('dashboard'); else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); } }} aria-pressed={activeTab === 'send'} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium ${activeTab === 'send' ? 'bg-amber-400 text-gray-950' : 'border border-gray-600 text-gray-200'}`}>{activeTab === 'send' ? 'Close Request Form' : 'Send Review Request'}</button>}
+            {canManageCustomerFeedback && <button type="button" onClick={() => { if (activeTab === 'send') setActiveTab('dashboard'); else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); } }} aria-pressed={activeTab === 'send'} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium ${activeTab === 'send' ? 'bg-amber-400 text-gray-950' : 'border border-gray-600 text-gray-200'}`}>{activeTab === 'send' ? 'Close Request Form' : 'Send Review Request'}</button>}
           </div>
         </div>
-        {activeTab === 'send' && <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-700 pt-4" role="group" aria-label="Job review request type">
-          {canManageCustomerFeedback && <button type="button" onClick={() => { setGoogleOnlyMode(false); setLifecycleType('manual'); setSendMethod('satisfaction'); }} aria-pressed={!googleOnlyMode} className={`min-h-11 rounded-lg border px-4 py-2 text-sm ${!googleOnlyMode ? 'border-amber-400 text-amber-200 bg-amber-950/30' : 'border-gray-600 text-gray-300'}`}>Rating &amp; Private Feedback</button>}
-          {canRequestGoogleReviews && <button type="button" onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); }} aria-pressed={googleOnlyMode} className={`min-h-11 rounded-lg border px-4 py-2 text-sm ${googleOnlyMode ? 'border-amber-400 text-amber-200 bg-amber-950/30' : 'border-gray-600 text-gray-300'}`}>Google Review Request</button>}
-        </div>}
+
       </section>}
 
-      {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><div className="rounded-xl border border-cyan-800/50 bg-cyan-950/20 p-4 sm:p-5"><h2 className="text-xl font-bold text-white">Proposal Check</h2><p className="mt-1 text-sm text-gray-300">A conversation before the decision: questions, changes, and anything that would help us earn the job. Customer replies go directly to the email sender.</p></div><ProposalFollowUps /></section>}
+      {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><ProposalFollowUps /></section>}
 
-      {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><div className="rounded-xl border border-violet-800/50 bg-violet-950/20 p-4 sm:p-5"><h2 className="text-xl font-bold text-white">Lost Opportunities</h2><p className="mt-1 text-sm text-gray-300">Ask why we lost the job, review the customer’s response, and identify an opportunity to recover it.</p></div><LostOpportunityReviews /></section>}
+      {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><LostOpportunityReviews /></section>}
 
       {/* Send Request Tab */}
       {activeTab === 'send' && (
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
-              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Ask About Their Experience'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Send a customer directly to your Google review page.' : 'Ask the customer to rate their experience and share feedback with your team.'}</p></div>
+              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Ask About Their Experience'}</h2></div>
               {googleOnlyMode && canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3 lg:shrink-0"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 shrink-0 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Customer scans this from your screen.</div></div></div>}
             </div>
             {!googleOnlyMode && canManageCustomerFeedback && (
