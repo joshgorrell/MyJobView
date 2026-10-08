@@ -1,5 +1,5 @@
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Search, Filter, Clock, Calendar, User, AlertCircle, Camera, Wrench, CheckCircle, X, Mail, MailCheck, Phone, PhoneOff, ArrowUpDown, ArrowDown, ArrowUp, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,6 +58,8 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
   const workOrderOptions = useWorkOrderOptions();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [salesRepFilter, setSalesRepFilter] = useState<string[]>([]);
@@ -86,9 +88,10 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       .subscribe();
 
     return () => {
+      loadGeneration.current++;
       channel.unsubscribe();
     };
-  }, [sortDir]);
+  }, [sortDir, profile?.id, profile?.role]);
 
   async function loadUsers() {
     try {
@@ -115,6 +118,14 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
   }
 
   async function loadWorkOrders() {
+    const generation = ++loadGeneration.current;
+    setLoading(true);
+    setLoadError(null);
+    let timeout: ReturnType<typeof setTimeout>;
+    const deadline = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => reject(new Error('Work orders took too long to load. Please retry.')), 15000);
+    });
+    const withinDeadline = <T,>(request: PromiseLike<T>) => Promise.race([request, deadline]);
     try {
       let query = supabase
         .from('work_orders')
@@ -148,14 +159,14 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
         query = query.eq('assigned_to', profile.id);
       }
 
-      const { data: woData, error: woError } = await query;
+      const { data: woData, error: woError } = await withinDeadline(query);
       if (woError) throw woError;
 
       const woList = woData || [];
       const woIds = woList.map(wo => wo.id);
 
       const [partsResult, photosResult, completionsResult] = woIds.length > 0
-        ? await Promise.all([
+        ? await withinDeadline(Promise.all([
             supabase
               .from('parts_requests')
               .select('id, status, work_order_id')
@@ -168,7 +179,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
               .from('job_completions')
               .select('id, work_order_id')
               .in('work_order_id', woIds)
-          ])
+          ]))
         : [null, null, null];
 
       const partsMap = new Map<string, { count: number; pending: number }>();
@@ -200,11 +211,13 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
         };
       });
 
-      setWorkOrders(workOrdersWithCounts);
+      if (generation === loadGeneration.current) setWorkOrders(workOrdersWithCounts);
     } catch (error) {
       console.error('Error loading work orders:', error);
+      if (generation === loadGeneration.current) setLoadError(error instanceof Error ? error.message : 'Unable to load work orders. Please retry.');
     } finally {
-      setLoading(false);
+      clearTimeout(timeout!);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }
 
@@ -273,10 +286,10 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
 
   const filteredWorkOrders = workOrders.filter(wo => {
     const matchesSearch =
-      wo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wo.work_order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wo.project?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wo.project?.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
+      (wo.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (wo.work_order_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (wo.project?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (wo.project?.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(wo.work_order_status_id || workOrderOptions.find(o=>o.kind==='status'&&o.system_key===wo.status)?.id || wo.status) || statusFilter.includes(wo.status);
     const matchesSalesRep = salesRepFilter.length === 0 || (wo.created_by && salesRepFilter.includes(wo.created_by));
@@ -299,6 +312,15 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Loading work orders...</div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div role="alert" className="p-4 bg-white rounded-lg space-y-3">
+        <p className="text-red-700">{loadError}</p>
+        <button onClick={() => loadWorkOrders()} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Retry</button>
       </div>
     );
   }
