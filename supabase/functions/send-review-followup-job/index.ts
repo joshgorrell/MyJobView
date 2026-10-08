@@ -86,18 +86,12 @@ function buildFollowUpSatisfactionEmail(params: {
   ];
 
   const makeButton = (r: typeof ratings[0]) => `
-    <td align="center" style="padding:6px;">
-      <a href="${makeRatingUrl(r.key)}" style="display:block;text-decoration:none;width:120px;height:130px;border-radius:12px;overflow:hidden;background:${r.bg};">
-        <table cellpadding="0" cellspacing="0" width="120" style="width:120px;height:130px;border-radius:12px;background:${r.bg};">
-          <tr><td align="center" width="120" height="54" style="padding:14px 8px 4px;vertical-align:bottom;">
-            <span style="font-size:28px;line-height:28px;display:block;height:28px;">${r.emoji}</span>
-          </td></tr>
-          <tr><td align="center" width="120" height="32" style="padding:4px 6px 0;vertical-align:middle;">
-            <span style="color:#ffffff;font-size:11px;font-weight:700;display:block;line-height:14px;">${r.label}</span>
-          </td></tr>
-          <tr><td align="center" width="120" height="44" style="padding:2px 6px 14px;vertical-align:top;">
-            <span style="color:rgba(255,255,255,0.8);font-size:10px;line-height:13px;display:block;">${r.desc}</span>
-          </td></tr>
+    <td align="center" valign="top" style="padding:6px;">
+      <a href="${makeRatingUrl(r.key)}" style="display:block;text-decoration:none;width:120px;border-radius:12px;background:${r.bg};">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="120" style="width:120px;border-radius:12px;background:${r.bg};">
+          <tr><td align="center" style="padding:16px 8px 8px;"><span style="display:block;font-size:28px;line-height:32px;">${r.emoji}</span></td></tr>
+          <tr><td align="center" height="36" style="padding:0 8px;vertical-align:middle;"><span style="display:block;color:#ffffff;font-size:13px;font-weight:700;line-height:16px;">${r.key === 'needs_attention' ? 'Needs<br>Attention' : r.label}</span></td></tr>
+          <tr><td align="center" height="32" style="padding:6px 8px 16px;vertical-align:top;"><span style="display:block;color:#ffffff;font-size:11px;line-height:16px;">${r.key === 'okay' ? 'Room to improve' : r.key === 'needs_attention' ? 'Please contact me' : r.desc}</span></td></tr>
         </table>
       </a>
     </td>`;
