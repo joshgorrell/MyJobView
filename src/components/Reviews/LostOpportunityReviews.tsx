@@ -1,3 +1,4 @@
+import { FullEmailPreview } from "./FullEmailPreview";
 import AdminSalesReviewModal from "./AdminSalesReviewModal";
 import React, { useEffect, useState } from "react";
 import { Trash2, FileText, Download, ExternalLink, Paperclip } from "lucide-react";
@@ -471,14 +472,14 @@ export default function LostOpportunityReviews(
           role="dialog"
           aria-modal="true"
           aria-labelledby="lost-email-preview-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4"
           onClick={() => setPreview(null)}
         >
           <div
-            className="w-full max-w-3xl rounded-xl bg-gray-800 border border-gray-600 overflow-hidden"
+            className="flex h-[92dvh] max-h-[92dvh] w-full max-w-3xl flex-col rounded-xl bg-gray-800 border border-gray-600 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 flex justify-between gap-4">
+            <div className="p-4 flex shrink-0 justify-between gap-4">
               <div>
                 <h3
                   id="lost-email-preview-title"
@@ -494,19 +495,16 @@ export default function LostOpportunityReviews(
               <button
                 type="button"
                 onClick={() => setPreview(null)}
-                className="text-gray-200 self-start"
+                className="min-h-11 shrink-0 px-3 text-gray-200 self-start"
               >
                 Close
               </button>
             </div>
-            <iframe
-              title="Lost Opportunity email preview"
-              sandbox=""
-              srcDoc={preview.html}
-              className="w-full h-[70vh] bg-white"
-            />
-            <p className="p-3 text-sm text-gray-400">
-              Preview only. No email has been sent.
+            <div className="min-h-0 flex-1 overflow-auto bg-white" role="region" aria-label="Full email preview" tabIndex={0}>
+              <FullEmailPreview title="Lost Opportunity email preview" html={preview.html} />
+            </div>
+            <p className="shrink-0 p-3 text-sm text-gray-400">
+              Scroll to see the entire email, including its buttons and footer. Preview only—no email has been sent.
             </p>
           </div>
         </div>
