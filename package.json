@@ -37,7 +37,8 @@
     "test:work-order-billing": "node tests/work-order-billing/database.mjs && node tests/work-order-billing/worker.mjs && node tests/work-order-billing/qbo.mjs",
     "test:work-order-billing:browser": "npm run build && node tests/work-order-billing/browser.mjs && node tests/work-order-billing/work-order-browser.mjs",
     "test:purchasing": "node tests/purchasing/database.mjs && node tests/purchasing/email.mjs && node tests/purchasing/delivery.mjs",
-    "test:purchasing:browser": "npm run build && node tests/purchasing/browser.mjs"
+    "test:purchasing:browser": "npm run build && node tests/purchasing/browser.mjs",
+    "test:lead-emails": "node tests/lead-emails/runtime.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
