@@ -1,3 +1,6 @@
+import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
+import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
+import { dateKey } from '../../lib/workOrderScheduling';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -10,8 +13,6 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Filter
 } from 'lucide-react';
@@ -172,13 +173,13 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
       end.setMonth(end.getMonth() + 1);
       end.setDate(0);
     } else {
-      start.setDate(start.getDate() - start.getDay());
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
       end.setDate(start.getDate() + 6);
     }
 
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
+      start: dateKey(start),
+      end: dateKey(end)
     };
   }
 
@@ -200,7 +201,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
       }
     } else {
       const start = new Date(currentDate);
-      start.setDate(start.getDate() - start.getDay());
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
 
       for (let i = 0; i < 7; i++) {
         const day = new Date(start);
@@ -225,7 +226,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
   }
 
   function getTimeOffForDate(userId: string, date: Date): TimeOffRequest | null {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = dateKey(date);
     return timeOffRequests.find(
       r => r.user_id === userId &&
            r.start_date <= dateStr &&
@@ -234,7 +235,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
   }
 
   function getDayAvailability(date: Date): DayAvailability {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = dateKey(date);
     let available = 0;
     let pto = 0;
     let sick = 0;
@@ -327,42 +328,16 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
     return true;
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading availability calendar...</div>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4">
+    <CalendarWorkspace loading={loading} className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-xl sm:text-2xl font-bold text-white">
             {viewType === 'my-calendar' ? 'My Calendar' : viewType === 'all-technicians' ? 'Technician Calendar' : 'Resource Availability'}
           </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('prev')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentDate(new Date())}
-              className="px-4 py-2 text-sm font-medium bg-white hover:bg-gray-100 rounded-lg"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => navigate('next')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          <CalendarNavigation date={dateKey(currentDate)} onDateChange={date => setCurrentDate(new Date(date + 'T12:00:00'))} onPrevious={() => navigate('prev')} onNext={() => navigate('next')} />
           <span className="text-lg font-medium text-white">
             {viewMode === 'month'
               ? currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -371,36 +346,15 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex bg-white rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-                viewMode === 'week'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Week
-            </button>
-            <button
-              onClick={() => setViewMode('month')}
-              className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-                viewMode === 'month'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Month
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <CalendarViewSwitcher value={viewMode} onChange={setViewMode} options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }]} />
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
@@ -413,7 +367,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
               <Clock className="w-5 h-5 text-yellow-600" />
             </div>
@@ -426,7 +380,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-blue-600" />
             </div>
@@ -439,7 +393,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
               <AlertCircle className="w-5 h-5 text-red-600" />
             </div>
@@ -487,7 +441,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
                       {date.getDate()}
                     </div>
                     <div className="space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <span className="text-green-600 flex items-center gap-1">
                           <CheckCircle className="w-3 h-3" />
                           {availability.available}
@@ -696,6 +650,6 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
           </div>
         </div>
       )}
-    </div>
+    </CalendarWorkspace>
   );
 }

@@ -1125,6 +1125,7 @@ interface CombineWorkOrderModalProps {
 
 function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: CombineWorkOrderModalProps) {
   const [loading, setLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
@@ -1154,8 +1155,8 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
   }
 
   async function handleCombine() {
-    if (selectedTechs.length === 0 || !scheduledDate) {
-      alert('Please select at least one technician and a schedule date');
+    if (selectedTechs.length === 0 || !scheduledDate || !scheduledTime || scheduleError) {
+      alert('Please select a technician and an available date and time');
       return;
     }
     if (!description.trim()) {
@@ -1202,7 +1203,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
     }
   }
 
-  const canSubmit = selectedTechs.length > 0 && !!scheduledDate && description.trim().length > 0;
+  const canSubmit = selectedTechs.length > 0 && !!scheduledDate && !!scheduledTime && !scheduleError && description.trim().length > 0;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-stretch justify-center z-50 p-0 sm:p-4 sm:items-center">
@@ -1407,6 +1408,9 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
               </div>
             ) : (
               <SchedulingCalendar
+                technicians={techs}
+                onValidationChange={setScheduleError}
+                earliestDate={serviceRequests.map(sr => sr.earliest_date || '').sort().reverse()[0]}
                 technicianIds={selectedTechs}
                 selectedDate={scheduledDate}
                 selectedTime={scheduledTime}
