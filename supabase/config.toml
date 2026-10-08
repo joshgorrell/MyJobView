@@ -264,3 +264,7 @@ verify_jwt = false
 
 [functions.invoice-portal-delivery]
 verify_jwt = false
+
+# Public opaque-token image endpoint; no customer data is returned.
+[functions.proposal-check-open]
+verify_jwt = false

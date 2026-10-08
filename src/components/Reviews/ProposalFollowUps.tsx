@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Mail, Eye, Send, CheckCircle, RotateCcw, Pencil, X, Maximize2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import ProposalCheckHistory from './ProposalCheckHistory';
 import { lostReviewAction } from './lostReview';
 
 type Preview = { html: string; content: string; subject: string; recipient: string; reply_to: string; sender: string };
@@ -27,6 +28,7 @@ export default function ProposalFollowUps() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [historyRefresh, setHistoryRefresh] = useState(0);
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function ProposalFollowUps() {
         setPreviewExpanded(false);
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to prepare email.'); }
-    finally { setBusy(false); }
+    finally { setBusy(false); if (send) setHistoryRefresh(v => v + 1); }
   }
 
   const canSubmit = (mode === 'proposal' ? proposal : mode === 'customer' ? contact : !!(name.trim() && /^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(email.trim())));
@@ -104,6 +106,7 @@ export default function ProposalFollowUps() {
     <div className="flex flex-wrap gap-3">
       <button disabled={!canSubmit || busy || sent} onClick={() => void act(false)} className="flex min-h-11 items-center gap-2 rounded-lg border border-cyan-600 px-4 py-2 text-cyan-300 disabled:opacity-50"><Eye className="h-4 w-4" />{busy ? 'Preparing…' : 'Preview Email'}</button>
     </div>
+    <ProposalCheckHistory refreshKey={historyRefresh} />
     <p className="text-xs text-gray-400">Send when you&apos;re ready. The owner note works well after the salesperson has followed up. Customer replies arrive by email.</p>
 
     {preview && (
