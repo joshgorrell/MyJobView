@@ -204,7 +204,7 @@ Deno.serve(async (req: Request) => {
         responseToken: previewToken,
         surveyType,
       });
-      const firstName = previewName.split(' ')[0];
+      const firstName = previewName;
       let subject = surveyType === 'one_year'
         ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
         : surveyType === 'post_test_tune'
@@ -286,7 +286,7 @@ Deno.serve(async (req: Request) => {
       surveyType,
     });
 
-    const firstName = finalCustomerName.split(' ')[0];
+    const firstName = finalCustomerName;
     let subject = surveyType === 'one_year'
       ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
       : surveyType === 'post_test_tune'

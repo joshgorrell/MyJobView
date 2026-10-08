@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
   const ttDays = settings?.test_tune_period_days || 90;
 
   const { data: projects, error } = await supabase.from("projects")
-    .select("id,name,contact_id,organization_id,sales_order_id,substantial_completion_date,contacts:contact_id(contact_name,full_name,first_name,email)")
+    .select("id,name,contact_id,organization_id,sales_order_id,substantial_completion_date,contacts:contact_id(contact_name,full_name,first_name,last_name,company_name,email)")
     .not("substantial_completion_date", "is", null)
     .lte("substantial_completion_date", dueDate)
     .is("test_tune_started_at", null)
@@ -85,7 +85,7 @@ Deno.serve(async (req: Request) => {
         notes: "Satisfied by automatic Day-7 Test & Tune activation"
       }).eq("project_id", project.id).eq("status", "pending");
 
-      const name = contact.first_name || contact.contact_name || contact.full_name || "there";
+      const name = contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || "there";
       const emailResponse = await fetch(`${url}/functions/v1/send-punchlist-invite`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${serviceKey}`, "Content-Type": "application/json" },

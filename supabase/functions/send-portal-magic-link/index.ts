@@ -190,7 +190,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('contacts')
-      .select('id, email, first_name, last_name, portal_access_enabled, portal_user_id')
+      .select('id, email, contact_name, full_name, company_name, first_name, last_name, portal_access_enabled, portal_user_id')
       .eq('email', email.toLowerCase())
       .maybeSingle();
 
@@ -348,7 +348,7 @@ Deno.serve(async (req: Request) => {
 
     if (RESEND_API_KEY) {
       const htmlBody = buildEmailHtml({
-        firstName: contact.first_name || '',
+        firstName: contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '',
         companyName,
         context,
         portalLink,
