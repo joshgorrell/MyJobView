@@ -20,6 +20,7 @@ interface ContactSearchResult {
   email: string | null;
   phone: string | null;
   username: string | null;
+  assigned_to: string | null;
 }
 
 export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
@@ -96,7 +97,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, contact_name, company_name, email, phone, username')
+        .select('id, contact_name, company_name, email, phone, username, assigned_to')
         .or(`contact_name.ilike.%${query}%,company_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
         .order('contact_name')
         .limit(10);
@@ -112,6 +113,12 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
 
   function selectContact(contact: ContactSearchResult) {
     setSelectedContact(contact);
+
+    const repId = contact.assigned_to;
+    const repIsAssignable = repId
+      ? salesReps.some((rep) => rep.id === repId)
+      : false;
+
     setFormData({
       ...formData,
       contact_name: contact.contact_name || '',
@@ -120,6 +127,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       phone: contact.phone || '',
       username: contact.username || '',
       office_id: '',
+      assignment: repIsAssignable ? repId! : 'fishbowl',
     });
     setShowResults(false);
     setContactSearch('');
@@ -134,6 +142,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       email: '',
       phone: '',
       username: '',
+      assignment: 'fishbowl',
     });
   }
 
