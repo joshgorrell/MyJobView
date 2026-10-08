@@ -8,6 +8,12 @@ for (const [file, name] of [['send-satisfaction-email','buildSatisfactionEmail']
   const module = await run(source + `\nexport { ${name} };`);
   const html = module[name]({customerName:'Customer',companyName:'Electronic Life',companyEmail:'test@example.com',feedbackBaseUrl:'https://test.example',responseToken:'test-token'});
   for (const rating of ['excellent','good','okay','needs_attention']) assert.ok(html.includes(`/feedback?rating=${rating}&token=test-token`));
+  if (file === 'send-satisfaction-email') {
+    assert.ok(!html.includes('substantially complete') && !html.includes('Test & Tune'));
+    assert.ok(html.includes('5-star Google review'));
+    const projectHtml = module[name]({customerName:'Customer',companyName:'Electronic Life',companyEmail:'test@example.com',feedbackBaseUrl:'https://test.example',responseToken:'test-token',surveyType:'job_completion'});
+    assert.ok(projectHtml.includes('substantially complete'));
+  }
   assert.ok(html.includes('Needs<br>Attention'));
   assert.ok(html.includes('Room to improve') && html.includes('Please contact me'));
   assert.ok(!html.includes('height:130px') && !html.includes('overflow:hidden'));
