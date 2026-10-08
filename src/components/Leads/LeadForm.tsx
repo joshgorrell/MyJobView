@@ -47,6 +47,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
   const [searching, setSearching] = useState(false);
   const [selectedContact, setSelectedContact] = useState<ContactSearchResult | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const hideOffice = contactMode === 'existing' && selectedContact !== null;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
@@ -118,6 +119,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       email: contact.email || '',
       phone: contact.phone || '',
       username: contact.username || '',
+      office_id: '',
     });
     setShowResults(false);
     setContactSearch('');
@@ -597,7 +599,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
             <p className="text-xs text-muted mt-1">Separate tags with spaces. Use # prefix.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${hideOffice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">Follow-up Priority</label>
               <select
@@ -612,7 +614,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
               </select>
             </div>
 
-            {offices.length > 0 && (
+            {offices.length > 0 && !hideOffice && (
               <div>
                 <label className="block text-sm font-medium text-secondary mb-1.5">Sales Office</label>
                 <select
