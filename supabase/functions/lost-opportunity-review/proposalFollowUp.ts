@@ -10,28 +10,31 @@ export function proposalFollowUpContent(settings: any, contact: any, sender: { n
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;background:#ecfeff;border-radius:12px"><tr><td style="padding:28px 20px;text-align:center"><span style="font-size:11px;letter-spacing:2px;color:#0e7490;font-weight:700">YOUR EXPERIENCE MATTERS</span><h1 style="font-size:30px;line-height:1.2;color:#164e63;margin:12px 0 0">How are we doing?</h1></td></tr></table>
   <p style="font-size:16px;line-height:1.8">${sender.owner ? `My team works hard to make sure we're recommending the right solution, communicating clearly, and providing a great experience from the very beginning. If we've missed the mark somewhere—or if there's something we could do differently to earn your business—I'd like to know.` : `If you have questions about the proposal, would like to explore different options, need something adjusted, or there's simply something we could do better to earn your business, please let me know.`}</p>
   <p style="font-size:16px;line-height:1.8">${sender.owner ? `Maybe you have a question that hasn't been answered. Maybe something in the proposal needs to change. Or maybe you're comparing us with another option and there's something we could do better.` : `Our goal isn't just to send you a proposal—it's to make sure we've put together the <strong>right solution for you.</strong>`}</p>
-  <p style="font-size:18px;line-height:1.6;font-weight:700;color:#164e63">${sender.owner ? 'Whatever it is, you can reply directly to me.' : 'Is there anything we can do to win your business?'}</p>
-  <p style="font-size:14px;text-align:center;color:#64748b">Or simply reply to this email. ${sender.owner ? `Your reply comes directly to me.` : `I'm happy to help.`}</p>
+  ${sender.owner ? '' : '<p style="font-size:18px;line-height:1.6;font-weight:700;color:#164e63">Is there anything we can do to win your business?</p>'}
   `;
 }
 
 export function proposalFollowUpEmail(settings: any, contact: any, sender: { name: string; email: string; owner: boolean; photo?: string }) {
   const company = esc(settings.company_name || 'Our team');
-  const content = proposalFollowUpContent(settings, contact, sender) + proposalResponseButtons(settings) + proposalClosing(settings, sender);
-  return wrapInEmailLayout(content, company, esc(settings.company_email || ''), '#0e7490', settings.company_logo_url || '', [], 'light').replace('You received this email because you recently worked with us.<br>Thank you for your business.', 'Thank you for giving us the opportunity to earn your business.');
+  const content = proposalFollowUpContent(settings, contact, sender) + proposalResponseButtons() + proposalClosing(settings, sender);
+  return wrapInEmailLayout(content, company, esc(settings.company_email || ''), '#0e7490', settings.company_logo_url || '', [], 'light').replace('You received this email because you recently worked with us.<br>Thank you for your business.', proposalFooter(settings));
 }
 
 export function wrapProposalContent(settings: any, content: string, sender?: { name: string; email: string; owner: boolean; photo?: string }) {
-  content += proposalResponseButtons(settings) + (sender ? proposalClosing(settings, sender) : '');
+  content += proposalResponseButtons() + (sender ? proposalClosing(settings, sender) : '');
   const company = esc(settings.company_name || 'Our team');
-  return wrapInEmailLayout(content, company, esc(settings.company_email || ''), '#0e7490', settings.company_logo_url || '', [], 'light').replace('You received this email because you recently worked with us.<br>Thank you for your business.', 'Thank you for giving us the opportunity to earn your business.');
+  return wrapInEmailLayout(content, company, esc(settings.company_email || ''), '#0e7490', settings.company_logo_url || '', [], 'light').replace('You received this email because you recently worked with us.<br>Thank you for your business.', proposalFooter(settings));
 }
 
-export function proposalResponseButtons(settings: any) {
+function proposalFooter(settings: any) {
   const owner = settings.owner_email
     ? `Anything else? Email <strong>${esc(settings.owner_name)}, Owner</strong>, at <a href="mailto:${esc(settings.owner_email)}">${esc(settings.owner_email)}</a>.`
     : `Anything else? <a href="mailto:${esc(settings.company_email || '')}">Email our team</a>.`;
-  return `<section style="margin:28px 0"><h2 style="text-align:center;color:#164e63">What do you think of your proposal?</h2>${Object.entries(proposalChoices).map(([choice, value]) => `<p style="text-align:center;margin:10px 0"><a href="#proposal-check-preview-${choice}" style="display:inline-block;min-width:210px;background:#0e7490;color:white;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:700">${value.label}</a></p>`).join('')}<p style="text-align:center;font-size:14px;line-height:1.8">${owner}</p><p style="text-align:center;font-size:12px;color:#64748b">Your choice helps us follow up. Proposal approval remains a separate step.</p></section>`;
+  return `Thank you for giving us the opportunity to earn your business.<span style="display:block;text-align:center;font-size:14px;line-height:1.8;color:#334155;margin:20px 0 8px">${owner}</span><span style="display:block;text-align:center;font-size:12px;line-height:1.6;color:#64748b">Your choice helps us follow up. Proposal approval remains a separate step.</span>`;
+}
+
+export function proposalResponseButtons() {
+  return `<section style="margin:28px 0"><h2 style="text-align:center;color:#164e63">What do you think of your proposal?</h2>${Object.entries(proposalChoices).map(([choice, value]) => `<p style="text-align:center;margin:10px 0"><a href="#proposal-check-preview-${choice}" style="display:inline-block;min-width:210px;background:#0e7490;color:white;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:700">${value.label}</a></p>`).join('')}</section>`;
 }
 
 function proposalClosing(settings: any, sender: { name: string; email: string; owner: boolean; photo?: string }) {
