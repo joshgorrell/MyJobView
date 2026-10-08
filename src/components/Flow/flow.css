@@ -201,3 +201,15 @@
 
 .flow .flow-view-tabs button{color:var(--flow-secondary)}
 .flow .flow-view-tabs button.flow-selected{color:var(--flow-accent)}
+
+.flow .flow-message-action{white-space:nowrap;background:var(--flow-bg);color:var(--flow-text);border-color:var(--flow-line)}
+.flow-heading-actions > button{white-space:nowrap}
+.flow-message-destinations{display:grid;grid-template-columns:1fr 1fr auto;align-items:stretch;gap:8px;margin:0 18px 12px;padding:8px;background:var(--flow-muted);border:1px solid var(--flow-line);border-radius:8px}
+.flow .flow-message-destinations button{justify-content:flex-start;text-align:left;padding:10px;gap:10px;border:1px solid var(--flow-line);background:var(--flow-bg);color:var(--flow-text);min-width:0}
+.flow-message-destinations strong,.flow-message-destinations small{display:block}
+.flow-message-destinations small{color:var(--flow-secondary);font-size:12px;margin-top:2px}
+.flow .flow-message-destinations button:last-child{align-self:flex-start;padding:8px}
+@container (max-width:500px){.flow .flow-heading{padding-inline:10px;gap:6px}.flow-message-destinations{grid-template-columns:1fr auto;margin:0 10px 10px}.flow-message-destinations button:not(:last-child){grid-column:1}.flow-message-destinations button:last-child{grid-column:2;grid-row:1}}
+
+@media(max-width:640px){.flow .flow-heading .flow-desktop-label{display:none}.flow .flow-heading .flow-mobile-label{display:inline}}
+@container (max-width:340px){.flow .flow-heading{flex-wrap:wrap}.flow .flow-heading>div:first-child{flex-basis:100%}.flow-heading-actions{margin-left:auto}}

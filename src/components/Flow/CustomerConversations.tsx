@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Plus, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, AlertCircle, HelpCircle } from 'lucide-react';
+import { MessageSquare, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, AlertCircle, HelpCircle } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -662,13 +662,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
                 <MessageSquare className="w-5 h-5 text-blue-600" />
                 Customer conversations
               </h2>
-              <button
-                onClick={() => setShowNewThread(true)}
-                className="p-2.5 sm:p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors active:scale-95 touch-manipulation"
-                title="New Thread"
-              >
-                <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
-              </button>
+
             </div>
 
             <div className="relative mb-3">

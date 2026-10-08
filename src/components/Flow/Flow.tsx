@@ -76,6 +76,18 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const [expanded, setExpanded] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
   const [messaging, setMessaging] = useState(false);
+  const [choosingMessage, setChoosingMessage] = useState(false);
+  const messageAction = useRef<HTMLButtonElement>(null);
+  const messageChoices = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!choosingMessage) return;
+    messageChoices.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setChoosingMessage(false); messageAction.current?.focus(); }
+    };
+    window.addEventListener('keydown', dismiss);
+    return () => window.removeEventListener('keydown', dismiss);
+  }, [choosingMessage]);
   const [marking, setMarking] = useState(false);
   const scope = useMemo(() => ({ contactId, projectId, workOrderId }), [contactId, projectId, workOrderId]);
   const chosenScope = target ? { ...scope, ...targetScope(target) } : scope;
@@ -145,10 +157,22 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
   return <section className={`flow ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
-      {canPost && <div className="flow-heading-actions"><button onClick={() => { setMessaging(!messaging); setComposing(false); }}><MessageSquare size={15} /> Message</button><button className="flow-primary" onClick={() => { setComposing(!composing); setMessaging(false); }}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button></div>}
+      {(canPost || canMessageCustomers) && <div className="flow-heading-actions">
+        <button className="flow-message-action" aria-label="New message" ref={messageAction} aria-expanded={choosingMessage} aria-controls={`${controlId}-message-destination`}
+          onClick={() => {
+            if (canPost && canMessageCustomers) setChoosingMessage(!choosingMessage);
+            else if (canMessageCustomers) { setComposing(false); setCreateCustomer(true); setView('customers'); }
+            else { setComposing(false); setMessaging(!messaging); }
+          }}><MessageSquare size={15} /><span className="flow-desktop-label">New message</span><span className="flow-mobile-label">Message</span>{canPost && canMessageCustomers && <ChevronDown size={13} />}</button>
+        {canPost && <button className="flow-primary" onClick={() => { setComposing(!composing); setMessaging(false); setChoosingMessage(false); }}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button>}
+      </div>}
     </header>
     {composing && <PostFlowUpdate scope={chosenScope} onClose={() => setComposing(false)} onPosted={() => { setComposing(false); void flow.refresh(); }} />}
-    {canMessageCustomers && <button className="flow-primary" onClick={() => { setCreateCustomer(true); setView('customers'); }}>New customer message</button>}
+    {choosingMessage && <div ref={messageChoices} id={`${controlId}-message-destination`} className="flow-message-destinations" role="group" aria-label="Message destination">
+      {canPost && <button onClick={() => { setChoosingMessage(false); setMessaging(true); setComposing(false); if (view === 'customers') setView('all'); }}><MessageSquare size={17} /><span><strong>Internal chat</strong><small>Teammates, departments or everyone</small></span></button>}
+      {canMessageCustomers && <button onClick={() => { setChoosingMessage(false); setMessaging(false); setCreateCustomer(true); setView('customers'); }}><User size={17} /><span><strong>Customer message</strong><small>Start a customer conversation</small></span></button>}
+      <button aria-label="Close message choices" onClick={() => { setChoosingMessage(false); messageAction.current?.focus(); }}><X size={16} /></button>
+    </div>}
     {messaging && <div className="flow-message-composer"><DiscussionPostForm onSuccess={() => { setMessaging(false); void flow.refresh(); }} /></div>}
     <div className="flow-toolbar">
       <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{FLOW_VIEWS.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
