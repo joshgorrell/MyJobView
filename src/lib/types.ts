@@ -1,4 +1,6 @@
 export interface Profile {
+  is_technician?: boolean;
+  is_sales_rep?: boolean;
   id: string;
   employment_type?: 'hourly' | 'job_time' | 'salary' | null;
   requires_daily_clock?: boolean;

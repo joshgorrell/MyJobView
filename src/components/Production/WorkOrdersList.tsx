@@ -99,7 +99,8 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       const { data: salesData } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['sales', 'sales_v2', 'admin', 'office_manager'])
+        .eq('is_sales_rep', true)
+        .eq('is_active', true)
         .order('full_name');
 
       if (salesData) setSalesReps(salesData);
@@ -108,7 +109,8 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       const { data: techData } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['technician', 'field_tech', 'project_manager'])
+        .eq('is_technician', true)
+        .eq('is_active', true)
         .order('full_name');
 
       if (techData) setTechnicians(techData);

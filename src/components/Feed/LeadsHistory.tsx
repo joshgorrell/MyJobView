@@ -65,7 +65,7 @@ export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, role, avatar_url')
-        .in('role', ['sales', 'admin', 'manager'])
+        .eq('is_sales_rep', true)
         .eq('is_active', true)
         .order('full_name');
       if (data) setSalesReps(data);

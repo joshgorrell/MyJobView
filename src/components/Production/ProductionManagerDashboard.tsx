@@ -213,7 +213,7 @@ export function ProductionManagerDashboard() {
         supabase
           .from('profiles')
           .select('id', { count: 'exact', head: true })
-          .in('role', ['tech', 'technician', 'lead_technician']),
+          .eq('is_technician', true).eq('is_active', true),
         supabase
           .from('job_completions')
           .select(`
@@ -261,7 +261,7 @@ export function ProductionManagerDashboard() {
         const { data: techProfiles } = await supabase
           .from('profiles')
           .select('id, full_name')
-          .in('role', ['tech', 'technician', 'lead_technician'])
+          .eq('is_technician', true).eq('is_active', true)
           .limit(5);
 
         if (techProfiles && techProfiles.length > 0) {

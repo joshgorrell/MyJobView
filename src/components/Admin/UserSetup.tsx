@@ -29,8 +29,8 @@ export const setupSections = [
   },
   {
     key: 'sales',
-    label: 'Sales',
-    help: 'Sales representative designation and applicable sales settings.',
+    label: 'Assignments & Sales',
+    help: 'Technician and Sales Representative designations control assignment lists independently of roles and permissions.',
   },
 ] as const;
 type Section = (typeof setupSections)[number]['key'];
@@ -297,6 +297,7 @@ export function UserDataCard({
                 ['Email', profile.email],
                 ['Username', profile.username],
                 ['Role', roleName || profile.role],
+                ['Technician', profile.is_technician],
                 ['Office access', offices.length ? offices.join(', ') : 'All offices'],
                 ['Account', profile.is_active === false ? 'Inactive' : 'Active'],
                 ['Classification', classification],

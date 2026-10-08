@@ -714,7 +714,7 @@ export function BonusApprovalDashboard() {
               <UserSelector
                 selectedUserId={assignmentModal.leadTechId}
                 onSelect={(id) => setAssignmentModal({ ...assignmentModal, leadTechId: id })}
-                roleFilter={['technician', 'production_manager', 'service_manager']}
+                designation="is_technician"
                 label="Lead Technician"
                 placeholder="Select Lead Technician..."
                 showClearButton={false}

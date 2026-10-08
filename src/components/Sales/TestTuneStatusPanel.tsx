@@ -865,7 +865,7 @@ export function TestTuneStatusPanel({
                 <UserSelector
                   selectedUserId={selectedTechId}
                   onSelect={(id) => setSelectedTechId(id)}
-                  roleFilter={['technician', 'production_manager', 'service_manager']}
+                  designation="is_technician"
                   label=""
                   placeholder="Select Lead Technician..."
                   showClearButton={false}

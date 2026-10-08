@@ -16,7 +16,7 @@ const modules=departments.flatMap(d=>Array.from({length:8},(_,i)=>({id:d.id+'mod
 const records={roles:[{id:'role',role_key:'sales',display_name:'Sales',description:'Sales role'},{id:'adminrole',role_key:'admin',display_name:'Administrator',description:'Admin role'}],company_offices:[{id:'office',office_name:'Topeka'}],departments,role_department_access:departments.map(d=>({department_id:d.id,has_access:true})),department_modules:modules,role_module_access:modules.map(m=>({module_id:m.id,has_access:true})),pay_schedules:[{id:'schedule',name:'Weekly',frequency:'weekly',is_active:true}],profiles:[profile],employees:[{id:'emp',user_id:'employee',hire_date:'2026-01-01',employment_status:'active',termination_date:null,employee_number:'100'}],employee_payroll_configs:[config],user_offices:[{office_id:'office'}],user_setup_reviews:[{user_id:'employee',reviewed_sections:['profile','access','permissions','notifications','pay','sales']}]};
 export const supabase={from(table){let one=false;let operation='select';let input;let columns='*';const filters=[];const result=()=>{let data=records[table]||[];if(table==='profiles'&&filters.some(f=>f[0]==='id'&&f[1]==='admin'))data=[{id:'admin',role:'admin'}];if(operation!=='select')window.calls.push({table,operation,input});if(window.fixtureFail===table)return Promise.resolve({data:null,error:{message:'Fixture failure'}});if(operation==='upsert'&&table==='user_setup_reviews')records[table]=[input];return Promise.resolve({data:one?(data[0]||null):data,error:null});};const q=new Proxy({},{get(_,k){if(k==='then')return (done,fail)=>result().then(done,fail);if(k==='single'||k==='maybeSingle')return ()=>{one=true;return result()};if(k==='select')return c=>{columns=c;return q};if(k==='eq')return (k,v)=>{filters.push([k,v]);return q};if(['update','insert','delete','upsert'].includes(k))return v=>{operation=k;input=v;return q};return()=>q}});return q},auth:{getUser:async()=>({data:{user:{id:'admin'}}}),getSession:async()=>({data:{session:{access_token:'fixture'}}})},rpc:async(name,input)=>{window.calls.push({rpc:name,input});return {error:null}}};
 export {profile};`;
-const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {AddUserForm} from './src/components/Admin/AddUserForm';import {EditUserForm} from './src/components/Admin/EditUserForm';import {profile} from 'fixture';window.fetch=async()=>{window.calls.push({create:true});return {ok:true,json:async()=>({user:{id:'newuser'}})}};createRoot(document.getElementById('root')).render(location.search.includes('edit')?<EditUserForm user={profile} onClose={()=>{window.closed=true}} onSuccess={()=>{window.saved=true}}/>:<AddUserForm onClose={()=>{}} onSuccess={()=>{window.created=true}}/>);`;
+const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {AddUserForm} from './src/components/Admin/AddUserForm';import {EditUserForm} from './src/components/Admin/EditUserForm';import {profile} from 'fixture';window.fetch=async(url,options)=>{window.calls.push({create:true,input:JSON.parse(options.body)});return {ok:true,json:async()=>({user:{id:'newuser'}})}};createRoot(document.getElementById('root')).render(location.search.includes('edit')?<EditUserForm user={profile} onClose={()=>{window.closed=true}} onSuccess={()=>{window.saved=true}}/>:<AddUserForm onClose={()=>{}} onSuccess={()=>{window.created=true}}/>);`;
 let browser;
 const server = createServer(async (req, res) => {
   try {
@@ -90,6 +90,8 @@ try {
   assert.ok((await page.locator('form').innerText()).includes('pay schedule'));
   await page.locator('select').last().selectOption('schedule');
   await page.getByRole('button', { name: 'Review & Continue' }).click();
+  await page.getByLabel(/^Technician/).check();
+  await page.getByLabel(/^Sales Rep/).check();
   await page.getByRole('button', { name: 'Review & Continue' }).click();
 
   assert.equal(await page.evaluate(() => window.calls.filter((c) => c.create).length), 0);
@@ -106,7 +108,11 @@ try {
   assert.ok(
     await page.evaluate(() => window.calls.some((c) => c.table === 'profiles' && c.input?.notify_on_mention === false)),
   );
+  assert.ok(await page.evaluate(() => window.calls.some(c => c.create && c.input.is_technician === true && c.input.is_sales_rep === true)));
   await page.goto(url + '/?edit');
+  await page.getByRole('button', {name:'Assignments & Sales',exact:true}).click();
+  await page.getByLabel(/^Technician/).check();
+  await page.getByLabel('Sales representative (business designation)',{exact:true}).check();
   await page.getByRole('button', { name: 'Pay & Time', exact: true }).click();
   const hours = page.locator('input[type="number"]').last();
   await hours.fill('35');
@@ -114,6 +120,7 @@ try {
   await effective.fill('2026-11-01');
   await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
   await page.waitForFunction(() => window.saved && window.closed);
+  assert.ok(await page.evaluate(() => window.calls.some(c => c.table === 'profiles' && c.operation === 'update' && c.input.is_technician === true && c.input.is_sales_rep === true)));
   assert.ok(
     await page.evaluate(() =>
       window.calls.some(
@@ -131,7 +138,7 @@ try {
     'Permissions',
     'Notifications',
     'Pay & Time',
-    'Sales',
+    'Assignments & Sales',
     'Review / User Card',
   ])
     await page.getByRole('button', { name, exact: true }).click();

@@ -39,7 +39,7 @@ export function AvailabilityBrowserModal({
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['tech', 'service_manager', 'project_manager', 'office_manager', 'admin', 'manager'])
+        .eq('is_technician', true)
         .eq('is_active', true)
         .order('full_name');
       setAllTechnicians(data || []);

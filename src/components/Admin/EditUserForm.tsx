@@ -147,6 +147,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     role_id: (user as any).role_id || '',
     email_leads: user.email_leads,
     is_sales_rep: (user as any).is_sales_rep ?? false,
+    is_technician: user.is_technician ?? false,
     can_create_proposals: (user as any).can_create_proposals ?? true,
     can_create_purchase_orders:
       (user as any).can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(user.role),
@@ -691,6 +692,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         role_id: formData.role_id || null,
         email_leads: formData.email_leads,
         is_sales_rep: formData.is_sales_rep,
+        is_technician: formData.is_technician,
         can_create_proposals: formData.can_create_proposals,
         can_create_purchase_orders: formData.can_create_purchase_orders,
         can_view_prospects: formData.can_view_prospects,
@@ -1449,6 +1451,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
             )}
             {activeTab === 'sales' && (
               <div className="space-y-5">
+              <p className="text-sm text-gray-300">Choose where this user can be assigned. Only active users with the matching designation appear in assignment lists. These settings do not change roles or permissions.</p>
+              <label className="flex items-start gap-3 text-white">
+                <input type="checkbox" checked={formData.is_technician}
+                  onChange={(e) => setFormData({ ...formData, is_technician: e.target.checked })}
+                  className="mt-1 w-4 h-4" />
+                <span>Technician<span className="block text-xs text-gray-400 mt-1">Include in technician assignment and scheduling lists.</span></span>
+              </label>
+
                 <label className="flex gap-3 text-white">
                   <input
                     type="checkbox"
@@ -1462,7 +1472,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                   />
                   Sales representative (business designation)
                 </label>
-                {(formData.role === 'sales' || formData.role === 'admin' || formData.role === 'manager') && (
+                {formData.is_sales_rep && (
                   <div>
                     <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                       Sales Target Settings

@@ -145,7 +145,7 @@ export function DispatchScheduler() {
         supabase
           .from('profiles')
           .select('id, full_name, role, employment_type')
-          .in('role', ['tech', 'lead_tech'])
+          .eq('is_technician', true)
           .eq('is_active', true)
           .order('full_name')
       ]);

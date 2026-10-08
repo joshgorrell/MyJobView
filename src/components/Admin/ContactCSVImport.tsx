@@ -312,7 +312,7 @@ export function ContactCSVImport() {
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name, username, first_name, last_name')
-      .in('role', ['sales', 'sales_rep', 'sales_manager', 'service_manager', 'manager', 'admin'])
+      .eq('is_sales_rep', true)
       .eq('is_active', true)
       .order('full_name', { ascending: true });
     if (data) setSalesReps(data);

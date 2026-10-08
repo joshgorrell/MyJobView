@@ -140,7 +140,7 @@ export function ResourceAvailabilityCalendar({ viewType = 'all-technicians', use
     if (viewType === 'my-calendar' && userId) {
       query = query.eq('id', userId);
     } else if (viewType === 'all-technicians') {
-      query = query.eq('role', 'tech');
+      query = query.eq('is_technician', true).eq('is_active', true);
     }
 
     query = query.order('full_name');

@@ -71,7 +71,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   const [taxLookupError, setTaxLookupError] = useState<string>('');
   const [manualTaxRate, setManualTaxRate] = useState(savedDraft?.manualTaxRate || '');
   const [salesReps, setSalesReps] = useState<any[]>([]);
-  const [selectedSalesRep, setSelectedSalesRep] = useState<string>(savedDraft?.selectedSalesRep || profile?.id || '');
+  const [selectedSalesRep, setSelectedSalesRep] = useState<string>(savedDraft?.selectedSalesRep || (profile?.is_sales_rep ? profile.id : ''));
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [zipCode, setZipCode] = useState(savedDraft?.zipCode || '');
 
@@ -172,7 +172,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
     if (profile?.role === 'admin' || (profile as any)?.can_edit_contact_assignments) {
       loadSalesReps();
     }
-    if (profile?.id && !selectedSalesRep) {
+    if (profile?.id && profile.is_sales_rep && !selectedSalesRep) {
       setSelectedSalesRep(profile.id);
     }
   }, [contactId, initialLeadId, profile]);
@@ -200,7 +200,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, role')
-        .in('role', ['sales', 'admin', 'manager'])
+        .eq('is_sales_rep', true).eq('is_active', true)
         .order('full_name');
       if (error) throw error;
       setSalesReps(data || []);

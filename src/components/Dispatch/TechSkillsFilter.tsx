@@ -114,7 +114,7 @@ export function TechSkillsFilter({ onTechnicianSelect, onClose }: TechSkillsFilt
             )
           )
         `)
-        .in('role', ['tech'])
+        .eq('is_technician', true).eq('is_active', true)
         .order('full_name');
 
       if (error) throw error;
@@ -151,7 +151,7 @@ export function TechSkillsFilter({ onTechnicianSelect, onClose }: TechSkillsFilt
             )
           )
         `)
-        .in('role', ['tech'])
+        .eq('is_technician', true).eq('is_active', true)
         .order('full_name');
 
       if (error) throw error;

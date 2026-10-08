@@ -190,7 +190,7 @@ export function TradeshowKiosk() {
         .from('profiles')
         .select('id, full_name, first_name, last_name, username')
         .eq('organization_id', organizationId)
-        .in('role', ['sales', 'sales_manager', 'manager', 'admin'])
+        .eq('is_sales_rep', true)
         .eq('is_active', true)
         .order('full_name', { ascending: true });
       setSalesReps(data ?? []);

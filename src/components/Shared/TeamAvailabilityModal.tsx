@@ -108,7 +108,7 @@ export function TeamAvailabilityModal({
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name')
-      .in('role', ['tech', 'service_manager', 'manager', 'admin'])
+      .eq('is_technician', true).eq('is_active', true)
       .eq('active', true)
       .order('full_name');
 
