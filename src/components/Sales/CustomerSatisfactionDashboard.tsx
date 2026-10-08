@@ -75,6 +75,7 @@ export function CustomerSatisfactionDashboard() {
       let query = supabase
         .from('customer_satisfaction')
         .select('id, customer_name, customer_email, sales_rep_name, lead_tech_name, rating, comment, comment_public, sent_at, responded_at, follow_up_cleared_at, follow_up_cleared_by')
+        .or('survey_type.is.null,survey_type.neq.test_tune_welcome')
         .order('sent_at', { ascending: false });
 
       if (dateRange !== 'all') {
