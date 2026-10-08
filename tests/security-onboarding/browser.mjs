@@ -371,11 +371,17 @@ for(const width of [320,390,768,1440]) {
  await productPage.setViewportSize({width,height:844});
  await productPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?add-product');
  await productPage.getByRole('heading',{name:'New Product',exact:true}).waitFor();
- await productPage.evaluate(()=>{document.documentElement.style.colorScheme='dark';});
  const controls=productPage.locator('.product-form-controls input:not([type="hidden"]):not([type="file"]):not(:disabled), .product-form-controls select:not(:disabled), .product-form-controls textarea:not(:disabled)');
  assert.ok(await controls.count()>10);
- for(const control of await controls.all()) {
-  assert.deepEqual(await control.evaluate(el=>{const s=getComputedStyle(el);return [s.colorScheme,s.backgroundColor,s.color];}),['light','rgb(255, 255, 255)','rgb(0, 0, 0)']);
+ // Product forms follow the workspace palette; security agreement fields above stay white.
+ for(const [theme,background,text] of [
+  ['light','rgb(255, 255, 255)','rgb(17, 24, 39)'],
+  ['dark','rgb(17, 24, 39)','rgb(249, 250, 251)'],
+ ]) {
+  await productPage.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;},theme);
+  for(const control of await controls.all()) {
+   assert.deepEqual(await control.evaluate(el=>{const s=getComputedStyle(el);return [s.colorScheme,s.backgroundColor,s.color];}),[theme,background,text],`Product controls follow ${theme} theme at ${width}px`);
+  }
  }
  const description=productPage.getByPlaceholder('Description that customers will see on proposals');
  await description.fill('A full product description. '.repeat(20));
