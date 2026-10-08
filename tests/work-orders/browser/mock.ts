@@ -104,12 +104,13 @@ const fixtures: Record<string, any[]> = {
     { id: "trim", name: "Trim", is_active: true },
   ],
   profiles: [
-    { id: "tech", full_name: "Test Technician", role: "tech", is_active: true },
+    { id: "tech", full_name: "Test Technician", role: "tech", is_active: true, is_technician: true },
     {
       id: "tech2",
       full_name: "Second Technician",
       role: "tech",
       is_active: true,
+      is_technician: true,
     },
   ],
   contacts: [
@@ -234,6 +235,7 @@ export const supabase = {
     );
     return q;
   },
+  removeChannel() {},
   channel() {
     const channel: any = {
       on() {

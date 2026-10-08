@@ -5,7 +5,7 @@ const server = await createServer({
   configFile: "tests/work-orders/browser/vite.config.mjs",
 });
 await server.listen();
-const launchOptions = { headless: true };
+const launchOptions = { headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined };
 if (process.env.PLAYWRIGHT_USE_SERVERLESS_CHROMIUM) {
   const { default: binary } = await import("@sparticuz/chromium");
   launchOptions.args = binary.args.filter((arg) => arg !== "--single-process");
@@ -145,6 +145,28 @@ try {
         "Service origin can select project type",
       );
       assert.ok(fieldCount > 10);
+      if (theme === 'light' && size.width === 1280) {
+        await page.getByPlaceholder('e.g., Install HVAC system, Repair unit, Warranty service call').fill('Precise service appointment');
+        await page.getByText('Estimated Hours',{exact:true}).locator('..').locator('input').fill('7.5');
+        await page.getByLabel('Calendar date').fill('2026-10-12');
+        await page.getByRole('button',{name:'Schedule Test Technician on 2026-10-12 at 9:00 AM',exact:true}).click();
+        assert.equal(await page.getByText('Estimated Hours',{exact:true}).locator('..').locator('input').inputValue(),'7.5');
+        await page.getByRole('button', {name:'Enter date & time',exact:true}).click();
+        await page.getByLabel('Test Technician',{exact:true}).check();
+        await page.getByLabel('Work order date').fill('2026-10-12');
+        await page.getByLabel('Work order start time').fill('09:20');
+        await page.getByLabel('Work order end time').fill('10:40');
+        await page.locator('select').filter({has:page.locator('option[value="yes"]')}).selectOption('yes');
+        const submit = page.getByRole('button',{name:'Create Work Order',exact:true});
+        await page.waitForFunction(() => ![...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Create Work Order')?.disabled);
+        await submit.click();
+        await page.waitForFunction(() => window.__created);
+        const order = await page.evaluate(() => window.__created.p_assignments[0].work_order);
+        assert.equal(order.start_date,'2026-10-12');
+        assert.equal(order.start_time,'09:20');
+        assert.equal(order.end_time,'10:40');
+        assert.equal(order.estimated_hours,7.5,'Calendar duration must not overwrite sold labor');
+      }
       assert.deepEqual(errors, []);
       await page.close();
     }

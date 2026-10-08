@@ -2,12 +2,12 @@ import {useWorkOrderOptions} from '../../lib/workOrderOptions';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { X, Search, Plus, User, Briefcase, Users, MapPin, AlertTriangle, Bell, Mail, MessageSquare, Link, Calendar, PhoneCall, LayoutGrid, ExternalLink, Package, ChevronDown, ChevronUp, ClipboardList, Phone, Repeat } from 'lucide-react';
+import { X, Search, Plus, User, Briefcase, MapPin, AlertTriangle, Bell, Mail, MessageSquare, Link, PhoneCall, ExternalLink, Package, ChevronDown, ChevronUp, ClipboardList, Phone, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ProjectScope from '../Projects/ProjectScope';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
-import { TeamAvailabilityModal } from '../Shared/TeamAvailabilityModal';
-import { AvailabilityBrowserModal } from '../Shared/AvailabilityBrowserModal';
+import { WorkOrderSchedulePicker } from './WorkOrderSchedulePicker';
+import { schedulingError } from '../../lib/workOrderScheduling';
 import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { RecurrenceSelector, RecurrenceRule } from '../Shared/RecurrenceSelector';
 
@@ -144,8 +144,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const [selectedTechnicians, setSelectedTechnicians] = useState<string[]>(
     initialTechnicianIds
   );
-  const [showAvailabilityBrowser, setShowAvailabilityBrowser] = useState(false);
-  const [showTeamAvailability, setShowTeamAvailability] = useState(false);
+
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [technicianVisitNotes, setTechnicianVisitNotes] = useState<Record<string, string>>({});
   const [allProjects, setAllProjects] = useState<Array<{id:string;name:string;project_number:string}>>([]);
@@ -628,22 +628,6 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     }
   }
 
-  function generateHalfHourSlots(): string[] {
-    const slots: string[] = [];
-    for (let h = 6; h <= 20; h++) {
-      slots.push(`${h.toString().padStart(2, '0')}:00`);
-      if (h < 20) slots.push(`${h.toString().padStart(2, '0')}:30`);
-    }
-    return slots;
-  }
-
-  function formatSlotLabel(time: string): string {
-    const [h, m] = time.split(':').map(Number);
-    const period = h >= 12 ? 'PM' : 'AM';
-    const hour = h % 12 || 12;
-    return `${hour}:${m.toString().padStart(2, '0')} ${period}`;
-  }
-
   function validate(): boolean {
     const errors: Record<string, string> = {};
 
@@ -671,6 +655,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     if (!formData.end_time) {
       errors.end_time = 'End time is required';
     }
+    const timeError = schedulingError({ date: formData.start_date, start: formData.start_time, end: formData.end_time });
+    if (timeError || scheduleError) errors.schedule = timeError || scheduleError || '';
     if (!formData.customer_contacted) {
       errors.customer_contacted = 'Please indicate if the customer has been contacted';
     }
@@ -688,44 +674,6 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  }
-
-  function toggleTechnician(techId: string) {
-    setSelectedTechnicians(prev =>
-      prev.includes(techId)
-        ? prev.filter(id => id !== techId)
-        : [...prev, techId]
-    );
-  }
-
-  function handleTimeSlotClick(date: string, startTime: string, endTime: string) {
-    // Calculate 1 hour duration from start time
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const endHours = (hours + 1) % 24;
-    const calculatedEndTime = `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-
-    setFormData(prev => ({
-      ...prev,
-      start_date: date,
-      start_time: startTime,
-      end_time: endTime || calculatedEndTime,
-      estimated_hours: '1'
-    }));
-  }
-
-  function handleTeamAvailabilitySelect(technicianId: string, date: string, startTime: string, endTime: string) {
-    setSelectedTechnicians(prev => {
-      if (!prev.includes(technicianId)) return [...prev, technicianId];
-      return prev;
-    });
-    setFormData(prev => ({
-      ...prev,
-      start_date: date,
-      start_time: startTime,
-      end_time: endTime,
-      estimated_hours: '1'
-    }));
-    setShowTeamAvailability(false);
   }
 
   function addTask() {
@@ -1402,88 +1350,24 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
           )}
 
-          {/* Technician Selection */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Assign Technicians *
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTeamAvailability(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600 transition-colors shadow-sm"
-                  title="See all technicians' schedules side-by-side to find the best fit"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                  View Team Availability
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAvailabilityBrowser(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-                  title="Open full-screen calendar to find the best time slot"
-                >
-                  <Calendar className="w-4 h-4" />
-                  Browse Availability
-                </button>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 -mt-2">
-              Select one or more technicians. Selecting multiple will create one linked work order per technician.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-              {technicians.length === 0 && (
-                <p className="text-sm text-gray-500 col-span-2 text-center py-2">No active technicians found</p>
-              )}
-              {technicians.map(tech => (
-                <label
-                  key={tech.id}
-                  className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${
-                    selectedTechnicians.includes(tech.id)
-                      ? 'bg-blue-50 border-blue-500'
-                      : 'bg-white border-gray-300 hover:border-blue-300'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedTechnicians.includes(tech.id)}
-                    onChange={() => toggleTechnician(tech.id)}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium">{tech.full_name}</span>
-                </label>
-              ))}
-            </div>
-            {selectedTechnicians.length > 1 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm font-semibold text-blue-800">
-                  {selectedTechnicians.length} techs selected — {selectedTechnicians.length} linked work orders will be created
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Each technician gets their own work order. All are linked together under the same job for billing and reporting.
-                </p>
-              </div>
-            )}
-            {validationErrors.technicians && (
-              <p className="text-sm text-red-600">{validationErrors.technicians}</p>
-            )}
-          </div>
-
-          {/* Full-screen availability browser */}
-          {showAvailabilityBrowser && (
-            <AvailabilityBrowserModal
-              initialTechnicianIds={selectedTechnicians}
-              onSlotSelected={(date, start, end) => {
-                handleTimeSlotClick(date, start, end);
-              }}
-              onTechniciansSelected={(techIds) => {
-                setSelectedTechnicians(techIds);
-              }}
-              onClose={() => setShowAvailabilityBrowser(false)}
-            />
-          )}
+          <WorkOrderSchedulePicker
+            organizationId={profile?.organization_id || undefined}
+            technicians={technicians}
+            technicianIds={selectedTechnicians}
+            onTechniciansChange={(ids) => {
+              setSelectedTechnicians(ids);
+              setValidationErrors(previous => ({ ...previous, technicians: '', schedule: '' }));
+            }}
+            value={{ date: formData.start_date, start: formData.start_time, end: formData.end_time }}
+            onChange={(slot) => {
+              setFormData(previous => ({ ...previous, start_date: slot.date, start_time: slot.start, end_time: slot.end }));
+              setValidationErrors(previous => ({ ...previous, start_date: '', start_time: '', end_time: '', schedule: '' }));
+            }}
+            onValidationChange={setScheduleError}
+            earliestDate={serviceRequest?.earliest_date}
+            errors={validationErrors}
+          />
+          {validationErrors.schedule && <p role="alert" className="text-sm text-red-600">{validationErrors.schedule}</p>}
 
           {/* Work Order Details */}
           <div className="space-y-4">
@@ -1589,93 +1473,13 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Start Date *
-                </label>
-                <input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => {
-                    setFormData({ ...formData, start_date: e.target.value });
-                    if (validationErrors.start_date) setValidationErrors(prev => ({ ...prev, start_date: '' }));
-                  }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.start_date ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
-                />
-                {validationErrors.start_date && <p className="text-sm text-red-600 mt-1">{validationErrors.start_date}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Completion
-                </label>
-                <input
-                  type="date"
-                  value={formData.target_completion_date}
-                  onChange={(e) => setFormData({ ...formData, target_completion_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Half-hour time picker */}
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Time *
-                  {formData.start_time && <span className="ml-2 text-xs text-green-600 font-normal">Selected: {formatSlotLabel(formData.start_time)}</span>}
-                </label>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
-                  {generateHalfHourSlots().map(slot => (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, start_time: slot });
-                        if (validationErrors.start_time) setValidationErrors(prev => ({ ...prev, start_time: '' }));
-                      }}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                        formData.start_time === slot
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:border-blue-400 hover:text-blue-700'
-                      }`}
-                    >
-                      {formatSlotLabel(slot)}
-                    </button>
-                  ))}
-                </div>
-                {validationErrors.start_time && <p className="text-sm text-red-600 mt-1">{validationErrors.start_time}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End Time *
-                  {formData.end_time && <span className="ml-2 text-xs text-green-600 font-normal">Selected: {formatSlotLabel(formData.end_time)}</span>}
-                </label>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
-                  {generateHalfHourSlots().map(slot => (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, end_time: slot });
-                        if (validationErrors.end_time) setValidationErrors(prev => ({ ...prev, end_time: '' }));
-                      }}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                        formData.end_time === slot
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:border-blue-400 hover:text-blue-700'
-                      }`}
-                    >
-                      {formatSlotLabel(slot)}
-                    </button>
-                  ))}
-                </div>
-                {validationErrors.end_time && <p className="text-sm text-red-600 mt-1">{validationErrors.end_time}</p>}
-              </div>
-            </div>
-
+            <details className="border border-gray-200 rounded-lg p-3">
+              <summary className="min-h-11 flex items-center text-sm font-medium text-gray-700 cursor-pointer">Repeat or set a completion target</summary>
+              <label className="block text-sm text-gray-700 my-3">Target completion
+                <input type="date" value={formData.target_completion_date}
+                  onChange={e => setFormData({ ...formData, target_completion_date: e.target.value })}
+                  className="block w-full min-h-11 px-3 py-2 border border-gray-300 rounded-lg mt-1" />
+              </label>
             {/* Recurrence */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
@@ -1694,6 +1498,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
                 </p>
               )}
             </div>
+
+            </details>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2225,7 +2031,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </button>
             <button
               type="submit"
-              disabled={loading || selectedTechnicians.length === 0}
+              disabled={loading || selectedTechnicians.length === 0 || Boolean(scheduleError)}
               className="w-full sm:flex-1 px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base font-medium"
             >
               {loading ? 'Creating...' : `Create ${selectedTechnicians.length > 1 ? `${selectedTechnicians.length} Work Orders` : 'Work Order'}`}
@@ -2234,14 +2040,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         </form>
       </div>
 
-      {showTeamAvailability && (
-        <TeamAvailabilityModal
-          onClose={() => setShowTeamAvailability(false)}
-          onSelectSlot={handleTeamAvailabilitySelect}
-          initialDate={formData.start_date || undefined}
-          preSelectedTechIds={selectedTechnicians}
-        />
-      )}
+
     </div>
   );
 }

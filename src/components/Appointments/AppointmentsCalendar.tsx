@@ -1,6 +1,12 @@
+import { CalendarMonthGrid } from '../Shared/Calendar/CalendarMonthGrid';
+import { CalendarGantt } from '../Shared/Calendar/CalendarGantt';
+import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
+import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
+import { CalendarTimeGrid, type CalendarGridEvent } from '../Shared/Calendar/CalendarTimeGrid';
+import { weekDates, monthDates, calendarPeriodDays, addDays, minutes, timeKey, timeLabel } from '../../lib/workOrderScheduling';
 import { calendarDateKey, createTimestampInTimezone, formatTimeInTimezone, formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect, useRef, ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, AlertTriangle, Users, Clock, CheckCircle2, AlertCircle, Wrench, LayoutList, LayoutGrid, Settings, Maximize2, User, Lock, Star, Repeat } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Users, Clock, CheckCircle2, AlertCircle, Wrench, Settings, User, Lock, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CreateAppointmentModal } from './CreateAppointmentModal';
 import { CalendarManagementModal } from './CalendarManagementModal';
@@ -39,26 +45,15 @@ interface Technician {
   employment_type?: string;
 }
 
-interface TechnicianStats {
-  technician_id: string;
-  technician_name: string;
-  total_items: number;
-  work_orders: number;
-  appointments: number;
-  completed: number;
-  in_progress: number;
-  pending: number;
-}
 
-type ViewMode = 'month' | 'week' | 'day' | 'agenda';
-type TechnicianViewMode = 'timeline' | 'list';
+type ViewMode = 'month' | 'week' | 'day' | 'gantt' | 'agenda';
 type AgendaGrouping = 'all' | 'week' | 'month';
 type DateRangeFilter = '30' | '90' | '180' | 'all';
 
-export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }: { personalOnly?: boolean; onWorkOrderSelect?: (id: string) => void } = {}) {
+export function AppointmentsCalendar({ personalOnly = false, technicianOnly = false, onWorkOrderSelect, initialView = 'day', initialDate, initialTechnicianIds, embedded = false, onViewChange, onDateChange, onDayView }: { personalOnly?: boolean; technicianOnly?: boolean; onWorkOrderSelect?: (id: string) => void; initialView?: ViewMode; initialDate?: string; initialTechnicianIds?: string[]; embedded?: boolean; onViewChange?: (view: ViewMode) => void; onDateChange?: (date: string) => void; onDayView?: (date: string) => void } = {}) {
   const { profile } = useAuth();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [currentDate, setCurrentDate] = useState(initialDate ? new Date(initialDate + 'T12:00:00') : new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [loadError,setLoadError] = useState('');
@@ -67,37 +62,38 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null);
-  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [storedCalendarView, setCalendarView] = useState<'my' | 'technicians' | 'shared'>('my');
-  const calendarView = personalOnly ? 'my' : storedCalendarView;
+  const calendarView = personalOnly ? 'my' : technicianOnly ? 'technicians' : storedCalendarView;
   const [sharedCalendarMemberIds, setSharedCalendarMemberIds] = useState<string[]>([]);
-  const [technicianViewMode, setTechnicianViewMode] = useState<TechnicianViewMode>('timeline');
+  const [calendarTechnicianIds] = useState(() => initialTechnicianIds || new URLSearchParams(window.location.search).get('technicianIds')?.split(',').filter(Boolean) || []);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [technicianStats, setTechnicianStats] = useState<TechnicianStats[]>([]);
   const [draggedItem, setDraggedItem] = useState<{ appointment: Appointment; sourceTime: string } | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ techId: string; time: string } | null>(null);
   const [showCalendarManagement, setShowCalendarManagement] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [calendars, setCalendars] = useState<any[]>([]);
   const [savingDefault, setSavingDefault] = useState(false);
   const [localDefault, setLocalDefault] = useState<string | null>(null);
-  const todayRef = useRef<HTMLDivElement>(null);
 
   // Agenda view state
   const [agendaGrouping, setAgendaGrouping] = useState<AgendaGrouping>('all');
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>('90');
   const [agendaAppointments, setAgendaAppointments] = useState<Appointment[]>([]);
+  const calendarLoadId = useRef(0);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [agendaTypeFilter, setAgendaTypeFilter] = useState<string[]>([]);
   const [agendaStatusFilter, setAgendaStatusFilter] = useState<string[]>([]);
 
   // Drag-to-create state
-  const [dragSelectStart, setDragSelectStart] = useState<string | null>(null);
-  const [dragSelectEnd, setDragSelectEnd] = useState<string | null>(null);
-  const [isDragSelecting, setIsDragSelecting] = useState(false);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | undefined>();
   const [selectedEndTime, setSelectedEndTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    onDateChange?.(calendarDateKey(currentDate));
+    if (viewMode === 'day' && onDayView) onDayView(calendarDateKey(currentDate));
+    else onViewChange?.(viewMode);
+  }, [currentDate, viewMode]);
 
   // Recurring delete scope modal
   const [recurringDeleteTarget, setRecurringDeleteTarget] = useState<Appointment | null>(null);
@@ -117,9 +113,9 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
       const date = params.get('date');
       const calId = params.get('calendarId');
 
-      if (view) setCalendarView(view);
-      if (mode) setViewMode(mode);
-      if (date) setCurrentDate(new Date(date.length===10?date+'T12:00:00':date));
+      if (view && ['my', 'technicians', 'shared'].includes(view)) setCalendarView(view);
+      if (mode && ['day', 'week', 'month', 'gantt', 'agenda'].includes(mode)) setViewMode(mode);
+      if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(date + 'T12:00:00').getTime())) setCurrentDate(new Date(date + 'T12:00:00'));
       if (calId) setSelectedCalendarId(calId);
     } else if (profile) {
       // Restore saved default calendar preference
@@ -160,11 +156,6 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     filterAppointments();
   }, [calendarView, allAppointments, sharedCalendarMemberIds]);
 
-  useEffect(() => {
-    if (calendarView === 'technicians') {
-      calculateTechnicianStats();
-    }
-  }, [appointments, calendarView]);
 
   // Real-time subscription for appointments and work orders
   useEffect(() => {
@@ -205,16 +196,6 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     }
   }
 
-  // Scroll to today's date when calendar loads or view changes
-  useEffect(() => {
-    if (viewMode === 'month' && todayRef.current && !loading) {
-      // Small delay to ensure DOM is fully rendered
-      setTimeout(() => {
-        todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 100);
-    }
-  }, [viewMode, currentDate, loading]);
-
   function filterAppointments() {
     if (calendarView === 'my' && profile) {
       setAppointments(allAppointments.filter(apt => apt.technician_id === profile.id));
@@ -223,7 +204,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     } else if (calendarView === 'shared') {
       setAppointments(allAppointments);
     } else {
-      setAppointments(allAppointments);
+      setAppointments(calendarTechnicianIds.length ? allAppointments.filter(apt => apt.technician_id && calendarTechnicianIds.includes(apt.technician_id)) : allAppointments);
     }
   }
 
@@ -301,6 +282,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         query = query.eq('id', profile.id);
       } else if (calendarView === 'technicians') {
         query = query.eq('is_technician', true);
+        if (calendarTechnicianIds.length) query = query.in('id', calendarTechnicianIds);
         // If viewing "Technician Calendar", filter by calendar membership if a calendar is selected
         if (selectedCalendarId) {
           const { data: members } = await supabase
@@ -328,78 +310,10 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     }
   }
 
-  function calculateTechnicianStats() {
-    const statsMap = new Map<string, TechnicianStats>();
 
-    appointments.forEach(apt => {
-      if (!apt.technician_id) return;
 
-      if (!statsMap.has(apt.technician_id)) {
-        statsMap.set(apt.technician_id, {
-          technician_id: apt.technician_id,
-          technician_name: apt.technician_name,
-          total_items: 0,
-          work_orders: 0,
-          appointments: 0,
-          completed: 0,
-          in_progress: 0,
-          pending: 0
-        });
-      }
-
-      const stats = statsMap.get(apt.technician_id)!;
-      stats.total_items++;
-
-      if (apt.isWorkOrder) {
-        stats.work_orders++;
-      } else if (!apt.isReminder) {
-        stats.appointments++;
-      }
-
-      const status = apt.status.toLowerCase();
-      if (status === 'completed') {
-        stats.completed++;
-      } else if (status === 'in_progress' || status === 'in progress' || status === 'on_my_way') {
-        stats.in_progress++;
-      } else {
-        stats.pending++;
-      }
-    });
-
-    setTechnicianStats(Array.from(statsMap.values()));
-  }
-
-  function getTechnicianAppointments(technicianId: string): Appointment[] {
-    return appointments.filter(apt => apt.technician_id === technicianId);
-  }
-
-  function generateTimeSlots(): string[] {
-    const slots: string[] = [];
-    for (let hour = 6; hour < 22; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      slots.push(`${hour.toString().padStart(2, '0')}:30`);
-    }
-    return slots;
-  }
-
-  function getAppointmentsForTimeSlot(timeSlot: string): Appointment[] {
-    const slotHour = parseInt(timeSlot.split(':')[0]);
-    return appointments.filter(apt => {
-      const aptHour = parseInt(apt.start_time.split(':')[0]);
-      return aptHour === slotHour;
-    });
-  }
-
-  function getAppointmentForTimeSlot(technicianId: string, timeSlot: string): Appointment | null {
-    const techAppts = getTechnicianAppointments(technicianId);
-    return techAppts.find(apt => {
-      const aptHour = parseInt(apt.start_time.split(':')[0]);
-      const slotHour = parseInt(timeSlot.split(':')[0]);
-      return aptHour === slotHour;
-    }) || null;
-  }
-
-  async function handleTimeDrop(appointment: Appointment, newTime: string, newTechId?: string) {
+  async function handleTimeDrop(appointment: Appointment, newTime: string, newTechId?: string, targetDate?: string) {
+    const newDate = targetDate || appointment.appointment_date;
     const targetTechId = newTechId || appointment.technician_id;
     if (!targetTechId) return;
 
@@ -407,30 +321,22 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     const targetTech = technicians.find(t => t.id === targetTechId);
 
     // Calculate new end time (maintain duration)
-    const oldStartHour = parseInt(appointment.start_time.split(':')[0]);
-    const oldStartMin = parseInt(appointment.start_time.split(':')[1]);
-    const oldEndHour = parseInt(appointment.end_time.split(':')[0]);
-    const oldEndMin = parseInt(appointment.end_time.split(':')[1]);
-    const durationHours = oldEndHour - oldStartHour;
-    const durationMins = oldEndMin - oldStartMin;
-
-    const newStartHour = parseInt(newTime.split(':')[0]);
-    const newStartMin = parseInt(newTime.split(':')[1]);
-    const newEndHour = newStartHour + durationHours;
-    const newEndMin = newStartMin + durationMins;
-    const newEndTime = `${newEndHour.toString().padStart(2, '0')}:${newEndMin.toString().padStart(2, '0')}`;
+    const duration = minutes(appointment.end_time) - minutes(appointment.start_time);
+    const endMinutes = minutes(newTime) + duration;
+    if (duration <= 0 || endMinutes >= 1440) { alert('Choose a time that ends on the same day.'); return; }
+    const newEndTime = timeKey(endMinutes);
 
     // Build confirmation message
     let confirmMessage = `Reschedule "${appointment.title}"?\n\n`;
-    confirmMessage += `From: ${oldTime} - ${appointment.end_time.slice(0, 5)}\n`;
-    confirmMessage += `To: ${newTime} - ${newEndTime}\n`;
+    confirmMessage += `From: ${appointment.appointment_date} ${oldTime} - ${appointment.end_time.slice(0, 5)}\n`;
+    confirmMessage += `To: ${newDate} ${newTime} - ${newEndTime}\n`;
 
     if (newTechId && newTechId !== appointment.technician_id) {
       confirmMessage += `\nReassign from: ${appointment.technician_name}\n`;
       confirmMessage += `To: ${targetTech?.full_name}\n`;
     }
 
-    confirmMessage += `\nDate: ${new Date(appointment.appointment_date).toLocaleDateString('en-US', {
+    confirmMessage += `\nDate: ${new Date(newDate + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -440,7 +346,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
 
     const doTimeDrop = async () => {
       const hasConflict = await checkForConflicts(
-        appointment.appointment_date,
+        newDate,
         newTime,
         newEndTime,
         targetTechId,
@@ -451,7 +357,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         setConfirmModal({
           title: 'Scheduling Conflict',
           message: `⚠️ SCHEDULING CONFLICT\n\n${conflictWarning}\n\nDo you still want to reschedule?`,
-          onConfirm: () => doTimeDropForce()
+          onConfirm: () => doTimeDropForce(true)
         });
         return;
       }
@@ -459,22 +365,22 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
       await doTimeDropForce();
     };
 
-    const doTimeDropForce = async () => {
+    const doTimeDropForce = async (force = false) => {
       try {
-        const dateStr = appointment.appointment_date.split('T')[0];
+        const dateStr = newDate;
 
         if (appointment.isWorkOrder) {
           const result = await rescheduleWorkOrder(
             appointment.id, dateStr, newTime, newEndTime,
             newTechId || undefined,
-            { force: true }
+            { force }
           );
           if (!result.success) throw new Error(result.error || 'Failed to reschedule');
         } else {
           const result = await rescheduleAppointment(
             appointment.id, dateStr, newTime, newEndTime,
             newTechId || undefined,
-            { force: true }
+            { force }
           );
           if (!result.success) throw new Error(result.error || 'Failed to reschedule');
         }
@@ -485,13 +391,12 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         alert('Failed to reschedule. Please try again.');
       } finally {
         setDraggedItem(null);
-        setDropTarget(null);
-        setConflictWarning(null);
+          setConflictWarning(null);
       }
     };
 
     setConfirmModal({
-      title: 'Reschedule Appointment',
+      title: appointment.isWorkOrder ? 'Move work order' : 'Move appointment',
       message: confirmMessage,
       onConfirm: () => doTimeDrop()
     });
@@ -533,7 +438,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         let woEnd = wo.scheduled_end_time;
         if (!woEnd) {
           const hours = wo.estimated_hours || 2;
-          const endMin = woStart.split(':').map(Number).reduce((h, m) => h * 60 + m, 0) + hours * 60;
+          const endMin = minutes(woStart) + hours * 60;
           const eh = Math.floor(endMin / 60);
           const em = endMin % 60;
           woEnd = `${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}`;
@@ -560,18 +465,23 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
   }
 
   async function loadAppointments() {
+    const requestId = ++calendarLoadId.current;
     setLoading(true);
     try {
       let startDate: Date;
       let endDate: Date;
 
       if (viewMode === 'month') {
-        startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const days = monthDates(calendarDateKey(currentDate));
+        startDate = new Date(days[0] + 'T12:00:00');
+        endDate = new Date(days[days.length - 1] + 'T12:00:00');
+      } else if (viewMode === 'gantt') {
+        startDate = new Date(currentDate);
+        endDate = new Date(addDays(calendarDateKey(currentDate), 13) + 'T12:00:00');
       } else if (viewMode === 'week') {
         const day = currentDate.getDay();
         startDate = new Date(currentDate);
-        startDate.setDate(currentDate.getDate() - day);
+        startDate.setDate(currentDate.getDate() - ((day + 6) % 7));
         endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 6);
       } else {
@@ -863,17 +773,20 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         return a.start_time.localeCompare(b.start_time);
       });
 
+      if (requestId !== calendarLoadId.current) return;
       setAllAppointments(combined);
       setLoadError('');
     } catch (error) {
+      if (requestId !== calendarLoadId.current) return;
       console.error('Error loading calendar items:', error);
       setLoadError('Unable to load all calendar items. Refresh this view to try again.');
     } finally {
-      setLoading(false);
+      if (requestId === calendarLoadId.current) setLoading(false);
     }
   }
 
   async function loadAgendaAppointments() {
+    const requestId = ++calendarLoadId.current;
     setLoading(true);
     try {
       const startDate = new Date();
@@ -1134,11 +1047,13 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         return a.start_time.localeCompare(b.start_time);
       });
 
+      if (requestId !== calendarLoadId.current) return;
       setAllAppointments(combined);
     } catch (error) {
+      if (requestId !== calendarLoadId.current) return;
       console.error('Error loading agenda appointments:', error);
     } finally {
-      setLoading(false);
+      if (requestId === calendarLoadId.current) setLoading(false);
     }
   }
 
@@ -1174,53 +1089,23 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     const newDate = new Date(currentDate);
     if (viewMode === 'month') {
       newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
-    } else if (viewMode === 'week') {
-      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
+    } else if (viewMode === 'week' || viewMode === 'gantt') {
+      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1) * calendarPeriodDays(viewMode));
     } else {
       newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1));
     }
     setCurrentDate(newDate);
   }
 
-  function getMonthDays() {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
 
-    const days: Date[] = [];
-    const current = new Date(startDate);
-
-    while (days.length < 42) {
-      days.push(new Date(current));
-      current.setDate(current.getDate() + 1);
-    }
-
-    return days;
-  }
-
-  function getWeekDays() {
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-
-    const days: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(startOfWeek);
-      day.setDate(startOfWeek.getDate() + i);
-      days.push(day);
-    }
-
-    return days;
-  }
 
   function getAppointmentsForDate(date: Date): Appointment[] {
-    const dateStr = calendarDateKey(date);
-    return appointments.filter(apt => apt.appointment_date === dateStr);
+    return appointments.filter(apt => apt.appointment_date === calendarDateKey(date));
   }
 
-  function openCreateModal(date?: Date, time?: string) {
+  function openCreateModal(date?: Date, time?: string, end?: string, technicianId?: string) {
+    setSelectedEndTime(end || null);
+    setSelectedTechnicianId(technicianId);
     if (date) {
       setSelectedDate(calendarDateKey(date));
     } else {
@@ -1228,151 +1113,6 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     }
     setSelectedTime(time || null);
     setShowCreateModal(true);
-  }
-
-  function getDragSelectedSlots(): string[] {
-    if (!dragSelectStart || !dragSelectEnd) return [];
-    const slots = generateTimeSlots();
-    const startIdx = slots.indexOf(dragSelectStart);
-    const endIdx = slots.indexOf(dragSelectEnd);
-    if (startIdx === -1 || endIdx === -1) return [];
-    const lo = Math.min(startIdx, endIdx);
-    const hi = Math.max(startIdx, endIdx);
-    return slots.slice(lo, hi + 1);
-  }
-
-  function commitDragSelection() {
-    if (!dragSelectStart || !dragSelectEnd) {
-      setIsDragSelecting(false);
-      setDragSelectStart(null);
-      setDragSelectEnd(null);
-      return;
-    }
-    const slots = generateTimeSlots();
-    const startIdx = slots.indexOf(dragSelectStart);
-    const endIdx = slots.indexOf(dragSelectEnd);
-    const lo = Math.min(startIdx, endIdx);
-    const hi = Math.max(startIdx, endIdx);
-    const startTime = slots[lo];
-    const [endH, endM] = slots[hi].split(':').map(Number);
-    const endMinutes = endH * 60 + endM + 30;
-    const endTime = `${Math.floor(endMinutes / 60).toString().padStart(2, '0')}:${(endMinutes % 60).toString().padStart(2, '0')}`;
-    setIsDragSelecting(false);
-    setDragSelectStart(null);
-    setDragSelectEnd(null);
-    setSelectedDate(calendarDateKey(currentDate));
-    setSelectedTime(startTime);
-    setShowCreateModal(true);
-    // Pass end time via selectedEndTime
-    setSelectedEndTime(endTime);
-  }
-
-  async function handleDrop(targetDate: Date) {
-    if (!draggedAppointment) return;
-
-    const newDateStr = calendarDateKey(targetDate);
-    if (newDateStr === draggedAppointment.appointment_date) {
-      setDraggedAppointment(null);
-      setDragOverDate(null);
-      return;
-    }
-
-    const oldDateFormatted = new Date(draggedAppointment.appointment_date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-    const newDateFormatted = targetDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-
-    const dropMessage =
-      `Reschedule "${draggedAppointment.title}"?\n\n` +
-      `From: ${oldDateFormatted}\n` +
-      `To: ${newDateFormatted}\n` +
-      `Time: ${draggedAppointment.start_time.slice(0, 5)}\n\n` +
-      `Do you want to proceed?`;
-
-    const doDrop = async () => {
-      const hasConflict = await checkForConflicts(
-        newDateStr,
-        draggedAppointment.start_time,
-        draggedAppointment.end_time,
-        draggedAppointment.technician_id || '',
-        draggedAppointment.id
-      );
-
-      if (hasConflict) {
-        setConfirmModal({
-          title: 'Scheduling Conflict',
-          message: `⚠️ SCHEDULING CONFLICT\n\n${conflictWarning}\n\nDo you still want to reschedule?`,
-          onConfirm: () => doDropForce()
-        });
-        return;
-      }
-
-      await doDropForce();
-    };
-
-    const doDropForce = async () => {
-      try {
-        const result = await rescheduleAppointment(
-          draggedAppointment.id,
-          newDateStr,
-          draggedAppointment.start_time.slice(0, 5),
-          draggedAppointment.end_time.slice(0, 5),
-          draggedAppointment.technician_id || undefined,
-          { force: true }
-        );
-
-        if (!result.success) {
-          alert(result.error || 'Failed to reschedule appointment');
-        }
-
-        await loadAppointments();
-      } catch (error) {
-        console.error('Error rescheduling appointment:', error);
-        alert('Failed to reschedule appointment');
-      } finally {
-        setDraggedAppointment(null);
-        setDragOverDate(null);
-        setConflictWarning(null);
-      }
-    };
-
-    setConfirmModal({
-      title: 'Reschedule Appointment',
-      message: dropMessage,
-      onConfirm: () => doDrop()
-    });
-  }
-
-  function handlePopOut() {
-    // Build URL with current calendar state
-    const params = new URLSearchParams({
-      view: calendarView,
-      viewMode,
-      date: calendarDateKey(currentDate),
-      calendarId: selectedCalendarId || '',
-      popup: 'true'
-    });
-
-    // Open in new window
-    const width = window.screen.width;
-    const height = window.screen.height;
-    const popupWindow = window.open(
-      `/calendar?${params.toString()}`,
-      'CalendarPopout',
-      `width=${width},height=${height},left=0,top=0,menubar=no,toolbar=no,location=no,status=no`
-    );
-
-    if (popupWindow) {
-      popupWindow.focus();
-    }
   }
 
   function getWeekOfYear(date: Date): number {
@@ -1498,24 +1238,13 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
       return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     } else if (viewMode === 'week') {
       const startOfWeek = new Date(currentDate);
-      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+      startOfWeek.setDate(currentDate.getDate() - ((currentDate.getDay() + 6) % 7));
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(startOfWeek.getDate() + 6);
       return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     } else {
       return currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading calendar...</p>
-        </div>
-      </div>
-    );
   }
 
   if (!(profile as any)?.has_calendar_access) {
@@ -1554,8 +1283,24 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
     }
   }
 
+  const timeGridDates = (viewMode === 'month' ? monthDates(calendarDateKey(currentDate)) : viewMode === 'gantt' ? Array.from({ length: 14 }, (_, i) => addDays(calendarDateKey(currentDate), i)) : viewMode === 'week' ? weekDates(calendarDateKey(currentDate)) : [calendarDateKey(currentDate)]).map(date => new Date(date + 'T12:00:00'));
+  const techTimeline = calendarView === 'technicians' && viewMode === 'day';
+  const timeGridColumns = techTimeline ? technicians.map(tech => ({ key: tech.id, date: calendarDateKey(currentDate), label: tech.full_name })) : timeGridDates.map(date => ({ key: calendarDateKey(date), date: calendarDateKey(date), label: date.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + date.getDate() }));
+  const timeGridEvents: CalendarGridEvent[] = timeGridDates.flatMap(date => getAppointmentsForDate(date).map(apt => ({
+    id: apt.id, columnKey: techTimeline ? apt.technician_id || 'unassigned' : calendarDateKey(date), start: apt.start_time?.slice(0, 5) || '00:00', end: apt.isReminder && apt.start_time && apt.end_time === apt.start_time ? timeKey(minutes(apt.start_time) + 30) : apt.end_time?.slice(0, 5) || '24:00',
+    title: apt.title, kind: apt.isWorkOrder ? 'work_order' : apt.is_blocked || apt.reminderType === 'time_off' ? 'time_off' : apt.isReminder ? 'reminder' : 'appointment',
+    allDay: apt.all_day || !apt.start_time || !apt.end_time,
+    draggable: !apt.isReminder && !apt.is_blocked && apt.status !== 'completed' && apt.status !== 'cancelled',
+    onDragStart: event => { if (techTimeline) setDraggedItem({ appointment: apt, sourceTime: apt.start_time }); else setDraggedAppointment(apt); event.dataTransfer.effectAllowed = 'move'; },
+    onDragEnd: () => { setDraggedAppointment(null); setDraggedItem(null); },
+    content: <><div className="font-semibold truncate">{apt.isWorkOrder ? <button type="button" onClick={() => { if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="hover:underline text-left">{apt.title}</button> : <button type="button" onClick={() => setSelectedEventId(selectedEventId === apt.id ? null : apt.id)} className="hover:underline text-left">{apt.title}</button>}</div>
+      <div className="truncate">{apt.all_day ? 'All day' : apt.start_time === apt.end_time ? timeLabel(apt.start_time) : `${timeLabel(apt.start_time)} – ${timeLabel(apt.end_time)}`}</div>
+      {apt.technician_name && <div className="truncate">{apt.technician_name}</div>}
+      {!apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && !apt.is_blocked && <button type="button" onClick={e => { e.stopPropagation(); requestDeleteAppointment(apt); }} className="text-red-700 hover:underline" aria-label={'Delete ' + apt.title}>Delete</button>}</>,
+  })));
+
   return (
-    <div className="space-y-6">
+    <CalendarWorkspace embedded={embedded} loading={loading} className="space-y-6" tabHref={'/calendar?' + new URLSearchParams({ popup: 'true', view: calendarView, viewMode, date: calendarDateKey(currentDate), calendarId: selectedCalendarId || '', technicianIds: calendarTechnicianIds.join(',') }).toString()}>
       {loadError && <p role="alert" className="text-red-600 text-sm">{loadError}</p>}
       {/* Header: two rows */}
       <div className="space-y-3 bg-slate-800 rounded-xl p-3">
@@ -1575,95 +1320,12 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
               {viewMode === 'agenda' ? agendaAppointments.length : appointments.length}{' '}
               {(viewMode === 'agenda' ? agendaAppointments.length : appointments.length) === 1 ? 'item' : 'items'}
             </span>
-            {viewMode !== 'agenda' && (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => navigateDate('prev')}
-                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4 text-white" />
-                  </button>
-                  <button
-                    onClick={() => {void getOrganizationTimezone().then(tz=>setCurrentDate(new Date(formatDateInTimezone(new Date().toISOString(),tz)+'T12:00:00')));}}
-                    className="px-3 py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    Today
-                  </button>
-                  <button
-                    onClick={() => navigateDate('next')}
-                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4 text-white" />
-                  </button>
-                </div>
-                <span className="text-sm sm:text-base font-medium text-white whitespace-nowrap">{formatDateHeader()}</span>
-              </>
-            )}
+            <CalendarNavigation date={calendarDateKey(currentDate)} onDateChange={date => setCurrentDate(new Date(date + 'T12:00:00'))} onPrevious={() => navigateDate('prev')} onNext={() => navigateDate('next')} />
+            <span className="text-sm font-medium text-white">{formatDateHeader()}</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-0.5 bg-white/10 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('month')}
-                className={`px-2.5 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                  viewMode === 'month' ? 'bg-white text-gray-900 shadow-sm' : 'text-white hover:bg-white/10'
-                }`}
-              >
-                Month
-              </button>
-              <button
-                onClick={() => setViewMode('week')}
-                className={`px-2.5 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                  viewMode === 'week' ? 'bg-white text-gray-900 shadow-sm' : 'text-white hover:bg-white/10'
-                }`}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setViewMode('day')}
-                className={`px-2.5 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                  viewMode === 'day' ? 'bg-white text-gray-900 shadow-sm' : 'text-white hover:bg-white/10'
-                }`}
-              >
-                Day
-              </button>
-              {(calendarView === 'my' || calendarView === 'shared') && (
-                <button
-                  onClick={() => setViewMode('agenda')}
-                  className={`px-2.5 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                    viewMode === 'agenda' ? 'bg-white text-gray-900 shadow-sm' : 'text-white hover:bg-white/10'
-                  }`}
-                >
-                  Agenda
-                </button>
-              )}
-            </div>
-
-            {/* Technician sub-view toggle */}
-            {calendarView === 'technicians' && viewMode === 'day' && (
-              <div className="flex items-center gap-0.5 bg-white/10 rounded-lg p-0.5">
-                <button
-                  onClick={() => setTechnicianViewMode('timeline')}
-                  className={`px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-                    technicianViewMode === 'timeline' ? 'bg-white text-gray-900 shadow-sm' : 'text-white hover:bg-white/10'
-                  }`}
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Timeline</span>
-                </button>
-                <button
-                  onClick={() => setTechnicianViewMode('list')}
-                  className={`px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-                    technicianViewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-white hover:bg-white/10'
-                  }`}
-                >
-                  <LayoutList className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">List</span>
-                </button>
-              </div>
-            )}
+            <CalendarViewSwitcher value={viewMode} onChange={setViewMode} options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'gantt', label: 'Gantt' }, ...((calendarView === 'my' || calendarView === 'shared') ? [{ value: 'agenda' as const, label: 'Agenda' }] : [])]} />
 
             {/* Manage Calendars — always visible for eligible roles */}
             {profile && ['admin', 'manager', 'field_supervisor'].includes(profile.role) && (
@@ -1676,29 +1338,20 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
               </button>
             )}
 
-            {/* Pop-out */}
-            <button
-              onClick={handlePopOut}
-              className="p-2 bg-white/10 text-white hover:bg-white/20 rounded-lg transition-colors"
-              title="Pop out calendar in new window"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-
             {/* Add Event */}
             <button
               onClick={() => openCreateModal()}
               className="px-3 py-1.5 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>New+</span>
+              <span>New event</span>
             </button>
           </div>
         </div>
 
         {/* Row 2: Calendar Tab Rail */}
         {!personalOnly && <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          <CalendarTab
+          {!technicianOnly && <CalendarTab
             label="My Calendar"
             icon={<User className="w-3.5 h-3.5" />}
             color={null}
@@ -1707,7 +1360,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
             onSelect={() => handleTabSelect('my')}
             onSetDefault={() => saveDefaultCalendarView('my')}
             savingDefault={savingDefault}
-          />
+          />}
           <CalendarTab
             label="Tech Calendar"
             icon={<Users className="w-3.5 h-3.5" />}
@@ -1734,708 +1387,30 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         </div>}
       </div>
 
-      {/* Technician Calendar Views */}
-      {calendarView === 'technicians' && viewMode === 'day' && (
-        <>
-          {/* Stats Overview - Only show in Day view */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <Users className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{technicians.length}</span>
-              </div>
-              <div className="text-sm opacity-90">Active Technicians</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <Wrench className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{technicianStats.reduce((sum, s) => sum + s.work_orders, 0)}</span>
-              </div>
-              <div className="text-sm opacity-90">Work Orders</div>
-            </div>
-            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg p-4 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <Clock className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{technicianStats.reduce((sum, s) => sum + s.in_progress, 0)}</span>
-              </div>
-              <div className="text-sm opacity-90">In Progress</div>
-            </div>
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg p-4 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <CheckCircle2 className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{technicianStats.reduce((sum, s) => sum + s.completed, 0)}</span>
-              </div>
-              <div className="text-sm opacity-90">Completed</div>
-            </div>
-          </div>
+      {viewMode === 'month' && <CalendarMonthGrid date={calendarDateKey(currentDate)} events={timeGridEvents.map(event => ({ ...event, date: event.columnKey }))} loading={loading} error={loadError} onRetry={() => { void loadAppointments(); }}
+        onDateSelect={date => { setCurrentDate(new Date(date + 'T12:00:00')); setViewMode('day'); }} onEventSelect={event => { if (event.kind === 'work_order') { if (onWorkOrderSelect) onWorkOrderSelect(event.id); else window.location.assign(`/?tab=work_orders&workOrderId=${event.id}`); } else { setCurrentDate(new Date(event.date + 'T12:00:00')); setViewMode('day'); setSelectedEventId(event.id); } }}
+        onEventDrop={date => { if (draggedAppointment) void handleTimeDrop(draggedAppointment, draggedAppointment.start_time.slice(0, 5), undefined, date); }} />}
+      {viewMode === 'gantt' && <CalendarGantt dates={timeGridDates.map(calendarDateKey)} tracks={calendarView === 'my' ? [{ id: profile!.id, label: profile!.full_name || 'My Calendar' }] : calendarView === 'technicians' ? technicians.map(tech => ({ id: tech.id, label: tech.full_name })) : Array.from(new Map(appointments.filter(apt => apt.technician_id).map(apt => [apt.technician_id!, { id: apt.technician_id!, label: apt.technician_name || 'Calendar member' }])).values())}
+        events={timeGridEvents.map(event => ({ ...event, date: event.columnKey, technicianId: appointments.find(apt => apt.id === event.id)?.technician_id || '' }))} loading={loading} error={loadError} onRetry={() => { void loadAppointments(); }}
+        onDateSelect={date => { setCurrentDate(new Date(date + 'T12:00:00')); setViewMode('day'); }} onEventSelect={event => { setCurrentDate(new Date(event.date + 'T12:00:00')); setViewMode('day'); setSelectedEventId(event.id); }}
+        onEventDrop={(date, techId) => { if (draggedAppointment) void handleTimeDrop(draggedAppointment, draggedAppointment.start_time.slice(0, 5), techId, date); }} />}
 
-          {/* Timeline View - Vertical Layout */}
-          {technicianViewMode === 'timeline' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="overflow-auto max-h-[800px]">
-                <table className="w-full border-collapse">
-                  <thead className="bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">
-                    <tr>
-                      <th className="sticky left-0 z-20 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-900 border-r-2 border-gray-300 w-20">
-                        Time
-                      </th>
-                      {technicians.map(tech => {
-                        const stats = technicianStats.find(s => s.technician_id === tech.id);
-                        return (
-                          <th key={tech.id} className="px-3 py-3 text-center text-sm font-semibold text-gray-900 border-r border-gray-200 min-w-48">
-                            <div>{tech.full_name}</div>
-                            <div className="text-xs text-gray-500 font-normal capitalize">{tech.role}</div>
-                            <div className="flex items-center justify-center gap-2 mt-1">
-                              <span className="text-xs text-gray-600">
-                                {stats?.total_items || 0} items
-                              </span>
-                              {stats && stats.in_progress > 0 && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                  {stats.in_progress}
-                                </span>
-                              )}
-                            </div>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {generateTimeSlots().map(timeSlot => {
-                      return (
-                        <tr key={timeSlot} className="hover:bg-gray-50">
-                          <td className="sticky left-0 z-10 bg-white px-4 py-6 border-r-2 border-gray-300 text-sm font-medium text-gray-700">
-                            {timeSlot}
-                          </td>
-                          {technicians.map(tech => {
-                            const appointment = getAppointmentForTimeSlot(tech.id, timeSlot);
-                            const isDropTarget = dropTarget?.techId === tech.id && dropTarget?.time === timeSlot;
-
-                            return (
-                              <td
-                                key={tech.id}
-                                className={`px-2 py-2 border-r border-gray-200 relative cursor-pointer hover:bg-gray-50 ${
-                                  isDropTarget ? 'bg-blue-100' : ''
-                                }`}
-                                onDragOver={(e) => {
-                                  e.preventDefault();
-                                  if (draggedItem && (!appointment || appointment.id !== draggedItem.appointment.id)) {
-                                    setDropTarget({ techId: tech.id, time: timeSlot });
-                                  }
-                                }}
-                                onDragLeave={() => {
-                                  setDropTarget(null);
-                                }}
-                                onDrop={(e) => {
-                                  e.preventDefault();
-                                  if (draggedItem) {
-                                    handleTimeDrop(draggedItem.appointment, timeSlot, tech.id);
-                                  }
-                                }}
-                                onClick={() => {
-                                  if (!appointment) {
-                                    openCreateModal(currentDate, timeSlot);
-                                  }
-                                }}
-                                title={!appointment ? `Click to schedule at ${timeSlot}` : ''}
-                              >
-                                {appointment ? (
-                                  <div
-                                    draggable={!appointment.isReminder && appointment.status !== 'completed'}
-                                    onDragStart={() => {
-                                      if (!appointment.isReminder && appointment.status !== 'completed') {
-                                        setDraggedItem({ appointment, sourceTime: timeSlot });
-                                      }
-                                    }}
-                                    onDragEnd={() => {
-                                      setDraggedItem(null);
-                                      setDropTarget(null);
-                                    }}
-                                    className={`cursor-move rounded px-2 py-2 text-xs font-medium shadow-sm ${
-                                      appointment.status === 'completed'
-                                        ? 'bg-green-100 text-green-800 border border-green-300 cursor-not-allowed'
-                                        : appointment.status === 'in_progress' || appointment.status === 'on_my_way'
-                                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                        : appointment.isWorkOrder
-                                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                                        : appointment.isReminder
-                                        ? 'bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed'
-                                        : 'bg-teal-100 text-teal-800 border border-teal-300'
-                                    }`}
-                                    title={`${appointment.title}\n${appointment.customer_name}\n${appointment.start_time.slice(0, 5)} - ${appointment.end_time.slice(0, 5)}\nStatus: ${appointment.status}\n${appointment.isReminder ? 'Cannot drag reminders' : appointment.status === 'completed' ? 'Cannot drag completed items' : 'Drag to reschedule'}`}
-                                  >
-                                    <div className="flex items-center gap-1 whitespace-nowrap overflow-hidden">
-                                      {appointment.isWorkOrder && <Wrench className="w-3 h-3 flex-shrink-0" />}
-                                      <span className="truncate">
-                                        {appointment.title.length > 8 ? appointment.title.slice(0, 8) + '...' : appointment.title}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="h-8"></div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
-                <p className="text-xs text-gray-600">
-                  <strong>Tip:</strong> Drag and drop appointments or work orders to reschedule them to a different time or reassign to another technician.
-                  Completed items and reminders cannot be moved.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* List View */}
-          {technicianViewMode === 'list' && (
-            <div className="space-y-4">
-              {technicians.map(tech => {
-                const stats = technicianStats.find(s => s.technician_id === tech.id);
-                const techAppts = getTechnicianAppointments(tech.id);
-
-                return (
-                  <div key={tech.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">{tech.full_name}</h3>
-                          <p className="text-sm text-gray-600 capitalize">{tech.role}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-gray-900">{stats?.total_items || 0}</div>
-                            <div className="text-xs text-gray-500">Total Items</div>
-                          </div>
-                          <div className="h-10 w-px bg-gray-300"></div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">{stats?.completed || 0}</div>
-                            <div className="text-xs text-gray-500">Completed</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-amber-600">{stats?.in_progress || 0}</div>
-                            <div className="text-xs text-gray-500">In Progress</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-6">
-                      {techAppts.length === 0 ? (
-                        <div className="text-center py-8">
-                          <CalendarIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                          <p className="text-gray-500">No scheduled items for this period</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {techAppts.map(apt => (
-                            <div
-                              key={apt.id}
-                              className={`flex items-center gap-4 p-4 rounded-lg border-2 ${
-                                apt.status === 'completed'
-                                  ? 'bg-green-50 border-green-200'
-                                  : apt.status === 'in_progress' || apt.status === 'on_my_way'
-                                  ? 'bg-amber-50 border-amber-200'
-                                  : 'bg-gray-50 border-gray-200'
-                              }`}
-                            >
-                              <div className="flex-shrink-0">
-                                {apt.isWorkOrder ? (
-                                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                                    <Wrench className="w-5 h-5 text-white" />
-                                  </div>
-                                ) : apt.isReminder ? (
-                                  <div className="w-10 h-10 bg-gray-500 rounded-lg flex items-center justify-center">
-                                    <AlertCircle className="w-5 h-5 text-white" />
-                                  </div>
-                                ) : (
-                                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                                    <CalendarIcon className="w-5 h-5 text-white" />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold text-gray-900">{apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}</h4>
-                                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                                    apt.status === 'completed'
-                                      ? 'bg-green-100 text-green-700'
-                                      : apt.status === 'in_progress' || apt.status === 'on_my_way'
-                                      ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-gray-100 text-gray-700'
-                                  }`}>
-                                    {apt.status.replace('_', ' ')}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-600">{apt.customer_name}</p>
-                              </div>
-                              <div className="flex-shrink-0 text-right">
-                                <div className="text-lg font-semibold text-gray-900">
-                                  {apt.start_time.slice(0, 5)}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {new Date(apt.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Shared Month View - Works for both My Calendar and Technician Calendar */}
-      {viewMode === 'month' && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-7 border-b border-gray-200">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="px-3 py-2 text-sm font-medium text-gray-700 text-center">
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {getMonthDays().map((date, index) => {
-              const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-              const isToday = date.toDateString() === new Date().toDateString();
-              const dayAppointments = getAppointmentsForDate(date);
-
-              return (
-                <div
-                  key={index}
-                  ref={isToday ? todayRef : null}
-                  className={`min-h-28 p-2 border-b border-r border-gray-200 transition-colors ${
-                    !isCurrentMonth ? 'bg-gray-50' : ''
-                  } ${isToday ? 'bg-blue-50' : ''} ${
-                    dragOverDate === calendarDateKey(date) ? 'bg-green-100 ring-2 ring-green-400' : ''
-                  }`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOverDate(calendarDateKey(date));
-                  }}
-                  onDragLeave={() => setDragOverDate(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    handleDrop(date);
-                  }}
-                  onDoubleClick={() => openCreateModal(date)}
-                >
-                  <div
-                    className={`text-sm font-medium mb-1 cursor-pointer hover:underline ${
-                      isToday ? 'text-blue-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openCreateModal(date);
-                    }}
-                    title="Click to add event on this date"
-                  >
-                    {date.getDate()}
-                  </div>
-                  <div className="space-y-1">
-                    {dayAppointments.slice(0, 3).map((apt) => (
-                      <div
-                        key={apt.id}
-                        draggable={!apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && apt.status !== 'cancelled'}
-                        onDragStart={(e) => {
-                          if (!apt.isWorkOrder && !apt.isReminder) {
-                            setDraggedAppointment(apt);
-                            e.dataTransfer.effectAllowed = 'move';
-                          }
-                        }}
-                        onDragEnd={() => {
-                          setDraggedAppointment(null);
-                          setDragOverDate(null);
-                        }}
-                        className={`text-xs p-1 rounded truncate ${
-                          apt.isWorkOrder || apt.isReminder ? 'cursor-default' : 'cursor-move'
-                        } ${
-                          apt.status === 'completed'
-                            ? 'bg-green-100 text-green-800 cursor-default'
-                            : apt.status === 'cancelled'
-                            ? 'bg-gray-100 text-gray-600 cursor-default'
-                            : apt.isReminder
-                            ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                            : apt.isWorkOrder
-                            ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                            : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                        } ${draggedAppointment?.id === apt.id ? 'opacity-50' : ''}`}
-                        title={`${apt.title}${apt.isReminder ? ` (${apt.reminderType} reminder)` : apt.isWorkOrder ? ' (Work Order)' : ` - ${apt.customer_name}`}${isRecurring(apt) ? ' (Recurring)' : ''}`}
-                      >
-                        <span className="flex items-center gap-0.5 truncate">
-                          {isRecurring(apt) && <Repeat className="w-2.5 h-2.5 flex-shrink-0 opacity-70" />}
-                          {apt.start_time.slice(0, 5)} {apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}
-                        </span>
-                      </div>
-                    ))}
-                    {dayAppointments.length > 3 && (
-                      <div className="text-xs text-gray-500 pl-1">
-                        +{dayAppointments.length - 3} more
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Week View - Works for both My Calendar and Technician Calendar */}
-      {viewMode === 'week' && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-          <div className="grid grid-cols-7 border-b border-gray-200 min-w-[560px]">
-            {getWeekDays().map((date, index) => {
-              const isToday = date.toDateString() === new Date().toDateString();
-              return (
-                <div key={index} className={`px-3 py-2 text-center border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50' : ''}`}>
-                  <div className="text-xs text-gray-500">
-                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                  </div>
-                  <div className={`text-lg font-semibold ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>
-                    {date.getDate()}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="grid grid-cols-7 min-w-[560px]">
-            {getWeekDays().map((date, index) => {
-              const isToday = date.toDateString() === new Date().toDateString();
-              const dayAppointments = getAppointmentsForDate(date);
-
-              return (
-                <div
-                  key={index}
-                  className={`min-h-96 p-3 border-r border-gray-200 last:border-r-0 cursor-pointer hover:bg-gray-50 ${
-                    isToday ? 'bg-blue-50/30' : ''
-                  } ${dragOverDate === calendarDateKey(date) ? 'bg-green-100 ring-2 ring-green-400' : ''}`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOverDate(calendarDateKey(date));
-                  }}
-                  onDragLeave={() => setDragOverDate(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    handleDrop(date);
-                  }}
-                  onDoubleClick={() => openCreateModal(date)}
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('.space-y-2') === e.currentTarget.querySelector('.space-y-2')) {
-                      openCreateModal(date);
-                    }
-                  }}
-                  title="Double-click to add event"
-                >
-                  <div className="space-y-2">
-                    {dayAppointments.map((apt) => (
-                      <div
-                        key={apt.id}
-                        draggable={!apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && apt.status !== 'cancelled'}
-                        onDragStart={(e) => {
-                          if (!apt.isWorkOrder && !apt.isReminder) {
-                            setDraggedAppointment(apt);
-                            e.dataTransfer.effectAllowed = 'move';
-                          }
-                        }}
-                        onDragEnd={() => {
-                          setDraggedAppointment(null);
-                          setDragOverDate(null);
-                        }}
-                        className={`p-2 rounded text-xs ${
-                          apt.isWorkOrder || apt.isReminder ? 'cursor-default' : 'cursor-move'
-                        } ${
-                          apt.status === 'completed'
-                            ? 'bg-green-100 text-green-800 cursor-default'
-                            : apt.status === 'cancelled'
-                            ? 'bg-gray-100 text-gray-600 cursor-default'
-                            : apt.is_blocked
-                            ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                            : apt.isReminder
-                            ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                            : apt.isWorkOrder
-                            ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                            : apt.appointment_type === 'personal'
-                            ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
-                            : apt.appointment_type === 'work_order'
-                            ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                            : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                        } ${draggedAppointment?.id === apt.id ? 'opacity-50' : ''}`}
-                      >
-                        <div className="font-semibold flex items-center gap-1">
-                          {apt.appointment_type === 'personal' && !apt.is_blocked && (
-                            <User className="w-3 h-3 flex-shrink-0" />
-                          )}
-                          {apt.appointment_type === 'customer_meeting' && !apt.is_blocked && (
-                            <Users className="w-3 h-3 flex-shrink-0" />
-                          )}
-                          {apt.is_private && !apt.is_blocked && (
-                            <Lock className="w-3 h-3 flex-shrink-0" />
-                          )}
-                          {isRecurring(apt) && (
-                            <Repeat className="w-3 h-3 flex-shrink-0 opacity-70" />
-                          )}
-                          <span>{apt.start_time.slice(0, 5)}</span>
-                        </div>
-                        <div className="truncate">{apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}</div>
-                        {apt.customer_name && (
-                          <div className="text-gray-600 truncate">{apt.customer_name}</div>
-                        )}
-                        {apt.technician_name && (
-                          <div className="text-gray-500 truncate text-xs">{apt.technician_name}</div>
-                        )}
-                      </div>
-                    ))}
-                    {dayAppointments.length === 0 && (
-                      <div className="text-xs text-gray-400 text-center py-8">No items</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Day Schedule View - Timeline with time slots */}
-      {viewMode === 'day' && (calendarView === 'my' || calendarView === 'shared' || (calendarView === 'technicians' && technicianViewMode === 'list')) && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {/* Date Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 md:px-6 py-4 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold">
-                  {currentDate.toLocaleDateString('en-US', { weekday: 'long' })}
-                </h2>
-                <p className="text-sm md:text-base text-blue-100">
-                  {currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl md:text-3xl font-bold">{appointments.length}</div>
-                <div className="text-xs md:text-sm text-blue-100">
-                  {appointments.length === 1 ? 'Event' : 'Events'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Timeline */}
-          <div
-            className="overflow-auto max-h-[700px]"
-            onMouseLeave={() => {
-              if (isDragSelecting) {
-                commitDragSelection();
-              }
-            }}
-          >
-            {appointments.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <CalendarIcon className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                <p>No scheduled items for this day</p>
-                <p className="text-xs text-gray-400 mt-1">Click a time slot or drag to select a range</p>
-                <button
-                  onClick={() => openCreateModal(currentDate)}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  New+
-                </button>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-200 select-none">
-                {generateTimeSlots().map(timeSlot => {
-                  const slotAppointments = getAppointmentsForTimeSlot(timeSlot);
-                  const currentTime = new Date();
-                  const currentHour = currentTime.getHours();
-                  const slotHour = parseInt(timeSlot.split(':')[0]);
-                  const isCurrentHour = currentDate.toDateString() === currentTime.toDateString() && currentHour === slotHour;
-                  const isDragSelected = getDragSelectedSlots().includes(timeSlot);
-
-                  return (
-                    <div
-                      key={timeSlot}
-                      className={`flex flex-col sm:flex-row transition-colors ${
-                        isDragSelected ? 'bg-blue-100' : isCurrentHour ? 'bg-blue-50' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      {/* Time Column */}
-                      <div className={`flex-shrink-0 w-full sm:w-24 md:w-32 px-3 md:px-4 py-3 md:py-4 border-r border-gray-200 ${
-                        isDragSelected ? 'bg-blue-200' : isCurrentHour ? 'bg-blue-100' : 'bg-gray-50'
-                      }`}>
-                        <div className={`text-sm md:text-base font-semibold ${
-                          isDragSelected ? 'text-blue-700' : isCurrentHour ? 'text-blue-700' : 'text-gray-700'
-                        }`}>
-                          {timeSlot}
-                        </div>
-                        <div className="text-xs text-gray-500 hidden md:block">
-                          {new Date(`2000-01-01T${timeSlot}`).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Appointments Column */}
-                      <div
-                        className={`flex-1 min-h-[80px] p-3 md:p-4 ${isDragSelecting ? 'cursor-ns-resize' : 'cursor-pointer'}`}
-                        onMouseDown={() => {
-                          if (slotAppointments.length === 0) {
-                            setIsDragSelecting(true);
-                            setDragSelectStart(timeSlot);
-                            setDragSelectEnd(timeSlot);
-                          }
-                        }}
-                        onMouseEnter={() => {
-                          if (isDragSelecting) {
-                            setDragSelectEnd(timeSlot);
-                          }
-                        }}
-                        onMouseUp={() => {
-                          if (isDragSelecting) {
-                            if (dragSelectStart === dragSelectEnd) {
-                              setIsDragSelecting(false);
-                              setDragSelectStart(null);
-                              setDragSelectEnd(null);
-                              openCreateModal(currentDate, timeSlot);
-                            } else {
-                              commitDragSelection();
-                            }
-                          }
-                        }}
-                        onClick={() => {
-                          if (!isDragSelecting && slotAppointments.length === 0) {
-                            openCreateModal(currentDate, timeSlot);
-                          }
-                        }}
-                        title={slotAppointments.length === 0 ? `Click to schedule at ${timeSlot}` : ''}
-                      >
-                        {slotAppointments.length === 0 ? (
-                          <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-                            <Plus className="w-4 h-4 mr-1" />
-                            <span className="hidden sm:inline">Click to schedule</span>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {slotAppointments.map(apt => (
-                              <div
-                                key={apt.id}
-                                onClick={(e) => e.stopPropagation()}
-                                className={`p-3 rounded-lg border-2 transition-all ${
-                                  apt.status === 'completed'
-                                    ? 'bg-green-50 border-green-300'
-                                    : apt.status === 'in_progress' || apt.status === 'on_my_way'
-                                    ? 'bg-amber-50 border-amber-300'
-                                    : apt.status === 'cancelled'
-                                    ? 'bg-gray-100 border-gray-300'
-                                    : apt.is_blocked
-                                    ? 'bg-gray-200 border-gray-400'
-                                    : apt.appointment_type === 'personal'
-                                    ? 'bg-indigo-50 border-indigo-300'
-                                    : apt.appointment_type === 'work_order'
-                                    ? 'bg-orange-50 border-orange-300'
-                                    : apt.isWorkOrder
-                                    ? 'bg-blue-50 border-blue-300'
-                                    : apt.isReminder
-                                    ? 'bg-purple-50 border-purple-300'
-                                    : 'bg-blue-50 border-blue-300'
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                      <h3 className="font-semibold text-gray-900 text-sm md:text-base">
-                                        {apt.isWorkOrder ? <button type="button" onClick={event => { event.stopPropagation(); if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="text-blue-600 hover:underline text-left">{apt.title}</button> : apt.title}
-                                      </h3>
-                                      {apt.appointment_type === 'personal' && !apt.is_blocked && (
-                                        <User className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                                      )}
-                                      {apt.appointment_type === 'customer_meeting' && !apt.is_blocked && (
-                                        <Users className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                                      )}
-                                      {apt.is_private && !apt.is_blocked && (
-                                        <Lock className="w-4 h-4 text-gray-600 flex-shrink-0" />
-                                      )}
-                                      {isRecurring(apt) && (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-                                          <Repeat className="w-3 h-3" />
-                                          Recurring
-                                        </span>
-                                      )}
-                                      {apt.isWorkOrder && (
-                                        <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-800 rounded">
-                                          Work Order
-                                        </span>
-                                      )}
-                                      {apt.isReminder && (
-                                        <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded capitalize">
-                                          {apt.reminderType} Reminder
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600 mb-1">
-                                      <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                                      <span>{apt.start_time.slice(0, 5)} - {apt.end_time.slice(0, 5)}</span>
-                                    </div>
-                                    {apt.customer_name && (
-                                      <p className="text-xs md:text-sm text-gray-600 truncate">
-                                        {apt.customer_name}
-                                      </p>
-                                    )}
-                                    {calendarView === 'technicians' && apt.technician_name && (
-                                      <p className="text-xs text-gray-500 mt-1">
-                                        {apt.isReminder ? 'Assigned to' : 'Technician'}: {apt.technician_name}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                    <StatusBadge status={apt.status} />
-                                    {!apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          requestDeleteAppointment(apt);
-                                        }}
-                                        className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors border border-red-200"
-                                        title="Delete appointment"
-                                      >
-                                        Delete
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Footer Tip */}
-          {appointments.length > 0 && (
-            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
-              <p className="text-xs text-gray-600">
-                <strong>Tip:</strong> Click on empty time slots to quickly schedule an event.
-              </p>
-            </div>
-          )}
+      {/* Day and week share the same grid used when scheduling work orders. */}
+      {(viewMode === 'week' || viewMode === 'day') && (
+        <div className="space-y-2">
+          <CalendarTimeGrid columns={timeGridColumns} events={timeGridEvents} loading={loading} error={loadError} onRetry={() => { void loadAppointments(); }}
+            onSlotSelect={(column, time) => openCreateModal(new Date(column.date + 'T12:00:00'), time, undefined, techTimeline ? column.key : undefined)}
+            onRangeSelect={(column, start, end) => { if (timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(end) > minutes(event.start)))) { alert('Choose an open time range.'); return; } openCreateModal(new Date(column.date + 'T12:00:00'), start, end, techTimeline ? column.key : undefined); }}
+            onDropDate={column => { const item = techTimeline ? draggedItem?.appointment : draggedAppointment; if (item) void handleTimeDrop(item, item.start_time.slice(0, 5), techTimeline ? column.key : undefined, column.date); }}
+            onDropSlot={(column, start) => { const item = techTimeline ? draggedItem?.appointment : draggedAppointment; if (item) void handleTimeDrop(item, start, techTimeline ? column.key : undefined, column.date); }}
+            slotState={(column, start) => ({ disabled: timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(start) + 30 > minutes(event.start))) })} />
+          {appointments.filter(apt => apt.id === selectedEventId).map(apt => <div key={apt.id} className="rounded-lg border border-gray-200 bg-white p-4 text-gray-900">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{apt.title}</h3><StatusBadge status={apt.status} /><button type="button" onClick={() => setSelectedEventId(null)} className="min-h-11 px-3 text-sm">Close details</button></div>
+            <p className="text-sm">{apt.all_day ? 'All day' : apt.start_time === apt.end_time ? timeLabel(apt.start_time) : `${timeLabel(apt.start_time)} – ${timeLabel(apt.end_time)}`}{apt.technician_name ? ` · ${apt.technician_name}` : ''}</p>
+            {apt.customer_name && <p className="text-sm">{apt.customer_name}</p>}
+            {!apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && !apt.is_blocked && <button type="button" onClick={() => requestDeleteAppointment(apt)} className="min-h-11 text-sm text-red-700 hover:underline">Delete appointment</button>}
+          </div>)}
+          <p className="text-xs text-gray-500">Click an open time or drag across time slots to add an event. Drag an appointment to another day to reschedule.</p>
         </div>
       )}
 
@@ -2594,7 +1569,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
                   >
                     <Plus className="w-4 h-4" />
-                    New+
+                    New event
                   </button>
                 </div>
               ) : (
@@ -2752,7 +1727,8 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
 
       {showCreateModal && (
         <CreateAppointmentModal
-          calendarContext={calendarView}
+          calendarContext={calendarView === 'my' ? 'my' : 'technicians'}
+          initialTechnicianId={selectedTechnicianId}
           initialDate={selectedDate || undefined}
           initialTime={selectedTime || undefined}
           initialEndTime={selectedEndTime || undefined}
@@ -2790,6 +1766,8 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
         isOpen={confirmModal !== null}
         title={confirmModal?.title ?? ''}
         message={confirmModal?.message ?? ''}
+        variant={confirmModal?.title.includes('Delete') ? 'danger' : 'neutral'}
+        confirmLabel={confirmModal?.title.includes('Delete') ? 'Delete' : 'Confirm move'}
         onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
         onCancel={() => setConfirmModal(null)}
       />
@@ -2801,7 +1779,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
           onClose={() => setRecurringDeleteTarget(null)}
         />
       )}
-    </div>
+    </CalendarWorkspace>
   );
 }
 

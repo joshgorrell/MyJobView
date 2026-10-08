@@ -1,9 +1,10 @@
+import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
+import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
+import { dateKey } from '../../lib/workOrderScheduling';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   ZoomIn,
   ZoomOut,
   User,
@@ -129,7 +130,7 @@ export function ScheduleTimelineView() {
         end.setDate(end.getDate() + 6);
         break;
       case 'week':
-        start.setDate(start.getDate() - start.getDay());
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         end.setDate(start.getDate() + 27);
         break;
       case 'month':
@@ -140,8 +141,8 @@ export function ScheduleTimelineView() {
     }
 
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
+      start: dateKey(start),
+      end: dateKey(end)
     };
   }
 
@@ -244,75 +245,18 @@ export function ScheduleTimelineView() {
   const dayWidth = getDayWidth();
   const totalWidth = days.length * dayWidth;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading timeline...</div>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4">
+    <CalendarWorkspace loading={loading} className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-xl sm:text-2xl font-bold text-white">Timeline View (Gantt)</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('prev')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentDate(new Date())}
-              className="px-4 py-2 text-sm font-medium bg-white hover:bg-gray-100 rounded-lg"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => navigate('next')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          <CalendarNavigation date={dateKey(currentDate)} onDateChange={date => setCurrentDate(new Date(date + 'T12:00:00'))} onPrevious={() => navigate('prev')} onNext={() => navigate('next')} />
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex bg-white rounded-lg p-1">
-            <button
-              onClick={() => setZoomLevel('day')}
-              className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
-                zoomLevel === 'day'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Days
-            </button>
-            <button
-              onClick={() => setZoomLevel('week')}
-              className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
-                zoomLevel === 'week'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Weeks
-            </button>
-            <button
-              onClick={() => setZoomLevel('month')}
-              className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
-                zoomLevel === 'month'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Months
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <CalendarViewSwitcher value={zoomLevel} onChange={setZoomLevel} options={[{ value: 'day', label: 'Days' }, { value: 'week', label: 'Weeks' }, { value: 'month', label: 'Months' }]} />
         </div>
       </div>
 
@@ -541,6 +485,6 @@ export function ScheduleTimelineView() {
           </div>
         </div>
       )}
-    </div>
+    </CalendarWorkspace>
   );
 }

@@ -1,3 +1,4 @@
+import { schedulingError, timeKey } from '../../lib/workOrderScheduling';
 import { useState, useEffect } from 'react';
 import { X, Save, Calendar, User, Lock, Unlock, Clock, Wrench, BookOpen } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
@@ -31,6 +32,7 @@ interface CreateAppointmentModalProps {
   calendarContext?: 'my' | 'technicians'; // New prop to distinguish calendar mode
   initialDate?: string; // Pre-fill date from calendar click
   initialTime?: string; // Pre-fill start time from calendar click
+  initialTechnicianId?: string;
   initialEndTime?: string; // Pre-fill end time from drag selection
   onClose: () => void;
   onSuccess: () => void;
@@ -45,6 +47,7 @@ export function CreateAppointmentModal({
   initialDate,
   initialTime,
   initialEndTime,
+  initialTechnicianId,
   onClose,
   onSuccess
 }: CreateAppointmentModalProps) {
@@ -61,7 +64,7 @@ export function CreateAppointmentModal({
   const [endTime, setEndTime] = useState(initialEndTime || '');
   const [allDay, setAllDay] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
-  const [technicianId, setTechnicianId] = useState('');
+  const [technicianId, setTechnicianId] = useState(initialTechnicianId || '');
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
@@ -93,33 +96,14 @@ export function CreateAppointmentModal({
     }
   }, [appointmentType, user, calendarContext]);
 
-  // Auto-calculate end time (1 hour after start time) snapped to 30-min increment
+  // Preserve exact minutes for direct entry and calendar selections.
   useEffect(() => {
     if (startTime && !endTime && !initialEndTime) {
-      const [hours, minutes] = startTime.split(':').map(Number);
-      const totalMinutes = hours * 60 + minutes + 60;
-      const snapped = Math.round(totalMinutes / 30) * 30;
-      const endHour = Math.floor(snapped / 60) % 24;
-      const endMin = snapped % 60;
-      setEndTime(`${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`);
+      const [hours, mins] = startTime.split(':').map(Number);
+      const end = hours * 60 + mins + 60;
+      if (end < 1440) setEndTime(timeKey(end));
     }
   }, [startTime]);
-
-  function generateTimeOptions(): { value: string; label: string }[] {
-    const options: { value: string; label: string }[] = [];
-    for (let h = 0; h < 24; h++) {
-      for (const m of [0, 30]) {
-        const value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        const period = h < 12 ? 'AM' : 'PM';
-        const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
-        const displayMin = m === 0 ? '00' : '30';
-        options.push({ value, label: `${displayHour}:${displayMin} ${period}` });
-      }
-    }
-    return options;
-  }
-
-  const timeOptions = generateTimeOptions();
 
   // Update title placeholder based on context and type
   const getTitlePlaceholder = () => {
@@ -207,6 +191,9 @@ export function CreateAppointmentModal({
       alert('Please fill in start and end times, or mark as all-day event');
       return;
     }
+
+    const timeError = !allDay && schedulingError({ date: appointmentDate, start: startTime, end: endTime });
+    if (timeError) { alert(timeError); return; }
 
     // Validate technician for non-personal appointments (only in Technician Calendar mode)
     if (calendarContext === 'technicians' && appointmentType !== 'personal' && !technicianId) {
@@ -462,34 +449,16 @@ export function CreateAppointmentModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Time *
                 </label>
-                <select
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required={!allDay}
-                  className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-white"
-                >
-                  <option value="">Select time...</option>
-                  {timeOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                <input type="time" step="60" aria-label="Appointment start time" value={startTime} onChange={e => setStartTime(e.target.value)} required={!allDay}
+                  className="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base bg-white" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   End Time *
                 </label>
-                <select
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required={!allDay}
-                  className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-white"
-                >
-                  <option value="">Select time...</option>
-                  {timeOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                <input type="time" step="60" aria-label="Appointment end time" value={endTime} onChange={e => setEndTime(e.target.value)} required={!allDay}
+                  className="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base bg-white" />
               </div>
             </div>
           )}
