@@ -410,7 +410,7 @@ Deno.serve(async (req) => {
       const extendedSettings = { ...settings, owner_name: organization.subdomain === "elife" ? "Josh Gorrell" : null, owner_email: organization.subdomain === "elife" ? "josh@electroniclife.com" : null, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" };
       const defaultContent = proposalFollowUpContent(extendedSettings, contact, sender);
       const defaultSubject = owner ? "A quick note from the owner" : "How are we doing?";
-      if (b.action === "proposal_preview") return json({ html: proposalFollowUpEmail(extendedSettings, contact, sender), content: defaultContent, subject: defaultSubject, recipient: contact.email, reply_to: sender.email, sender: sender.name });
+      if (b.action === "proposal_preview") return json({ html: proposalFollowUpEmail(extendedSettings, contact, sender), content: defaultContent, subject: defaultSubject, recipient: contact.email, reply_to: sender.email, sender: sender.name, owner_name: extendedSettings.owner_name, owner_email: extendedSettings.owner_email });
       if (typeof b.send_key !== "string" || !/^[0-9a-f-]{36}$/.test(b.send_key)) return json({ error: "Preview the email before sending." }, 400);
       const editedSubject = typeof b.edited_subject === "string" ? b.edited_subject.trim().slice(0, 300) : "";
       const editedContent = typeof b.edited_content === "string" ? b.edited_content.slice(0, 200000) : "";

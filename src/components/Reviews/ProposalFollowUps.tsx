@@ -1,3 +1,6 @@
+import ProposalEmailPreview from './ProposalEmailPreview';
+import ProposalCheckResponse from './ProposalCheckResponse';
+import type { ProposalChoice } from '../../../supabase/functions/_shared/proposalCheckOptions';
 import { useEffect, useState } from 'react';
 import { Mail, Eye, Send, CheckCircle, RotateCcw, Pencil, X, Maximize2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -5,10 +8,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import ProposalCheckHistory from './ProposalCheckHistory';
 import { lostReviewAction } from './lostReview';
 
-type Preview = { html: string; content: string; subject: string; recipient: string; reply_to: string; sender: string };
+type Preview = { html: string; content: string; subject: string; recipient: string; reply_to: string; sender: string; owner_name?: string | null; owner_email?: string | null };
 
 export default function ProposalFollowUps() {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const isJosh = profile?.email?.trim().toLowerCase() === 'josh@electroniclife.com';
   const [proposals, setProposals] = useState<{ id: string; title: string; proposal_number: string; contacts: { contact_name: string } | null }[]>([]);
   const [mode, setMode] = useState<'customer' | 'manual' | 'proposal'>('customer');
@@ -23,6 +26,7 @@ export default function ProposalFollowUps() {
   const [editedSubject, setEditedSubject] = useState('');
   const [editedContent, setEditedContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [responsePreview, setResponsePreview] = useState<ProposalChoice | null>(null);
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [sendKey, setSendKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,7 +61,7 @@ export default function ProposalFollowUps() {
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   }, [preview, busy]);
 
-  const reset = () => { setPreview(null); setSent(false); setError(''); setSendKey(''); setEditedSubject(''); setEditedContent(''); setIsEditing(false); setPreviewExpanded(false); };
+  const reset = () => { setResponsePreview(null); setPreview(null); setSent(false); setError(''); setSendKey(''); setEditedSubject(''); setEditedContent(''); setIsEditing(false); setPreviewExpanded(false); };
 
   async function act(send: boolean) {
     setBusy(true); setError('');
@@ -77,6 +81,7 @@ export default function ProposalFollowUps() {
       if (send) { setSent(true); setPreview(null); }
       else {
         const p = data as Preview;
+        setResponsePreview(null);
         setPreview(p);
         setEditedSubject(p.subject);
         setEditedContent(p.content);
@@ -153,7 +158,8 @@ export default function ProposalFollowUps() {
             {/* Live preview iframe */}
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-600">
               <div className="border-b border-gray-600 bg-gray-900 px-4 py-2 text-xs font-medium text-gray-400">Live Preview</div>
-              <iframe title="Proposal follow-up email preview" sandbox="" srcDoc={livePreviewHtml} className="h-[400px] w-full bg-white sm:h-[500px]" />
+              {responsePreview ? <div><button type="button" onClick={()=>setResponsePreview(null)} className="min-h-11 px-4 text-sm text-cyan-300">← Back to email preview</button><ProposalCheckResponse key={responsePreview} previewChoice={responsePreview} previewBrand={{company_name:companySettings?.company_name||'Our team',company_logo_url:companySettings?.company_logo_url||'',owner_name:preview.owner_name||(isJosh?'Josh Gorrell':null),owner_email:preview.owner_email||(isJosh?'josh@electroniclife.com':companySettings?.company_email||preview.reply_to)}}/></div> : <ProposalEmailPreview html={livePreviewHtml} onChoice={setResponsePreview}/>}
+              <p className="bg-gray-900 px-4 py-2 text-xs text-gray-400">Click a response button to preview the customer’s next steps. Preview clicks and messages are not recorded. Other email links stay inactive here.</p>
             </div>
           </div>
 
