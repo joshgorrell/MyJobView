@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, AtSign, Users } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, AtSign, Users, Search, UserCheck, ChevronDown } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
@@ -11,6 +11,15 @@ import { offlineSupabaseInsert } from '../../lib/offlineSupport';
 interface LeadFormProps {
   onClose: () => void;
   onSuccess: () => void;
+}
+
+interface ContactSearchResult {
+  id: string;
+  contact_name: string;
+  company_name: string | null;
+  email: string | null;
+  phone: string | null;
+  username: string | null;
 }
 
 export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
@@ -32,6 +41,15 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
+  const [contactMode, setContactMode] = useState<'new' | 'existing'>('new');
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<ContactSearchResult | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+
   // Auto-save hook
   const { restoreSavedData, clearSavedData } = useAutoSave({
     key: 'lead_new',
@@ -49,6 +67,73 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       setFormData(savedData);
     }
   }, []);
+
+  useEffect(() => {
+    if (contactMode !== 'existing') return;
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (contactSearch.trim().length < 2) {
+      setContactResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchTimeoutRef.current = setTimeout(() => searchContacts(contactSearch.trim()), 300);
+    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
+  }, [contactSearch, contactMode]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (resultsRef.current && !resultsRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  async function searchContacts(query: string) {
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, contact_name, company_name, email, phone, username')
+        .or(`contact_name.ilike.%${query}%,company_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
+        .order('contact_name')
+        .limit(10);
+
+      if (error) throw error;
+      setContactResults(data || []);
+    } catch {
+      setContactResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function selectContact(contact: ContactSearchResult) {
+    setSelectedContact(contact);
+    setFormData({
+      ...formData,
+      contact_name: contact.contact_name || '',
+      company_name: contact.company_name || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      username: contact.username || '',
+    });
+    setShowResults(false);
+    setContactSearch('');
+  }
+
+  function clearSelectedContact() {
+    setSelectedContact(null);
+    setFormData({
+      ...formData,
+      contact_name: '',
+      company_name: '',
+      email: '',
+      phone: '',
+      username: '',
+    });
+  }
 
   async function loadSalesReps() {
     const { data } = await supabase
@@ -109,6 +194,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
         created_by: profile?.id,
         is_fishbowl: isFishbowl,
         claimed_at: isFishbowl ? null : new Date().toISOString(),
+        converted_from_contact_id: selectedContact?.id || null,
       };
 
       const leadResult = await offlineSupabaseInsert('leads', leadData);
@@ -140,6 +226,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
             company_name: formData.company_name,
             contact_name: formData.contact_name,
             is_fishbowl: isFishbowl,
+            linked_contact_id: selectedContact?.id || null,
           },
         });
       }
@@ -292,6 +379,8 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
     onClose();
   }
 
+  const inputClass = "w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent";
+
   return (
     <QuickActionModal
       title="New Lead"
@@ -303,6 +392,118 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       successMessage="Lead Created!"
     >
         <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4 min-w-0">
+          {/* Contact Mode Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-secondary mb-2">
+              Customer <span className="text-red-400">*</span>
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setContactMode('new'); clearSelectedContact(); }}
+                className={`flex-1 px-3 py-2.5 text-sm rounded-lg border transition-all font-medium ${
+                  contactMode === 'new'
+                    ? 'border-emerald-500 bg-emerald-600/15 text-emerald-300'
+                    : 'border-subtle bg-surface text-secondary hover:border-emerald-500/40'
+                }`}
+              >
+                New Contact
+              </button>
+              <button
+                type="button"
+                onClick={() => { setContactMode('existing'); clearSelectedContact(); }}
+                className={`flex-1 px-3 py-2.5 text-sm rounded-lg border transition-all font-medium ${
+                  contactMode === 'existing'
+                    ? 'border-emerald-500 bg-emerald-600/15 text-emerald-300'
+                    : 'border-subtle bg-surface text-secondary hover:border-emerald-500/40'
+                }`}
+              >
+                Existing Customer
+              </button>
+            </div>
+          </div>
+
+          {/* Existing Customer Search */}
+          {contactMode === 'existing' && !selectedContact && (
+            <div className="relative" ref={resultsRef}>
+              <label className="block text-sm font-medium text-secondary mb-1.5">
+                Search for a customer
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Search className="w-4 h-4 text-muted" />
+                </div>
+                <input
+                  type="text"
+                  value={contactSearch}
+                  onChange={(e) => { setContactSearch(e.target.value); setShowResults(true); }}
+                  onFocus={() => setShowResults(true)}
+                  className={`${inputClass} pl-10`}
+                  placeholder="Search by name, company, email, or phone..."
+                  autoFocus
+                />
+                {searching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted">...</div>
+                )}
+              </div>
+
+              {showResults && contactSearch.trim().length >= 2 && (
+                <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg">
+                  {contactResults.length === 0 && !searching ? (
+                    <div className="px-4 py-3 text-sm text-muted">No customers found. Try a different search, or use "New Contact".</div>
+                  ) : (
+                    contactResults.map((contact) => (
+                      <button
+                        type="button"
+                        key={contact.id}
+                        onClick={() => selectContact(contact)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-emerald-600/10 border-b border-subtle/50 last:border-0 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-primary truncate">{contact.contact_name || 'Unnamed'}</p>
+                            <p className="text-xs text-muted truncate">
+                              {contact.company_name ? `${contact.company_name} · ` : ''}
+                              {contact.email || contact.phone || 'No contact info'}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-muted mt-1">Search your existing customer database by name, company, email, or phone number.</p>
+            </div>
+          )}
+
+          {/* Selected Contact Banner */}
+          {contactMode === 'existing' && selectedContact && (
+            <div className="rounded-lg border border-emerald-600/40 bg-emerald-600/10 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-primary truncate">{selectedContact.contact_name || 'Unnamed'}</p>
+                    <p className="text-xs text-muted truncate">
+                      {selectedContact.company_name ? `${selectedContact.company_name} · ` : ''}
+                      {selectedContact.email || selectedContact.phone || 'No contact info'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSelectedContact}
+                  className="text-xs text-muted hover:text-primary shrink-0 px-2 py-1 rounded hover:bg-surface transition-colors"
+                >
+                  Change
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Contact Fields - shown for both modes, but auto-filled when existing contact selected */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
@@ -313,7 +514,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 required
                 value={formData.contact_name}
                 onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={inputClass}
                 placeholder="John Doe"
               />
             </div>
@@ -325,7 +526,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 type="text"
                 value={formData.company_name}
                 onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={inputClass}
                 placeholder="Acme Corp"
               />
             </div>
@@ -343,7 +544,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') })}
-                className="w-full pl-10 pr-4 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={`${inputClass} pl-10 pr-4`}
                 placeholder={formData.contact_name ? generateUsername(formData.contact_name) : 'johndoe'}
               />
             </div>
@@ -357,7 +558,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={inputClass}
                 placeholder="john@acme.com"
               />
             </div>
@@ -367,7 +568,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={inputClass}
                 placeholder="+1 (555) 123-4567"
               />
             </div>
@@ -379,7 +580,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
               value={formData.opportunity_description}
               onChange={(e) => setFormData({ ...formData, opportunity_description: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+              className={`${inputClass} resize-none`}
               placeholder="Interested in our enterprise plan..."
             />
           </div>
@@ -390,7 +591,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
               type="text"
               value={formData.tags}
               onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-              className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={inputClass}
               placeholder="#enterprise #referral"
             />
             <p className="text-xs text-muted mt-1">Separate tags with spaces. Use # prefix.</p>
@@ -402,7 +603,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
               <select
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={inputClass}
               >
                 <option value="urgent">Urgent — within hours</option>
                 <option value="high">High — within 1 day</option>
@@ -417,7 +618,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
                 <select
                   value={formData.office_id}
                   onChange={(e) => setFormData({ ...formData, office_id: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className={inputClass}
                 >
                   <option value="">No specific office</option>
                   {offices.map((office) => (
@@ -433,7 +634,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
             <select
               value={formData.assignment}
               onChange={(e) => setFormData({ ...formData, assignment: e.target.value })}
-              className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={inputClass}
             >
               <option value="fishbowl">Send to Fishbowl (All reps notified)</option>
               {salesReps.map((rep) => (
