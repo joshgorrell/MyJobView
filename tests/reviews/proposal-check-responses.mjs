@@ -4,7 +4,8 @@ import ts from 'typescript';
 import {PGlite} from '@electric-sql/pglite';
 const moduleFrom=s=>import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText).toString('base64'));
 globalThis.__options=await moduleFrom(await readFile('supabase/functions/_shared/proposalCheckOptions.ts','utf8'));
-const {handleProposalResponse}=await moduleFrom('const {isProposalChoice,proposalChoices}=globalThis.__options;\n'+(await readFile('supabase/functions/proposal-check-response/handler.ts','utf8')).replace(/^import[^;]+;\n/gm,''));
+globalThis.__messageAlerts=[];
+const {handleProposalResponse}=await moduleFrom('const {isProposalChoice,proposalChoices}=globalThis.__options; const notifyProposalMessage=async(db,email,eventId)=>{globalThis.__messageAlerts.push(eventId)};\n'+(await readFile('supabase/functions/proposal-check-response/handler.ts','utf8')).replace(/^import[^;]+;\n/gm,''));
 const sql=new PGlite();const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 const base=await readFile('tests/reviews/proposal-check-history.mjs','utf8');const start=base.indexOf('await sql.exec(`CREATE ROLE');const end=base.indexOf('`);',start)+3;
 await new Function('sql','id','return (async()=>{'+base.slice(start,end)+'})()')(sql,id);
@@ -21,8 +22,10 @@ for(const [choice,value] of Object.entries(globalThis.__options.proposalChoices)
  assert.equal((await post({action:'interaction',choice,step:value.steps[0],event_key:crypto.randomUUID()})).status,200);
 }
 assert.equal((await post({action:'load'})).status,200);const branding=await(await post({action:'load'})).json();assert.equal(branding.owner_name,'Josh Gorrell');assert.equal(branding.owner_email,'josh@electroniclife.com');
+assert.equal(globalThis.__messageAlerts.length,0,'Clicks and selections do not send email alerts');
 const body={action:'message',choice:'needs_work',step:'Adjust the budget',message:'Please lower the equipment budget',event_key:crypto.randomUUID()};
 assert.equal((await post(body)).status,200);assert.equal((await post(body)).status,200);
+assert.equal(globalThis.__messageAlerts[0],globalThis.__messageAlerts[1],'Submission retries reuse the event identity for email deduplication');
 assert.equal((await sql.query("SELECT count(*)::int AS n FROM proposal_check_events WHERE kind='message'")).rows[0].n,1,'Retry saves one message');
 const notice=(await sql.query('SELECT * FROM notifications')).rows;assert.equal(notice.length,1);assert.equal(notice[0].user_id,id(10),'Notify responsible salesperson');
 assert.equal((await sql.query('SELECT confirmed_choice FROM proposal_check_reporting')).rows[0].confirmed_choice,'needs_work');
@@ -57,3 +60,24 @@ await sql.query("INSERT INTO proposal_check_events(email_id,organization_id,even
 assert.equal((await post({...body,event_key:crypto.randomUUID()})).status,503);assert.equal((await post(body)).status,200);
 await sql.exec(`UPDATE proposal_check_emails SET response_expires_at=now()-interval '1 second'`);assert.equal((await post(body)).status,404);
 await sql.close();console.log('Proposal responses: five abandoned-click paths, follow-up interactions, messages, idempotency, notifications, scanner hints, expiry, input validation, tenant/rep permissions, and private tokens passed.');
+
+const outgoing=[];let providerOk=true;let subdomain='elife';
+globalThis.__notificationTransport=async request=>{outgoing.push({payload:JSON.parse(request.body),headers:request.headers});return {ok:providerOk}};
+const notifySource=(await readFile('supabase/functions/proposal-check-response/notify.ts','utf8')).replace(/^import[^;]+;\n/gm,'');
+const {notifyProposalMessage}=await moduleFrom('const sendSystemEmail=globalThis.__notificationTransport;const {proposalChoices,isProposalChoice}=globalThis.__options;\n'+notifySource);
+const feedbackDb={from(table){const filters={};const q={select:()=>q,eq:(k,v)=>{filters[k]=v;return q},single:async()=>{
+ if(table==='organizations'){assert.equal(filters.id,'org');return{data:{subdomain}}}
+ if(table==='company_settings'){assert.equal(filters.organization_id,'org');return{data:{company_name:'Electronic Life',company_email:'office@example.com',from_email:'sender@example.com',app_url:'https://elife.myjobview.com'}}}
+ assert.equal(table,'proposal_check_events');assert.deepEqual(filters,{id:'event',email_id:'email',organization_id:'org',kind:'message'});return{data:{choice:'considering',step:'Need more information',message:'More details <please>'}};
+ }};q.maybeSingle=q.single;return q}};
+for(const variant of ['owner','sales']) {
+ await notifyProposalMessage(feedbackDb,{id:'email',organization_id:'org',recipient_name:'Volland Foundation',recipient_email:'customer@example.com',variant},'event');
+ assert.deepEqual(outgoing.at(-1).payload.to,['josh@electroniclife.com']);
+ assert.equal(outgoing.at(-1).payload.reply_to,'customer@example.com');
+ assert.ok(outgoing.at(-1).payload.html.includes('More details &lt;please&gt;'));
+ assert.ok(outgoing.at(-1).payload.text.includes('Volland Foundation'));
+ assert.equal(outgoing.at(-1).headers['Idempotency-Key'],'proposal-check-message-event');
+}
+providerOk=false;await assert.rejects(()=>notifyProposalMessage(feedbackDb,{id:'email',organization_id:'org',recipient_name:'Customer',recipient_email:'customer@example.com'},'event'),/notification failed/);
+providerOk=true;subdomain='another-dealer';await notifyProposalMessage(feedbackDb,{id:'email',organization_id:'org',recipient_name:'Customer',recipient_email:'customer@example.com'},'event');assert.deepEqual(outgoing.at(-1).payload.to,['office@example.com'],'Other dealers never send private feedback to Electronic Life');
+console.log('Owner email routing, both variants, saved feedback, reply address, escaping, tenant boundaries and retry idempotency passed.');

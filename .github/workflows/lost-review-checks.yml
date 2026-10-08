@@ -28,7 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:reviews
-      - run: node tests/reviews/proposal-follow-up.mjs && node tests/reviews/proposal-check-history.mjs && node tests/reviews/proposal-check-responses.mjs
+      - run: node tests/reviews/proposal-follow-up.mjs && node tests/reviews/proposal-check-history.mjs && node tests/reviews/proposal-check-responses.mjs && node tests/reviews/proposal-submission-delete.mjs
       - run: npm run build
         env:
           VITE_SUPABASE_URL: https://test.supabase.co
