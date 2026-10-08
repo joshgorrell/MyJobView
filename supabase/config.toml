@@ -268,3 +268,6 @@ verify_jwt = false
 # Public opaque-token image endpoint; no customer data is returned.
 [functions.proposal-check-open]
 verify_jwt = false
+
+[functions.proposal-check-response]
+verify_jwt = false

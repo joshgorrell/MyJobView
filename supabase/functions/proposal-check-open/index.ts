@@ -6,8 +6,7 @@ export async function handleOpen(req: Request, db: any) {
     const token = new URL(req.url).searchParams.get('token');
     if (token && /^[0-9a-f-]{72}$/.test(token)) {
       try {
-        const { error } = await db.from('proposal_check_emails').update({ opened_at: new Date().toISOString() })
-          .eq('open_token', token).is('opened_at', null).neq('status', 'failed');
+        const { error } = await db.rpc('record_proposal_check_open', { p_token: token });
         if (error) console.error('Could not record proposal check open');
       } catch { console.error('Could not record proposal check open'); }
     }

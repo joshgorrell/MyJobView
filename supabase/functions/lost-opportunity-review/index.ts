@@ -398,7 +398,7 @@ Deno.serve(async (req) => {
       if (!settings) return json({ error: "Company settings are not configured. Set up company email before sending follow-ups." }, 400);
       const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).maybeSingle());
       if (!organization) return json({ error: "Organization not found." }, 400);
-      const rep = await checked(await admin.from("profiles").select("first_name,last_name,email,is_active")
+      const rep = await checked(await admin.from("profiles").select("id,first_name,last_name,email,is_active")
         .eq("id", proposal?.created_by || user.id).eq("organization_id", org).maybeSingle());
       if (!rep) return json({ error: "Could not find the salesperson for this proposal. They may have been removed." }, 400);
       const owner = b.variant === "owner";
@@ -407,7 +407,7 @@ Deno.serve(async (req) => {
         email: owner ? "josh@electroniclife.com" : rep.email,
         photo: owner ? "https://elife.myjobview.com/images/josh-gorrell-email.jpg" : undefined };
       if (!sender.name || !sender.email || (!owner && !rep.is_active)) return json({ error: "Configure the sender’s name and email before sending." }, 400);
-      const extendedSettings = { ...settings, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" };
+      const extendedSettings = { ...settings, owner_name: organization.subdomain === "elife" ? "Josh Gorrell" : null, owner_email: organization.subdomain === "elife" ? "josh@electroniclife.com" : null, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" };
       const defaultContent = proposalFollowUpContent(extendedSettings, contact, sender);
       const defaultSubject = owner ? "A quick note from the owner" : "How are we doing?";
       if (b.action === "proposal_preview") return json({ html: proposalFollowUpEmail(extendedSettings, contact, sender), content: defaultContent, subject: defaultSubject, recipient: contact.email, reply_to: sender.email, sender: sender.name });
@@ -419,7 +419,8 @@ Deno.serve(async (req) => {
       const from = settings.from_email || settings.company_email;
       if (!from || !Deno.env.get("RESEND_API_KEY")) return json({ error: "Configure email delivery before sending." }, 503);
       return json(await sendTrackedProposalCheck(admin, sendSystemEmail, {
-        organization_id: org, send_key: b.send_key, sent_by: user.id,
+        organization_id: org, send_key: b.send_key, sent_by: user.id, responsible_user_id: rep.id,
+        response_url: `https://${organization.subdomain || "app"}.myjobview.com/proposal-check-response`,
         contact_id: mode === "manual" ? null : proposal?.contact_id || b.contact_id,
         proposal_id: proposal?.id || null, variant: b.variant,
         recipient_name: contact.contact_name || contact.first_name || contact.email,
