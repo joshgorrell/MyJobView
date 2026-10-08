@@ -1,3 +1,4 @@
+import { deleteProposalSubmission } from './deleteProposalSubmission.ts';
 import { proposalFollowUpEmail, proposalFollowUpContent, wrapProposalContent } from "./proposalFollowUp.ts";
 import { sendTrackedProposalCheck } from "./proposalCheckDelivery.ts";
 import { sendSystemEmail } from '../_shared/system-email.ts';
@@ -368,6 +369,10 @@ Deno.serve(async (req) => {
     );
     if (!access) return json({ error: "Reviews access required" }, 403);
     const org = profile.organization_id;
+    if (b.action === "delete_proposal_check_submission") {
+      const result = await deleteProposalSubmission(client, admin, profile, b.event_id);
+      return json(result.body, result.status);
+    }
     if (["proposal_preview", "proposal_send"].includes(b.action)) {
       const isAdmin = ["admin", "owner", "super_admin"].includes(profile.role);
       if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);

@@ -1,3 +1,4 @@
+import { notifyProposalMessage } from './notify.ts';
 import { isProposalChoice, proposalChoices } from '../_shared/proposalCheckOptions.ts';
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' };
 const json = (body: unknown, status=200) => new Response(JSON.stringify(body), {status,headers:{...headers,'Content-Type':'application/json'}});
@@ -10,7 +11,7 @@ export async function handleProposalResponse(req: Request, db: any) {
   if(req.method==='POST') {const raw=await req.text();if(raw.length>12000)return json({error:'Request too large'},413);body=JSON.parse(raw);if(!body||typeof body!=='object'||Array.isArray(body))return json({error:'Invalid request.'},400);}
   const token=req.method==='GET'?url.searchParams.get('token'):body.token;
   if(typeof token!=='string'||!/^[0-9a-f-]{72}$/.test(token))return json({error:'This response link is unavailable.'},404);
-  const {data:email,error}=await db.from('proposal_check_emails').select('id,organization_id,status,response_url,response_expires_at').eq('response_token',token).maybeSingle();
+  const {data:email,error}=await db.from('proposal_check_emails').select('id,organization_id,status,response_url,response_expires_at,recipient_name,recipient_email,proposal_id').eq('response_token',token).maybeSingle();
   if(error)throw error;
   if(!email||email.status!=='sent'||Date.parse(email.response_expires_at)<Date.now())return json({error:'This response link is unavailable or expired.'},404);
   async function record(kind:string,choice:string,step:string|null=null,message:string|null=null,key=crypto.randomUUID()) {
@@ -38,6 +39,7 @@ export async function handleProposalResponse(req: Request, db: any) {
   if(message.length>5000||!(/^[0-9a-f-]{36}$/.test(body.event_key||'')))return json({error:'Invalid response.'},400);
   if(body.action==='message'&&!step&&!message)return json({error:'Choose a next step or write a message.'},400);
   const event_id=await record(body.action,body.choice,step,body.action==='message'?message:null,body.event_key);
+  if(body.action==='message')await notifyProposalMessage(db,email,event_id);
   return json({success:true,event_id});
  } catch {return json({error:'We could not save this response. Please try again.'},503);}
 }
