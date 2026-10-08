@@ -340,18 +340,20 @@ ${truncatedBody}`;
 
         // Fire-and-forget email notifications for reps who have email_leads enabled
         const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-        const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+        const notificationKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         for (const rep of salesReps) {
           if (rep.email_leads !== false && rep.email) {
             fetch(`${supabaseUrl}/functions/v1/send-lead-notification`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${anonKey}`,
+                "Authorization": `Bearer ${notificationKey}`,
               },
               body: JSON.stringify({
                 leadId: newLead.id,
-                repEmail: rep.email,
+                to: [rep.email],
+                isFishbowl: true,
+                leadName: contactName,
                 contactName,
                 opportunity: extractedData.opportunity_summary || subject,
                 source: "email_forward",
