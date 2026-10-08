@@ -99,10 +99,12 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
   const [recurringDeleteTarget, setRecurringDeleteTarget] = useState<Appointment | null>(null);
 
   useEffect(() => {
+    if (!profile?.id || !profile.organization_id) return;
     loadCalendars();
 
     // Check for URL parameters to restore state (for pop-out window)
     if (personalOnly) {
+      if (initialDate) return;
       void getOrganizationTimezone().then(tz => setCurrentDate(new Date(formatDateInTimezone(new Date().toISOString(),tz)+'T12:00:00')));
       return;
     }
@@ -130,9 +132,10 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         }
       }
     }
-  }, []);
+  }, [profile?.id, profile?.organization_id]);
 
   useEffect(() => {
+    if (!profile?.id || !profile.organization_id) return;
     if (viewMode === 'agenda') {
       loadAgendaAppointments();
     } else {
@@ -143,7 +146,8 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
     } else if (calendarView === 'shared' && selectedCalendarId) {
       loadSharedCalendarMembers(selectedCalendarId);
     }
-  }, [currentDate, viewMode, calendarView, selectedCalendarId, dateRangeFilter]);
+    return () => { calendarLoadId.current += 1; };
+  }, [currentDate, viewMode, calendarView, selectedCalendarId, dateRangeFilter, profile?.id, profile?.organization_id]);
 
   // Filter agenda appointments when filters change
   useEffect(() => {
@@ -154,7 +158,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
 
   useEffect(() => {
     filterAppointments();
-  }, [calendarView, allAppointments, sharedCalendarMemberIds]);
+  }, [calendarView, allAppointments, sharedCalendarMemberIds, profile?.id]);
 
 
   // Real-time subscription for appointments and work orders
@@ -226,7 +230,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
       setCalendars(calendarsData);
 
       // Auto-select default calendar if none selected
-      if (!selectedCalendarId && calendarsData.length > 0) {
+      if (!technicianOnly && new URLSearchParams(window.location.search).get('popup') !== 'true' && !selectedCalendarId && calendarsData.length > 0) {
         const defaultCal = calendarsData.find((c: any) => c.is_default);
         if (defaultCal) {
           setSelectedCalendarId(defaultCal.id);
@@ -313,6 +317,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
 
 
   async function handleTimeDrop(appointment: Appointment, newTime: string, newTechId?: string, targetDate?: string) {
+    if (appointment.can_view_details === false || appointment.all_day || appointment.is_blocked || appointment.isReminder) return;
     const newDate = targetDate || appointment.appointment_date;
     const targetTechId = newTechId || appointment.technician_id;
     if (!targetTechId) return;
@@ -1187,6 +1192,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
   }
 
   function requestDeleteAppointment(apt: Appointment) {
+    if (apt.can_view_details === false) return;
     if (isRecurring(apt)) {
       setRecurringDeleteTarget(apt);
     } else {
@@ -1290,13 +1296,13 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
     id: apt.id, columnKey: techTimeline ? apt.technician_id || 'unassigned' : calendarDateKey(date), start: apt.start_time?.slice(0, 5) || '00:00', end: apt.isReminder && apt.start_time && apt.end_time === apt.start_time ? timeKey(minutes(apt.start_time) + 30) : apt.end_time?.slice(0, 5) || '24:00',
     title: apt.title, kind: apt.isWorkOrder ? 'work_order' : apt.is_blocked || apt.reminderType === 'time_off' ? 'time_off' : apt.isReminder ? 'reminder' : 'appointment',
     allDay: apt.all_day || !apt.start_time || !apt.end_time,
-    draggable: !apt.isReminder && !apt.is_blocked && apt.status !== 'completed' && apt.status !== 'cancelled',
+    draggable: apt.can_view_details !== false && !apt.all_day && !apt.isReminder && !apt.is_blocked && apt.status !== 'completed' && apt.status !== 'cancelled',
     onDragStart: event => { if (techTimeline) setDraggedItem({ appointment: apt, sourceTime: apt.start_time }); else setDraggedAppointment(apt); event.dataTransfer.effectAllowed = 'move'; },
     onDragEnd: () => { setDraggedAppointment(null); setDraggedItem(null); },
     content: <><div className="font-semibold truncate">{apt.isWorkOrder ? <button type="button" onClick={() => { if (onWorkOrderSelect) onWorkOrderSelect(apt.id); else window.location.assign(`/?tab=work_orders&workOrderId=${apt.id}`); }} className="hover:underline text-left">{apt.title}</button> : <button type="button" onClick={() => setSelectedEventId(selectedEventId === apt.id ? null : apt.id)} className="hover:underline text-left">{apt.title}</button>}</div>
       <div className="truncate">{apt.all_day ? 'All day' : apt.start_time === apt.end_time ? timeLabel(apt.start_time) : `${timeLabel(apt.start_time)} – ${timeLabel(apt.end_time)}`}</div>
       {apt.technician_name && <div className="truncate">{apt.technician_name}</div>}
-      {!apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && !apt.is_blocked && <button type="button" onClick={e => { e.stopPropagation(); requestDeleteAppointment(apt); }} className="text-red-700 hover:underline" aria-label={'Delete ' + apt.title}>Delete</button>}</>,
+      {apt.can_view_details !== false && !apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && !apt.is_blocked && <button type="button" onClick={e => { e.stopPropagation(); requestDeleteAppointment(apt); }} className="text-red-700 hover:underline" aria-label={'Delete ' + apt.title}>Delete</button>}</>,
   })));
 
   return (
@@ -1392,7 +1398,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         onEventDrop={date => { if (draggedAppointment) void handleTimeDrop(draggedAppointment, draggedAppointment.start_time.slice(0, 5), undefined, date); }} />}
       {viewMode === 'gantt' && <CalendarGantt dates={timeGridDates.map(calendarDateKey)} tracks={calendarView === 'my' ? [{ id: profile!.id, label: profile!.full_name || 'My Calendar' }] : calendarView === 'technicians' ? technicians.map(tech => ({ id: tech.id, label: tech.full_name })) : Array.from(new Map(appointments.filter(apt => apt.technician_id).map(apt => [apt.technician_id!, { id: apt.technician_id!, label: apt.technician_name || 'Calendar member' }])).values())}
         events={timeGridEvents.map(event => ({ ...event, date: event.columnKey, technicianId: appointments.find(apt => apt.id === event.id)?.technician_id || '' }))} loading={loading} error={loadError} onRetry={() => { void loadAppointments(); }}
-        onDateSelect={date => { setCurrentDate(new Date(date + 'T12:00:00')); setViewMode('day'); }} onEventSelect={event => { setCurrentDate(new Date(event.date + 'T12:00:00')); setViewMode('day'); setSelectedEventId(event.id); }}
+        onDateSelect={date => { setCurrentDate(new Date(date + 'T12:00:00')); setViewMode('day'); }} onEventSelect={event => { if (event.kind === 'work_order') { if (onWorkOrderSelect) onWorkOrderSelect(event.id); else window.location.assign(`/?tab=work_orders&workOrderId=${event.id}`); } else { setCurrentDate(new Date(event.date + 'T12:00:00')); setViewMode('day'); setSelectedEventId(event.id); } }}
         onEventDrop={(date, techId) => { if (draggedAppointment) void handleTimeDrop(draggedAppointment, draggedAppointment.start_time.slice(0, 5), techId, date); }} />}
 
       {/* Day and week share the same grid used when scheduling work orders. */}
@@ -1408,7 +1414,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
             <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{apt.title}</h3><StatusBadge status={apt.status} /><button type="button" onClick={() => setSelectedEventId(null)} className="min-h-11 px-3 text-sm">Close details</button></div>
             <p className="text-sm">{apt.all_day ? 'All day' : apt.start_time === apt.end_time ? timeLabel(apt.start_time) : `${timeLabel(apt.start_time)} – ${timeLabel(apt.end_time)}`}{apt.technician_name ? ` · ${apt.technician_name}` : ''}</p>
             {apt.customer_name && <p className="text-sm">{apt.customer_name}</p>}
-            {!apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && !apt.is_blocked && <button type="button" onClick={() => requestDeleteAppointment(apt)} className="min-h-11 text-sm text-red-700 hover:underline">Delete appointment</button>}
+            {apt.can_view_details !== false && !apt.isWorkOrder && !apt.isReminder && apt.status !== 'completed' && !apt.is_blocked && <button type="button" onClick={() => requestDeleteAppointment(apt)} className="min-h-11 text-sm text-red-700 hover:underline">Delete appointment</button>}
           </div>)}
           <p className="text-xs text-gray-500">Click an open time or drag across time slots to add an event. Drag an appointment to another day to reschedule.</p>
         </div>

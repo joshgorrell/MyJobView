@@ -81,6 +81,7 @@ export default function ConfirmModal({
               </div>
             </div>
             <button
+              type="button"
               onClick={onCancel}
               className="flex-shrink-0 text-muted hover:text-secondary transition-colors ml-2"
             >
@@ -89,12 +90,14 @@ export default function ConfirmModal({
           </div>
           <div className="flex gap-2 px-5 pb-5 justify-end">
             <button
+              type="button"
               onClick={onCancel}
               className="px-4 py-2 text-sm font-medium text-secondary bg-elevated hover:bg-elevated rounded-lg transition-colors"
             >
               {cancelLabel}
             </button>
             <button
+              type="button"
               onClick={onConfirm}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${styles.confirmClass}`}
             >
