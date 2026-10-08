@@ -71,3 +71,15 @@ assert.equal((await call({ ...manual, action: 'proposal_send', send_key: crypto.
 assert.equal(emails.at(-1).to, 'jane@example.com');
 assert.equal(emails.at(-1).reply_to, 'josh@electroniclife.com');
 console.log('Customer selection, manual recipients, email validation and unlinked sender routing passed.');
+
+for (const variant of ['sales', 'owner']) {
+ for (const recipient_name of ['Volland Foundation', 'Mary Ann Smith', 'Volland & Partners']) {
+  const preview = await call({ ...manual, variant, recipient_name });
+  assert.ok(preview.body.html.includes(`Hi ${recipient_name.replace(/&/g, '&amp;')},`), 'Preview preserves the complete entered name');
+  assert.equal((await call({ ...manual, variant, recipient_name, action: 'proposal_send', send_key: crypto.randomUUID() })).status, 200);
+  assert.ok(emails.at(-1).html.includes(`Hi ${recipient_name.replace(/&/g, '&amp;')},`), 'Sent email preserves the complete entered name');
+ }
+}
+const savedName = proposalFollowUpContent(settings, { contact_name: 'Volland Foundation', first_name: 'Volland' }, { name: 'Josh', email: 'sender@example.com', owner: true });
+assert.ok(savedName.includes('Hi Volland Foundation,'), 'Saved complete name takes priority over first name');
+console.log('Full business and personal recipient names preserved in both preview and send variants.');

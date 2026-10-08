@@ -74,7 +74,7 @@ function buildInvitationEmail(
     ? `<p>Thank you,</p><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px;vertical-align:middle"><img src="${escape(settings.invitation_owner_photo_url)}" alt="${escape(settings.invitation_owner_name)}" width="72" style="display:block;width:72px;height:auto;border-radius:10px;border:0" /></td><td style="vertical-align:middle;line-height:1.5"><strong>${escape(settings.invitation_owner_name)}</strong><br><span style="font-size:14px">Owner, ${company}</span></td></tr></table>`
     : `<p>Thank you,<br>${personal ? escape(settings.invitation_owner_name) : `${company} leadership team`}</p>`;
   const html = wrapInEmailLayout(
-    `<p>Hi ${escape(contact.first_name || contact.contact_name || "there")},</p><p>${introduction} Thank you for considering us for your <strong>${escape(opportunityName)}</strong>. Since we didn’t earn your business, could you spare 30 seconds to tell ${personal ? "me" : "us"} why? Your honest feedback will help us improve.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p style="font-size:13px">Your feedback is shared privately with authorized company reviewers.</p>${signature}`,
+    `<p>Hi ${escape(contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || "there")},</p><p>${introduction} Thank you for considering us for your <strong>${escape(opportunityName)}</strong>. Since we didn’t earn your business, could you spare 30 seconds to tell ${personal ? "me" : "us"} why? Your honest feedback will help us improve.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p style="font-size:13px">Your feedback is shared privately with authorized company reviewers.</p>${signature}`,
     company,
     escape(settings?.company_email || ""),
     "#0e7490",
@@ -386,9 +386,9 @@ Deno.serve(async (req) => {
         const name = typeof b.recipient_name === "string" ? b.recipient_name.trim() : "";
         const email = typeof b.recipient_email === "string" ? b.recipient_email.trim() : "";
         if (!name || name.length > 200 || /[\r\n]/.test(name) || email.length > 254 || !/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(email)) return json({ error: "Enter a customer name and a valid email address." }, 400);
-        contact = { first_name: name.split(/\s+/)[0], contact_name: name, email };
+        contact = { contact_name: name, email };
       } else {
-        contact = await checked(await client.from("contacts").select("first_name,contact_name,email")
+        contact = await checked(await client.from("contacts").select("first_name,last_name,contact_name,full_name,company_name,email")
           .eq("id", proposal?.contact_id || b.contact_id).eq("organization_id", org).maybeSingle());
         if (!contact) return json({ error: "Could not find that customer. They may have been deleted." }, 400);
       }
@@ -437,7 +437,7 @@ Deno.serve(async (req) => {
       // Use the user's RLS-scoped customer lookup as well as an explicit tenant check.
       const contact = await checked(
         await client.from("contacts").select(
-          "id,organization_id,email,contact_name,first_name,company_name",
+          "id,organization_id,email,contact_name,full_name,first_name,last_name,company_name",
         ).eq("id", b.contact_id).eq("organization_id", org).single(),
       );
       if (!contact.email) {

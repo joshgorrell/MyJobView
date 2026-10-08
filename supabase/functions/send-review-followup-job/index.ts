@@ -190,7 +190,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: reviewRows, error: reviewErr } = await supabaseAdmin
         .from('review_requests')
-        .select('id, contact_id, recipient_email, recipient_name, method, contacts:contact_id(contact_name, first_name, email)')
+        .select('id, contact_id, recipient_email, recipient_name, method, contacts:contact_id(contact_name, full_name, first_name, last_name, company_name, email)')
         .eq('organization_id', orgId)
         .eq('request_type', 'customer_review')
         .eq('review_completed', false)
@@ -211,7 +211,7 @@ Deno.serve(async (req: Request) => {
           const recipientEmail = contact?.email || row.recipient_email;
           if (!recipientEmail) continue;
 
-          const customerName = contact?.first_name || contact?.contact_name || row.recipient_name || '';
+          const customerName = row.recipient_name || contact?.contact_name || contact?.full_name || contact?.company_name || [contact?.first_name, contact?.last_name].filter(Boolean).join(' ') || '';
 
           const REVIEW_URL = 'https://g.page/r/CZzvVUth7kuyEBM/review';
           const emailHtml = buildFollowUpReviewEmail({
@@ -223,7 +223,7 @@ Deno.serve(async (req: Request) => {
             reviewUrl: REVIEW_URL,
           });
 
-          const firstName = customerName.split(' ')[0];
+          const firstName = customerName;
           const subject = firstName
             ? `One last ask, ${firstName} — we'd love your review`
             : `One last ask — we'd love your review`;
@@ -297,7 +297,7 @@ Deno.serve(async (req: Request) => {
             responseToken: row.response_token,
           });
 
-          const firstName = (row.customer_name || '').split(' ')[0];
+          const firstName = row.customer_name || '';
           const subject = firstName
             ? `Still waiting to hear from you, ${firstName}!`
             : 'Still waiting to hear from you!';

@@ -118,12 +118,12 @@ Deno.serve(async (req: Request) => {
 
     let recipientEmail = email;
     let customerName = name || '';
-    let subjectName = (name || '').split(' ')[0];
+    let subjectName = name || '';
 
     if (contactId) {
       const { data: contact, error: contactError } = await supabaseAdmin
         .from('contacts')
-        .select('contact_name, first_name, last_name, email, company_name')
+        .select('contact_name, full_name, first_name, last_name, email, company_name')
         .eq('id', contactId)
         .single();
 
@@ -150,8 +150,8 @@ Deno.serve(async (req: Request) => {
       }
 
       recipientEmail = contact.email;
-      customerName = contact.first_name || contact.contact_name || contact.company_name || '';
-      subjectName = contact.first_name || contact.company_name || '';
+      customerName = contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '';
+      subjectName = contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '';
     }
 
     if (!recipientEmail) {

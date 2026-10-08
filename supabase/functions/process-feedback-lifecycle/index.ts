@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
       headers: { "Authorization": `Bearer ${serviceKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         contactId: project.contact_id,
-        customerName: contact.first_name || contact.contact_name || contact.full_name || "",
+        customerName: contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || "",
         customerEmail: contact.email,
         salesRepId, leadTechId,
         surveyType, projectId: project.id, salesOrderId: project.sales_order_id
@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
     results.push({ project_id: project.id, survey_type: surveyType, status: "sent" });
   }
 
-  const common = "id,name,contact_id,sales_order_id,substantial_completion_date,test_tune_started_at,contacts:contact_id(contact_name,full_name,first_name,email)";
+  const common = "id,name,contact_id,sales_order_id,substantial_completion_date,test_tune_started_at,contacts:contact_id(contact_name,full_name,first_name,last_name,company_name,email)";
 
   // Day 0 feedback. <= today also safely catches a transient failed run; uniqueness makes it idempotent.
   const completion = await db.from("projects").select(common).not("substantial_completion_date", "is", null)
@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Post-Test & Tune feedback is anchored to the authoritative Sales Order end date.
-  const ended = await db.from("sales_orders").select("id,test_tune_end_date,projects!inner(id,name,contact_id,sales_order_id,substantial_completion_date,test_tune_started_at,contacts:contact_id(contact_name,full_name,first_name,email))")
+  const ended = await db.from("sales_orders").select("id,test_tune_end_date,projects!inner(id,name,contact_id,sales_order_id,substantial_completion_date,test_tune_started_at,contacts:contact_id(contact_name,full_name,first_name,last_name,company_name,email))")
     .not("test_tune_end_date", "is", null).lte("test_tune_end_date", today).limit(100);
   if (ended.error) throw ended.error;
   for (const order of ended.data || []) {
