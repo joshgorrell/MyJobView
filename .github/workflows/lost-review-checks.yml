@@ -5,6 +5,10 @@ on:
     paths:
       - 'src/components/Reviews/**'
       - 'supabase/functions/lost-opportunity-review/**'
+      - 'supabase/functions/proposal-check-response/**'
+      - 'supabase/functions/proposal-check-open/**'
+      - 'supabase/functions/_shared/proposalCheckOptions.ts'
+      - 'supabase/migrations/*proposal_check*'
       - 'supabase/migrations/*lost_review*'
       - 'tests/reviews/**'
       - '.github/workflows/lost-review-checks.yml'
@@ -24,10 +28,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:reviews
+      - run: node tests/reviews/proposal-follow-up.mjs && node tests/reviews/proposal-check-history.mjs && node tests/reviews/proposal-check-responses.mjs
       - run: npm run build
         env:
           VITE_SUPABASE_URL: https://test.supabase.co
           VITE_SUPABASE_ANON_KEY: test-key
       - run: npm install --no-save --package-lock=false playwright@1.55.1
       - run: npx playwright install --with-deps chromium
+      - run: node tests/reviews/proposal-response-browser.mjs
       - run: node tests/reviews/browser.mjs

@@ -27,6 +27,7 @@ import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
 import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
+const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
 // Lazy load components
@@ -478,6 +479,7 @@ function AppContent() {
     '/portal/membership',
     '/portal/signup',
     '/lost-opportunity-review',
+    '/proposal-check-response',
     '/security-onboarding',
     '/onboarding',
     '/login',
@@ -509,6 +511,10 @@ function AppContent() {
     return <LoadingFallback />;
   }
   // --- END PORTAL USER ISOLATION ---
+
+  if (currentPath === '/proposal-check-response') {
+    return <Suspense fallback={<LoadingFallback />}><ProposalCheckResponse /></Suspense>;
+  }
 
   if (currentPath === '/lost-opportunity-review') {
     return <Suspense fallback={<LoadingFallback />}><LostOpportunityForm /></Suspense>;

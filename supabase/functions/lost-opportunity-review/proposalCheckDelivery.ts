@@ -7,7 +7,7 @@ export async function sendTrackedProposalCheck(db: any, transport: (init: Reques
   };
   let row = await read();
   if (!row) {
-    const { data, error } = await db.from('proposal_check_emails').insert({ ...values, open_token: crypto.randomUUID() + crypto.randomUUID(), status: 'pending' }).select('*').single();
+    const { data, error } = await db.from('proposal_check_emails').insert({ ...values, open_token: crypto.randomUUID() + crypto.randomUUID(), response_token: crypto.randomUUID() + crypto.randomUUID(), status: 'pending' }).select('*').single();
     if (error && error.code !== '23505') throw error;
     row = data || await read();
   }
@@ -17,7 +17,8 @@ export async function sendTrackedProposalCheck(db: any, transport: (init: Reques
   const src = new URL('/functions/v1/proposal-check-open', baseUrl);
   src.searchParams.set('token', row.open_token);
   const pixel = `<img src="${src.toString().replace(/&/g, '&amp;')}" width="1" height="1" alt="" style="width:1px;height:1px;border:0" />`;
-  const html = row.email_html.includes('</body>') ? row.email_html.replace('</body>', pixel + '</body>') : row.email_html + pixel;
+  const trackedHtml = row.email_html.replace(/#proposal-check-preview-(love_it|considering|needs_work|off_base|declined)/g, (_match: string, choice: string) => `${baseUrl}/functions/v1/proposal-check-response?token=${row.response_token}&amp;choice=${choice}`);
+  const html = trackedHtml.includes('</body>') ? trackedHtml.replace('</body>', pixel + '</body>') : trackedHtml + pixel;
   const response = await transport({ headers: { 'Idempotency-Key': `proposal-check-${row.organization_id}-${row.send_key}` }, body: JSON.stringify({ from: row.from_address, to: row.recipient_email, reply_to: row.reply_to, subject: row.subject, html }) });
   let provider: any = {};
   try { provider = await response.json(); } catch { /* Status still determines success. */ }
