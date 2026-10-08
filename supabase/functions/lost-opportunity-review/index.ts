@@ -691,7 +691,11 @@ Deno.serve(async (req) => {
     return json({ error: "Unknown action" }, 400);
   } catch (e) {
     console.error("Lost review request failed", e);
-    const message = e instanceof Error ? e.message : "Unable to process this request. Please try again.";
+    const message = e instanceof Error
+      ? e.message
+      : typeof e === "object" && e !== null && "message" in e && typeof e.message === "string"
+      ? e.message
+      : "Unable to process this request. Please try again.";
     return json(
       { error: message },
       400,
