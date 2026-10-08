@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useAuth } from "../../contexts/AuthContext";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../../lib/supabase";
@@ -5,6 +6,8 @@ import { formatCurrency } from "../../lib/utils";
 import { X } from "lucide-react";
 
 type Line = {
+  products?: { is_discontinued?: boolean };
+  discontinued_override?: boolean;
   id: string;
   product_name: string;
   model_number?: string;
@@ -24,6 +27,7 @@ export function PurchasingDocumentModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const [discontinuedOverride, setDiscontinuedOverride] = useState(false);
   const [doc, setDoc] = useState<any>(null),
     [lines, setLines] = useState<Line[]>([]),
     [vendors, setVendors] = useState<any[]>([]),
@@ -76,7 +80,7 @@ export function PurchasingDocumentModal({
         const r = await supabase
           .from("purchase_orders")
           .select(
-            "*,po_items(*),purchase_quote_vendors(*),converted:purchase_orders!purchase_orders_source_quote_id_fkey(id),vendors(vendor_name),warehouses(name)",
+            "*,po_items(*,products(is_discontinued)),purchase_quote_vendors(*),converted:purchase_orders!purchase_orders_source_quote_id_fkey(id),vendors(vendor_name),warehouses(name)",
           )
           .eq("id", activeDocumentId)
           .single();
@@ -88,13 +92,14 @@ export function PurchasingDocumentModal({
       } else {
         const r = await supabase
           .from("product_request_items")
-          .select("*")
+          .select("*,products(is_discontinued)")
           .in(
             "id",
             (requestItems || []).map((x) => x.id),
           );
         if (r.error) throw r.error;
         const ls = (r.data || []).map((x) => ({
+          products: x.products,
           id: x.id,
           product_name: x.product_name,
           model_number: x.model_number,
@@ -133,6 +138,7 @@ export function PurchasingDocumentModal({
   }
   async function create() {
     await perform(async () => {
+      if (lines.some(line => line.products?.is_discontinued) && !discontinuedOverride) throw Error('Confirm the discontinued item override after verifying vendor stock.');
       if (!vendorIds.length || !warehouse || !office)
         throw Error("Select vendors, a warehouse and an office.");
       const r = await supabase.rpc("create_request_purchase_document", {
@@ -145,6 +151,7 @@ export function PurchasingDocumentModal({
         p_warehouse_id: warehouse,
         p_quote: quote,
         p_header: {
+          discontinued_override: discontinuedOverride,
           office_id: office,
           expected_date: expected,
           external_note: external,
@@ -202,6 +209,7 @@ export function PurchasingDocumentModal({
       const r = await supabase.rpc("convert_purchase_quote", {
         p_quote_id: doc.id,
         p_vendor_id: bid.vendor_id,
+        p_discontinued_override: discontinuedOverride || (lines.some(l => l.products?.is_discontinued) && lines.filter(l => l.products?.is_discontinued).every(l => l.discontinued_override)),
       });
       if (r.error) throw r.error;
       onSuccess();
@@ -381,6 +389,12 @@ export function PurchasingDocumentModal({
                 </div>
               </div>
             )}
+            {lines.some(line => line.products?.is_discontinued) && (!doc || quote) && (
+              <label className="flex items-start gap-2 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <input type="checkbox" aria-label="Override discontinued items" checked={discontinuedOverride} onChange={event => setDiscontinuedOverride(event.target.checked)} />
+                <span>Override discontinued items — purchasing has confirmed vendor stock is available.</span>
+              </label>
+            )}
             <div className="overflow-x-auto border rounded">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
@@ -402,7 +416,7 @@ export function PurchasingDocumentModal({
                     <tr key={l.id} className="border-t">
                       <td className="p-2">{l.job_reference}</td>
                       <td className="p-2">
-                        {l.product_name}
+                        {l.product_name}<ProductStatusNotice product={l.products} />
                         <span className="block text-xs text-gray-500">
                           {l.model_number}
                         </span>

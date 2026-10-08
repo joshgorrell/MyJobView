@@ -39,7 +39,7 @@
     "test:work-order-billing:browser": "npm run build && node tests/work-order-billing/browser.mjs && node tests/work-order-billing/work-order-browser.mjs",
     "test:purchasing": "node tests/purchasing/database.mjs && node tests/purchasing/email.mjs && node tests/purchasing/delivery.mjs",
     "test:purchasing:browser": "npm run build && node tests/purchasing/browser.mjs",
-    "test:catalog": "node tests/catalog/grouping.mjs",
+    "test:catalog": "node tests/catalog/grouping.mjs && node tests/catalog/lifecycle-database.mjs",
     "test:catalog:browser": "node tests/catalog/browser.mjs",
     "test:lead-emails": "node tests/lead-emails/runtime.mjs"
   },

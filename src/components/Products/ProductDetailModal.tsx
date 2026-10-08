@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { ProductUsageHistory } from './ProductUsageHistory';
 import { useAuth } from '../../contexts/AuthContext';
 import ProductDetailPanel, { type ProductDetailPanelData } from './ProductDetailPanel';
+import ProductStatusNotice from './ProductStatusNotice';
 import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 
 interface ProductDetailModalProps {
@@ -17,6 +18,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
   const { profile } = useAuth();
   const canEdit = profile?.can_edit_products ?? false;
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
+  const [productStatus, setProductStatus] = useState<{is_active?: boolean; is_discontinued?: boolean}>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'details' | 'history'>('details');
   const [auditInfo, setAuditInfo] = useState<{ createdAt: string; createdBy: string; updatedAt: string; updatedBy: string } | null>(null);
@@ -149,6 +151,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
       });
 
       const taxonomy = catalogTaxonomy(p);
+      setProductStatus({ is_active: p.is_active, is_discontinued: p.is_discontinued });
       setManufacturerId(p.manufacturer_id || null);
       setModel(p.manufacturer_model_number || '');
       setPanelData({
@@ -215,6 +218,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
         <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-gray-900 break-words">{panelData.productName}</h2>
+            <ProductStatusNotice product={productStatus} />
             {panelData.category && (
               <p className="text-xs text-gray-500 mt-0.5 truncate">
                 {panelData.category}{panelData.subcategory ? ` / ${panelData.subcategory}` : ''}

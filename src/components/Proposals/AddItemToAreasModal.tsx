@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { X, Package, Plus, Check, Loader2, Copy, ArrowLeft, Search, Pencil } from 'lucide-react';
@@ -163,7 +164,7 @@ export default function AddItemToAreasModal({
       .select(`
         id, sku, name, description, unit, unit_price, cost, our_price,
         default_labor_hours, image_url, product_link, manufacturer_model_number,
-        item_type, is_taxable, labor_phase_id, class_id, sales_description,
+        item_type, is_taxable, is_active, is_discontinued, labor_phase_id, class_id, sales_description,
         manufacturer:manufacturers(name),
         vendor:vendors!products_default_vendor_id_fkey(vendor_name),
         category:product_categories(name),
@@ -532,7 +533,7 @@ export default function AddItemToAreasModal({
                       >
                         <Package className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 text-sm">{product.name}</div>
+                          <div className="font-medium text-gray-900 text-sm">{product.name}</div><ProductStatusNotice product={product} />
                           {(product.categoryName || product.subcategoryName || product.vendorName) && <div className="text-xs text-blue-700 mt-0.5">
                             {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
                           </div>}
