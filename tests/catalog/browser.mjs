@@ -56,6 +56,24 @@ try {
     const viewButton=page.locator('button[aria-label="View TV-1"]:visible');
     await viewButton.click();await page.getByTestId('stub-product-id').filter({hasText:'a'}).waitFor();
     await page.getByRole('button',{name:'Close test details'}).click();
+    if(width>=768){
+      await page.getByLabel('Group products by').selectOption('brand');
+      await page.getByRole('button',{name:'Expand all'}).click();
+      const checkAlignment=async()=>{
+        const columns=await page.locator('section table:visible').evaluateAll(tables=>tables.map(table=>[...table.querySelectorAll('thead th')].map(cell=>({x:cell.getBoundingClientRect().x,width:cell.getBoundingClientRect().width}))));
+        assert.ok(columns.length>=3);
+        for(const row of columns.slice(1))for(let i=0;i<row.length;i++){
+          assert.ok(Math.abs(row[i].x-columns[0][i].x)<1,'Column starts must align between brands');
+          assert.ok(Math.abs(row[i].width-columns[0][i].width)<1,'Column widths must match between brands');
+        }
+      };
+      await checkAlignment();
+      assert.equal(await group('Sony').locator('span').first().evaluate(el=>getComputedStyle(el).fontSize),'14px');
+      await page.getByRole('button',{name:'Filters',exact:true}).click();
+      await page.getByText('Hide cost column',{exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
+      await checkAlignment();
+      if(width===1440)await page.screenshot({path:'/tmp/mjv-catalog-aligned.png',fullPage:true});
+    }
     if(width===390){await page.getByLabel('Group products by').selectOption('brand');await page.getByRole('button',{name:'Expand all'}).click();await page.screenshot({path:'/tmp/mjv-catalog-mobile.png',fullPage:true});}
     assert.deepEqual(errors,[]);console.log(`Catalog interactions and layout passed at ${width}px`);
     await page.close();

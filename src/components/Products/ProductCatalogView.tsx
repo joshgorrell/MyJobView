@@ -50,9 +50,9 @@ export default function ProductCatalogView(props: Props) {
       const panelId = `${id}-group-${index}`;
       return <section key={group.key} className="min-w-0 rounded-lg border border-gray-700 overflow-hidden">
         <h3><button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => toggle(group.key)}
-          className="flex w-full min-w-0 items-center gap-2 bg-gray-800 px-3 py-3 text-left text-white hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
-          {open ? <ChevronDown size={18} className="shrink-0" /> : <ChevronRight size={18} className="shrink-0" />}
-          <span className="min-w-0 flex-1 break-words font-medium">{group.label}</span>
+          className="flex w-full min-w-0 items-center gap-2 bg-gray-800 px-3 py-2 text-left text-white hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
+          {open ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
+          <span className="min-w-0 flex-1 break-words text-sm font-medium">{group.label}</span>
           <span className="shrink-0 rounded-full bg-gray-700 px-2 py-0.5 text-xs text-gray-300">{group.products.length} {group.products.length === 1 ? 'product' : 'products'}</span>
         </button></h3>
         <div id={panelId} hidden={!open}>{open && <div className="p-2">{content(group.products)}</div>}</div>
@@ -93,16 +93,24 @@ function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onD
       </article>)}
     </div>
     <div className="hidden sm:block overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[900px] table-fixed text-sm">
+        <colgroup>
+          <col style={{ width: '24%' }} />
+          <col />
+          {groupBy !== 'vendor' && <col style={{ width: '14%' }} />}
+          <col style={{ width: 96 }} />
+          {!hideCost && <col style={{ width: 96 }} />}
+          <col style={{ width: canEdit ? 144 : 48 }} />
+        </colgroup>
         <thead className="border-b border-gray-700 text-xs text-gray-400"><tr>
           <th className="p-2 text-left">Model / SKU</th><th className="p-2 text-left">Description</th>
           {groupBy !== 'vendor' && <th className="p-2 text-left">Vendor</th>}
           <th className="p-2 text-right">Price</th>{!hideCost && <th className="p-2 text-right">Cost</th>}<th className="p-2 text-right">Actions</th>
         </tr></thead>
         <tbody>{products.map(product => <tr key={product.id} className="border-b border-gray-700 hover:bg-gray-800">
-          <td className="p-2"><button type="button" className="flex items-center gap-2 text-left" onClick={() => onView(product.id)}>{image(product)}<div>{identity(product)}</div></button></td>
+          <td className="p-2"><button type="button" className="flex w-full min-w-0 items-center gap-2 text-left" onClick={() => onView(product.id)}>{image(product)}<div className="min-w-0">{identity(product)}</div></button></td>
           <td className="p-2 text-gray-300"><div className="line-clamp-2 break-words" title={product.description || ''}>{product.description || '-'}</div>{category(product)}</td>
-          {groupBy !== 'vendor' && <td className="p-2 text-xs text-gray-400">{product.vendorName || '—'}</td>}
+          {groupBy !== 'vendor' && <td className="p-2 text-xs text-gray-400 break-words">{product.vendorName || '—'}</td>}
           <td className="p-2 text-right text-white whitespace-nowrap">{price(product)}</td>
           {!hideCost && <td className="p-2 text-right text-gray-300 whitespace-nowrap">${Number(product.cost ?? 0).toFixed(2)}</td>}
           <td className="p-2">{actions(product)}</td>
