@@ -1122,7 +1122,7 @@ export default function ReviewsView() {
                 </select>
                 <p className="mt-2 text-sm leading-relaxed text-gray-400">
                   {lifecycleType === 'manual'
-                    ? 'Ask for feedback at any time. Choose a customer below, preview the email, then send.'
+                    ? 'Ask how we did after a completed job or one-time work order. Good or Excellent invites the customer to leave a 5-star Google review.'
                     : lifecycleType === 'test_tune_welcome'
                     ? 'Invite the customer to Test & Tune. Normally sent automatically 7 days after substantial completion.'
                     : lifecycleType === 'job_completion'
