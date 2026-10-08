@@ -72,7 +72,7 @@ export function FeedbackPage() {
   const autoSubmittedRef = useRef(false);
 
   useEffect(() => {
-    loadCompanyInfo();
+    if (!token) loadCompanyInfo();
     if (hasAutoRating && !autoSubmittedRef.current) {
       autoSubmittedRef.current = true;
       submitRating(ratingParam as Rating);
@@ -100,9 +100,10 @@ export function FeedbackPage() {
   async function submitRating(rating: Rating) {
     if (!token) return;
     try {
-      const { error } = await supabase.functions.invoke('submit-customer-feedback', { body: { token, rating } });
+      const { data, error } = await supabase.functions.invoke('submit-customer-feedback', { body: { token, rating } });
       if (error) throw error;
       setSelectedRating(rating);
+      if (data?.company) setCompanyInfo({ ...data.company, reviewUrl: data.company.reviewUrl || undefined });
       setPhase('comment');
     } catch {
       setPhase('error');
@@ -114,8 +115,9 @@ export function FeedbackPage() {
     setSelectedRating(rating);
     setSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke('submit-customer-feedback', { body: { token, rating } });
+      const { data, error } = await supabase.functions.invoke('submit-customer-feedback', { body: { token, rating } });
       if (error) throw error;
+      if (data?.company) setCompanyInfo({ ...data.company, reviewUrl: data.company.reviewUrl || undefined });
       setPhase('comment');
     } catch {
       setPhase('error');
@@ -225,7 +227,7 @@ export function FeedbackPage() {
               </div>
 
               {/* Google Review prompt shown immediately for positive ratings */}
-              {(selectedRating === 'excellent' || selectedRating === 'good') && (
+              {companyInfo.reviewUrl && (selectedRating === 'excellent' || selectedRating === 'good') && (
                 <div className="mb-6 p-5 bg-gray-900 border border-gray-700 rounded-2xl">
                   <div className="flex items-center gap-2 mb-3">
                     {[1,2,3,4,5].map(i => (
@@ -235,7 +237,7 @@ export function FeedbackPage() {
                   <p className="text-white font-semibold mb-1">Sounds like we earned a 5-star review!</p>
                   <p className="text-gray-400 text-sm mb-4">Would you mind sharing on Google? It takes less than 2 minutes and helps other customers find us.</p>
                   <a
-                    href={companyInfo.reviewUrl || '#'}
+                    href={companyInfo.reviewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-3 w-full py-4 bg-white hover:bg-gray-100 text-gray-900 rounded-xl font-bold text-base transition-colors shadow-lg"
