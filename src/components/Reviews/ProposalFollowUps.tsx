@@ -92,7 +92,7 @@ export default function ProposalFollowUps() {
   const isDirty = preview && (editedSubject !== preview.subject || editedContent !== preview.content);
   const livePreviewHtml = preview ? preview.html.replace(preview.content, editedContent) : '';
 
-  return <div className="space-y-6 rounded-xl border border-cyan-800/50 bg-gray-800 p-4 sm:p-6">
+  return <section className="min-w-0 space-y-5"><div className="space-y-4 rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-6">
     <div className="flex items-start gap-3"><Mail className="mt-1 h-6 w-6 text-cyan-400" /><div><h2 className="text-xl font-bold text-white">Send a Proposal Check</h2><p className="mt-1 text-sm text-gray-400">Thank customers for the opportunity and ask what would help earn their business.</p></div></div>
     <div className="grid gap-3 sm:grid-cols-2">
       {(['sales', ...(isJosh ? ['owner'] : [])] as ('sales' | 'owner')[]).map(v => <button key={v} disabled={busy} onClick={() => { setVariant(v); reset(); }} className={`rounded-xl border p-4 text-left transition ${variant === v ? 'border-cyan-400 bg-cyan-950/40' : 'border-gray-600 hover:border-gray-400'}`} aria-pressed={variant === v}><div className="font-semibold text-white">{v === 'owner' ? 'Owner Proposal Check' : 'Proposal Check'}</div><p className="mt-1 text-sm text-gray-400">{v === 'owner' ? 'A personal note from Josh Gorrell. Replies go directly to Josh.' : 'A warm check-in from you, or the linked proposal&apos;s salesperson. Replies go directly to the sender.'}</p></button>)}
@@ -106,8 +106,9 @@ export default function ProposalFollowUps() {
     <div className="flex flex-wrap gap-3">
       <button disabled={!canSubmit || busy || sent} onClick={() => void act(false)} className="flex min-h-11 items-center gap-2 rounded-lg border border-cyan-600 px-4 py-2 text-cyan-300 disabled:opacity-50"><Eye className="h-4 w-4" />{busy ? 'Preparing…' : 'Preview Email'}</button>
     </div>
+    </div>
     <ProposalCheckHistory refreshKey={historyRefresh} />
-    <p className="text-xs text-gray-400">Send when you&apos;re ready. The owner note works well after the salesperson has followed up. Customer replies arrive by email.</p>
+
 
     {preview && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="Email preview">
@@ -167,5 +168,5 @@ export default function ProposalFollowUps() {
         </div>
       </div>
     )}
-  </div>;
+  </section>;
 }

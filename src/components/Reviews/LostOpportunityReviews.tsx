@@ -48,7 +48,7 @@ export default function LostOpportunityReviews(
   const [expandedReview, setExpandedReview] = useState<string | null>(null);
   const [adminReview, setAdminReview] = useState<Review | null>(null);
   const [filter, setFilter] = useState("all");
-  const [creating, setCreating] = useState(showCreate);
+
   const [search, setSearch] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
@@ -281,7 +281,7 @@ export default function LostOpportunityReviews(
         title,
       })
     ) {
-      setCreating(false);
+
       setContact(null);
       setSearch("");
       setName("");
@@ -345,10 +345,10 @@ export default function LostOpportunityReviews(
   }
   return (
     <section className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">
-            Lost Opportunity Reviews
+            Lost Opportunities
           </h2>
           <p className="text-gray-400 text-sm mt-0.5">
             Learn why we lost and earn another chance. Customer feedback is
@@ -356,28 +356,8 @@ export default function LostOpportunityReviews(
           </p>
         </div>
         <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <label className="flex min-w-0 items-center gap-2 text-gray-300 text-sm">
-            Filter
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="min-h-11 min-w-0 flex-1 rounded-lg bg-gray-800 border border-gray-600 p-2 text-base sm:text-sm"
-            >
-              <option value="all">All</option>
-              <option value="awaiting">Awaiting Response</option>
-              <option value="new">NEW!</option>
-              <option value="complete">Complete</option>
-              <option value="winnable">Still Winnable</option>
-              <option value="bids">Competing Bid Uploaded</option>
-            </select>
-          </label>
-          <button
-            disabled={!canSend}
-            onClick={() => setCreating(!creating)}
-            className="min-h-11 bg-cyan-700 text-white rounded-lg px-4 py-2 text-sm"
-          >
-            {creating ? "Cancel" : "Send Lost Opportunity Email"}
-          </button>
+
+
         </div>
       </div>
       {error && (
@@ -390,10 +370,10 @@ export default function LostOpportunityReviews(
           {notice}
         </p>
       )}
-      {creating && canSend && (
+      {canSend && (
         <form
           onSubmit={send}
-          className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4 max-w-3xl"
+          className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4"
         >
           <label className="block text-gray-200">
             Customer (required)<input
@@ -532,6 +512,21 @@ export default function LostOpportunityReviews(
         </div>
       )}
       {adminReview && <AdminSalesReviewModal requestId={adminReview.request_id} customer={adminReview.recipient || "Customer"} onClose={() => setAdminReview(null)} />}
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-white">Send History & Responses</h2>          <label className="flex min-w-0 items-center gap-2 text-gray-300 text-sm">
+            Filter
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="min-h-11 min-w-0 flex-1 rounded-lg bg-gray-800 border border-gray-600 p-2 text-base sm:text-sm"
+            >
+              <option value="all">All</option>
+              <option value="awaiting">Awaiting Response</option>
+              <option value="new">NEW!</option>
+              <option value="complete">Complete</option>
+              <option value="winnable">Still Winnable</option>
+              <option value="bids">Competing Bid Uploaded</option>
+            </select>
+          </label></div>
       {loading
         ? <p className="text-gray-400">Loading…</p>
         : visible.length === 0

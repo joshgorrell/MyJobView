@@ -30,3 +30,14 @@ assert.ok(scopes.some(([table,key,value])=>table==='company_settings'&&key==='or
 subdomain='other';assert.equal((await submit()).data.company.reviewUrl,null);
 valid=false;assert.equal((await submit()).status,404);
 console.log('Rating email links, unclipped layout, and tenant-scoped Google handoff passed.');
+
+for (const file of ['send-satisfaction-email','send-punchlist-invite']) {
+  const source = await read(`supabase/functions/${file}/index.ts`);
+  const start = source.indexOf('function injectNoteIntoHtml');
+  const end = source.indexOf('const corsHeaders', start);
+  const { injectNoteIntoHtml } = await run(source.slice(start, end) + '\nexport { injectNoteIntoHtml };');
+  const html = injectNoteIntoHtml('<html><body><a href="https://test.example/feedback?token=real-token">Rate</a></body></html>', '<script>& note');
+  assert.ok(html.includes('&lt;script&gt;&amp; note'));
+  assert.ok(html.includes('token=real-token'), 'Personalization preserves the actual response token');
+  assert.equal(injectNoteIntoHtml('<body>Template</body>', ''), '<body>Template</body>');
+}

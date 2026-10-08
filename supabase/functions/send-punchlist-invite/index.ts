@@ -3,6 +3,24 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEmailTemplate, getCompanySettings, replacePlaceholders, convertTextToHtml, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
 
+function injectNoteIntoHtml(html: string, note: string): string {
+    if (!note.trim()) return html;
+    const noteBlock = `
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+        <tr>
+          <td style="background:#f8fafc;border-left:4px solid #06b6d4;border-radius:0 8px 8px 0;padding:16px 20px;">
+            <p style="color:#0c4a6e;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px 0;">Personal Note</p>
+            <p style="color:#374151;font-size:15px;line-height:1.7;margin:0;white-space:pre-wrap;">${note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+          </td>
+        </tr>
+      </table>`;
+    const insertBefore = '<p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">';
+    if (html.includes(insertBefore)) {
+      return html.replace(insertBefore, noteBlock + insertBefore);
+    }
+    return html.replace('</body>', noteBlock + '</body>');
+  }
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -637,7 +655,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { invite_id, contact_email, contact_name, project_name, expiration_date, access_type, preview, magic_link_only, plan_id } = body;
+    const { invite_id, contact_email, contact_name, project_name, expiration_date, access_type, preview, magic_link_only, plan_id, customSubject, personalNote } = body;
 
     if (!contact_name) {
       throw new Error("contact_name is required");
@@ -865,6 +883,9 @@ Deno.serve(async (req: Request) => {
         });
       }
     }
+
+    if (typeof customSubject === 'string' && customSubject.trim()) subject = customSubject.trim().slice(0, 200);
+    if (typeof personalNote === 'string') emailHtml = injectNoteIntoHtml(emailHtml, personalNote.slice(0, 5000));
 
     if (preview) {
       return new Response(
