@@ -1064,36 +1064,30 @@ export default function ReviewsView() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-gray-700 bg-gray-900 px-5 py-5">
-        <div className="flex items-center gap-2.5"><MessageSquare className="h-5 w-5 text-cyan-300" /><h1 className="text-2xl font-bold text-white">Feedback</h1></div>
-        <p className="mt-2 text-sm text-gray-300">Review the work. Check the proposal. Learn from lost opportunities.</p>
-      </div>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3">
+        <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-cyan-300" /><h1 className="text-xl font-bold text-white">Feedback</h1></div>
+        {canRequestGoogleReviews && <button type="button" onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-amber-300"><Star className="h-4 w-4" />Ask for a Google Review</button>}
+      </header>
 
-      {canRequestGoogleReviews && <div className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 to-gray-900 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3"><Star className="mt-0.5 h-6 w-6 shrink-0 fill-amber-400 text-amber-400" /><div><h2 className="font-bold text-white">Ask for a Google Review</h2><p className="mt-1 text-sm text-gray-300">Quick access to email, text, or share your Google review link.</p></div></div>
-        <button type="button" onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 py-2 font-semibold text-gray-950 hover:bg-amber-300 sm:shrink-0"><Star className="h-4 w-4" />Ask for a Google Review</button>
-      </div>}
-
-      <nav aria-label="Feedback sections" className="grid gap-3 sm:grid-cols-3">
+      <nav aria-label="Feedback sections" className="grid grid-cols-3 gap-1 border-b border-gray-700">
         {(canViewCustomerFeedback || canManageCustomerFeedback) && <button type="button" onClick={() => {
           if (canViewCustomerFeedback) setActiveTab('dashboard');
           else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }
-        }} aria-current={activeTab === 'dashboard' || activeTab === 'send' ? 'page' : undefined} className={`min-w-0 rounded-xl border p-4 text-left transition ${activeTab === 'dashboard' || activeTab === 'send' ? 'border-amber-400 bg-amber-950/30' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
-          <Star className="mb-3 h-5 w-5 text-amber-400" /><span className="block text-lg font-bold text-white">Job Reviews</span><span className="mt-1 block text-sm text-gray-300">Customer ratings, private feedback, and public Google reviews after the work.</span>
+        }} aria-current={activeTab === 'dashboard' || activeTab === 'send' ? 'page' : undefined} className={`min-h-11 min-w-0 rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'dashboard' || activeTab === 'send' ? 'border-amber-400 bg-amber-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+          <Star className="mr-1 hidden h-4 w-4 text-amber-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Job Reviews</span>
         </button>}
-        {canManageCustomerFeedback && <button type="button" onClick={() => setActiveTab('proposal')} aria-current={activeTab === 'proposal' ? 'page' : undefined} className={`min-w-0 rounded-xl border p-4 text-left transition ${activeTab === 'proposal' ? 'border-cyan-400 bg-cyan-950/30' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
-          <FileText className="mb-3 h-5 w-5 text-cyan-400" /><span className="block text-lg font-bold text-white">Proposal Check</span><span className="mt-1 block text-sm text-gray-300">Ask what the customer thinks of the proposal and what would help earn their business.</span>
+        {canManageCustomerFeedback && <button type="button" onClick={() => setActiveTab('proposal')} aria-current={activeTab === 'proposal' ? 'page' : undefined} className={`min-h-11 min-w-0 rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'proposal' ? 'border-cyan-400 bg-cyan-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+          <FileText className="mr-1 hidden h-4 w-4 text-cyan-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Proposal Check</span>
         </button>}
-        {(canViewLostOpportunities || canSendLostOpportunities) && <button type="button" onClick={() => setActiveTab('lost')} aria-current={activeTab === 'lost' ? 'page' : undefined} className={`min-w-0 rounded-xl border p-4 text-left transition ${activeTab === 'lost' ? 'border-violet-400 bg-violet-950/30' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
-          <MessageSquare className="mb-3 h-5 w-5 text-violet-400" /><span className="block text-lg font-bold text-white">Lost Opportunities</span><span className="mt-1 block text-sm text-gray-300">Learn why the customer chose another option and whether there’s another chance.</span>
+        {(canViewLostOpportunities || canSendLostOpportunities) && <button type="button" onClick={() => setActiveTab('lost')} aria-current={activeTab === 'lost' ? 'page' : undefined} className={`min-h-11 min-w-0 rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'lost' ? 'border-violet-400 bg-violet-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+          <MessageSquare className="mr-1 hidden h-4 w-4 text-violet-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Lost Opportunities</span>
         </button>}
       </nav>
 
-      {(activeTab === 'dashboard' || activeTab === 'send') && (canViewCustomerFeedback || canManageCustomerFeedback) && <section aria-label="Job Reviews" className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-bold text-white">Job Reviews</h2><p className="mt-1 text-sm text-gray-300">Customers can rate their experience, send feedback privately, or leave a Google review. Ratings and review statistics belong here.</p></div>
+      {(activeTab === 'dashboard' || activeTab === 'send') && (canViewCustomerFeedback || canManageCustomerFeedback) && <section aria-label="Job Reviews" className="border-b border-gray-700 pb-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-bold text-white">Job Reviews</h2><p className="mt-1 text-sm text-gray-300">Ratings, private feedback, and Google reviews. Stats and history are below.</p></div>
           <div className="flex flex-wrap gap-2 sm:shrink-0">
-            {canViewCustomerFeedback && <button type="button" onClick={() => setActiveTab('dashboard')} aria-pressed={activeTab === 'dashboard'} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium ${activeTab === 'dashboard' ? 'bg-amber-400 text-gray-950' : 'border border-gray-600 text-gray-200'}`}>Stats &amp; History</button>}
-            {(canManageCustomerFeedback || canRequestGoogleReviews) && <button type="button" onClick={() => { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }} aria-pressed={activeTab === 'send'} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium ${activeTab === 'send' ? 'bg-amber-400 text-gray-950' : 'border border-gray-600 text-gray-200'}`}>Send Review Request</button>}
+            {(canManageCustomerFeedback || canRequestGoogleReviews) && <button type="button" onClick={() => { if (activeTab === 'send') setActiveTab('dashboard'); else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); } }} aria-pressed={activeTab === 'send'} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium ${activeTab === 'send' ? 'bg-amber-400 text-gray-950' : 'border border-gray-600 text-gray-200'}`}>{activeTab === 'send' ? 'Close Request Form' : 'Send Review Request'}</button>}
           </div>
         </div>
         {activeTab === 'send' && <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-700 pt-4" role="group" aria-label="Job review request type">
@@ -1105,36 +1099,6 @@ export default function ReviewsView() {
       {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><div className="rounded-xl border border-cyan-800/50 bg-cyan-950/20 p-4 sm:p-5"><h2 className="text-xl font-bold text-white">Proposal Check</h2><p className="mt-1 text-sm text-gray-300">A conversation before the decision: questions, changes, and anything that would help us earn the job. Customer replies go directly to the email sender.</p></div><ProposalFollowUps /></section>}
 
       {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><div className="rounded-xl border border-violet-800/50 bg-violet-950/20 p-4 sm:p-5"><h2 className="text-xl font-bold text-white">Lost Opportunities</h2><p className="mt-1 text-sm text-gray-300">Ask why we lost the job, review the customer’s response, and identify an opportunity to recover it.</p></div><LostOpportunityReviews /></section>}
-
-      {/* Customer satisfaction is part of the unified Customer Feedback view. */}
-      {activeTab === 'dashboard' && canViewCustomerFeedback && (
-        <CustomerSatisfactionDashboard />
-      )}
-
-      {activeTab === 'dashboard' && canViewCustomerFeedback && <div className="rounded-xl border border-gray-700 bg-gray-800 p-5"><h3 className="mb-3 text-base font-semibold text-white">Google Review Activity</h3><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[
-        ['Requests Sent', requests.length],
-        ['Open Detected', requests.filter(r => r.email_opened).length],
-        ['Google Link Clicked', requests.filter(r => r.link_clicked).length],
-        ['Reviews Confirmed by Staff', requests.filter(r => r.review_completed).length],
-      ].map(([label, value]) => <div key={label} className="rounded-lg bg-gray-900 p-3"><div className="text-2xl font-bold text-amber-300">{value}</div><div className="mt-1 text-xs text-gray-300">{label}</div></div>)}</div><p className="mt-3 text-xs text-gray-400">Email opens and Google link clicks do not confirm that a public review was posted.</p></div>}
-
-      {activeTab === 'dashboard' && canViewCustomerFeedback && reviewChampions.length > 0 && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div><h2 className="text-base font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Secondary view: Google review requests attributed to the employee who asked.</p></div>
-            <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-          </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-            {reviewChampions.map((champion, index) => (
-              <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
-                <div className="font-semibold text-white truncate">{champion.name}</div>
-                <div className="mt-1 text-xl font-bold text-cyan-300">{champion.sent}</div>
-                <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Send Request Tab */}
       {activeTab === 'send' && (
@@ -1475,8 +1439,38 @@ export default function ReviewsView() {
         </div>
       )}
 
+      {/* Customer satisfaction is part of the unified Customer Feedback view. */}
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && (
+        <CustomerSatisfactionDashboard />
+      )}
+
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && <div className="rounded-xl border border-gray-700 bg-gray-800 p-5"><h3 className="mb-3 text-base font-semibold text-white">Google Review Activity</h3><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[
+        ['Requests Sent', requests.length],
+        ['Open Detected', requests.filter(r => r.email_opened).length],
+        ['Google Link Clicked', requests.filter(r => r.link_clicked).length],
+        ['Reviews Confirmed by Staff', requests.filter(r => r.review_completed).length],
+      ].map(([label, value]) => <div key={label} className="rounded-lg bg-gray-900 p-3"><div className="text-2xl font-bold text-amber-300">{value}</div><div className="mt-1 text-xs text-gray-300">{label}</div></div>)}</div><p className="mt-3 text-xs text-gray-400">Email opens and Google link clicks do not confirm that a public review was posted.</p></div>}
+
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && reviewChampions.length > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div><h2 className="text-base font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Secondary view: Google review requests attributed to the employee who asked.</p></div>
+            <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {reviewChampions.map((champion, index) => (
+              <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
+                <div className="font-semibold text-white truncate">{champion.name}</div>
+                <div className="mt-1 text-xl font-bold text-cyan-300">{champion.sent}</div>
+                <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Job review history */}
-      {activeTab === 'dashboard' && canViewCustomerFeedback && (
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && (
         <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
           {!canSeeAllRequests && (
             <div className="px-6 py-3 bg-blue-900/30 border-b border-blue-700/50 flex items-center gap-2 text-sm text-blue-300">
