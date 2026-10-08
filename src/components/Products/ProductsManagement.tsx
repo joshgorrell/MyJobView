@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Product } from '../../lib/types';
-import { Plus, CreditCard as Edit2, Trash2, Package, Search, Filter, Eye, Lock, Copy, X, ArrowUpDown, SlidersHorizontal, Grid3x3, List } from 'lucide-react';
+import { Plus, Search, Filter, Lock, X, Grid3x3, List, ArrowUpDown, Package } from 'lucide-react';
 import SinglePageProductForm from './SinglePageProductForm';
 import PackagesList from './PackagesList';
 import PackageForm from './PackageForm';
 import MonitoringServicesCatalog from './MonitoringServicesCatalog';
 import { ProductDetailModal } from './ProductDetailModal';
-import ProductsGridView from './ProductsGridView';
-import PackagesListView from './PackagesListView';
+import ProductCatalogView from './ProductCatalogView';
+import { catalogBrand, type CatalogProduct, type CatalogGrouping } from './catalogGrouping';
 import ConfirmModal from '../ui/ConfirmModal';
-import { catalogTaxonomy, type CatalogTaxonomy } from './CatalogTaxonomyFilters';
-
-type CatalogProduct = Product & CatalogTaxonomy & { category_id?: string | null; subcategory_id?: string | null; default_vendor_id?: string | null; image_url?: string | null };
+import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 
 export default function ProductsManagement() {
   const { profile, loading: authLoading } = useAuth();
@@ -38,6 +35,11 @@ export default function ProductsManagement() {
     return saved || null;
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [groupBy, setGroupBy] = useState<CatalogGrouping>(() => {
+    const saved = localStorage.getItem('productCatalog_groupBy');
+    return saved === 'category' || saved === 'vendor' || saved === 'none' ? saved : 'brand';
+  });
+  useEffect(() => { localStorage.setItem('productCatalog_groupBy', groupBy); }, [groupBy]);
   const [showMissingPhotos, setShowMissingPhotos] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -150,7 +152,7 @@ export default function ProductsManagement() {
 
       const { data, error } = await supabase
         .from('products')
-        .select('*, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
+        .select('*, manufacturers(name), catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
         .order('vendor', { nullsFirst: false })
         .order('sku', { nullsFirst: false });
 
@@ -158,7 +160,7 @@ export default function ProductsManagement() {
 
       if (error) throw error;
 
-      setProducts((data || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as CatalogProduct[]);
+      setProducts((data || []).map(p => ({ ...p, ...catalogTaxonomy(p), brandName: catalogBrand(p) })) as CatalogProduct[]);
       console.log('ProductsManagement: Products loaded successfully');
     } catch (error) {
       console.error('Error loading products:', error);
@@ -179,7 +181,7 @@ export default function ProductsManagement() {
       ]);
 
       if (mfgData.data) setManufacturers(mfgData.data);
-      if (vendorData.data) setVendors(vendorData.data.map((v: any) => ({ id: v.id, name: v.vendor_name })));
+      if (vendorData.data) setVendors(vendorData.data);
       if (phaseData.data) setPhases(phaseData.data);
     } catch (error) {
       console.error('Error loading filter options:', error);
@@ -191,10 +193,12 @@ export default function ProductsManagement() {
 
     if (showMissingPhotos) filtered = filtered.filter(p => !p.image_url?.trim());
 
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
+    if (searchTerm.trim()) {
+      const search = searchTerm.trim().toLowerCase();
       filtered = filtered.filter(p =>
         (p.name?.toLowerCase().includes(search)) ||
+        (p.description?.toLowerCase().includes(search)) ||
+        p.brandName.toLowerCase().includes(search) ||
         (p.manufacturer_model_number?.toLowerCase().includes(search)) ||
         (p.sku?.toLowerCase().includes(search)) ||
         p.categoryName.toLowerCase().includes(search) ||
@@ -289,8 +293,8 @@ export default function ProductsManagement() {
     .map(p => p.subcategoryName).filter(Boolean))).sort();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-2xl font-bold text-white">Product Catalog</h2>
           <p className="text-gray-400 mt-1">
@@ -328,10 +332,10 @@ export default function ProductsManagement() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-700">
+      <div className="flex gap-1 border-b border-gray-700">
         <button
           onClick={() => setActiveTab('products')}
-          className={`px-4 py-2 font-medium transition-colors ${
+          className={`px-2 sm:px-4 py-2 text-xs sm:text-base font-medium transition-colors ${
             activeTab === 'products'
               ? 'text-blue-400 border-b-2 border-blue-400'
               : 'text-gray-400 hover:text-white'
@@ -341,7 +345,7 @@ export default function ProductsManagement() {
         </button>
         <button
           onClick={() => setActiveTab('packages')}
-          className={`px-4 py-2 font-medium transition-colors ${
+          className={`px-2 sm:px-4 py-2 text-xs sm:text-base font-medium transition-colors ${
             activeTab === 'packages'
               ? 'text-blue-400 border-b-2 border-blue-400'
               : 'text-gray-400 hover:text-white'
@@ -351,7 +355,7 @@ export default function ProductsManagement() {
         </button>
         <button
           onClick={() => setActiveTab('monitoring')}
-          className={`px-4 py-2 font-medium transition-colors ${
+          className={`px-2 sm:px-4 py-2 text-xs sm:text-base font-medium transition-colors ${
             activeTab === 'monitoring'
               ? 'text-blue-400 border-b-2 border-blue-400'
               : 'text-gray-400 hover:text-white'
@@ -364,7 +368,7 @@ export default function ProductsManagement() {
       {/* Search and Filter Bar - Consistent across all tabs */}
       <div className="flex items-center gap-3 flex-wrap">
         {/* Search Bar */}
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-0 basis-full sm:basis-auto">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -391,6 +395,13 @@ export default function ProductsManagement() {
           </button>
         )}
 
+        {activeTab === 'products' && (
+          <select aria-label="Group products by" value={groupBy} onChange={e => setGroupBy(e.target.value as CatalogGrouping)}
+            className="max-w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
+            <option value="brand">Group: Brand</option><option value="category">Group: Category</option>
+            <option value="vendor">Group: Vendor</option><option value="none">No grouping</option>
+          </select>
+        )}
         {/* View Toggle - Always visible */}
         <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
           <button
@@ -469,7 +480,7 @@ export default function ProductsManagement() {
             className="fixed inset-0 z-[9998]"
             onClick={() => setShowFilterPanel(false)}
           />
-          <div className="fixed right-4 top-32 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999] p-4 space-y-4 max-h-[calc(100vh-150px)] overflow-y-auto">
+          <div className="fixed right-4 top-32 w-80 max-w-[calc(100vw-2rem)] bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999] p-4 space-y-4 max-h-[calc(100vh-150px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-white font-semibold">Filter Products</h3>
             <button
@@ -523,13 +534,13 @@ export default function ProductsManagement() {
 
           {manufacturers.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Manufacturer</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Brand</label>
               <select
                 value={filterManufacturer}
                 onChange={(e) => setFilterManufacturer(e.target.value)}
                 className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
               >
-                <option value="all">All Manufacturers</option>
+                <option value="all">All Brands</option>
                 {manufacturers.map(mfg => (
                   <option key={mfg.id} value={mfg.id}>{mfg.name}</option>
                 ))}
@@ -708,6 +719,8 @@ export default function ProductsManagement() {
           <button
             onClick={() => {
               setSearchTerm('');
+              setShowMissingPhotos(false);
+              setFilterSubcategory('all');
               setFilterType('all');
               setFilterCategory('all');
               setFilterManufacturer('all');
@@ -720,133 +733,18 @@ export default function ProductsManagement() {
           </button>
         </div>
       ) : activeTab === 'products' ? (
-        productsViewMode === 'grid' ? (
-          <ProductsGridView
-            products={filteredProducts}
-            canEdit={canEdit}
-            hideCost={hideCost}
-            onView={(productId) => setViewingProductId(productId)}
-            onEdit={handleEdit}
-            onDuplicate={handleDuplicate}
-            onDelete={(id) => setConfirmModal({ title: 'Delete Product', message: 'Delete this product?', onConfirm: () => handleDelete(id) })}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
-              <thead className="text-[10px] sm:text-xs lg:text-sm text-gray-400 border-b border-gray-700">
-                <tr>
-                  <th className="text-left py-1 sm:py-1.5 px-1 sm:px-2 w-8 sm:w-10 lg:w-12"></th>
-                  <th className="text-left py-1 sm:py-1.5 px-1 sm:px-2">Vendor / SKU</th>
-                  <th className="text-left py-1 sm:py-1.5 px-1 sm:px-2">Description</th>
-                  <th className="text-right py-1 sm:py-1.5 px-1 sm:px-2">Price</th>
-                  {!hideCost && (
-                    <th className="text-right py-1 sm:py-1.5 px-1 sm:px-2">Cost</th>
-                  )}
-                  <th className="text-right py-1 sm:py-1.5 px-1 sm:px-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="text-[10px] sm:text-xs lg:text-sm">
-                {filteredProducts.map(product => {
-                  const cost = Number(product.cost || 0);
-                  const price = Number(product.our_price || product.unit_price || 0);
-                  const profit = price - cost;
-                  const margin = price > 0 ? (profit / price) * 100 : 0;
-                  const description = product.description || '-';
-                  const truncatedDescription = description.length > 60 ? description.substring(0, 60) + '...' : description;
-
-                  return (
-                    <tr
-                      key={product.id}
-                      onClick={() => setViewingProductId(product.id)}
-                      className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer"
-                    >
-                      <td className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.manufacturer_model_number}
-                            className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 object-cover rounded border border-gray-600"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-gray-700 rounded flex items-center justify-center">
-                            <Package size={12} className="text-gray-500 sm:w-3 sm:h-3 lg:w-4 lg:h-4" />
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2">
-                        {product.vendorName && (
-                          <div className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-wide font-medium truncate">
-                            {product.vendorName}
-                          </div>
-                        )}
-                        <div className="font-mono font-medium text-white truncate lg:whitespace-normal">
-                          {product.sku || product.manufacturer_model_number}
-                        </div>
-                      </td>
-                      <td
-                        className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2 text-gray-300 max-w-xs"
-                        title={description}
-                      >
-                        <div className="truncate">
-                          {truncatedDescription}
-                        </div>
-                        {(product.categoryName || product.subcategoryName) && (
-                          <div className="truncate text-[9px] sm:text-[10px] text-gray-400">
-                            {[product.categoryName, product.subcategoryName].filter(Boolean).join(' / ')}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2 text-right text-white font-medium">
-                        ${price.toFixed(2)}
-                      </td>
-                      {!hideCost && (
-                        <td className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2 text-right text-gray-300">
-                          ${cost.toFixed(2)}
-                        </td>
-                      )}
-                      <td className="py-0.5 sm:py-1 lg:py-1.5 px-1 sm:px-2" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                          <button
-                            onClick={() => setViewingProductId(product.id)}
-                            className="text-green-400 hover:text-green-300 p-1 touch-manipulation"
-                            title="View details & history"
-                          >
-                            <Eye size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" />
-                          </button>
-                          {canEdit && (
-                            <>
-                              <button
-                                onClick={() => handleEdit(product.id)}
-                                className="text-blue-400 hover:text-blue-300 p-1 touch-manipulation"
-                                title="Edit product"
-                              >
-                                <Edit2 size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDuplicate(product.id)}
-                                className="text-purple-400 hover:text-purple-300 p-1 touch-manipulation"
-                                title="Duplicate product"
-                              >
-                                <Copy size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" />
-                              </button>
-                              <button
-                                onClick={() => setConfirmModal({ title: 'Delete Product', message: 'Delete this product?', onConfirm: () => handleDelete(product.id) })}
-                                className="text-red-400 hover:text-red-300 p-1 touch-manipulation"
-                                title="Delete product"
-                              >
-                                <Trash2 size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
+        <ProductCatalogView
+          products={filteredProducts}
+          groupBy={groupBy}
+          viewMode={productsViewMode}
+          revealMatches={Boolean(searchTerm.trim()) || showMissingPhotos || [filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase].some(value => value !== 'all')}
+          canEdit={canEdit}
+          hideCost={hideCost}
+          onView={setViewingProductId}
+          onEdit={handleEdit}
+          onDuplicate={handleDuplicate}
+          onDelete={(id) => setConfirmModal({ title: 'Delete Product', message: 'Delete this product?', onConfirm: () => handleDelete(id) })}
+        />
       ) : activeTab === 'packages' ? (
         <PackagesList
           key={packagesKey}

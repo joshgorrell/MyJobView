@@ -1,10 +1,11 @@
-import React from 'react';
-import { Product } from '../../lib/types';
+import type { CatalogProduct } from './catalogGrouping';
 import { formatCurrency } from '../../lib/utils';
 import { Package, CreditCard as Edit2, Trash2, Copy, Eye } from 'lucide-react';
 
 interface ProductsGridViewProps {
-  products: Product[];
+  products: CatalogProduct[];
+  showVendor?: boolean;
+  showBrand?: boolean;
   canEdit: boolean;
   hideCost: boolean;
   onView: (productId: string) => void;
@@ -20,15 +21,15 @@ export default function ProductsGridView({
   onView,
   onEdit,
   onDuplicate,
-  onDelete
+  onDelete,
+  showVendor = true,
+  showBrand = true
 }: ProductsGridViewProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
       {products.map(product => {
         const cost = Number(product.cost || 0);
-        const price = Number(product.our_price || product.unit_price || 0);
-        const profit = price - cost;
-        const margin = price > 0 ? (profit / price) * 100 : 0;
+        const price = Number(product.our_price ?? product.unit_price ?? 0);
 
         return (
           <div
@@ -43,7 +44,7 @@ export default function ProductsGridView({
               {product.image_url ? (
                 <img
                   src={product.image_url}
-                  alt={product.manufacturer_model_number}
+                  alt={product.manufacturer_model_number || ''}
                   className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
                 />
               ) : (
@@ -57,9 +58,10 @@ export default function ProductsGridView({
             <div className="p-3 space-y-2">
               {/* Vendor + SKU */}
               <div className="min-h-[40px]">
-                {product.vendor && (
+                {showBrand && product.brandName && <div className="text-xs text-muted truncate">{product.brandName}</div>}
+                {showVendor && product.vendorName && (
                   <div className="text-[10px] text-muted uppercase tracking-wide font-medium mb-0.5 truncate">
-                    {product.vendor}
+                    {product.vendorName}
                   </div>
                 )}
                 <h3

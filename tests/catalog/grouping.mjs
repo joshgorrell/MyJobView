@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+const module={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/components/Products/catalogGrouping.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports});
+const {catalogBrand,groupCatalogProducts,normalizeBrandName}=module.exports;
+assert.equal(catalogBrand({vendor:'SnapAV'}),'');
+assert.equal(catalogBrand({manufacturers:{name:'Episode'},manufacturer:'Old'}),'Episode');
+assert.equal(catalogBrand({manufacturer:'Sony'}),'Sony');
+assert.equal(normalizeBrandName(' SONY  Electronics '),'sony electronics');
+const groups=groupCatalogProducts([{id:'a',brandName:' Sony ',sku:'X10'},{id:'b',brandName:'SONY',sku:'X2'},{id:'c',brandName:'',sku:'Misc'}],'brand');
+assert.equal(groups.length,2);assert.equal(groups[0].products.length,2);assert.equal(groups[0].products[0].id,'b');assert.equal(groups[1].label,'Unassigned brand');
+console.log('Brand separation, legacy brands, normalization, sorting and missing brands passed.');

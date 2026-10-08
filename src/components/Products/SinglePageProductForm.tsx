@@ -1,3 +1,4 @@
+import { normalizeBrandName } from './catalogGrouping';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -726,12 +727,19 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
   async function handleAddManufacturer() {
     if (!newItemName.trim()) return;
+    const existing = manufacturers.find(m => normalizeBrandName(m.name) === normalizeBrandName(newItemName));
+    if (existing) {
+      setFormData(prev => ({ ...prev, manufacturer_id: existing.id }));
+      setShowNewManufacturer(false);
+      setNewItemName('');
+      return;
+    }
 
     try {
       const { data, error } = await supabase
         .from('manufacturers')
         .insert({
-          name: newItemName
+          name: newItemName.trim().replace(/\s+/g, ' ')
         })
         .select()
         .single();
@@ -1351,7 +1359,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             {/* Manufacturer */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Manufacturer <span className="text-red-500">*</span>
+                Brand / Manufacturer <span className="text-red-500">*</span>
               </label>
               {showNewManufacturer ? (
                 <div className="flex flex-wrap gap-2">
@@ -1388,7 +1396,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                       errors.manufacturer ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
-                    <option value="">Select Manufacturer</option>
+                    <option value="">Select Brand / Manufacturer</option>
                     {manufacturers.map(m => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
