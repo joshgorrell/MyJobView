@@ -88,7 +88,7 @@ export function ScheduleBoard() {
             role,
             status:technician_status(status, notes)
           `)
-          .in('role', ['tech'])
+          .eq('is_technician', true)
           .eq('is_active', true)
           .order('full_name')
       ]);

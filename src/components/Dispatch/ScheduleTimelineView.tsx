@@ -84,7 +84,7 @@ export function ScheduleTimelineView() {
         supabase
           .from('profiles')
           .select('id, full_name')
-          .in('role', ['tech', 'lead_tech'])
+          .eq('is_technician', true)
           .eq('is_active', true)
           .order('full_name')
       ]);

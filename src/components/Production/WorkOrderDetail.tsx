@@ -241,7 +241,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .eq('role', 'tech')
+        .eq('is_technician', true).eq('is_active', true)
         .order('full_name');
 
       if (error) throw error;

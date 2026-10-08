@@ -122,7 +122,7 @@ export function JobAcceptanceQueue() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, role')
-        .eq('role', 'tech')
+        .eq('is_technician', true).eq('is_active', true)
         .order('full_name');
 
       if (error) throw error;

@@ -150,7 +150,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .in('role', ['sales', 'admin'])
+      .eq('is_sales_rep', true)
       .eq('is_active', true)
       .order('full_name');
 
@@ -257,7 +257,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
               .from('profiles')
               .select('id, email, email_leads, notify_on_fishbowl')
               .in('id', userIds)
-              .eq('role', 'sales')
+              .eq('is_sales_rep', true)
               .eq('is_active', true);
             allSalesReps = data || [];
           }
@@ -265,7 +265,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
           const { data: unassignedReps } = await supabase
             .from('profiles')
             .select('id, email, email_leads, notify_on_fishbowl')
-            .eq('role', 'sales')
+            .eq('is_sales_rep', true)
             .eq('is_active', true)
             .not('id', 'in', `(SELECT user_id FROM user_offices)`);
 
@@ -276,7 +276,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
           const { data } = await supabase
             .from('profiles')
             .select('id, email, email_leads, notify_on_fishbowl')
-            .eq('role', 'sales')
+            .eq('is_sales_rep', true)
             .eq('is_active', true);
           allSalesReps = data || [];
         }

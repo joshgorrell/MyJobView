@@ -13,6 +13,7 @@ interface UserSelectorProps {
   selectedUserId: string | null;
   onSelect: (userId: string | null, userName: string | null) => void;
   roleFilter?: string[];
+  designation?: 'is_technician' | 'is_sales_rep';
   label: string;
   placeholder?: string;
   showClearButton?: boolean;
@@ -24,6 +25,7 @@ export function UserSelector({
   selectedUserId,
   onSelect,
   roleFilter = [],
+  designation,
   label,
   placeholder = 'Select user...',
   showClearButton = true,
@@ -35,9 +37,10 @@ export function UserSelector({
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
+  const roleFilterKey = roleFilter.join(',');
   useEffect(() => {
     loadUsers();
-  }, [roleFilter]);
+  }, [roleFilterKey, designation]);
 
   async function loadUsers() {
     try {
@@ -45,9 +48,12 @@ export function UserSelector({
       let query = supabase
         .from('profiles')
         .select('id, full_name, role, email')
+        .eq('is_active', true)
         .order('full_name', { ascending: true });
 
-      if (roleFilter.length > 0) {
+      if (designation) {
+        query = query.eq(designation, true);
+      } else if (roleFilter.length > 0) {
         query = query.in('role', roleFilter);
       }
 

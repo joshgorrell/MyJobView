@@ -73,7 +73,7 @@ export function TechStatusDashboard() {
       const { data: allTechs, error: techError } = await supabase
         .from('profiles')
         .select('id, full_name, email, role')
-        .in('role', ['tech', 'manager']);
+        .eq('is_technician', true).eq('is_active', true);
 
       if (techError) throw techError;
 

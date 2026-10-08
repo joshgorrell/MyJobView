@@ -165,7 +165,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
   useEffect(() => {
     loadSalesReps();
-    supabase.from('profiles').select('id, full_name').in('role', ['tech', 'service_manager', 'manager', 'admin']).eq('is_active', true).order('full_name')
+    supabase.from('profiles').select('id, full_name').eq('is_technician', true).eq('is_active', true).order('full_name')
       .then(({data}) => setTechnicians(data || []));
     if (!isEditMode && prefilledContactId) {
       loadContact(prefilledContactId);

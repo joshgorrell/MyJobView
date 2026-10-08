@@ -19,6 +19,7 @@ interface Project {
 }
 
 interface Technician {
+  is_technician?: boolean;
   id: string;
   full_name: string;
   email: string;
@@ -147,8 +148,8 @@ export function CreateAppointmentModal({
           .order('first_name'),
         supabase
           .from('profiles')
-          .select('id, full_name, email')
-          .in('role', ['admin', 'sales', 'technician', 'service_manager'])
+          .select('id, full_name, email, is_technician')
+          .or('is_technician.eq.true,role.in.(admin,sales,technician,service_manager)')
           .eq('is_active', true)
           .order('full_name'),
       ]);
@@ -524,7 +525,7 @@ export function CreateAppointmentModal({
                   className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 >
                   <option value="">Select technician...</option>
-                  {technicians.map(tech => (
+                  {technicians.filter(tech => appointmentType !== 'work_order' || tech.is_technician).map(tech => (
                     <option key={tech.id} value={tech.id}>
                       {tech.full_name}
                     </option>

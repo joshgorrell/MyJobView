@@ -108,6 +108,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     role_id: '' as string,
     email_leads: false,
     is_sales_rep: false,
+    is_technician: false,
     can_create_proposals: true,
     can_create_purchase_orders: false,
     can_create_work_orders: false,
@@ -382,6 +383,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           role_id: formData.role_id,
           email_leads: formData.email_leads,
           is_sales_rep: formData.is_sales_rep,
+          is_technician: formData.is_technician,
           can_view_prospects: formData.can_view_prospects,
           can_view_all_tasks: formData.can_view_all_tasks,
           can_view_all_messages: formData.can_view_all_messages,
@@ -1410,6 +1412,14 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           )}
           {activeTab === 'sales' && (
             <div className="space-y-5">
+              <p className="text-sm text-gray-300">Choose where this user can be assigned. Only active users with the matching designation appear in assignment lists. These settings do not change roles or permissions.</p>
+              <label className="flex items-start gap-3 text-white">
+                <input type="checkbox" checked={formData.is_technician}
+                  onChange={(e) => setFormData({ ...formData, is_technician: e.target.checked })}
+                  className="mt-1 w-4 h-4" />
+                <span>Technician<span className="block text-xs text-gray-400 mt-1">Include in technician assignment and scheduling lists.</span></span>
+              </label>
+
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"

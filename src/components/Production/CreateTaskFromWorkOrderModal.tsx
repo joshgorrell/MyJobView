@@ -21,6 +21,7 @@ interface Profile {
   id: string;
   full_name: string;
   role: string;
+  is_sales_rep?: boolean;
 }
 
 export function CreateTaskFromWorkOrderModal({
@@ -91,7 +92,7 @@ export function CreateTaskFromWorkOrderModal({
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, role')
+        .select('id, full_name, role, is_sales_rep')
         .eq('is_active', true)
         .order('full_name');
 
@@ -99,7 +100,7 @@ export function CreateTaskFromWorkOrderModal({
       setUsers(data || []);
 
       const salesUsers = (data || []).filter(u =>
-        ['sales', 'admin'].includes(u.role)
+        u.is_sales_rep === true
       );
       setSalesReps(salesUsers);
     } catch (error) {

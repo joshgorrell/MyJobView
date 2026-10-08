@@ -26,7 +26,7 @@
     "test:work-orders": "node tests/work-orders/modal-runtime.mjs",
     "test:vip-plans": "node tests/vip-plans/flow.mjs",
     "test:program-access": "node tests/program-access/database.mjs && node tests/program-access/invite-email.mjs",
-    "test:user-setup": "node tests/user-setup/database.mjs && node tests/user-setup/runtime.mjs && node tests/user-setup/payroll.mjs",
+    "test:user-setup": "node tests/user-setup/assignment-designations.mjs && node tests/user-setup/assignment-pickers.mjs && node tests/user-setup/database.mjs && node tests/user-setup/runtime.mjs && node tests/user-setup/payroll.mjs",
     "test:user-setup:browser": "npm run build && node tests/user-setup/browser.mjs",
     "test:employee-time:browser": "node tests/employee-time/browser.mjs",
     "test:employee-time": "node tests/employee-time/database.mjs && node tests/employee-time/integration.mjs && node tests/employee-time/runtime.mjs && node tests/employee-time/sync.mjs && node tests/employee-time/gps.mjs && node tests/employee-time/notifications.mjs",

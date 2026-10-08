@@ -335,7 +335,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['tech', 'service_manager', 'manager', 'admin'])
+        .eq('is_technician', true)
         .eq('is_active', true)
         .order('full_name');
 

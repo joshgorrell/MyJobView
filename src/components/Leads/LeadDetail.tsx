@@ -97,7 +97,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .in('role', ['sales', 'admin', 'manager'])
+        .eq('is_sales_rep', true)
         .eq('is_active', true)
         .order('full_name');
 
@@ -276,7 +276,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
         const { data: allSalesReps } = await supabase
           .from('profiles')
           .select('id, email, email_leads, notify_on_fishbowl')
-          .eq('role', 'sales')
+          .eq('is_sales_rep', true)
           .eq('is_active', true);
 
         if (allSalesReps && allSalesReps.length > 0) {

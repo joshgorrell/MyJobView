@@ -300,6 +300,7 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
       if (calendarView === 'my' && profile) {
         query = query.eq('id', profile.id);
       } else if (calendarView === 'technicians') {
+        query = query.eq('is_technician', true);
         // If viewing "Technician Calendar", filter by calendar membership if a calendar is selected
         if (selectedCalendarId) {
           const { data: members } = await supabase
@@ -315,9 +316,6 @@ export function AppointmentsCalendar({ personalOnly = false, onWorkOrderSelect }
             setTechnicians([]);
             return;
           }
-        } else {
-          // No calendar selected, show only technicians by default
-          query = query.eq('role', 'tech');
         }
       }
 
