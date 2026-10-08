@@ -61,7 +61,9 @@ function buildSatisfactionEmail(params: {
     ? `It’s been about a year since your system was completed. We’d love a quick check-in on how everything is working for you. This is also a great time to schedule a system checkup and ask about available service or protection plans.`
     : params.surveyType === 'post_test_tune'
       ? `Your Test & Tune period has wrapped up. After living with the system and giving us a chance to make adjustments, we’d love to know how the overall experience went.`
-      : `Your project is substantially complete. Before Test & Tune begins, we’d love a quick read on how our team did and whether there’s anything that needs our attention.`;
+      : params.surveyType === 'job_completion'
+        ? `Your project is substantially complete. Before Test & Tune begins, we’d love a quick read on how our team did and whether there’s anything that needs our attention.`
+        : `Now that our work is finished, we’d love to know how we did. Please choose a rating below and share any feedback. If we earned a Good or Excellent rating, we’d appreciate a 5-star Google review.`;
 
   return `<!DOCTYPE html>
 <html lang="en">
