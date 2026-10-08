@@ -14,6 +14,9 @@ for (const owner of [false, true]) {
   for (const value of Object.values(globalThis.__options.proposalChoices)) assert.ok(html.includes(value.label));
   assert.ok(html.includes('Josh Gorrell, Owner'));
   assert.ok(html.includes('mailto:josh@electroniclife.com'));
+  assert.ok(html.indexOf('Thank you,<br>') > html.indexOf('#proposal-check-preview-declined'), 'Closing signature follows all response buttons');
+  const edited = wrapProposalContent(settings, '<p>Edited personal note</p>', { name: owner ? 'Josh Gorrell' : 'Aaron Koker', email: 'sender@example.com', owner });
+  assert.ok(edited.indexOf('Thank you,<br>') > edited.indexOf('#proposal-check-preview-declined'), 'Edited emails preserve closing order');
   assert.ok(!html.includes('<script>'));
   assert.ok(!html.includes('Thank you for your business.'));
   if (owner) await writeFile('/tmp/mjv-owner-followup-preview.html', html);
