@@ -82,5 +82,5 @@ export function DailyLaunchpad({onClose,onNavigate}: {onClose:()=>void; onNaviga
   </div>;
 }
 export function DailyLaunchpadButton({onOpen}:{onOpen:()=>void}) {
-  return <button onClick={onOpen} aria-label="Open Command Center" title="Command Center" className="p-2 rounded-lg text-secondary hover:bg-elevated"><CalendarDays className="w-5 h-5" /></button>;
+  return <button onClick={onOpen} aria-label="Open Command Center" title="Command Center" className="w-11 h-11 md:w-9 md:h-9 flex shrink-0 items-center justify-center rounded-lg text-secondary hover:bg-elevated"><CalendarDays className="w-5 h-5" /></button>;
 }

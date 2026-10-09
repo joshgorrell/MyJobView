@@ -300,3 +300,30 @@ html {
 .product-form-controls input:disabled,
 .product-form-controls select:disabled,
 .product-form-controls textarea:disabled { opacity: 1; color: rgb(var(--text-secondary)); }
+
+/* Keep notification overlays within Safari's changing visual viewport. */
+.notification-panel {
+  top: calc(4rem + env(safe-area-inset-top, 0px));
+  right: max(.5rem, env(safe-area-inset-right, 0px));
+  left: max(.5rem, env(safe-area-inset-left, 0px));
+  max-height: calc(100vh - 4.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 4.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .notification-panel {
+    left: auto;
+    right: 1rem;
+    width: 24rem;
+    max-height: min(500px, calc(100dvh - 4.5rem));
+  }
+}
+
+.navigation-header-content {
+  padding-left: max(var(--header-gutter, .5rem), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--header-gutter, .5rem), env(safe-area-inset-right, 0px));
+}
+@media (min-width: 640px) { .navigation-header-content { --header-gutter: 1rem; } }
+@media (min-width: 1024px) { .navigation-header-content { --header-gutter: 2rem; } }
+.mobile-navigation-panel {
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, MessageCircle, CheckSquare, AlertCircle, Info, FileText, X, ChevronDown, ChevronUp, Trash2, MessageSquareWarning } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Notification } from '../../lib/types';
@@ -33,6 +34,35 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
   const { profile } = useAuth();
   const [unifiedNotifications, setUnifiedNotifications] = useState<UnifiedNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    if (window.matchMedia('(max-width: 767px)').matches) document.body.style.overflow = 'hidden';
+    panelRef.current?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setIsOpen(false); }
+      if (event.key !== 'Tab') return;
+      const controls = panelRef.current?.querySelectorAll<HTMLElement>('button, [href], [tabindex="0"]');
+      if (!controls?.length) return;
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panelRef.current)) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKey);
+      if (previousFocus?.isConnected) previousFocus.focus();
+      else bellRef.current?.focus();
+    };
+  }, [isOpen]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeFilter, setActiveFilter] = useState<'all' | 'messages' | 'tasks' | 'notifications'>('all');
   const [expandedNotification, setExpandedNotification] = useState<string | null>(null);
@@ -435,8 +465,12 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
   return (
     <div className="relative">
       <button
+        ref={bellRef}
+        aria-label="Notifications"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        className="relative w-11 h-11 md:w-10 md:h-10 flex items-center justify-center text-secondary hover:bg-elevated rounded-lg transition-colors"
       >
         <Bell className="w-6 h-6" />
         {unreadCount > 0 && (
@@ -446,49 +480,58 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[80] bg-black/30"
+            aria-hidden="true"
             onClick={() => setIsOpen(false)}
           />
-          <div className="fixed sm:absolute top-16 sm:top-auto right-0 sm:right-0 left-0 sm:left-auto sm:mt-2 w-full sm:w-96 sm:max-w-md bg-white sm:rounded-lg shadow-2xl border-t sm:border border-gray-200 z-50 max-h-[calc(100vh-4rem)] sm:max-h-[500px] flex flex-col">
-            <div className="p-3 sm:p-4 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-gray-900">Notifications</h3>
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Notifications"
+            tabIndex={-1}
+            className="notification-panel fixed bg-canvas text-primary rounded-xl shadow-2xl border border-subtle z-[90] flex flex-col overflow-hidden outline-none"
+          >
+            <div className="p-3 shrink-0 border-b border-subtle">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-bold text-primary">Notifications</h3>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="sm:hidden p-1 text-gray-400 hover:text-gray-600"
+                  aria-label="Close notifications"
+                  className="w-11 h-11 flex items-center justify-center text-muted hover:text-primary rounded-lg hover:bg-elevated"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               {unreadCount > 0 && (
-                <div className="flex gap-2 mb-2">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={handleMarkAllAsRead}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    className="min-h-9 text-xs text-brand font-medium"
                   >
                     Mark all read
                   </button>
-                  <span className="text-gray-300">|</span>
+                  <span className="text-muted">|</span>
                   <button
                     onClick={handleClearAll}
-                    className="text-xs text-red-600 hover:text-red-800 font-medium"
+                    className="min-h-9 text-xs text-danger font-medium"
                   >
                     Clear all
                   </button>
                 </div>
               )}
             </div>
-            <div className="px-3 sm:px-4 py-2 border-b border-gray-200">
+            <div className="px-3 py-2 shrink-0 border-b border-subtle">
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => setActiveFilter('all')}
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     activeFilter === 'all'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      : 'bg-elevated text-secondary hover:bg-surface'
                   }`}
                 >
                   All
@@ -498,7 +541,7 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
                   className={`px-3 py-1 text-xs rounded-full transition-colors flex items-center gap-1 ${
                     activeFilter === 'messages'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      : 'bg-elevated text-secondary hover:bg-surface'
                   }`}
                 >
                   <MessageCircle className="w-3 h-3" />
@@ -509,7 +552,7 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
                   className={`px-3 py-1 text-xs rounded-full transition-colors flex items-center gap-1 ${
                     activeFilter === 'tasks'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      : 'bg-elevated text-secondary hover:bg-surface'
                   }`}
                 >
                   <CheckSquare className="w-3 h-3" />
@@ -518,49 +561,51 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="notification-list min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {filteredNotifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <Bell className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                <div className="p-8 text-center text-muted">
+                  <Bell className="w-8 h-8 mx-auto mb-2 text-muted" />
                   <p className="text-sm">No {activeFilter === 'all' ? '' : activeFilter} yet</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-subtle">
                   {filteredNotifications.map((notification) => (
                     <div
                       key={notification.id}
                       className={`transition-colors ${
-                        !notification.is_read ? 'bg-blue-50' : ''
+                        !notification.is_read ? 'bg-infoSoft' : 'bg-canvas'
                       }`}
                     >
                       <div
-                        className="p-3 sm:p-4 hover:bg-gray-50 cursor-pointer"
+                        className="p-3 hover:bg-elevated"
                       >
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-2">
                           <div className="flex-shrink-0 mt-1">
                             {getNotificationIcon(notification)}
                           </div>
-                          <div className="flex-1 min-w-0" onClick={() => handleNotificationClick(notification)}>
-                            <p className="font-semibold text-gray-900 text-sm mb-1">
+                          <button type="button" className="flex-1 min-w-0 text-left" onClick={() => handleNotificationClick(notification)}>
+                            <p className="font-semibold text-primary text-sm mb-1 break-words">
                               {notification.title}
                             </p>
                             {notification.body && (
-                              <p className={`text-gray-600 text-sm break-words ${expandedNotification === notification.id ? '' : 'line-clamp-2'}`}>
+                              <p className={`text-secondary text-sm break-words ${expandedNotification === notification.id ? '' : 'line-clamp-2'}`}>
                                 {notification.body}
                               </p>
                             )}
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-muted mt-1">
                               {formatDistanceToNow(notification.created_at)}
                             </p>
-                          </div>
-                          <div className="flex-shrink-0 flex items-center gap-2">
+                          </button>
+                          <div className="flex-shrink-0 flex flex-col items-center gap-1">
                             {!notification.is_read && (
                               <div className="w-2 h-2 bg-blue-600 rounded-full" />
                             )}
-                            {notification.body && notification.body.length > 100 && (
+                            {notification.body && (
                               <button
+                                aria-label={expandedNotification === notification.id ? "Collapse notification" : "Expand notification"}
+                                aria-expanded={expandedNotification === notification.id}
                                 onClick={(e) => toggleExpand(e, notification.id)}
-                                className="p-1 text-gray-400 hover:text-gray-600"
+                                className="w-9 h-9 flex items-center justify-center text-muted hover:text-primary"
                               >
                                 {expandedNotification === notification.id ? (
                                   <ChevronUp className="w-4 h-4" />
@@ -571,8 +616,9 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
                             )}
                             {notification.type === 'notification' && (
                               <button
+                                aria-label="Delete notification"
                                 onClick={(e) => handleDeleteNotification(e, notification.id)}
-                                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                className="w-9 h-9 flex items-center justify-center text-muted hover:text-danger transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -586,7 +632,7 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
               )}
             </div>
           </div>
-        </>
+        </>, document.body
       )}
     </div>
   );

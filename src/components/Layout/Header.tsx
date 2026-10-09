@@ -3,6 +3,7 @@ import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { formatRoleName } from '../../lib/utils';
@@ -54,7 +55,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
         onTabChange('preferences');
         setMobileMenuOpen(false);
       }}
-      className="relative w-9 h-9 flex-shrink-0 rounded-full border border-subtle bg-elevated text-brand font-semibold text-xs flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-blue-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="relative w-11 h-11 md:w-9 md:h-9 flex-shrink-0 rounded-full border border-subtle bg-elevated text-brand font-semibold text-xs flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-blue-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       aria-label="Open profile and preferences"
       title={profile?.full_name ? `${profile.full_name} — Preferences` : 'Preferences'}
     >
@@ -159,14 +160,14 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
 
   return (
     <header className="theme-chrome theme-header bg-canvas border-b border-subtle">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="relative flex h-14 w-full items-center justify-between gap-0 sm:gap-4">
+      <div className="navigation-header-content w-full px-2 sm:px-4 lg:px-8">
+        <div className="relative flex h-14 w-full items-center justify-between gap-2 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}
-          <div className="absolute left-0 flex items-center gap-1 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-3">
             {onMenuToggle && (
               <button
                 onClick={onMenuToggle}
-                className="p-2 text-secondary hover:text-primary hover:bg-elevated rounded-lg transition-colors"
+                className="hidden md:block shrink-0 p-2 text-secondary hover:text-primary hover:bg-elevated rounded-lg transition-colors"
                 title="Toggle menu"
               >
                 <Menu className="w-5 h-5" />
@@ -174,21 +175,22 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
             )}
             <button
               onClick={() => onTabChange('feed')}
-              className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity"
+              className="flex min-w-0 items-center hover:opacity-80 transition-opacity"
+              aria-label="Open Flow"
             >
               <img
                 src={headerLogoUrl || companyLogoUrl || '/el_logo_color_(2).png'}
                 alt="Logo"
-                className="h-8 max-w-[23vw] sm:max-w-none object-contain"
+                className="h-8 w-auto max-w-full md:max-w-[160px] object-contain"
               />
             </button>
           </div>
 
           {/* User Info - Center (Desktop/iPad only) */}
-          <div className="hidden md:block flex-1" />
+          <div className="hidden md:block flex-1 min-w-0" />
 
           {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex shrink-0 items-center gap-3">
             <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} /><TimeButton onNavigate={onNavigate} />
 
             <div className="relative" ref={createMenuRef}>
@@ -343,9 +345,10 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
           </div>
 
           {/* Mobile Actions */}
-          <div className="md:hidden flex items-center gap-0.5 sm:gap-2">
+          <div className="md:hidden ml-auto flex shrink-0 items-center gap-0 sm:gap-2">
             <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} /><TimeButton onNavigate={onNavigate} />
             <NotificationBell
+              onTabChange={(tab) => { onTabChange(tab); setMobileMenuOpen(false); }}
               onLeadClick={(leadId) => {
                 onLeadClick(leadId);
                 setMobileMenuOpen(false);
@@ -366,16 +369,18 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
             {avatar}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-muted hover:text-primary hover:bg-surface rounded-lg transition-colors"
+              className="w-11 h-11 flex items-center justify-center text-muted hover:text-primary hover:bg-surface rounded-lg transition-colors"
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Menu — full-screen overlay, favorites + quick actions only */}
-        {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-50 bg-canvas overflow-y-auto">
+        {/* Mobile Menu — full-screen overlay with departments, favorites and quick actions */}
+        {mobileMenuOpen && createPortal(
+          <div className="theme-chrome mobile-navigation-panel md:hidden fixed inset-0 z-50 bg-canvas overflow-y-auto">
             {/* Header row with user info + close button */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-subtle sticky top-0 bg-canvas z-10">
               {profile && (
@@ -393,6 +398,15 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
             </div>
 
             <div className="px-4 py-4 flex flex-col gap-6">
+              {onMenuToggle && (
+                <button
+                  onClick={() => { setMobileMenuOpen(false); onMenuToggle(); }}
+                  className="w-full px-3 py-2.5 text-sm text-secondary hover:bg-surface rounded-lg flex items-center gap-3"
+                >
+                  <Menu className="w-4 h-4" />
+                  Browse departments
+                </button>
+              )}
               {/* Favorites */}
               {starredModules.length > 0 && (
                 <div>
@@ -528,7 +542,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                 </div>
               </div>
             </div>
-          </div>
+          </div>, document.body
         )}
       </div>
       {commandCenterOpen && <DailyLaunchpad onClose={()=>setCommandCenterOpen(false)} onNavigate={onNavigate} />}
