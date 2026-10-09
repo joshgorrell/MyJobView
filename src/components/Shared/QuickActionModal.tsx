@@ -127,6 +127,18 @@ export function QuickActionModal({
           max-width: 100%;
           font-size: max(16px, 1em) !important;
         }
+        .qam-body input[type="date"],
+        .qam-body input[type="time"] {
+          appearance: none;
+          -webkit-appearance: none;
+          display: block;
+          box-sizing: border-box;
+        }
+        .qam-body input[type="date"]::-webkit-date-and-time-value,
+        .qam-body input[type="time"]::-webkit-date-and-time-value {
+          min-height: 1.5em;
+          text-align: left;
+        }
         .qam-header-icon svg { color: rgb(var(--text-primary)); }
         @media (max-width: 639px) {
           .qam-body button { min-height: 44px; }
@@ -225,7 +237,7 @@ export function QuickActionModal({
           )}
 
           {/* Header */}
-          <div className={`flex items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4 flex-shrink-0 bg-gradient-to-r ${accentColor} rounded-t-2xl sm:rounded-t-xl`}>
+          <div className={`flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 flex-shrink-0 bg-gradient-to-r ${accentColor} rounded-t-2xl sm:rounded-t-xl`}>
             <div className="flex items-center gap-3 min-w-0">
               <div className="qam-header-icon w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
                 {icon}
