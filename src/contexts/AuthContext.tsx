@@ -137,6 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const refresh = () => { if (user) void loadProfile(user.id, isPortalUser); };
+    window.addEventListener('permissions-changed', refresh);
+    return () => window.removeEventListener('permissions-changed', refresh);
+  }, [user?.id, isPortalUser]);
+
   async function loadProfile(userId: string, portalUser: boolean) {
     if (loadingProfile) return;
 
@@ -191,11 +197,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(data);
 
       Promise.all([
-        supabase
+        Promise.resolve(supabase
           .from('company_settings')
           .select('*')
           .eq('organization_id', data.organization_id)
-          .maybeSingle()
+          .maybeSingle())
           .then(({ data: settings, error: settingsError }) => {
             if (!settingsError && settings) {
               setCompanySettings(settings);

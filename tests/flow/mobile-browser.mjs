@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
+const {chromium}=await import(process.env.USER_SETUP_PLAYWRIGHT_MODULE||'playwright');
 
 const directory = await mkdtemp(join(tmpdir(), 'mjv-flow-mobile-'));
 const fixture = `
@@ -63,7 +63,7 @@ try {
     await page.locator('.flow-row-main').first().click();await page.getByRole('button',{name:'Mark shown viewed',exact:true}).click();assert.equal(await page.locator('.flow-row--new').count(),0);
     await page.getByRole('button',{name:'About Flow unread indicators',exact:true}).click();assert.equal(await page.locator('.flow-footnote').isVisible(),true);
     await page.getByRole('button',{name:'About Flow unread indicators',exact:true}).click();
-    await page.getByRole('button',{name:'Update',exact:true}).click();assert.equal(await page.locator('.flow-composer').isVisible(),true);await page.getByRole('button',{name:'Update',exact:true}).click();
+    await page.getByRole('button',{name:'Create in Flow',exact:true}).click();await page.getByRole('button',{name:/Activity update/}).click();assert.equal(await page.locator('.flow-composer').isVisible(),true);await page.keyboard.press('Escape');
     if(process.env.FLOW_SCREENSHOT_DIR){await page.goto(url);await page.locator('.flow-row').first().waitFor();await page.screenshot({path:join(process.env.FLOW_SCREENSHOT_DIR,`flow-${width}.png`)});}
     console.log(`${width}px: feed begins ${headerHeight}px into card; ${visible} rows visible; controls pass`);
     await page.goto(url+'?scoped&dark');await page.locator('.flow-row').first().waitFor();assert.equal(await page.locator('.flow-segment').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

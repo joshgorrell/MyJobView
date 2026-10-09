@@ -1,3 +1,5 @@
+import { UserModuleAccess } from './UserModuleAccess';
+import { effectiveModuleAccess, isPermissionModule, permissionLabel, permissionOverridesMap } from '../../lib/permissionCatalog';
 import {
   UserSetupTabs,
   UserNotifications,
@@ -18,10 +20,6 @@ import {
   UserCircle,
   Clock,
   AlertCircle,
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
@@ -125,6 +123,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [dataLoadFailed, setDataLoadFailed] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const contentRef = useRef<HTMLFormElement>(null);
+  const moduleRequest = useRef(0);
+  const departmentRequest = useRef(0);
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
   const { reviewed, setReviewed, reviewError } = useSetupReview(user.id);
@@ -152,12 +152,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     can_create_purchase_orders:
       (user as any).can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(user.role),
     can_view_prospects: (user as any).can_view_prospects ?? false,
-    can_view_all_tasks: (user as any).can_view_all_tasks ?? true,
+    can_view_all_tasks: (user as any).can_view_all_tasks ?? false,
     can_view_all_messages: (user as any).can_view_all_messages ?? false,
-    can_view_all_pipeline: (user as any).can_view_all_pipeline ?? true,
+    can_view_all_pipeline: (user as any).can_view_all_pipeline ?? false,
     can_edit_contact_assignments: (user as any).can_edit_contact_assignments ?? false,
     can_create_work_orders: (user as any).can_create_work_orders ?? false,
-    can_edit_products: (user as any).can_edit_products ?? true,
+    can_edit_products: (user as any).can_edit_products ?? false,
     can_see_all_review_requests: (user as any).can_see_all_review_requests ?? false,
     can_request_google_reviews: (user as any).can_request_google_reviews ?? true,
     can_view_customer_feedback: (user as any).can_view_customer_feedback ?? ((user as any).can_see_all_review_requests ?? false),
@@ -168,8 +168,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     can_edit_contacts: (user as any).can_edit_contacts ?? true,
     has_calendar_access: (user as any).has_calendar_access ?? true,
     proposal_visibility_scope: (user as any).proposal_visibility_scope || ('company' as 'own' | 'office' | 'company'),
-    discussion_visibility_scope:
-      (user as any).discussion_visibility_scope || ('all' as 'all' | 'assigned_only' | 'private_only' | 'own_posts'),
     travel_bonus_enabled: (user as any).travel_bonus_enabled || false,
     travel_bonus_rate: (user as any).travel_bonus_rate || '0.50',
     travel_bonus_method: (user as any).travel_bonus_method || 'round_trip',
@@ -180,13 +178,13 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
   // --- Access tab state ---
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [deptRoleAccess, setDeptRoleAccess] = useState<Map<string, boolean>>(new Map());
+  const [, setDeptRoleAccess] = useState<Map<string, boolean>>(new Map());
   const [deptOverrides, setDeptOverrides] = useState<Map<string, DepartmentOverride>>(new Map());
   const [modules, setModules] = useState<Record<string, Module[]>>({});
   const [modRoleAccess, setModRoleAccess] = useState<Map<string, boolean>>(new Map());
   const [modOverrides, setModOverrides] = useState<Map<string, ModuleOverride>>(new Map());
-  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
-  const [accessMessage, setAccessMessage] = useState<{
+  const [, setExpandedDepts] = useState<Set<string>>(new Set());
+  const [accessMessage] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
@@ -378,6 +376,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   }
 
   async function loadDepartments() {
+    const request = ++departmentRequest.current;
     try {
       const { data: deptData, error: deptError } = await supabase
         .from('departments')
@@ -402,6 +401,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         (roleAccessData || []).forEach((item: RoleDepartmentAccess) => {
           accessMap.set(item.department_id, item.has_access);
         });
+        if (request !== departmentRequest.current) return;
         setDeptRoleAccess(accessMap);
       }
 
@@ -412,6 +412,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (overrideError) throw overrideError;
       const overrideMap = new Map<string, DepartmentOverride>();
       (overrideData || []).forEach((o: DepartmentOverride) => overrideMap.set(o.department_id, o));
+      if (request !== departmentRequest.current) return;
       setDeptOverrides(overrideMap);
     } catch (error) {
       setDataLoadFailed(true);
@@ -421,6 +422,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   }
 
   async function loadModules() {
+    const request = ++moduleRequest.current;
     try {
       const { data: moduleData, error: moduleError } = await supabase
         .from('department_modules')
@@ -430,9 +432,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (moduleError) throw moduleError;
 
       const grouped: Record<string, Module[]> = {};
-      (moduleData || []).forEach((m: Module) => {
+      (moduleData || []).filter(isPermissionModule).forEach((m: Module) => {
         if (!grouped[m.department_id]) grouped[m.department_id] = [];
-        grouped[m.department_id].push(m);
+        grouped[m.department_id].push({ ...m, display_name: permissionLabel(m.module_key, m.display_name) });
       });
       setModules(grouped);
 
@@ -447,6 +449,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         (roleAccessData || []).forEach((item: RoleModuleAccess) => {
           accessMap.set(item.module_id, item.has_access);
         });
+        if (request !== moduleRequest.current) return;
         setModRoleAccess(accessMap);
       }
 
@@ -457,6 +460,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (overrideError) throw overrideError;
       const overrideMap = new Map<string, ModuleOverride>();
       (overrideData || []).forEach((o: ModuleOverride) => overrideMap.set(o.module_id, o));
+      if (request !== moduleRequest.current) return;
       setModOverrides(overrideMap);
     } catch (error) {
       setDataLoadFailed(true);
@@ -467,136 +471,15 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
   // ===== Access tab helpers =====
 
-  function showAccessMessage(type: 'success' | 'error', text: string) {
-    setAccessMessage({ type, text });
-    setTimeout(() => setAccessMessage(null), 4000);
+  function getModEffectiveAccess(moduleId: string): boolean {
+    const all = Object.values(modules).flat();
+    const key = all.find(m => m.id === moduleId)?.module_key;
+    if (!key || (key === 'my_time_off' && !isEmployee)) return false;
+    return effectiveModuleAccess(key, all, modRoleAccess, permissionOverridesMap([...modOverrides.values()]), formData.role);
   }
 
   function getDeptEffectiveAccess(deptId: string): boolean {
-    const override = deptOverrides.get(deptId);
-    if (override) return override.has_access;
-    return deptRoleAccess.get(deptId) ?? false;
-  }
-
-  function hasDeptOverride(deptId: string): boolean {
-    return deptOverrides.has(deptId);
-  }
-
-  async function handleToggleDeptAccess(deptId: string) {
-    const currentOverride = deptOverrides.get(deptId);
-    const roleHasAccess = deptRoleAccess.get(deptId) ?? false;
-
-    try {
-      const remaining = reviewed.filter((k) => k !== 'permissions');
-      await saveSetupReview(user.id, remaining);
-      setReviewed(remaining);
-      if (currentOverride) {
-        const newAccess = !currentOverride.has_access;
-        if (newAccess === roleHasAccess) {
-          const { error } = await supabase.from('department_user_overrides').delete().eq('id', currentOverride.id);
-          if (error) throw error;
-          const newMap = new Map(deptOverrides);
-          newMap.delete(deptId);
-          setDeptOverrides(newMap);
-        } else {
-          const { error } = await supabase
-            .from('department_user_overrides')
-            .update({ has_access: newAccess })
-            .eq('id', currentOverride.id);
-          if (error) throw error;
-          const newMap = new Map(deptOverrides);
-          newMap.set(deptId, { ...currentOverride, has_access: newAccess });
-          setDeptOverrides(newMap);
-        }
-      } else {
-        const newAccess = !roleHasAccess;
-        const { data, error } = await supabase
-          .from('department_user_overrides')
-          .insert({
-            user_id: user.id,
-            department_id: deptId,
-            has_access: newAccess,
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        const newMap = new Map(deptOverrides);
-        newMap.set(deptId, data);
-        setDeptOverrides(newMap);
-      }
-      showAccessMessage('success', 'Department access updated');
-    } catch (error) {
-      console.error('Error updating department access:', error);
-      showAccessMessage('error', 'Failed to update department access');
-    }
-  }
-
-  function getModEffectiveAccess(moduleId: string): boolean {
-    const override = modOverrides.get(moduleId);
-    if (override) return override.override_type === 'grant';
-    return modRoleAccess.get(moduleId) ?? false;
-  }
-
-  function hasModOverride(moduleId: string): boolean {
-    return modOverrides.has(moduleId);
-  }
-
-  async function handleToggleModAccess(moduleId: string) {
-    const currentOverride = modOverrides.get(moduleId);
-    const roleHasAccess = modRoleAccess.get(moduleId) ?? false;
-
-    try {
-      const remaining = reviewed.filter((k) => k !== 'permissions');
-      await saveSetupReview(user.id, remaining);
-      setReviewed(remaining);
-      if (currentOverride) {
-        const currentAccess = currentOverride.override_type === 'grant';
-        const newAccess = !currentAccess;
-        if (newAccess === roleHasAccess) {
-          const { error } = await supabase.from('user_permission_overrides').delete().eq('id', currentOverride.id);
-          if (error) throw error;
-          const newMap = new Map(modOverrides);
-          newMap.delete(moduleId);
-          setModOverrides(newMap);
-        } else {
-          const newType: 'grant' | 'revoke' = newAccess ? 'grant' : 'revoke';
-          const { error } = await supabase
-            .from('user_permission_overrides')
-            .update({ override_type: newType })
-            .eq('id', currentOverride.id);
-          if (error) throw error;
-          const newMap = new Map(modOverrides);
-          newMap.set(moduleId, { ...currentOverride, override_type: newType });
-          setModOverrides(newMap);
-        }
-      } else {
-        const newType: 'grant' | 'revoke' = !roleHasAccess ? 'grant' : 'revoke';
-        const { data, error } = await supabase
-          .from('user_permission_overrides')
-          .insert({
-            user_id: user.id,
-            module_id: moduleId,
-            override_type: newType,
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        const newMap = new Map(modOverrides);
-        newMap.set(moduleId, data);
-        setModOverrides(newMap);
-      }
-      showAccessMessage('success', 'Page access updated');
-    } catch (error) {
-      console.error('Error updating page access:', error);
-      showAccessMessage('error', 'Failed to update page access');
-    }
-  }
-
-  function toggleDeptExpand(deptId: string) {
-    const newSet = new Set(expandedDepts);
-    if (newSet.has(deptId)) newSet.delete(deptId);
-    else newSet.add(deptId);
-    setExpandedDepts(newSet);
+    return (modules[deptId] || []).some(m => getModEffectiveAccess(m.id));
   }
 
   // ===== Employee tab helpers =====
@@ -646,11 +529,20 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     setError(null);
     setSuccessMessage(null);
 
+    let profileSaved = false;
+
     try {
       if (!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
         throw new Error('Enter a full name and valid email.');
+      if (!formData.username.trim()) throw new Error('Enter a username on Profile before saving.');
       if (isEmployee && (!employeeForm.hire_date || !employeeForm.pay_schedule_id))
         throw new Error('Employees require a hire date and pay schedule.');
+      if (isEmployee && employeeForm.expected_weekly_hours !== '' &&
+        (!Number.isFinite(Number(employeeForm.expected_weekly_hours)) || Number(employeeForm.expected_weekly_hours) < 0))
+        throw new Error('Expected weekly hours must be a non-negative number on Pay & Time.');
+      if (formData.travel_bonus_enabled &&
+        (!Number.isFinite(Number(formData.travel_bonus_rate)) || Number(formData.travel_bonus_rate) < 0))
+        throw new Error('Travel bonus rate must be a non-negative number on Pay & Time.');
       if (!formData.role_id) throw new Error('Please select a role for this user');
 
       const {
@@ -712,7 +604,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         can_edit_contacts: formData.can_edit_contacts,
         has_calendar_access: formData.has_calendar_access,
         proposal_visibility_scope: formData.proposal_visibility_scope,
-        discussion_visibility_scope: formData.discussion_visibility_scope,
         travel_bonus_enabled: formData.travel_bonus_enabled,
         travel_bonus_rate: formData.travel_bonus_enabled ? parseFloat(formData.travel_bonus_rate as string) : null,
         travel_bonus_method: formData.travel_bonus_enabled ? formData.travel_bonus_method : null,
@@ -728,6 +619,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
       if (updateError) throw new Error(`Database error: ${updateError.message} (${updateError.code})`);
       if (!updatedProfile) throw new Error('Update succeeded but no data returned.');
+      profileSaved = true;
 
       if (['sales', 'admin', 'manager', 'sales_manager'].includes(formData.role)) {
         await supabase.rpc('recalculate_sales_quota_for_user', {
@@ -817,7 +709,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       onClose();
     } catch (err: any) {
       console.error('Error during update:', err);
-      setError(err.message || 'Failed to update user');
+      const detail = err.message || 'Failed to update user';
+      setError(profileSaved
+        ? `The profile saved, but the remaining setup did not finish: ${detail}`
+        : `Changes were not saved: ${detail}`);
+      contentRef.current?.scrollTo({ top: 0 });
     } finally {
       setLoading(false);
     }
@@ -903,7 +799,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
             {error && (
-              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">{error}</div>
+              <div role="alert" className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">{error}</div>
             )}
             {successMessage && (
               <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-sm">
@@ -927,6 +823,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         {/* Tab content */}
         <form
           id="edit-user-form"
+          noValidate
           ref={contentRef}
           onSubmit={handleSubmit}
           onChange={() => setReviewed((prev) => prev.filter((k) => k !== activeTab))}
@@ -972,7 +869,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                   custom: deptOverrides.has(d.id),
                   modules: (modules[d.id] || []).map((m) => ({
                     name: m.display_name,
-                    enabled: getDeptEffectiveAccess(d.id) && getModEffectiveAccess(m.id),
+                    enabled: getModEffectiveAccess(m.id),
                     custom: modOverrides.has(m.id),
                   })),
                 }))}
@@ -1229,6 +1126,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
             {activeTab === 'permissions' && (
               <div className="space-y-5">
+                <p className="text-sm text-blue-200 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  Department and module access switches save immediately. Other permission checkboxes
+                  save when you select Save Changes.
+                </p>
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Permissions</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1355,29 +1256,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
 
                     <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-white mb-2">
-                        Team Pulse (Discussion) Visibility
-                      </label>
-                      <select
-                        value={formData.discussion_visibility_scope}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            discussion_visibility_scope: e.target.value as any,
-                          })
-                        }
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      >
-                        <option value="all">All Discussion Posts</option>
-                        <option value="assigned_only">Only Assigned or Mentioned Posts</option>
-                        <option value="private_only">Only Private Posts (Assigned/Mentioned)</option>
-                        <option value="own_posts">Only Their Own Posts</option>
-                      </select>
-                      <p className="text-xs text-gray-400 mt-2">
-                        <span className="font-medium">All:</span> sees all posts &middot;{' '}
-                        <span className="font-medium">Assigned:</span> only posts assigned to or mentioning them
-                        &middot; <span className="font-medium">Private:</span> only private posts they're part of
-                        &middot; <span className="font-medium">Own:</span> only posts they created
+                      <h4 className="text-sm font-medium text-white mb-2">Flow Message Visibility</h4>
+                      <p className="text-xs text-gray-400">
+                        Direct messages are visible to their participants. Department messages are visible
+                        to users with access to that department. Company messages are visible to users
+                        with Flow access. Customer conversations follow their assigned access.
                       </p>
                     </div>
                   </div>
@@ -1513,165 +1396,13 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
               </div>
             )}
 
-            {/* ===== DEPARTMENT ACCESS TAB ===== */}
             {activeTab === 'permissions' && (
-              <>
-                <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <Shield className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-blue-200">
-                      <p className="font-medium mb-1">How Access Works</p>
-                      <ul className="list-disc list-inside space-y-1 text-blue-300 text-xs">
-                        <li>Users inherit access from their role by default</li>
-                        <li>Toggle a department to override the role default</li>
-                        <li>Expand a department to control individual pages</li>
-                        <li>Overridden items are marked with a yellow badge</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Department-level access */}
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                    Department Access
-                  </h3>
-                  <div className="space-y-2">
-                    {departments.map((dept) => {
-                      const hasAccess = getDeptEffectiveAccess(dept.id);
-                      const isOverridden = hasDeptOverride(dept.id);
-                      const roleHasAccess = deptRoleAccess.get(dept.id) ?? false;
-
-                      return (
-                        <div
-                          key={dept.id}
-                          className={`rounded-lg border transition-all ${
-                            hasAccess ? 'border-green-500/30 bg-green-500/10' : 'border-gray-700 bg-gray-800/50'
-                          }`}
-                        >
-                          <div className="p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-3 flex-1">
-                              <div
-                                className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                                style={{ backgroundColor: dept.color }}
-                              >
-                                {dept.display_name.charAt(0)}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-sm text-white">{dept.display_name}</h4>
-                                  {isOverridden && (
-                                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded">
-                                      Override
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  Role default: {roleHasAccess ? 'Has access' : 'No access'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => toggleDeptExpand(dept.id)}
-                                className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded transition-colors"
-                              >
-                                {expandedDepts.has(dept.id) ? (
-                                  <ChevronDown className="w-4 h-4" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4" />
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleDeptAccess(dept.id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-xs transition-all ${
-                                  hasAccess
-                                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                                }`}
-                              >
-                                {hasAccess ? (
-                                  <>
-                                    <Eye className="w-3 h-3" /> Access
-                                  </>
-                                ) : (
-                                  <>
-                                    <EyeOff className="w-3 h-3" /> No Access
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Page-level access */}
-                          {expandedDepts.has(dept.id) && (modules[dept.id] || []).length > 0 && (
-                            <div className="px-3 pb-3 space-y-1.5 border-t border-gray-700/50 pt-2">
-                              {(modules[dept.id] || []).map((mod) => {
-                                const modHasAccess = getModEffectiveAccess(mod.id);
-                                const modIsOverridden = hasModOverride(mod.id);
-                                const modRoleHasAccess = modRoleAccess.get(mod.id) ?? false;
-
-                                return (
-                                  <div
-                                    key={mod.id}
-                                    className={`p-2.5 rounded-lg border flex items-center justify-between transition-all ${
-                                      modHasAccess
-                                        ? 'border-green-500/20 bg-green-500/5'
-                                        : 'border-gray-700 bg-gray-800/30'
-                                    }`}
-                                  >
-                                    <div className="min-w-0 flex-1 mr-3">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm text-white font-medium">{mod.display_name}</span>
-                                        {modIsOverridden && (
-                                          <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs font-medium rounded">
-                                            Override
-                                          </span>
-                                        )}
-                                      </div>
-                                      <p className="text-xs text-gray-500 mt-0.5">
-                                        {mod.description ||
-                                          `Role default: ${modRoleHasAccess ? 'Has access' : 'No access'}`}
-                                      </p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleModAccess(mod.id)}
-                                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium text-xs transition-all flex-shrink-0 ${
-                                        modHasAccess
-                                          ? 'bg-green-600 hover:bg-green-700 text-white'
-                                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                                      }`}
-                                    >
-                                      {modHasAccess ? (
-                                        <>
-                                          <Eye className="w-3 h-3" /> On
-                                        </>
-                                      ) : (
-                                        <>
-                                          <EyeOff className="w-3 h-3" /> Off
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {expandedDepts.has(dept.id) && (modules[dept.id] || []).length === 0 && (
-                            <div className="px-3 pb-3 text-center text-gray-500 text-xs">
-                              No pages in this department
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
+              <UserModuleAccess inline userId={user.id} userName={user.full_name} userRoleId={formData.role_id || null} previewRole={formData.role} onClose={() => {}} onChanged={() => {
+                void loadModules();
+                const remaining = reviewed.filter(k => k !== 'permissions');
+                void saveSetupReview(user.id, remaining);
+                setReviewed(remaining);
+              }} />
             )}
 
             {/* ===== EMPLOYEE INFO TAB ===== */}
@@ -1680,7 +1411,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                 <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-4">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                     <UserCircle className="w-4 h-4 text-blue-400" />
-                    Employee Classification
+                    Employment Classification
                   </h3>
 
                   {!isEmployee ? (
@@ -1691,7 +1422,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           <span>Classified as Non-Employee. Payroll and timekeeping are not enabled.</span>
                         </div>
                       )}
-                      {classification === 'unreviewed' && (
+                      {classification === 'unreviewed' && !showNonEmployeeConfirm && (
                         <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
                           <AlertCircle className="w-4 h-4 flex-shrink-0" />
                           <span>This legacy user has not been classified yet. Choose a classification below.</span>
@@ -1708,6 +1439,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                           setIsEmployee(true);
                           setShowEmployeeSetup(true);
+                          setShowNonEmployeeConfirm(false);
                         }}
                         className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                       >
@@ -1719,15 +1451,38 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           onClick={() => {
                             setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                             setShowNonEmployeeConfirm(true);
+                            setShowEmployeeSetup(false);
                           }}
+                          aria-pressed={showNonEmployeeConfirm}
                           className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
                         >
-                          Confirm as Non-Employee User
+                          {showNonEmployeeConfirm ? 'Non-Employee Selected' : 'Confirm as Non-Employee User'}
                         </button>
+                      )}
+                      {showNonEmployeeConfirm && (
+                        <div role="status" className="p-3 bg-blue-500/10 border border-blue-500/40 rounded-lg text-blue-200 text-sm">
+                          Non-Employee selected. Save the user to apply this classification.
+                          Subcontractors and other external users can retain their assigned access;
+                          employee payroll and timekeeping will not be enabled.
+                        </div>
                       )}
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {!employeeRecord && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
+                            setIsEmployee(false);
+                            setShowEmployeeSetup(false);
+                            setShowNonEmployeeConfirm(true);
+                          }}
+                          className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
+                        >
+                          Select Non-Employee Instead
+                        </button>
+                      )}
                       {currentConfig && !currentConfig.reviewed_at && (
                         <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
                           <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -2031,7 +1786,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         </form>
 
         {/* Footer buttons */}
-        <div className="flex gap-3 p-4 sm:p-6 border-t border-gray-700 flex-shrink-0">
+        <div className="p-4 sm:p-6 border-t border-gray-700 flex-shrink-0">
+          {(dataLoading || dataLoadFailed) && (
+            <p role="status" className="text-sm text-amber-200 mb-3">
+              {dataLoading ? 'Loading user setup before saving…'
+                : 'Saving is unavailable because setup data did not load. Access switches that showed a saved confirmation are already saved.'}
+            </p>
+          )}
+          <div className="flex gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -2047,6 +1809,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </button>
+          </div>
         </div>
       </div>
     </div>

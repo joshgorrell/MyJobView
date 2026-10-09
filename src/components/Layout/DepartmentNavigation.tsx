@@ -90,7 +90,11 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
   };
 
   const handleModuleClick = (moduleKey: string) => {
-    onModuleChange(moduleKey);
+    if (moduleKey === 'tv_dashboard' || moduleKey === 'sales_tv_dashboard') {
+      window.open(moduleKey === 'tv_dashboard' ? '/tv-dashboard' : '/sales-tv-dashboard', '_blank', 'noopener');
+    } else {
+      onModuleChange(moduleKey);
+    }
     // Clear any pending hover timeouts
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
