@@ -40,6 +40,11 @@ await db.exec(await readFile(new URL('../../supabase/migrations/20261006141909_s
 await db.exec(await readFile(new URL('../../supabase/migrations/20261001134611_project_task_visit_handoff.sql',import.meta.url),'utf8'));
 const migration=(await readdir('supabase/migrations')).find(name=>name.endsWith('_complete_work_order_scheduling.sql'));
 await db.exec(await readFile('supabase/migrations/'+migration,'utf8'));
+const hardening=(await readdir('supabase/migrations')).find(n=>n.endsWith('_harden_work_order_handoff_triggers.sql'));
+await db.exec(await readFile('supabase/migrations/'+hardening,'utf8'));
+assert.equal((await db.query("SELECT to_regprocedure('public.capture_sold_project_handoff()') IS NULL AS hidden")).rows[0].hidden,true);
+assert.equal((await db.query("SELECT has_function_privilege('authenticated','work_order_private.capture_sold_project_handoff()','EXECUTE') AS allowed")).rows[0].allowed,false);
+assert.equal((await db.query("SELECT count(*)::int n FROM pg_trigger t JOIN pg_proc p ON p.oid=t.tgfoid JOIN pg_namespace n ON n.oid=p.pronamespace WHERE t.tgname IN ('capture_sold_project_handoff','cancel_removed_task_assignments') AND n.nspname='work_order_private'")).rows[0].n,2);
 const order = (extra={}) => ({company_id:id(1),contact_id:id(30),title:'Fully scheduled service visit',type:'service',assigned_to:id(11),start_date:'2027-01-04',start_time:'09:00',end_time:'10:00',customer_contacted:true,...extra});
 const create=async(key,orders)=> (await db.query('SELECT create_work_order_assignments($1,$2,NULL) result',[id(key),JSON.stringify(orders.map(work_order=>({work_order})))] )).rows[0].result;
 const count=async(table)=>Number((await db.query(`SELECT count(*) n FROM ${table}`)).rows[0].n);
