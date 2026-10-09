@@ -1,466 +1,69 @@
-import { useState, useEffect } from 'react';
+import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Split, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
-import {
-  X,
-  Split,
-  Calendar,
-  Users,
-  ListTodo,
-  Plus,
-  Trash2,
-  AlertCircle
-} from 'lucide-react';
+import { QuickActionModal } from '../Shared/QuickActionModal';
+import { WorkOrderSchedulePicker } from '../Production/WorkOrderSchedulePicker';
+import { overlappingBookings, type CalendarBooking, type ScheduleSelection } from '../../lib/workOrderScheduling';
 
-interface JobSplitModalProps {
-  workOrder: {
-    id: string;
-    work_order_number: string;
-    title: string;
-    description: string | null;
-    estimated_hours: number;
-    assigned_to: string | null;
-    start_date: string | null;
-    projects: {
-      contacts: {
-        full_name: string;
-      };
-    };
-  };
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-interface Technician {
-  id: string;
-  full_name: string;
-  role: string;
-}
-
-interface SplitPart {
-  id: string;
-  description: string;
-  estimated_hours: number;
-  assigned_to: string;
-  scheduled_date: string;
-}
-
-export function JobSplitModal({ workOrder, onClose, onSuccess }: JobSplitModalProps) {
+interface WorkOrder { id: string; work_order_number: string; title: string; estimated_hours: number; assigned_to: string | null; start_date: string | null }
+interface Part { id: string; description: string; hours: string; technicianIds: string[]; schedule: ScheduleSelection; error: string | null }
+export function JobSplitModal({ workOrder, onClose, onSuccess }: { workOrder: WorkOrder; onClose: () => void; onSuccess: () => void }) {
   const { profile } = useAuth();
-  const [techs, setTechs] = useState<Technician[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [splitType, setSplitType] = useState<'multi_day' | 'multi_tech' | 'multi_task'>('multi_task');
-  const [splitReason, setSplitReason] = useState('');
-  const [parts, setParts] = useState<SplitPart[]>([
-    {
-      id: '1',
-      description: '',
-      estimated_hours: Math.floor(workOrder.estimated_hours / 2),
-      assigned_to: workOrder.assigned_to || '',
-      scheduled_date: workOrder.start_date || ''
-    },
-    {
-      id: '2',
-      description: '',
-      estimated_hours: Math.ceil(workOrder.estimated_hours / 2),
-      assigned_to: workOrder.assigned_to || '',
-      scheduled_date: workOrder.start_date || ''
-    }
-  ]);
-
-  useEffect(() => {
-    loadTechs();
-  }, []);
-
-  async function loadTechs() {
+  const [techs, setTechs] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [type, setType] = useState('multi_task');
+  const [reason, setReason] = useState('');
+  const blank = (): Part => ({ id: crypto.randomUUID(), description: '', hours: '', technicianIds: workOrder.assigned_to ? [workOrder.assigned_to] : [], schedule: { date: '', start: '', end: '' }, error: 'Choose an available booking.' });
+  const [parts, setParts] = useState<Part[]>(() => [blank(), blank()]);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const key = useRef(crypto.randomUUID());
+  const submitting = useRef(false);
+  const exclude = useRef([workOrder.id]);
+  useEffect(() => { let active = true; supabase.from('profiles').select('id,full_name').eq('organization_id', profile?.organization_id).eq('is_technician', true).eq('is_active', true).order('full_name').then(({ data, error }) => {
+    if (active) { if (error) setError('Technicians could not be loaded. Close and retry.'); else setTechs(data || []); }
+  }); return () => { active = false; }; }, [profile?.organization_id]);
+  const update = (id: string, value: Partial<Part>) => setParts(current => {
+    const target = current.find(part => part.id === id);
+    if (!target || Object.entries(value).every(([key, next]) => Object.is(target[key as keyof Part], next))) return current;
+    return current.map(part => part.id === id ? { ...part, ...value } : part);
+  });
+  const bookings: CalendarBooking[] = parts.map(part => ({ id: part.id, technicianId: part.technicianIds[0], date: part.schedule.date, start: part.schedule.start, end: part.schedule.end, title: part.description, kind: 'work_order' }));
+  const overlaps = parts.some(part => overlappingBookings(bookings.filter(item => item.id !== part.id), part.technicianIds, part.schedule).length);
+  const valid = parts.every(part => part.description.trim() && Number(part.hours) > 0 && Number.isFinite(Number(part.hours)) && part.technicianIds.length === 1 && techs.some(tech => tech.id === part.technicianIds[0]) && part.schedule.date && part.schedule.start && part.schedule.end && !part.error) && !overlaps;
+  async function save() {
+    if (!valid || submitting.current) return;
+    submitting.current = true; setSaving(true); setError('');
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, role')
-        .eq('is_technician', true)
-        .eq('is_active', true)
-        .order('full_name');
-
+      const { data, error } = await supabase.rpc('split_scheduled_work_order', { p_source_id: workOrder.id, p_request_id: key.current, p_split_type: type, p_reason: reason,
+        p_parts: parts.map(part => ({ description: part.description.trim(), estimated_hours: Number(part.hours), assigned_to: part.technicianIds[0], ...part.schedule })) });
       if (error) throw error;
-      setTechs(data || []);
-    } catch (error) {
-      console.error('Error loading techs:', error);
-    }
+      for (const [index, part] of parts.entries()) await notifyTechJobAssigned(part.technicianIds[0], { work_order_number: data?.[index]?.work_order_number || '', title: part.description.trim(), scheduled_date: part.schedule.date });
+      onSuccess(); onClose();
+    } catch (e) { setError((e as { message?: string }).message || 'Unable to split this work order. Try again.'); }
+    finally { submitting.current = false; setSaving(false); }
   }
-
-  function addPart() {
-    const nextDate = parts.length > 0 && parts[parts.length - 1].scheduled_date
-      ? new Date(parts[parts.length - 1].scheduled_date)
-      : new Date();
-
-    if (splitType === 'multi_day') {
-      nextDate.setDate(nextDate.getDate() + 1);
-    }
-
-    setParts([
-      ...parts,
-      {
-        id: String(parts.length + 1),
-        description: '',
-        estimated_hours: 2,
-        assigned_to: parts[0]?.assigned_to || '',
-        scheduled_date: nextDate.toISOString().split('T')[0]
-      }
-    ]);
-  }
-
-  function removePart(id: string) {
-    if (parts.length <= 2) {
-      alert('Must have at least 2 parts');
-      return;
-    }
-    setParts(parts.filter(p => p.id !== id));
-  }
-
-  function updatePart(id: string, field: keyof SplitPart, value: any) {
-    setParts(parts.map(p => p.id === id ? { ...p, [field]: value } : p));
-  }
-
-  async function handleSplit() {
-    if (parts.some(p => !p.description.trim())) {
-      alert('All parts must have a description');
-      return;
-    }
-
-    if (parts.some(p => !p.assigned_to)) {
-      alert('All parts must have an assigned technician');
-      return;
-    }
-
-    if (parts.some(p => !p.scheduled_date)) {
-      alert('All parts must have a scheduled date');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: splitData, error: splitError } = await supabase
-        .from('job_splits')
-        .insert({
-          parent_work_order_id: workOrder.id,
-          split_type: splitType,
-          split_reason: splitReason,
-          total_parts: parts.length,
-          created_by: profile?.id
-        })
-        .select()
-        .single();
-
-      if (splitError) throw splitError;
-
-      const { data: companyData } = await supabase
-        .from('company_settings')
-        .select('id')
-        .single();
-
-      if (!companyData) throw new Error('Company settings not found');
-
-      const { data: parentWO } = await supabase
-        .from('work_orders')
-        .select('project_id, contact_id, billable_type, address, service_location_city, service_location_state, service_location_zip')
-        .eq('id', workOrder.id)
-        .single();
-
-      if (!parentWO) throw new Error('Parent work order not found');
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        const woNumber = `${workOrder.work_order_number}-P${i + 1}`;
-
-        const { data: newWO, error: woError } = await supabase
-          .from('work_orders')
-          .insert({
-            company_id: companyData.id,
-            project_id: parentWO.project_id,
-            contact_id: parentWO.contact_id,
-            work_order_number: woNumber,
-            title: `${workOrder.title} (Part ${i + 1}/${parts.length})`,
-            description: part.description,
-            type: 'service',
-            status: 'assigned',
-            priority: 'medium',
-            assigned_to: part.assigned_to,
-            start_date: part.scheduled_date,
-            estimated_hours: part.estimated_hours,
-            created_by: profile?.id,
-            billable_type: parentWO.billable_type,
-            address: parentWO.address,
-            service_location_city: parentWO.service_location_city,
-            service_location_state: parentWO.service_location_state,
-            service_location_zip: parentWO.service_location_zip,
-            is_split_part: true,
-            parent_split_id: splitData.id,
-            notes: `Part ${i + 1} of ${parts.length} - Split from ${workOrder.work_order_number}`
-          })
-          .select()
-          .single();
-
-        if (woError) throw woError;
-
-        const { error: partError } = await supabase
-          .from('job_split_parts')
-          .insert({
-            job_split_id: splitData.id,
-            work_order_id: newWO.id,
-            part_number: i + 1,
-            assigned_to: part.assigned_to,
-            scheduled_date: part.scheduled_date,
-            description: part.description,
-            estimated_hours: part.estimated_hours,
-            status: 'assigned'
-          });
-
-        if (partError) throw partError;
-
-        const tech = techs.find(t => t.id === part.assigned_to);
-        if (tech) {
-          await notifyTechJobAssigned(part.assigned_to, {
-            work_order_number: woNumber,
-            title: newWO.title,
-            customer_name: workOrder.projects.contacts.full_name,
-            scheduled_date: part.scheduled_date,
-            address: parentWO.address || undefined
-          });
-        }
-      }
-
-      const { error: updateError } = await supabase
-        .from('work_orders')
-        .update({
-          status: 'split',
-          notes: `Split into ${parts.length} parts. See split parts for details.`
-        })
-        .eq('id', workOrder.id);
-
-      if (updateError) throw updateError;
-
-      alert(`Job successfully split into ${parts.length} parts!`);
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error('Error splitting job:', error);
-      alert('Failed to split job');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function getSplitTypeDescription(type: string) {
-    switch (type) {
-      case 'multi_day':
-        return 'Split job across multiple days with same or different techs';
-      case 'multi_tech':
-        return 'Assign different parts to different technicians simultaneously';
-      case 'multi_task':
-        return 'Break job into distinct tasks that can be scheduled separately';
-      default:
-        return '';
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Split className="w-6 h-6 text-blue-400" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Split Job</h3>
-                <p className="text-sm text-gray-400 mt-1">
-                  {workOrder.work_order_number} - {workOrder.title}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          <div className="bg-gray-900 rounded-lg p-4">
-            <div className="text-sm text-gray-400 mb-2">Customer</div>
-            <div className="text-white font-medium">{workOrder.projects.contacts.full_name}</div>
-            <div className="text-sm text-gray-400 mt-2">Original Estimated Hours: {workOrder.estimated_hours}h</div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Split Type *
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {[
-                { value: 'multi_day', icon: Calendar, label: 'Multi-Day' },
-                { value: 'multi_tech', icon: Users, label: 'Multi-Tech' },
-                { value: 'multi_task', icon: ListTodo, label: 'Multi-Task' }
-              ].map(type => {
-                const Icon = type.icon;
-                return (
-                  <button
-                    key={type.value}
-                    onClick={() => setSplitType(type.value as any)}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      splitType === type.value
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-gray-700 hover:border-gray-600 bg-gray-900'
-                    }`}
-                  >
-                    <Icon className={`w-6 h-6 mb-2 ${
-                      splitType === type.value ? 'text-blue-400' : 'text-gray-400'
-                    }`} />
-                    <div className={`font-medium ${
-                      splitType === type.value ? 'text-blue-400' : 'text-white'
-                    }`}>
-                      {type.label}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {getSplitTypeDescription(splitType)}
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Split Reason (Optional)
-            </label>
-            <textarea
-              value={splitReason}
-              onChange={(e) => setSplitReason(e.target.value)}
-              rows={2}
-              placeholder="Why is this job being split?"
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-gray-400">
-                Job Parts ({parts.length})
-              </label>
-              <button
-                onClick={addPart}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Add Part
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {parts.map((part, idx) => (
-                <div
-                  key={part.id}
-                  className="bg-gray-900 rounded-lg border border-gray-700 p-4"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="text-sm font-medium text-white">
-                      Part {idx + 1} of {parts.length}
-                    </div>
-                    {parts.length > 2 && (
-                      <button
-                        onClick={() => removePart(part.id)}
-                        className="p-1 hover:bg-gray-800 rounded transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">Description *</label>
-                      <input
-                        type="text"
-                        value={part.description}
-                        onChange={(e) => updatePart(part.id, 'description', e.target.value)}
-                        placeholder="What needs to be done in this part?"
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Est. Hours *</label>
-                        <input
-                          type="number"
-                          step="0.5"
-                          value={part.estimated_hours}
-                          onChange={(e) => updatePart(part.id, 'estimated_hours', parseFloat(e.target.value))}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Scheduled Date *</label>
-                        <input
-                          type="date"
-                          value={part.scheduled_date}
-                          onChange={(e) => updatePart(part.id, 'scheduled_date', e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Assign To *</label>
-                        <select
-                          value={part.assigned_to}
-                          onChange={(e) => updatePart(part.id, 'assigned_to', e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select...</option>
-                          {techs.map(tech => (
-                            <option key={tech.id} value={tech.id}>{tech.full_name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-300">
-                <strong>Note:</strong> Splitting this job will create {parts.length} new work orders and mark the original as "split". Each technician will receive a notification for their assigned part.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 border-t border-gray-700 flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSplit}
-            disabled={loading}
-            className="px-8 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold"
-          >
-            <Split className="w-5 h-5" />
-            {loading ? 'Splitting...' : `Split into ${parts.length} Parts`}
-          </button>
-        </div>
+  return <QuickActionModal title="Split job" subtitle={workOrder.work_order_number + ' · ' + workOrder.title} icon={<Split />} scrollBody={false} onClose={() => { if (!saving) onClose(); }}>
+    <div className="flex flex-col min-h-0">
+      <div className="overflow-y-auto min-h-0 p-4 space-y-4">
+        <p className="text-sm text-secondary">Schedule every part before saving. The original booking is cancelled when all parts are created; its history is preserved.</p>
+        <label className="block text-sm">Split type<select aria-label="Split type" value={type} onChange={e => setType(e.target.value)} className="block w-full rounded-lg border border-subtle bg-canvas p-2"><option value="multi_task">Separate tasks</option><option value="multi_day">Multiple days</option><option value="multi_tech">Multiple technicians</option></select></label>
+        <label className="block text-sm">Reason<textarea aria-label="Split reason" value={reason} onChange={e => setReason(e.target.value)} className="block w-full rounded-lg border border-subtle bg-canvas p-2" /></label>
+        {parts.map((part, index) => <section key={part.id} className="rounded-xl border border-subtle p-3 space-y-3">
+          <div className="flex justify-between items-center"><h3 className="font-semibold">Part {index + 1}</h3>{parts.length > 2 && <button type="button" aria-label={'Remove part ' + (index + 1)} onClick={() => setParts(current => current.filter(item => item.id !== part.id))} className="p-2"><Trash2 size={18} /></button>}</div>
+          <label className="block text-sm">Description<input aria-label={'Part ' + (index + 1) + ' description'} value={part.description} onChange={e => update(part.id, { description: e.target.value })} className="block w-full rounded-lg border border-subtle bg-canvas p-2" /></label>
+          <label className="block text-sm">Estimated hours<input aria-label={'Part ' + (index + 1) + ' estimated hours'} type="number" min="0.1" step="0.1" value={part.hours} onChange={e => update(part.id, { hours: e.target.value })} className="block w-full rounded-lg border border-subtle bg-canvas p-2" /></label>
+          <WorkOrderSchedulePicker organizationId={profile?.organization_id} technicians={techs} technicianIds={part.technicianIds} onTechniciansChange={ids => update(part.id, { technicianIds: ids.slice(-1) })} value={part.schedule} onChange={schedule => update(part.id, { schedule })} onValidationChange={error => update(part.id, { error })} excludeWorkOrderIds={exclude.current} initialMode="manual" />
+        </section>)}
+        <button type="button" disabled={parts.length >= 50 || saving} onClick={() => setParts(current => [...current, blank()])} className="flex items-center gap-2 min-h-11"><Plus size={18} />Add part</button>
+        {overlaps && <p role="alert" className="text-danger text-sm">Parts for the same technician cannot overlap.</p>}
+        {error && <p role="alert" className="text-danger text-sm">{error}</p>}
+      </div>
+      <div className="shrink-0 p-4 border-t border-subtle flex gap-3">
+        <button type="button" disabled={saving} onClick={onClose} className="flex-1 min-h-11 rounded-lg border border-subtle">Cancel</button>
+        <button type="button" disabled={saving || !valid} onClick={save} className="flex-1 min-h-11 rounded-lg bg-blue-600 text-white disabled:opacity-50">{saving ? 'Saving…' : 'Create ' + parts.length + ' parts'}</button>
       </div>
     </div>
-  );
+  </QuickActionModal>;
 }

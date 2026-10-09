@@ -47,6 +47,7 @@ interface CreateWorkOrderModalProps {
   projectId?: string;
   contactId?: string;
   initialTechnicianIds?: string[];
+  emergency?: boolean;
   serviceRequest?: ServiceRequestContext;
 }
 
@@ -128,7 +129,7 @@ interface ProductResult {
   unit_price: number | null;
 }
 
-export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId, initialTechnicianIds = [], serviceRequest }: CreateWorkOrderModalProps) {
+export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId, initialTechnicianIds = [], serviceRequest, emergency = false }: CreateWorkOrderModalProps) {
   const { profile } = useAuth();
   const workOrderOptions = useWorkOrderOptions();
   const [workOrderTypeId,setWorkOrderTypeId] = useState('');
@@ -204,7 +205,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     warranty_reference_id: '',
     title: serviceRequest ? `${serviceRequest.request_type === 'project' ? 'Project' : 'Service'}: ${serviceRequest.job_description.substring(0, 60)}` : '',
     description: serviceRequest?.job_description || '',
-    priority: serviceRequest?.priority === 'emergency' ? 'urgent' : serviceRequest?.priority === 'urgent' ? 'high' : 'medium',
+    priority: emergency ? 'urgent' : serviceRequest?.priority === 'emergency' ? 'urgent' : serviceRequest?.priority === 'urgent' ? 'high' : 'medium',
     start_date: '',
     start_time: serviceRequest?.requested_time || '',
     end_time: '',
@@ -801,8 +802,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
       // If converting from a service request, update it and send tech notifications
       if (serviceRequest && createdWorkOrders && createdWorkOrders.length > 0) {
-        const contactName = selectedContact?.full_name || selectedContact?.company_name || serviceRequest.customer_name;
-        const address = serviceRequest.job_location_address || selectedContact?.street_address;
+        const contactName = selectedContact?.full_name || selectedContact?.company_name || serviceRequest?.customer_name || formData.customer_name;
+        const address = serviceRequest?.job_location_address || formData.customer_address || selectedContact?.street_address;
         for (let i = 0; i < selectedTechnicians.length; i++) {
           const wo = createdWorkOrders[i] || createdWorkOrders[0];
           await notifyTechJobAssigned(selectedTechnicians[i], {
@@ -815,24 +816,6 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         }
       }
 
-      // Generate recurring instances if recurrence was set
-      if (recurrenceRule && createdWorkOrders && createdWorkOrders.length > 0) {
-        const parentWO = createdWorkOrders[0];
-        const { data: recurData, error: recurError } = await supabase.rpc('generate_recurring_work_orders', {
-          parent_work_order_id: parentWO.id
-        });
-        if (recurError) {
-          console.error('Error generating recurring work orders:', recurError);
-        } else {
-          const count = Array.isArray(recurData) ? recurData.length : (recurData ?? 0);
-          if (count > 0) {
-            alert(`Work order created successfully! ${count} recurring instance${count !== 1 ? 's' : ''} were also generated.`);
-            onSuccess();
-            onClose();
-            return;
-          }
-        }
-      }
 
       onSuccess();
       onClose();
@@ -851,7 +834,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       <div role="dialog" aria-modal="true" aria-label="Create work order" className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-            {serviceRequest ? 'Convert to Work Order' : 'Create Work Order'}
+            {emergency ? 'Create Emergency Work Order' : serviceRequest ? 'Convert to Work Order' : 'Create Work Order'}
           </h2>
           <button
             onClick={onClose}

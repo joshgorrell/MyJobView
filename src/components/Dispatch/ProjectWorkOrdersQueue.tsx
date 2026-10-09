@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { ScheduleWorkOrderModal } from '../Production/ScheduleWorkOrderModal';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { notifyTechJobAssigned, notifyTechJobReassigned } from '../../lib/dispatchNotifications';
 import { rescheduleWorkOrder } from '../../lib/scheduling';
 import { WorkOrderDetail } from '../Production/WorkOrderDetail';
 import {
@@ -10,7 +10,6 @@ import {
   Clock,
   MapPin,
   User,
-  CheckCircle,
   Filter,
   ChevronDown,
   ChevronUp,
@@ -31,6 +30,9 @@ interface ProjectWorkOrder {
   priority: string;
   assigned_to: string | null;
   start_date: string | null;
+  scheduled_date: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
   target_completion_date: string | null;
   estimated_hours: number;
   actual_hours: number;
@@ -41,14 +43,14 @@ interface ProjectWorkOrder {
   customer_contacted: boolean;
   projects: {
     id: string;
-    project_name: string;
+    name: string;
     status: string;
     contacts: {
       id: string;
       company_name: string | null;
       full_name: string;
       phone: string | null;
-      address_line1: string | null;
+      street_address: string | null;
       city: string | null;
       state: string | null;
     };
@@ -70,14 +72,79 @@ export function ProjectWorkOrdersQueue() {
   const [workOrders, setWorkOrders] = useState<ProjectWorkOrder[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWO, setSelectedWO] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [expandedWO, setExpandedWO] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [assigningTo, setAssigningTo] = useState<string | null>(null);
-  const [selectedTech, setSelectedTech] = useState('');
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true); setLoadError('');
+    try {
+      if (!profile?.organization_id) throw new Error('Your organization could not be loaded.');
+      let query = supabase
+        .from('work_orders')
+        .select(`
+          *,
+          projects (
+            id,
+            name,
+            status,
+            contacts (
+              id,
+              company_name,
+              full_name,
+              phone,
+              street_address,
+              city,
+              state
+            )
+          ),
+          profiles:profiles!work_orders_assigned_to_fkey (
+            id,
+            full_name
+          )
+        `)
+        .eq('organization_id', profile.organization_id)
+        .not('is_archived', 'is', true)
+        .not('project_id', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (filterStatus !== 'all') {
+        query = query.eq('status', filterStatus);
+      }
+
+      if (filterPriority !== 'all') {
+        query = query.eq('priority', filterPriority);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw new Error(error.message || 'Project work orders could not be loaded.');
+      setWorkOrders(data || []);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Project work orders could not be loaded.');
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus, filterPriority, profile?.organization_id]);
+
+  const loadTechs = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('organization_id', profile?.organization_id).eq('is_technician', true).eq('is_active', true)
+        .order('full_name');
+
+      if (error) throw new Error(error.message || 'Project work orders could not be loaded.');
+      setTechs(data || []);
+    } catch (error) {
+      console.error('Error loading techs:', error);
+    }
+  }, [profile?.organization_id]);
 
   useEffect(() => {
     loadData();
@@ -95,118 +162,10 @@ export function ProjectWorkOrdersQueue() {
     return () => {
       channel.unsubscribe();
     };
-  }, [filterStatus, filterPriority]);
+  }, [loadData, loadTechs]);
 
-  async function loadData() {
-    try {
-      let query = supabase
-        .from('work_orders')
-        .select(`
-          *,
-          projects (
-            id,
-            project_name,
-            status,
-            contacts (
-              id,
-              company_name,
-              full_name,
-              phone,
-              address_line1,
-              city,
-              state
-            )
-          ),
-          profiles (
-            id,
-            full_name
-          )
-        `)
-        .not('project_id', 'is', null)
-        .order('created_at', { ascending: false });
-
-      if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
-      }
-
-      if (filterPriority !== 'all') {
-        query = query.eq('priority', filterPriority);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setWorkOrders(data || []);
-    } catch (error) {
-      console.error('Error loading project work orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadTechs() {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, role')
-        .eq('is_technician', true).eq('is_active', true)
-        .order('full_name');
-
-      if (error) throw error;
-      setTechs(data || []);
-    } catch (error) {
-      console.error('Error loading techs:', error);
-    }
-  }
-
-  async function assignTechnician(woId: string, previousTechId: string | null) {
-    if (!selectedTech) return;
-
-    try {
-      const wo = workOrders.find(w => w.id === woId);
-      if (!wo) return;
-
-      const date = wo.start_date || new Date().toISOString().split('T')[0];
-      const startTime = '08:00';
-      const endMin = 8 * 60 + (wo.estimated_hours || 2) * 60;
-      const endTime = `${Math.floor(endMin / 60).toString().padStart(2, '0')}:${(endMin % 60).toString().padStart(2, '0')}`;
-
-      const result = await rescheduleWorkOrder(woId, date, startTime, endTime, selectedTech);
-
-      if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
-          return;
-        }
-        await rescheduleWorkOrder(woId, date, startTime, endTime, selectedTech, { force: true });
-      } else if (!result.success) {
-        alert(result.error || 'Failed to assign technician');
-        return;
-      }
-
-      if (previousTechId && previousTechId !== selectedTech) {
-        await notifyTechJobReassigned(selectedTech, {
-          work_order_number: wo.work_order_number,
-          title: wo.title,
-          previous_tech: wo.profiles?.full_name,
-          scheduled_date: wo.start_date || undefined
-        });
-      } else {
-        await notifyTechJobAssigned(selectedTech, {
-          work_order_number: wo.work_order_number,
-          title: wo.title,
-          customer_name: wo.projects.contacts.full_name,
-          scheduled_date: wo.start_date || undefined,
-          address: wo.address || wo.projects.contacts.address_line1 || undefined
-        });
-      }
-
-      setAssigningTo(null);
-      setSelectedTech('');
-      await loadData();
-    } catch (error) {
-      console.error('Error assigning technician:', error);
-      alert('Failed to assign technician');
-    }
+  function assignTechnician(woId: string) {
+    setAssigningTo(woId);
   }
 
   function getPriorityColor(priority: string) {
@@ -237,6 +196,8 @@ export function ProjectWorkOrdersQueue() {
     }
   }
 
+  if (selectedWorkOrderId) return <WorkOrderDetail workOrderId={selectedWorkOrderId} onBack={() => { setSelectedWorkOrderId(null); loadData(); }} />;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -244,6 +205,8 @@ export function ProjectWorkOrdersQueue() {
       </div>
     );
   }
+
+  if (loadError) return <div role="alert" className="p-4 space-y-3"><p>{loadError}</p><button type="button" onClick={loadData} className="min-h-11 px-4 rounded-lg border border-subtle">Retry project work orders</button></div>;
 
   return (
     <div className="space-y-4">
@@ -317,9 +280,9 @@ export function ProjectWorkOrdersQueue() {
               className="bg-gray-800 rounded-lg border border-gray-700 hover:border-green-500 transition-colors cursor-pointer"
             >
               <div className="p-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-green-500/20 text-green-400 border border-green-500/30">
                         <Briefcase className="w-4 h-4" />
                         PROJECT WO
@@ -327,11 +290,11 @@ export function ProjectWorkOrdersQueue() {
 
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getPriorityColor(wo.priority)}`}>
                         {wo.priority === 'high' && <AlertCircle className="w-3.5 h-3.5" />}
-                        {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
+                        {(wo.priority || 'medium').charAt(0).toUpperCase() + (wo.priority || 'medium').slice(1)}
                       </span>
 
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(wo.status)}`}>
-                        {wo.status.replace('_', ' ').charAt(0).toUpperCase() + wo.status.replace('_', ' ').slice(1)}
+                        {(wo.status || 'pending').replace('_', ' ').charAt(0).toUpperCase() + (wo.status || 'pending').replace('_', ' ').slice(1)}
                       </span>
 
                       <span className="text-xs text-gray-500 font-mono">
@@ -350,7 +313,7 @@ export function ProjectWorkOrdersQueue() {
                       <div>
                         <div className="font-semibold text-white text-lg">{wo.title}</div>
                         <div className="text-sm text-gray-400 mt-1">
-                          Project: {wo.projects.project_name}
+                          Project: {wo.projects.name}
                         </div>
                       </div>
 
@@ -371,11 +334,11 @@ export function ProjectWorkOrdersQueue() {
                         </div>
                       </div>
 
-                      {(wo.address || wo.projects.contacts.address_line1) && (
+                      {(wo.address || wo.projects.contacts.street_address) && (
                         <div className="flex items-start gap-3">
                           <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                           <div className="text-sm text-gray-300">
-                            {wo.address || wo.projects.contacts.address_line1}
+                            {wo.address || wo.projects.contacts.street_address}
                             {wo.projects.contacts.city && `, ${wo.projects.contacts.city}`}
                             {wo.projects.contacts.state && `, ${wo.projects.contacts.state}`}
                           </div>
@@ -433,49 +396,10 @@ export function ProjectWorkOrdersQueue() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2">
-                    {!wo.assigned_to || assigningTo === wo.id ? (
-                      <div className="space-y-2">
-                        <select
-                          value={selectedTech}
-                          onChange={(e) => setSelectedTech(e.target.value)}
-                          className="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
-                        >
-                          <option value="">Select tech...</option>
-                          {techs.map(tech => (
-                            <option key={tech.id} value={tech.id}>{tech.full_name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => assignTechnician(wo.id, wo.assigned_to)}
-                          disabled={!selectedTech}
-                          className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Assign
-                        </button>
-                        {assigningTo === wo.id && (
-                          <button
-                            onClick={() => {
-                              setAssigningTo(null);
-                              setSelectedTech('');
-                            }}
-                            className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setAssigningTo(wo.id);
-                          setSelectedTech(wo.assigned_to);
-                        }}
-                        className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                      >
-                        Reassign
-                      </button>
-                    )}
+                  <div className="flex gap-2 sm:flex-col shrink-0" onClick={event => event.stopPropagation()}>
+                    <button type="button" onClick={() => assignTechnician(wo.id)} className="px-4 min-h-11 bg-blue-600 text-white rounded-lg text-sm">
+                      {wo.assigned_to ? 'Reschedule / reassign' : 'Schedule work order'}
+                    </button>
 
                     <button
                       onClick={() => setExpandedWO(expandedWO === wo.id ? null : wo.id)}
@@ -491,15 +415,17 @@ export function ProjectWorkOrdersQueue() {
         </div>
       )}
 
-      {selectedWorkOrderId && (
-        <WorkOrderDetail
-          workOrderId={selectedWorkOrderId}
-          onClose={() => {
-            setSelectedWorkOrderId(null);
-            loadData();
-          }}
-        />
-      )}
+
+      {assigningTo && <ScheduleWorkOrderModal title="Schedule work order" organizationId={profile?.organization_id} technicians={techs}
+        initialTechnicianId={workOrders.find(wo => wo.id === assigningTo)?.assigned_to}
+        initialSchedule={{ date: workOrders.find(wo => wo.id === assigningTo)?.scheduled_date || '', start: workOrders.find(wo => wo.id === assigningTo)?.scheduled_start_time?.slice(0, 5) || '', end: workOrders.find(wo => wo.id === assigningTo)?.scheduled_end_time?.slice(0, 5) || '' }}
+        excludeWorkOrderIds={[assigningTo]} onClose={() => { setAssigningTo(null); }}
+        onSave={async (schedule, technicianId) => {
+          const result = await rescheduleWorkOrder(assigningTo, schedule.date, schedule.start, schedule.end, technicianId);
+          if (!result.success) throw new Error(result.error || 'Technician is already booked. Choose another time.');
+          await loadData();
+        }} />}
+
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { rescheduleAppointment, rescheduleWorkOrder } from '../../lib/scheduling
 import { CalendarMonthGrid } from '../Shared/Calendar/CalendarMonthGrid';
 import { CalendarGantt } from '../Shared/Calendar/CalendarGantt';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useMemo } from 'react';
 import { Calendar, Clock, RefreshCw } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '../../lib/supabase';
@@ -15,7 +15,7 @@ import { CalendarTimeGrid, CALENDAR_FIRST_MINUTE, CALENDAR_ROW_HEIGHT } from '..
 
 interface Technician { id: string; full_name: string }
 interface Props {
-  organizationId?: string;
+  organizationId?: string | null;
   technicians: Technician[];
   technicianIds: string[];
   onTechniciansChange: (ids: string[]) => void;
@@ -23,6 +23,8 @@ interface Props {
   onChange: (value: ScheduleSelection) => void;
   onValidationChange: (error: string | null) => void;
   earliestDate?: string | null;
+  initialMode?: 'browse' | 'manual';
+  excludeWorkOrderIds?: string[];
   errors?: Record<string, string>;
   showTechnicianSelection?: boolean;
   showManualEntry?: boolean;
@@ -31,12 +33,12 @@ const ROW_HEIGHT = CALENDAR_ROW_HEIGHT;
 const FIRST_MINUTE = CALENDAR_FIRST_MINUTE;
 const EMPTY_IDS: string[] = [];
 
-export function WorkOrderSchedulePicker({ organizationId, technicians, technicianIds, onTechniciansChange, value, onChange, onValidationChange, earliestDate, errors = {}, showTechnicianSelection = true, showManualEntry = true }: Props) {
+export function WorkOrderSchedulePicker({ organizationId, technicians, technicianIds, onTechniciansChange, value, onChange, onValidationChange, earliestDate, errors = {}, showTechnicianSelection = true, showManualEntry = true, initialMode = 'browse', excludeWorkOrderIds = EMPTY_IDS }: Props) {
   const [draggedBooking, setDraggedBooking] = useState<CalendarBooking | null>(null);
   const [moveConfirmation, setMoveConfirmation] = useState<{ message: string; confirm: () => void } | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
-  const [mode, setMode] = useState<'browse' | 'manual'>('browse');
+  const [mode, setMode] = useState<'browse' | 'manual'>(initialMode);
   const [view, setView] = useState<'day' | 'week' | 'month' | 'gantt'>('day');
   const [anchor, setAnchor] = useState(value.date || earliestDate || dateKey(new Date()));
   const [weekTechnician, setWeekTechnician] = useState('');
@@ -50,13 +52,14 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
   const instanceId = useId();
   const navigated = useRef(false);
   const today = formatInTimeZone(new Date(), timezone, 'yyyy-MM-dd');
-  const days = view === 'month' ? monthDates(anchor) : view === 'gantt' ? Array.from({ length: 14 }, (_, i) => addDays(anchor, i)) : view === 'week' ? weekDates(anchor) : [anchor];
+  const days = useMemo(() => view === 'month' ? monthDates(anchor) : view === 'gantt' ? Array.from({ length: 14 }, (_, i) => addDays(anchor, i)) : view === 'week' ? weekDates(anchor) : [anchor], [view, anchor]);
   const dateStart = days[0];
   const dateEnd = days[days.length - 1];
   const extraDate = value.date && (value.date < dateStart || value.date > dateEnd) ? value.date : '';
-  const datesToLoad = extraDate ? [...days, extraDate] : days;
+  const datesToLoad = useMemo(() => extraDate ? [...days, extraDate] : days, [extraDate, days]);
+  const excludedIdsKey = excludeWorkOrderIds.slice().sort().join(',');
   const allIdsKey = technicians.map(t => t.id).sort().join(',');
-  const queryKey = [organizationId, allIdsKey, dateStart, dateEnd, extraDate, revision].join('|');
+  const queryKey = [organizationId, allIdsKey, dateStart, dateEnd, extraDate, excludedIdsKey, revision].join('|');
   const availableTechnicians = technicianIds.length ? technicians.filter(t => technicianIds.includes(t.id)) : technicians;
   const weekTech = technicians.find(t => t.id === weekTechnician) || availableTechnicians[0];
   const weekIds = technicianIds.length ? technicianIds : weekTech ? [weekTech.id] : EMPTY_IDS;
@@ -66,13 +69,13 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
 
   useEffect(() => {
     let cancelled = false;
-    getOrganizationTimezone(organizationId).then(zone => {
+    getOrganizationTimezone(organizationId || undefined).then(zone => {
       if (cancelled) return;
       setTimezone(zone);
       if (!navigated.current && !value.date && !earliestDate) setAnchor(formatInTimeZone(new Date(), zone, 'yyyy-MM-dd'));
     });
     return () => { cancelled = true; };
-  }, [organizationId]);
+  }, [organizationId, earliestDate, value.date]);
 
   useEffect(() => { if (value.date) setAnchor(value.date); }, [value.date]);
   useEffect(() => { if (scrollRef.current && mode === 'browse') scrollRef.current.scrollTop = (8 * 60 - FIRST_MINUTE) / 30 * ROW_HEIGHT; }, [mode, view]);
@@ -95,17 +98,17 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
           loadCalendarPages(supabase.from('work_orders').select('id,title,scheduled_date,scheduled_start_time,scheduled_end_time,assigned_to,status', { count: 'exact' })
             .eq('organization_id', organizationId).in('assigned_to', ids)
             .or(dateFilter('scheduled_date'))
-            .not('status', 'in', '("cancelled","archived")').order('id').abortSignal(controller.signal)),
+            .not('is_archived', 'is', true).not('status', 'in', '("completed","cancelled","archived","split")').order('id').abortSignal(controller.signal)),
           loadCalendarPages(supabase.from('appointments').select('id,title,appointment_date,start_time,end_time,assigned_technician,all_day,is_private,status', { count: 'exact' })
             .eq('organization_id', organizationId).in('assigned_technician', ids)
             .or(dateFilter('appointment_date'))
-            .neq('status', 'cancelled').order('id').abortSignal(controller.signal)),
+            .not('status', 'in', '("completed","cancelled","archived")').order('id').abortSignal(controller.signal)),
           loadCalendarPages(supabase.from('pto_requests').select('id,employee_id,start_date,end_date', { count: 'exact' })
             .eq('organization_id', organizationId).in('employee_id', ids).eq('status', 'approved')
             .or(ptoFilter).order('id').abortSignal(controller.signal)),
         ]);
         const items: CalendarBooking[] = [
-          ...(results[0].data || []).map(wo => ({ id: wo.id, technicianId: wo.assigned_to, date: wo.scheduled_date,
+          ...(results[0].data || []).filter(wo => !excludedIdsKey.split(',').includes(wo.id)).map(wo => ({ id: wo.id, technicianId: wo.assigned_to, date: wo.scheduled_date,
             start: wo.scheduled_start_time && wo.scheduled_end_time && minutes(wo.scheduled_end_time) > minutes(wo.scheduled_start_time) ? wo.scheduled_start_time.slice(0, 5) : '00:00',
             end: wo.scheduled_start_time && wo.scheduled_end_time && minutes(wo.scheduled_end_time) > minutes(wo.scheduled_start_time) ? wo.scheduled_end_time.slice(0, 5) : '24:00',
             title: wo.title || 'Work order', kind: 'work_order' as const, canMove: wo.status !== 'completed' && Boolean(wo.scheduled_start_time && wo.scheduled_end_time) })),
@@ -132,7 +135,7 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
     }
     void load();
     return () => { cancelled = true; controller.abort(); clearTimeout(timer); };
-  }, [queryKey]);
+  }, [queryKey, organizationId, allIdsKey, dateStart, dateEnd, extraDate, excludedIdsKey, datesToLoad]);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -197,7 +200,7 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
     <div className="p-4 space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <h3 className="font-semibold flex items-center gap-2"><Calendar className="h-5 w-5 text-blue-600" />Schedule</h3>
-        {showManualEntry && <div className="flex bg-gray-100 p-1 rounded-lg" aria-label="Scheduling method">
+        {showManualEntry && <div className="grid grid-cols-1 sm:grid-cols-2 w-full sm:w-auto bg-gray-100 p-1 rounded-lg" aria-label="Scheduling method">
           <button type="button" aria-pressed={mode === 'browse'} onClick={() => setMode('browse')} className={'min-h-11 px-3 text-sm rounded-md ' + (mode === 'browse' ? 'bg-white shadow-sm text-blue-700 font-semibold' : 'text-gray-600')}>Browse calendar</button>
           <button type="button" aria-pressed={mode === 'manual'} onClick={() => setMode('manual')} className={'min-h-11 px-3 text-sm rounded-md ' + (mode === 'manual' ? 'bg-white shadow-sm text-blue-700 font-semibold' : 'text-gray-600')}>Enter date & time</button>
         </div>}
@@ -244,8 +247,8 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
     </CalendarWorkspace>}
 
     <div className="p-4 space-y-3">
-      {showManualEntry && <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <label className="text-sm font-medium col-span-2 sm:col-span-1">Date<input aria-label="Work order date" type="date" min={earliestDate || undefined} value={value.date} onChange={e => { navigated.current = true; onChange({ ...value, date: e.target.value }); }} className={inputClass} />{errors.start_date && <span className="text-xs text-red-600">{errors.start_date}</span>}</label>
+      {showManualEntry && <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <label className="text-sm font-medium">Date<input aria-label="Work order date" type="date" min={earliestDate || undefined} value={value.date} onChange={e => { navigated.current = true; onChange({ ...value, date: e.target.value }); }} className={inputClass} />{errors.start_date && <span className="text-xs text-red-600">{errors.start_date}</span>}</label>
         <label className="text-sm font-medium">Start<input aria-label="Work order start time" type="time" step="60" value={value.start} onChange={e => onChange({ ...value, start: e.target.value })} className={inputClass} />{errors.start_time && <span className="text-xs text-red-600">{errors.start_time}</span>}</label>
         <label className="text-sm font-medium">End<input aria-label="Work order end time" type="time" step="60" value={value.end} onChange={e => onChange({ ...value, end: e.target.value })} className={inputClass} />{errors.end_time && <span className="text-xs text-red-600">{errors.end_time}</span>}</label>
       </div>}

@@ -167,6 +167,11 @@ try {
         assert.equal(order.end_time,'10:40');
         assert.equal(order.estimated_hours,7.5,'Calendar duration must not overwrite sold labor');
       }
+      await page.goto(`http://127.0.0.1:5187?emergency&theme=${theme}`);
+      await page.getByText('Create Emergency Work Order', {exact:true}).waitFor();
+      assert.equal(await page.locator('select').filter({has:page.locator('option[value="urgent"]')}).inputValue(),'urgent');
+      assert.equal(await page.getByRole('button',{name:'Create Work Order',exact:true}).isEnabled(),false,'Emergency intake cannot skip customer and scheduling');
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Emergency form fits viewport');
       assert.deepEqual(errors, []);
       await page.close();
     }

@@ -3,7 +3,7 @@ import { CALENDAR_EVENT_STYLES } from '../Shared/Calendar/calendarStyles';
 import { CALENDAR_FIRST_MINUTE, CALENDAR_LAST_MINUTE, CALENDAR_ROW_HEIGHT } from '../Shared/Calendar/CalendarTimeGrid';
 import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
-import { dateKey } from '../../lib/workOrderScheduling';
+import { dateKey, loadCalendarPages } from '../../lib/workOrderScheduling';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { getTechColor } from '../../lib/techColors';
@@ -284,6 +284,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
       setTimeOff((ptoRes.data || []).map((r: any) => ({ user_id: r.employee_id, start_date: r.start_date, end_date: r.end_date })));
     } catch (e) {
       console.error('Error loading schedule data:', e);
+      setErrorMessage('Schedule could not be loaded. Refresh before scheduling.');
     } finally {
       setLoading(false);
     }
@@ -291,18 +292,18 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
 
   async function loadUnscheduled() {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await loadCalendarPages(supabase
         .from('work_orders')
         .select(`
           id, work_order_number, title, priority, estimated_hours, assigned_to,
-          project:projects(project_name),
+          project:projects(name),
           contact:contacts(full_name, company_name),
           assigned_tech:profiles!work_orders_assigned_to_fkey(full_name)
         `)
-        .is('scheduled_date', null)
+        .not('is_archived', 'is', true).or('scheduled_date.is.null,scheduled_start_time.is.null,scheduled_end_time.is.null')
         .not('status', 'in', '("completed","cancelled","archived")')
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .order('created_at', { ascending: false }).order('id'));
+
 
       if (error) throw error;
 
@@ -315,12 +316,13 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         assigned_to: wo.assigned_to,
         assigned_tech_name: wo.assigned_tech?.full_name || null,
         customer_name: wo.contact?.full_name || wo.contact?.company_name || null,
-        project_name: wo.project?.project_name || null,
+        project_name: wo.project?.name || null,
       }));
 
       setUnscheduled(items);
     } catch (e) {
       console.error('Error loading unscheduled work orders:', e);
+      setErrorMessage('Incomplete schedules could not be loaded. Refresh to retry.');
     }
   }
 

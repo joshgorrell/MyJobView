@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateWorkOrderModal } from '../Production/CreateWorkOrderModal';
 import type { ServiceRequestContext } from '../Production/CreateWorkOrderModal';
-import { SchedulingCalendar } from '../Shared/SchedulingCalendar';
-import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
+import { WorkOrderSchedulePicker } from '../Production/WorkOrderSchedulePicker';
+import { QuickActionModal } from '../Shared/QuickActionModal';
 import ConfirmModal from '../ui/ConfirmModal';
 import {
   AlertCircle,
@@ -32,7 +33,6 @@ import {
   AlertTriangle,
   PhoneCall,
   Layers,
-  Info,
   CheckSquare
 } from 'lucide-react';
 import { ServiceRequestForm } from '../Service/ServiceRequestForm';
@@ -357,8 +357,10 @@ export function ServiceRequestQueue() {
     : null;
 
   function canSelectRequest(request: ServiceRequest): boolean {
-    if (request.status !== 'open') return false;
+    if (request.status !== 'open' || !request.contact_id) return false;
     if (constraintContactId && request.contact_id !== constraintContactId) return false;
+    const first = requests.find(item => selectedRequestIds.has(item.id));
+    if (first && (request.project_id !== first.project_id || request.billable_type !== first.billable_type || [request.job_location_address,request.job_location_city,request.job_location_state,request.job_location_zip].map(value => (value || '').trim().toLowerCase()).join('|') !== [first.job_location_address,first.job_location_city,first.job_location_state,first.job_location_zip].map(value => (value || '').trim().toLowerCase()).join('|'))) return false;
     return true;
   }
 
@@ -498,7 +500,7 @@ export function ServiceRequestQueue() {
                 {selectedRequestIds.size} requests selected
               </div>
               <div className="text-xs text-orange-400 truncate max-w-[220px] sm:max-w-none">
-                {selectedRequests[0]?.customer_name || 'Same customer'} — combine into one work order
+                {selectedRequests[0]?.customer_name || 'Same customer'} — combine into scheduled visits
               </div>
             </div>
           </div>
@@ -602,9 +604,9 @@ export function ServiceRequestQueue() {
                           title="Select to combine with other requests from this customer"
                           className="w-4 h-4 rounded border-strong text-orange-600 focus:ring-orange-500 focus:ring-offset-0 cursor-pointer"
                         />
-                      ) : constraintContactId && request.contact_id !== constraintContactId ? (
+                      ) : constraintContactId ? (
                         <span
-                          title={`Can only combine requests from the same customer. Currently selecting requests from ${selectedRequests[0]?.customer_name}`}
+                          title={`Combine requests for the same customer, project, billing type and location. Currently selecting requests from ${selectedRequests[0]?.customer_name}`}
                           className="flex items-center justify-center w-4 h-4 text-secondary cursor-not-allowed"
                         >
                           <CheckSquare className="w-4 h-4 opacity-30" />
@@ -1124,334 +1126,48 @@ interface CombineWorkOrderModalProps {
 }
 
 function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: CombineWorkOrderModalProps) {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
-  const [estimatedHours, setEstimatedHours] = useState('2');
-  const [description, setDescription] = useState(
-    serviceRequests.map((sr, i) => `${i + 1}. [${sr.customer_name}] ${sr.job_description}`).join('\n\n')
-  );
-  const [internalNotes, setInternalNotes] = useState(serviceRequests.map((sr, i) => [`Request ${i + 1}`, sr.notes, `Customer contact: ${sr.customer_contact_instruction || 'dispatch'}`, sr.earliest_date && `Do not schedule before: ${sr.earliest_date}`, sr.requested_date && `Need by: ${sr.requested_date}`, sr.estimated_duration && `Estimated duration: ${sr.estimated_duration}`, sr.warranty_type && `Warranty: ${sr.warranty_type}; ${sr.warranty_reference || ''}; ${sr.warranty_notes || ''}`].filter(Boolean).join('\n')).join('\n\n'));
-
-  const customer = serviceRequests[0];
-
-  function toggleTechSelection(techId: string) {
-    setSelectedTechs(prev =>
-      prev.includes(techId) ? prev.filter(id => id !== techId) : [...prev, techId]
-    );
-  }
-
-  function formatDateTime(): string {
-    if (!scheduledDate) return 'Not scheduled';
-    const d = new Date(scheduledDate + 'T12:00:00');
-    const dateLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    if (!scheduledTime) return dateLabel;
-    const [h, m] = scheduledTime.split(':').map(Number);
-    const period = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    return `${dateLabel} at ${h12}:${m.toString().padStart(2, '0')} ${period}`;
-  }
-
-  async function handleCombine() {
-    if (selectedTechs.length === 0 || !scheduledDate || !scheduledTime || scheduleError) {
-      alert('Please select a technician and an available date and time');
-      return;
-    }
-    if (!description.trim()) {
-      alert('Please enter a job description');
-      return;
-    }
-
-    if (serviceRequests.some(sr => sr.earliest_date && scheduledDate < sr.earliest_date)) {
-      alert('Schedule on or after every selected request’s earliest date.');
-      return;
-    }
-    setLoading(true);
+  const [schedule, setSchedule] = useState({ date: '', start: '', end: '' });
+  const [hours, setHours] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [description, setDescription] = useState(serviceRequests.map((sr, i) => `${i + 1}. ${sr.job_description}`).join('\n\n'));
+  const key = useRef(crypto.randomUUID());
+  const submitting = useRef(false);
+  const earliest = serviceRequests.map(sr => sr.earliest_date || '').sort().slice(-1)[0];
+  const valid = selectedTechs.length > 0 && !!schedule.date && !!schedule.start && !!schedule.end && !scheduleError && Number(hours) > 0 && Number.isFinite(Number(hours)) && !!description.trim() && confirmed;
+  async function save() {
+    if (!valid || submitting.current) return;
+    submitting.current = true; setLoading(true); setError('');
     try {
-      const { error } = await supabase.rpc('combine_service_requests_to_work_order', {
-        p_service_request_ids: serviceRequests.map(sr => sr.id),
-        p_tech_ids: selectedTechs,
-        p_scheduled_date: scheduledDate,
-        p_scheduled_time: scheduledTime || null,
-        p_estimated_hours: parseFloat(estimatedHours) || 2,
-        p_description: description.trim(),
-        p_internal_notes: internalNotes.trim() || null,
-      });
-
+      const { data, error } = await supabase.rpc('create_combined_work_orders', { p_request_id: key.current, p_service_request_ids: serviceRequests.map(sr => sr.id), p_tech_ids: selectedTechs,
+        p_date: schedule.date, p_start: schedule.start, p_end: schedule.end, p_estimated_hours: Number(hours), p_description: description.trim(),
+        p_internal_notes: serviceRequests.map(sr => [sr.notes, sr.earliest_date && `Do not schedule before: ${sr.earliest_date}`, sr.warranty_type && `Warranty: ${sr.warranty_type}; ${sr.warranty_reference || ''}; ${sr.warranty_notes || ''}`].filter(Boolean).join('\n')).join('\n\n') });
       if (error) throw error;
-
-      for (const techId of selectedTechs) {
-        const woNumber = `WO-COMBINED`;
-        await notifyTechJobAssigned(techId, {
-          work_order_number: woNumber,
-          title: `Service: ${description.substring(0, 50)}`,
-          customer_name: customer.customer_name,
-          scheduled_date: scheduledDate,
-          address: customer.job_location_address,
-        });
+      for (const [index, technicianId] of [...selectedTechs].sort().entries()) {
+        await notifyTechJobAssigned(technicianId, { work_order_number: data?.[index]?.work_order_number || '', title: description.trim(), customer_name: serviceRequests[0].customer_name, scheduled_date: schedule.date, address: serviceRequests[0].job_location_address });
       }
-
-      alert(`${serviceRequests.length} service requests combined into 1 work order successfully!`);
       onSuccess();
-    } catch (error) {
-      console.error('Error combining service requests:', error);
-      alert('Failed to combine service requests');
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError((e as { message?: string }).message || 'Unable to combine requests. Try again.'); }
+    finally { submitting.current = false; setLoading(false); }
   }
-
-  const canSubmit = selectedTechs.length > 0 && !!scheduledDate && !!scheduledTime && !scheduleError && description.trim().length > 0;
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-stretch justify-center z-50 p-0 sm:p-4 sm:items-center">
-      <div className="bg-canvas w-full sm:rounded-2xl sm:max-w-7xl flex flex-col max-h-[100dvh] sm:max-h-[95dvh] overflow-hidden shadow-2xl border border-strong">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-4 sm:px-6 py-4 border-b border-strong shrink-0 bg-canvas">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-orange-600 flex items-center justify-center">
-              <Layers className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-lg sm:text-xl font-bold text-primary">Combine into One Work Order</h3>
-              <p className="text-xs sm:text-sm text-muted mt-0.5">
-                {serviceRequests.length} service requests from {customer.customer_name}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 hover:bg-elevated rounded-lg transition-colors text-muted hover:text-primary"
-          >
-            <XCircle className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Body: two-panel layout — on mobile, form on top then calendar below */}
-        <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
-
-          {/* Left panel — scrollable form */}
-          <div className="w-full lg:w-[360px] xl:w-[400px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-strong overflow-y-auto max-h-[45vh] lg:max-h-none">
-            <div className="p-4 sm:p-5 space-y-4">
-
-              {/* Info banner */}
-              <div className="flex items-start gap-2.5 bg-orange-900/20 border border-orange-700/40 rounded-lg p-3">
-                <Info className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                <div className="text-xs text-orange-300 leading-relaxed">
-                  <strong>Combining {serviceRequests.length} requests</strong> into a single work order. All requests will be marked as scheduled and linked to the new work order.
-                </div>
-              </div>
-
-              {/* Selected requests summary */}
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
-                  Requests Being Combined
-                </label>
-                <div className="bg-canvas border border-strong rounded-lg divide-y divide-gray-700">
-                  {serviceRequests.map((sr) => (
-                    <div key={sr.id} className="px-3 py-2.5">
-                      <div className="flex items-start gap-2">
-                        <span className={`mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border ${
-                          sr.priority === 'emergency' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
-                          sr.priority === 'urgent' ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' :
-                          'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                        }`}>
-                          {sr.priority}
-                        </span>
-                        <p className="text-xs text-muted line-clamp-2 flex-1">{sr.job_description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Customer / Location */}
-              <div className="flex items-start gap-3 bg-orange-500/10 border border-orange-500/20 rounded-xl p-3">
-                <MapPin className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <div className="font-semibold text-primary text-sm">{customer.customer_name}</div>
-                  <div className="text-xs text-muted mt-0.5 leading-relaxed">
-                    {customer.job_location_address}
-                    {customer.job_location_city && `, ${customer.job_location_city}`}
-                    {customer.job_location_state && `, ${customer.job_location_state}`}
-                  </div>
-                  {customer.customer_phone && (
-                    <div className="flex items-center gap-1 text-xs text-muted mt-1">
-                      <Phone className="w-3 h-3" />
-                      {customer.customer_phone}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Combined Description */}
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
-                  Combined Job Description *
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  placeholder="Enter combined job description..."
-                  className="w-full px-3 py-2 bg-canvas border border-strong rounded-lg text-primary text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                />
-              </div>
-
-              {/* Technician selector */}
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
-                  Assign Technicians *
-                </label>
-                <div className="bg-canvas border border-strong rounded-lg overflow-hidden">
-                  {techs.map((tech, idx) => (
-                    <label
-                      key={tech.id}
-                      className={`flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-elevated ${
-                        idx < techs.length - 1 ? 'border-b border-strong' : ''
-                      } ${selectedTechs.includes(tech.id) ? 'bg-orange-500/10' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedTechs.includes(tech.id)}
-                        onChange={() => toggleTechSelection(tech.id)}
-                        className="w-4 h-4 text-orange-600 bg-elevated border-strong rounded focus:ring-orange-500"
-                      />
-                      <User className="w-3.5 h-3.5 text-muted shrink-0" />
-                      <span className={`text-sm flex-1 ${selectedTechs.includes(tech.id) ? 'text-primary font-medium' : 'text-muted'}`}>
-                        {tech.full_name}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {selectedTechs.length > 0 && (
-                  <p className="text-xs text-green-400 mt-1.5">
-                    {selectedTechs.length} tech{selectedTechs.length > 1 ? 's' : ''} assigned
-                  </p>
-                )}
-              </div>
-
-              {/* Schedule */}
-              <div className="bg-canvas border border-strong rounded-xl p-3 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Calendar className={`w-4 h-4 shrink-0 ${scheduledDate ? 'text-orange-400' : 'text-muted'}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-muted font-medium">Scheduled</div>
-                    <div className={`text-sm font-semibold truncate ${scheduledDate ? 'text-primary' : 'text-muted'}`}>
-                      {formatDateTime()}
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-1">
-                    <label className="block text-[10px] text-muted mb-1">Date *</label>
-                    <input
-                      type="date"
-                      value={scheduledDate}
-                      onChange={(e) => setScheduledDate(e.target.value)}
-                      className="w-full px-2 py-2 bg-elevated border border-strong rounded-lg text-primary text-xs focus:ring-1 focus:ring-orange-500"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-[10px] text-muted mb-1">Time</label>
-                    <input
-                      type="time"
-                      step="1800"
-                      value={scheduledTime}
-                      onChange={(e) => setScheduledTime(e.target.value)}
-                      className="w-full px-2 py-2 bg-elevated border border-strong rounded-lg text-primary text-xs focus:ring-1 focus:ring-orange-500"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-[10px] text-muted mb-1">Est. Hours</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0.5"
-                      value={estimatedHours}
-                      onChange={(e) => setEstimatedHours(e.target.value)}
-                      className="w-full px-2 py-2 bg-elevated border border-strong rounded-lg text-primary text-xs focus:ring-1 focus:ring-orange-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Internal notes */}
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
-                  Internal Notes
-                </label>
-                <textarea
-                  value={internalNotes}
-                  onChange={(e) => setInternalNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Notes for the technician..."
-                  className="w-full px-3 py-2 bg-canvas border border-strong rounded-lg text-primary text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Right panel — scheduling calendar */}
-          <div className="flex-1 min-h-0 flex flex-col min-h-[300px] lg:min-h-0">
-            {selectedTechs.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-canvas">
-                <div className="w-16 h-16 rounded-full bg-canvas flex items-center justify-center mb-4">
-                  <Calendar className="w-8 h-8 text-secondary" />
-                </div>
-                <p className="text-muted font-medium">Select technicians to view their schedule</p>
-                <p className="text-secondary text-sm mt-1">Tap a time slot to schedule the work order</p>
-              </div>
-            ) : (
-              <SchedulingCalendar
-                technicians={techs}
-                onValidationChange={setScheduleError}
-                earliestDate={serviceRequests.map(sr => sr.earliest_date || '').sort().reverse()[0]}
-                technicianIds={selectedTechs}
-                selectedDate={scheduledDate}
-                selectedTime={scheduledTime}
-                estimatedHours={parseFloat(estimatedHours) || 2}
-                onSlotSelect={(date, time) => {
-                  setScheduledDate(date);
-                  setScheduledTime(time);
-                }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-strong bg-canvas">
-          <div className="text-xs text-muted hidden sm:block">
-            {canSubmit
-              ? `Ready to combine ${serviceRequests.length} requests into 1 work order for ${formatDateTime()}`
-              : 'Select techs + date to continue'}
-          </div>
-          <div className="flex gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 sm:flex-none px-4 py-3 sm:py-2.5 bg-elevated text-primary rounded-xl hover:bg-elevated transition-colors text-sm font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleCombine}
-              disabled={loading || !canSubmit}
-              className="flex-1 sm:flex-none px-4 sm:px-6 py-3 sm:py-2.5 bg-orange-600 text-primary rounded-xl hover:bg-orange-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-semibold shadow-lg shadow-orange-900/30"
-            >
-              <Layers className="w-4 h-4 shrink-0" />
-              {loading ? 'Creating...' : `Combine ${serviceRequests.length} into 1 Work Order`}
-            </button>
-          </div>
-        </div>
+  return <QuickActionModal title="Combine service requests" subtitle={serviceRequests[0]?.customer_name} icon={<Layers />} scrollBody={false} onClose={() => { if (!loading) onClose(); }}>
+    <div className="flex flex-col min-h-0">
+      <div className="overflow-y-auto min-h-0 p-4 space-y-4">
+        <p className="text-sm text-secondary">Combine {serviceRequests.length} requests into one scheduled visit per technician. All work orders stay linked.</p>
+        <label className="block text-sm">Visit description<textarea aria-label="Combined visit description" value={description} onChange={e => setDescription(e.target.value)} rows={4} className="block w-full rounded-lg border border-subtle bg-canvas p-2" /></label>
+        <label className="block text-sm">Estimated hours per technician<input aria-label="Combined estimated hours" type="number" min="0.1" step="0.1" value={hours} onChange={e => setHours(e.target.value)} className="block w-full rounded-lg border border-subtle bg-canvas p-2" /></label>
+        <WorkOrderSchedulePicker organizationId={profile?.organization_id} technicians={techs} technicianIds={selectedTechs} onTechniciansChange={setSelectedTechs} value={schedule} onChange={setSchedule} onValidationChange={setScheduleError} earliestDate={earliest} initialMode="manual" />
+        <label className="flex items-center gap-3 text-sm min-h-11"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />Customer confirmed this visit</label>
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      </div>
+      <div className="shrink-0 p-4 border-t border-subtle flex gap-3">
+        <button type="button" disabled={loading} onClick={onClose} className="flex-1 min-h-11 rounded-lg border border-subtle">Cancel</button>
+        <button type="button" disabled={loading || !valid} onClick={save} className="flex-1 min-h-11 rounded-lg bg-blue-600 text-white disabled:opacity-50">{loading ? 'Saving…' : `Create ${selectedTechs.length || ''} scheduled visit${selectedTechs.length === 1 ? '' : 's'}`}</button>
       </div>
     </div>
-  );
+  </QuickActionModal>;
 }
