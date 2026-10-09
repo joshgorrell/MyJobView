@@ -4,6 +4,9 @@ DO $$ BEGIN
  IF to_regprocedure('public.create_work_order_assignments(uuid,jsonb,uuid)') IS NULL THEN
   RAISE EXCEPTION 'Apply project_task_visit_handoff and subsequent migrations before complete_work_order_scheduling';
  END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='service_requests' AND column_name='earliest_date') THEN
+  RAISE EXCEPTION 'Apply service_request_fast_intake before complete_work_order_scheduling';
+ END IF;
 END $$;
 -- A split may schedule the same technician in multiple non-overlapping parts.
 DROP INDEX public.work_order_creation_retry;
@@ -36,7 +39,7 @@ BEGIN
  IF NOT allow_overlap AND (
   EXISTS(SELECT 1 FROM public.work_orders w WHERE w.organization_id=p_org AND w.assigned_to=p_tech
    AND w.scheduled_date=p_date AND w.id IS DISTINCT FROM p_exclude_work_order
-   AND w.status NOT IN ('completed','cancelled','archived','split') AND NOT coalesce(w.is_archived,false)
+   AND coalesce(w.status,'pending') NOT IN ('completed','cancelled','archived','split') AND NOT coalesce(w.is_archived,false)
    AND coalesce(w.scheduled_start_time,'00:00'::time)<p_end AND coalesce(w.scheduled_end_time,'23:59:59'::time)>p_start)
   OR EXISTS(SELECT 1 FROM public.appointments a WHERE a.organization_id=p_org AND a.assigned_technician=p_tech
    AND a.appointment_date::date=p_date AND a.id IS DISTINCT FROM p_exclude_appointment
@@ -51,12 +54,13 @@ CREATE OR REPLACE FUNCTION work_order_private.require_complete_work_order()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE scheduling_changed boolean;
 BEGIN
+ IF NEW.status IS NULL AND (TG_OP='INSERT' OR OLD.status IS NOT NULL) THEN RAISE EXCEPTION 'A work order requires a status'; END IF;
  scheduling_changed := TG_OP='INSERT';
  IF TG_OP='UPDATE' THEN
   IF NEW.organization_id IS DISTINCT FROM OLD.organization_id THEN RAISE EXCEPTION 'Cannot move a work order between organizations'; END IF;
   scheduling_changed := (NEW.assigned_to,NEW.scheduled_date,NEW.scheduled_start_time,NEW.scheduled_end_time,NEW.start_date)
     IS DISTINCT FROM (OLD.assigned_to,OLD.scheduled_date,OLD.scheduled_start_time,OLD.scheduled_end_time,OLD.start_date)
-    OR (OLD.status IN ('completed','cancelled','archived','split') AND NEW.status NOT IN ('completed','cancelled','archived','split'))
+    OR (coalesce(OLD.status,'pending') IN ('completed','cancelled','archived','split') AND coalesce(NEW.status,'pending') NOT IN ('completed','cancelled','archived','split'))
     OR (coalesce(OLD.is_archived,false) AND NOT coalesce(NEW.is_archived,false));
  END IF;
  -- Legacy incomplete records can still receive notes, progress and close-out updates.
@@ -64,6 +68,8 @@ BEGIN
   IF nullif(btrim(NEW.title),'') IS NULL OR NOT EXISTS(SELECT 1 FROM public.contacts WHERE id=NEW.contact_id AND organization_id=NEW.organization_id) THEN RAISE EXCEPTION 'A work order requires a title and customer in your organization'; END IF;
  END IF;
  IF NOT scheduling_changed THEN RETURN NEW; END IF;
+ IF NEW.company_id IS DISTINCT FROM NEW.organization_id AND (TG_OP='INSERT' OR NEW.company_id IS DISTINCT FROM OLD.company_id) THEN RAISE EXCEPTION 'Work order company must match its organization'; END IF;
+ IF NEW.type IS NULL THEN RAISE EXCEPTION 'Select a work order type'; END IF;
  IF nullif(btrim(NEW.title),'') IS NULL OR NOT EXISTS(SELECT 1 FROM public.contacts WHERE id=NEW.contact_id AND organization_id=NEW.organization_id) THEN
   RAISE EXCEPTION 'A work order requires a title and customer';
  END IF;
@@ -85,6 +91,7 @@ CREATE TRIGGER zz_require_complete_work_order BEFORE INSERT OR UPDATE ON public.
 CREATE OR REPLACE FUNCTION work_order_private.guard_appointment_booking()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
+ IF TG_OP='UPDATE' AND NEW.organization_id IS DISTINCT FROM OLD.organization_id THEN RAISE EXCEPTION 'Cannot move an appointment between organizations'; END IF;
  IF NEW.assigned_technician IS NULL OR coalesce(NEW.status,'scheduled') IN ('cancelled','completed','archived') THEN RETURN NEW; END IF;
  IF TG_OP='UPDATE' THEN
   IF (NEW.assigned_technician,NEW.appointment_date,NEW.start_time,NEW.end_time,NEW.status,NEW.all_day)
@@ -350,7 +357,7 @@ BEGIN
    coalesce(c.full_name,c.company_name,'Customer') AS customer_name,p.full_name AS technician_name,
    CASE WHEN w.assigned_to IS NULL OR NOT coalesce(p.is_active AND p.is_technician,false) OR w.contact_id IS NULL OR nullif(btrim(w.title),'') IS NULL OR w.scheduled_date IS NULL OR w.scheduled_start_time IS NULL OR w.scheduled_end_time IS NULL OR w.scheduled_end_time<=w.scheduled_start_time THEN 'incomplete' ELSE 'overdue' END AS reason
   FROM public.work_orders w LEFT JOIN public.contacts c ON c.id=w.contact_id LEFT JOIN public.profiles p ON p.id=w.assigned_to
-  WHERE w.organization_id=v_org AND NOT coalesce(w.is_archived,false) AND w.status NOT IN ('completed','cancelled','archived','split')
+  WHERE w.organization_id=v_org AND NOT coalesce(w.is_archived,false) AND coalesce(w.status,'pending') NOT IN ('completed','cancelled','archived','split')
    AND (w.assigned_to IS NULL OR NOT coalesce(p.is_active AND p.is_technician,false) OR w.contact_id IS NULL OR nullif(btrim(w.title),'') IS NULL OR w.scheduled_date IS NULL OR w.scheduled_start_time IS NULL OR w.scheduled_end_time IS NULL OR w.scheduled_end_time<=w.scheduled_start_time
     OR (w.scheduled_date+w.scheduled_end_time)<(now() AT TIME ZONE coalesce(zone,'America/Chicago')))
  ), page AS (SELECT * FROM flagged ORDER BY CASE WHEN reason='incomplete' THEN 0 ELSE 1 END,scheduled_date NULLS FIRST,id LIMIT least(greatest(p_limit,1),100) OFFSET greatest(p_offset,0))

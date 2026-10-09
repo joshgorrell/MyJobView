@@ -296,11 +296,11 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         .from('work_orders')
         .select(`
           id, work_order_number, title, priority, estimated_hours, assigned_to,
-          project:projects(project_name),
+          project:projects(name),
           contact:contacts(full_name, company_name),
           assigned_tech:profiles!work_orders_assigned_to_fkey(full_name)
         `)
-        .or('scheduled_date.is.null,scheduled_start_time.is.null,scheduled_end_time.is.null')
+        .not('is_archived', 'is', true).or('scheduled_date.is.null,scheduled_start_time.is.null,scheduled_end_time.is.null')
         .not('status', 'in', '("completed","cancelled","archived")')
         .order('created_at', { ascending: false }).order('id'));
 
@@ -316,7 +316,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         assigned_to: wo.assigned_to,
         assigned_tech_name: wo.assigned_tech?.full_name || null,
         customer_name: wo.contact?.full_name || wo.contact?.company_name || null,
-        project_name: wo.project?.project_name || null,
+        project_name: wo.project?.name || null,
       }));
 
       setUnscheduled(items);

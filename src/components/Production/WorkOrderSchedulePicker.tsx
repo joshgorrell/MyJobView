@@ -98,11 +98,11 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
           loadCalendarPages(supabase.from('work_orders').select('id,title,scheduled_date,scheduled_start_time,scheduled_end_time,assigned_to,status', { count: 'exact' })
             .eq('organization_id', organizationId).in('assigned_to', ids)
             .or(dateFilter('scheduled_date'))
-            .not('status', 'in', '("cancelled","archived")').order('id').abortSignal(controller.signal)),
+            .not('is_archived', 'is', true).not('status', 'in', '("completed","cancelled","archived","split")').order('id').abortSignal(controller.signal)),
           loadCalendarPages(supabase.from('appointments').select('id,title,appointment_date,start_time,end_time,assigned_technician,all_day,is_private,status', { count: 'exact' })
             .eq('organization_id', organizationId).in('assigned_technician', ids)
             .or(dateFilter('appointment_date'))
-            .neq('status', 'cancelled').order('id').abortSignal(controller.signal)),
+            .not('status', 'in', '("completed","cancelled","archived")').order('id').abortSignal(controller.signal)),
           loadCalendarPages(supabase.from('pto_requests').select('id,employee_id,start_date,end_date', { count: 'exact' })
             .eq('organization_id', organizationId).in('employee_id', ids).eq('status', 'approved')
             .or(ptoFilter).order('id').abortSignal(controller.signal)),
