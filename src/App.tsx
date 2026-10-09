@@ -59,7 +59,6 @@ const TaskForm = lazy(() => import('./components/Tasks/TaskForm').then(m => ({ d
 const UserPreferences = lazy(() => import('./components/Settings/UserPreferences').then(m => ({ default: m.UserPreferences })));
 const HowItWorks = lazy(() => import('./components/Help/HowItWorks').then(m => ({ default: m.HowItWorks })));
 const ProposalsView = lazy(() => import('./components/Proposals/ProposalsView'));
-const ConnectionsView = lazy(() => import('./components/Connections/ConnectionsView'));
 const ImprovementsView = lazy(() => import('./components/Improvements/ImprovementsView').then(m => ({ default: m.ImprovementsView })));
 const RecurView = lazy(() => import('./components/Recur/RecurView'));
 const DispatchConsole = lazy(() => import('./components/Dispatch/DispatchConsole').then(m => ({ default: m.DispatchConsole })));
@@ -84,7 +83,6 @@ const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopo
 const SalesDashboard = lazy(() => import('./components/SalesDashboard/SalesDashboardPage').then(m => ({ default: m.SalesDashboardPage })));
 const PipelineBoard = lazy(() => import('./components/Sales/PipelineBoard').then(m => ({ default: m.PipelineBoard })));
 const ProspectsPage = lazy(() => import('./components/Sales/ProspectsPage').then(m => ({ default: m.ProspectsPage })));
-const SalesActivity = lazy(() => import('./components/Sales/SalesActivity').then(m => ({ default: m.SalesActivity })));
 const SalesPerformance = lazy(() => import('./components/Sales/SalesPerformance').then(m => ({ default: m.SalesPerformance })));
 const SalesOrdersView = lazy(() => import('./components/Sales/SalesOrdersView').then(m => ({ default: m.SalesOrdersView })));
 const SalesOrderDetail = lazy(() => import('./components/Sales/SalesOrderDetail').then(m => ({ default: m.SalesOrderDetail })));
@@ -979,7 +977,6 @@ function AppContent() {
             />
           )}
           {activeTab === 'fishbowl' && checkModuleAccess('fishbowl') && <FishbowlView key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
-          {activeTab === 'connections' && checkModuleAccess('connections') && <ConnectionsView key={activeTab} />}
           {(activeTab === 'proposals' || activeTab === 'sales') && checkModuleAccess('proposals') && (
             <ProposalsView
               key={activeTab}
@@ -1079,7 +1076,6 @@ function AppContent() {
             />
           )}
           {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'sales_activity' && checkModuleAccess('sales_activity') && <SalesActivity key={activeTab} />}
           {activeTab === 'pipeline_board' && checkModuleAccess('pipeline_board') && <PipelineBoard key={activeTab} />}
           {activeTab === 'prospects' && checkModuleAccess('prospects') && <ProspectsPage key={activeTab} />}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}

@@ -1,6 +1,8 @@
 // Only implemented pages and named capabilities belong in the permission editor.
 // Legacy database rows retain their IDs for historical references and bookmarks.
 const retiredKeys = new Set([
+  "connections",
+  "sales_activity",
   "preferences",
   "by_office",
   "proposal_messages_admin",
@@ -91,6 +93,8 @@ export function resolveLegacyPage(key: string): string {
   return (
     (
       {
+        connections: "feed",
+        sales_activity: "feed",
         messages: "feed",
         proposal_messages_admin: "feed",
         by_office: "sales_dashboard",

@@ -13,7 +13,7 @@ Role changes load the selected role's saved page defaults and retain explicit us
 | Messages | Customer-message capability remains, labeled Flow: Customer Messages; standalone Sales menu removed; old URLs open Flow. |
 | Invoices | One permission and one preferred department menu per role; existing row IDs/bookmarks remain. |
 | Payroll / Time Approval | Real Finance workspaces with backend authority tied to page grants; payroll links hidden when unavailable. |
-| Activity Log | Retained because its histories/functions are not completely replaced by Flow. |
+| Activity Log / Connections | Standalone pages removed; old links open Flow. Interaction logging, personal reminders and recurring outreach move into Flow, with existing history preserved. |
 | Tasks | Retained; Flow shows task events and links, while Tasks supplies assignment and completion. |
 | By Office / Unassigned Jobs | Retired catalog aliases route to Sales Dashboard / Dispatch. |
 | Legacy Admin settings aliases | Retired standalone entries route to the matching System Administration sections. |
@@ -51,3 +51,13 @@ The private cleanup backup stores the previous module metadata, role grants, use
 - Global typecheck remains blocked by existing repository errors; a clean repository-wide typecheck is not claimed.
 
 Supabase's advisory notices for the new authenticated SECURITY DEFINER RPCs are intentional: their administrator/tenant checks are regression-tested. The private backup has RLS enabled with no client policies and client grants revoked; its [no-policy advisory](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) reflects intentional denial of client access.
+
+## Flow consolidation
+
+Flow now owns interaction logging and personal follow-ups. Its + button opens the shared +Create modal pattern for internal chat, activity updates and customer/job interactions. Follow-ups supports completion with notes and pause/resume for recurring outreach. Tasks retains assignment/completion; Flow remains its event timeline. Customer conversation permission remains separate.
+
+The full-page feed measures the available window beneath the application header and uses an internal scroll area. Card-width queries accommodate the department sidebar. Embedded Flow keeps its natural layout. Tests cover six sizes from 390px phones through desktop, including a 600px-high laptop window, modal focus/Escape, failed saves, recurring follow-ups and customer inbox regression behavior.
+
+The consolidation migration retains legacy tables, backfills interaction events idempotently, and protects own reminders/schedules and same-organization customer/job context. It repairs the scheduled notification trigger's obsolete column references and derives occurrence organization from its parent for maintenance jobs. Original explicit user revocations are preserved.
+
+The live Flow consolidation migration is applied: Connections/Activity Log have no active page entries, leaving 50 active module rows. All original user exceptions were verified unchanged; the frontend awaits PR merge/deployment.

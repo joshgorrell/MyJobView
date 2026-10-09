@@ -267,4 +267,5 @@ await asUser(user);
 await db.exec(`INSERT INTO user_permission_overrides SELECT '${user}',id,'revoke' FROM department_modules WHERE module_key='messages';`);
 assert.equal((await db.query('SELECT count(*)::int n FROM messages')).rows[0].n,0,'Explicit messaging revocation blocks direct API reads');
 console.log('PASS: portal/staff replies, read state, notifications, spoof prevention, internal notes/images, expired access, and cross tenant isolation.');
+await (await import('./interactions-database-cases.mjs')).interactionCases(db,{org,otherOrg,user,colleague,outsider,customer,otherCustomer,project,wo,uid});
 await db.close();
