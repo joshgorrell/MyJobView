@@ -183,7 +183,7 @@ function AppContent() {
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [createCustomerMessageRequested, setCreateCustomerMessageRequested] = useState(false);
+  const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -454,7 +454,7 @@ function AppContent() {
   useEffect(() => {
     setShowContactForm(false);
     setShowLeadForm(false);
-    if (activeTab !== 'feed') setCreateCustomerMessageRequested(false);
+    if (activeTab !== 'feed') setCreateInternalChatRequested(false);
     setShowServiceRequestForm(false);
     setShowTaskForm(false);
     setShowJobMediaUpload(false);
@@ -880,7 +880,7 @@ function AppContent() {
           <Header
             onCreateContact={() => setShowContactForm(true)}
             onCreateLead={() => setShowLeadForm(true)}
-            onCreateMessage={() => { setCreateCustomerMessageRequested(true); setActiveTab('feed'); }}
+            onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
             onCreateServiceRequest={() => setShowServiceRequestForm(true)}
             onCreateTask={() => {
@@ -959,8 +959,8 @@ function AppContent() {
             <MasterFeed
               key={activeTab}
               onLeadClick={setSelectedLeadId}
-              createRequested={createCustomerMessageRequested}
-              onCreateOpened={() => setCreateCustomerMessageRequested(false)}
+              createRequested={createInternalChatRequested}
+              onCreateOpened={() => setCreateInternalChatRequested(false)}
               openThreadId={openFlowThreadId}
               onThreadSelected={setOpenFlowThreadId}
               onOpenProposal={(proposalId, threadId) => {
@@ -1359,7 +1359,7 @@ function AppContent() {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);
             } else if (action.type === 'CREATE_MESSAGE') {
-              setCreateCustomerMessageRequested(true);
+              setCreateInternalChatRequested(true);
               setActiveTab('feed');
             } else if (action.type === 'CREATE_PROPOSAL') {
               if (action.prefill) setAiProposalPrefill(action.prefill as ProposalPrefill);
