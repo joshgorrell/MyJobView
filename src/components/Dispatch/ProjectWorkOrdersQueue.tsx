@@ -1,7 +1,7 @@
+import { ScheduleWorkOrderModal } from '../Production/ScheduleWorkOrderModal';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { notifyTechJobAssigned, notifyTechJobReassigned } from '../../lib/dispatchNotifications';
 import { rescheduleWorkOrder } from '../../lib/scheduling';
 import { WorkOrderDetail } from '../Production/WorkOrderDetail';
 import {
@@ -10,7 +10,6 @@ import {
   Clock,
   MapPin,
   User,
-  CheckCircle,
   Filter,
   ChevronDown,
   ChevronUp,
@@ -31,6 +30,9 @@ interface ProjectWorkOrder {
   priority: string;
   assigned_to: string | null;
   start_date: string | null;
+  scheduled_date: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
   target_completion_date: string | null;
   estimated_hours: number;
   actual_hours: number;
@@ -70,13 +72,11 @@ export function ProjectWorkOrdersQueue() {
   const [workOrders, setWorkOrders] = useState<ProjectWorkOrder[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWO, setSelectedWO] = useState<string | null>(null);
   const [expandedWO, setExpandedWO] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [assigningTo, setAssigningTo] = useState<string | null>(null);
-  const [selectedTech, setSelectedTech] = useState('');
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -159,54 +159,8 @@ export function ProjectWorkOrdersQueue() {
     }
   }
 
-  async function assignTechnician(woId: string, previousTechId: string | null) {
-    if (!selectedTech) return;
-
-    try {
-      const wo = workOrders.find(w => w.id === woId);
-      if (!wo) return;
-
-      const date = wo.start_date || new Date().toISOString().split('T')[0];
-      const startTime = '08:00';
-      const endMin = 8 * 60 + (wo.estimated_hours || 2) * 60;
-      const endTime = `${Math.floor(endMin / 60).toString().padStart(2, '0')}:${(endMin % 60).toString().padStart(2, '0')}`;
-
-      const result = await rescheduleWorkOrder(woId, date, startTime, endTime, selectedTech);
-
-      if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
-          return;
-        }
-        await rescheduleWorkOrder(woId, date, startTime, endTime, selectedTech, { force: true });
-      } else if (!result.success) {
-        alert(result.error || 'Failed to assign technician');
-        return;
-      }
-
-      if (previousTechId && previousTechId !== selectedTech) {
-        await notifyTechJobReassigned(selectedTech, {
-          work_order_number: wo.work_order_number,
-          title: wo.title,
-          previous_tech: wo.profiles?.full_name,
-          scheduled_date: wo.start_date || undefined
-        });
-      } else {
-        await notifyTechJobAssigned(selectedTech, {
-          work_order_number: wo.work_order_number,
-          title: wo.title,
-          customer_name: wo.projects.contacts.full_name,
-          scheduled_date: wo.start_date || undefined,
-          address: wo.address || wo.projects.contacts.address_line1 || undefined
-        });
-      }
-
-      setAssigningTo(null);
-      setSelectedTech('');
-      await loadData();
-    } catch (error) {
-      console.error('Error assigning technician:', error);
-      alert('Failed to assign technician');
-    }
+  function assignTechnician(woId: string, _previousTechId: string | null) {
+    setAssigningTo(woId);
   }
 
   function getPriorityColor(priority: string) {
@@ -434,48 +388,9 @@ export function ProjectWorkOrdersQueue() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    {!wo.assigned_to || assigningTo === wo.id ? (
-                      <div className="space-y-2">
-                        <select
-                          value={selectedTech}
-                          onChange={(e) => setSelectedTech(e.target.value)}
-                          className="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
-                        >
-                          <option value="">Select tech...</option>
-                          {techs.map(tech => (
-                            <option key={tech.id} value={tech.id}>{tech.full_name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => assignTechnician(wo.id, wo.assigned_to)}
-                          disabled={!selectedTech}
-                          className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Assign
-                        </button>
-                        {assigningTo === wo.id && (
-                          <button
-                            onClick={() => {
-                              setAssigningTo(null);
-                              setSelectedTech('');
-                            }}
-                            className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setAssigningTo(wo.id);
-                          setSelectedTech(wo.assigned_to);
-                        }}
-                        className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                      >
-                        Reassign
-                      </button>
-                    )}
+                    <button type="button" onClick={() => assignTechnician(wo.id, wo.assigned_to)} className="px-4 min-h-11 bg-blue-600 text-white rounded-lg text-sm">
+                      {wo.assigned_to ? 'Reschedule / reassign' : 'Schedule work order'}
+                    </button>
 
                     <button
                       onClick={() => setExpandedWO(expandedWO === wo.id ? null : wo.id)}
@@ -494,12 +409,22 @@ export function ProjectWorkOrdersQueue() {
       {selectedWorkOrderId && (
         <WorkOrderDetail
           workOrderId={selectedWorkOrderId}
-          onClose={() => {
+          onBack={() => {
             setSelectedWorkOrderId(null);
             loadData();
           }}
         />
       )}
+      {assigningTo && <ScheduleWorkOrderModal title="Schedule work order" organizationId={profile?.organization_id} technicians={techs}
+        initialTechnicianId={workOrders.find(wo => wo.id === assigningTo)?.assigned_to}
+        initialSchedule={{ date: workOrders.find(wo => wo.id === assigningTo)?.scheduled_date || '', start: workOrders.find(wo => wo.id === assigningTo)?.scheduled_start_time?.slice(0, 5) || '', end: workOrders.find(wo => wo.id === assigningTo)?.scheduled_end_time?.slice(0, 5) || '' }}
+        excludeWorkOrderIds={[assigningTo]} onClose={() => { setAssigningTo(null); }}
+        onSave={async (schedule, technicianId) => {
+          const result = await rescheduleWorkOrder(assigningTo, schedule.date, schedule.start, schedule.end, technicianId);
+          if (!result.success) throw new Error(result.error || 'Technician is already booked. Choose another time.');
+          await loadData();
+        }} />}
+
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { ScheduleWorkOrderModal } from './ScheduleWorkOrderModal';
 import { NotesPolishButton } from '../Shared/NotesPolishButton';
 import {CreateInvoiceFromWorkOrderModal} from '../Invoices/CreateInvoiceFromWorkOrderModal';
 import {InvoiceDetailModal} from '../Invoices/InvoiceDetailModal';
@@ -38,6 +39,9 @@ interface WorkOrder {
   status: string;
   priority: string;
   start_date: string;
+  scheduled_date: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
   target_completion_date: string;
   actual_completion_date: string | null;
   estimated_hours: number;
@@ -217,7 +221,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [customerHistory, setCustomerHistory] = useState<any[]>([]);
   const [showContactLogModal, setShowContactLogModal] = useState(false);
   const [contactLogRefreshKey, setContactLogRefreshKey] = useState(0);
-  const [selectedTechId, setSelectedTechId] = useState('');
   const [selectedLinkIds, setSelectedLinkIds] = useState<string[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [laborPhases, setLaborPhases] = useState<{ id: string; name: string }[]>([]);
@@ -623,31 +626,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         }
       }
     });
-  }
-
-  async function handleDuplicateToTech() {
-    if (!profile || !selectedTechId) {
-      alert('Please select a technician');
-      return;
-    }
-
-    try {
-      const { error } = await supabase.rpc('duplicate_work_order_to_technician', {
-        p_source_work_order_id: workOrderId,
-        p_target_technician_id: selectedTechId,
-        p_user_id: profile.id
-      });
-
-      if (error) throw error;
-
-      setShowDuplicateModal(false);
-      setSelectedTechId('');
-      loadWorkOrderData();
-      alert('Work order duplicated and linked successfully!');
-    } catch (error) {
-      console.error('Error duplicating work order:', error);
-      alert('Failed to duplicate work order. Please try again.');
-    }
   }
 
   function getStatusColor(status: string) {
@@ -1952,56 +1930,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
       )}
 
-      {/* Duplicate Work Order Modal */}
-      {showDuplicateModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900">Duplicate Work Order</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Create a copy for another technician, linked together</p>
-              </div>
-              <button onClick={() => setShowDuplicateModal(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
-                Creates a duplicate, assigns to the selected tech, and links both work orders for billing.
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Technician</label>
-                <select
-                  value={selectedTechId}
-                  onChange={(e) => setSelectedTechId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Choose a technician...</option>
-                  {technicians.filter(t => t.id !== workOrder.assigned_to).map(tech => (
-                    <option key={tech.id} value={tech.id}>{tech.full_name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
-              <button
-                onClick={() => setShowDuplicateModal(false)}
-                className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDuplicateToTech}
-                disabled={!selectedTechId}
-                className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                Duplicate & Link
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showDuplicateModal && <ScheduleWorkOrderModal title="Duplicate work order" organizationId={profile?.organization_id}
+        technicians={technicians.filter(t => t.id !== workOrder.assigned_to)}
+        initialSchedule={{ date: workOrder.scheduled_date || '', start: workOrder.scheduled_start_time?.slice(0, 5) || '', end: workOrder.scheduled_end_time?.slice(0, 5) || '' }}
+        onClose={() => setShowDuplicateModal(false)} onSave={async (schedule, technicianId, requestId) => {
+          const { error } = await supabase.rpc('create_scheduled_work_order_copy', { p_source_id: workOrderId, p_request_id: requestId, p_tech_id: technicianId, p_date: schedule.date, p_start: schedule.start, p_end: schedule.end });
+          if (error) throw new Error(error.message);
+          await loadWorkOrderData();
+        }} />}
       <ConfirmModal
         isOpen={!!confirmModal}
         title={confirmModal?.title || ''}

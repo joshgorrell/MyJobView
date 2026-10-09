@@ -1,6 +1,7 @@
 import LaborRemovalChoice from "../../../src/components/Proposals/LaborRemovalChoice";
 import ProjectTasksList from "../../../src/components/Projects/ProjectTasksList";
 import { CreateWorkOrderModal } from "../../../src/components/Production/CreateWorkOrderModal";
+import { EmergencyJobModal } from '../../../src/components/Dispatch/EmergencyJobModal';
 import { WorkOrderSettings } from "../../../src/components/Admin/WorkOrderSettings";
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -18,6 +19,8 @@ createRoot(document.getElementById("root")!).render(
     <div className="p-3">
       <ProjectTasksList projectId="p" canEdit />
     </div>
+  ) : new URLSearchParams(location.search).has("emergency") ? (
+    <EmergencyJobModal onClose={() => {}} onSuccess={() => {}} />
   ) : new URLSearchParams(location.search).has("service") ? (
     <CreateWorkOrderModal
       contactId="c"
