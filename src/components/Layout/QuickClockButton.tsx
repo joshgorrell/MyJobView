@@ -156,7 +156,8 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
     <>
       <button
         onClick={() => setShowModal(true)}
-        className={`px-3 py-2 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg ${buttonColor} text-white`}
+        className={`min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 shrink-0 px-3 py-2 rounded-lg transition-all font-medium flex items-center justify-center gap-2 shadow-lg ${buttonColor} text-white`}
+        aria-label="Time Clock"
         title="Time Clock"
       >
         {hasActiveJob && !isOnBreak ? (
