@@ -3,6 +3,7 @@ import { MessageSquare, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Lin
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { resolveMessageAttachments } from '../../lib/messageAttachments';
+import { useConversationHeight } from './useConversationHeight';
 import { useAuth } from '../../contexts/AuthContext';
 import { insertFlowTag, useFlowTags, TagChoice } from './useFlowTags';
 
@@ -139,6 +140,8 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
     if (createRequested) { setShowNewThread(true); onCreateOpened?.(); }
   }, [createRequested, onCreateOpened]);
   const [loading, setLoading] = useState(true);
+  const conversationSize = useConversationHeight(!authLoading && !loading);
+  const historyRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -187,7 +190,6 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
   useEffect(() => { setSelectedThread(null); openedRequest.current = null; }, [contactId, projectId, workOrderId]);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadThreads = useCallback(async () => {
@@ -404,7 +406,8 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
   // Scroll to bottom and mark as read
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const history = historyRef.current;
+    history?.scrollTo({ top: history.scrollHeight, behavior: 'smooth' });
     if (selectedThread && messages.length > 0) {
       markMessagesAsRead();
     }
@@ -625,7 +628,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+    <div className="customer-conversations w-full min-w-0 px-2 sm:px-4 py-4 sm:py-6">
       {loadError && <div role="alert" className="p-3 text-red-600">{loadError} <button onClick={() => void loadThreads()}>Retry</button></div>}
       {openThreadId && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert">This conversation is unavailable or you do not have access.</p>}
       {/* Stats bar */}
@@ -659,10 +662,10 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         </div>
       </div>
 
-      <div className="h-[min(650px,70dvh)] min-h-[320px] flex flex-col sm:flex-row gap-2 sm:gap-4">
+      <div ref={conversationSize.ref} style={{ height: conversationSize.height }} className="conversation-workspace min-h-0 min-w-0 flex flex-col sm:flex-row gap-2 sm:gap-4">
         {/* Threads List */}
-        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-80 lg:w-96 sm:flex-shrink-0 min-w-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col`}>
-          <div className="p-3 sm:p-4 border-b border-gray-200">
+        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-[35%] sm:max-w-96 shrink-0 min-h-0 min-w-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col`}>
+          <div className="shrink-0 p-3 sm:p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-blue-600" />
@@ -718,7 +721,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
             </div>}
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {filteredThreads.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-400" />
@@ -808,10 +811,10 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         </div>
 
         {/* Messages Panel */}
-        <div className={`${selectedThread ? 'flex' : 'hidden sm:flex'} flex-1 bg-white rounded-lg shadow-sm border border-gray-200 flex-col`}>
+        <div className={`${selectedThread ? 'flex' : 'hidden sm:flex'} flex-1 min-h-0 min-w-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col overflow-hidden`}>
           {selectedThread ? (
             <>
-              <div className="p-3 sm:p-4 border-b border-gray-200">
+              <div className="shrink-0 p-3 sm:p-4 border-b border-gray-200">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <button
                     onClick={() => setSelectedThread(null)}
@@ -837,7 +840,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+              <div ref={historyRef} className="conversation-history flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
                 {messages.map((message) => {
                   const isOwnMessage = message.author_id === profile?.id || message.author_type === 'staff';
 
@@ -873,109 +876,109 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     </div>
                   );
                 })}
-                <div ref={messagesEndRef} />
-              </div>
 
-              {/* Unanswered questions summary for proposal threads */}
-              {selectedThread.proposal_id && !isInternal && (() => {
-                const customerMessages = messages.filter(m => m.author_type === 'customer' && !m.is_internal);
-                const lastStaffIdx = (() => {
-                  for (let i = messages.length - 1; i >= 0; i--) {
-                    if (messages[i].author_type === 'staff' && !messages[i].is_internal) return i;
-                  }
-                  return -1;
-                })();
-                const unanswered = customerMessages.filter((_, idx) => {
-                  const msgIdx = messages.indexOf(customerMessages[idx]);
-                  return msgIdx > lastStaffIdx;
-                });
-                if (unanswered.length === 0 || !showQuestionSummary) return null;
-                const grouped = unanswered.reduce((acc, m) => {
-                  const key = m.context_label || 'General';
-                  if (!acc[key]) acc[key] = [];
-                  acc[key].push(m);
-                  return acc;
-                }, {} as Record<string, Message[]>);
+                {/* Unanswered questions summary for proposal threads */}
+                {selectedThread.proposal_id && !isInternal && (() => {
+                  const customerMessages = messages.filter(m => m.author_type === 'customer' && !m.is_internal);
+                  const lastStaffIdx = (() => {
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                      if (messages[i].author_type === 'staff' && !messages[i].is_internal) return i;
+                    }
+                    return -1;
+                  })();
+                  const unanswered = customerMessages.filter((_, idx) => {
+                    const msgIdx = messages.indexOf(customerMessages[idx]);
+                    return msgIdx > lastStaffIdx;
+                  });
+                  if (unanswered.length === 0 || !showQuestionSummary) return null;
+                  const grouped = unanswered.reduce((acc, m) => {
+                    const key = m.context_label || 'General';
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(m);
+                    return acc;
+                  }, {} as Record<string, Message[]>);
 
-                return (
-                  <div className="mx-3 sm:mx-4 mt-3 mb-1 rounded-lg border border-blue-200 bg-blue-50/60 overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 bg-blue-100/50">
-                      <div className="flex items-center gap-2">
-                        <HelpCircle className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-semibold text-blue-900">
-                          {unanswered.length} unanswered question{unanswered.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => setShowQuestionSummary(false)}
-                        className="text-blue-400 hover:text-blue-600 p-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="p-3 space-y-2 max-h-32 overflow-y-auto">
-                      {Object.entries(grouped).map(([label, msgs]) => (
-                        <div key={label}>
-                          {label !== 'General' && (
-                            <p className="text-xs font-medium text-blue-700 mb-0.5 flex items-center gap-1">
-                              <MessageSquare className="w-3 h-3" />
-                              {label}
-                            </p>
-                          )}
-                          {msgs.map(m => (
-                            <p key={m.id} className="text-xs text-gray-700 line-clamp-2 pl-3 border-l-2 border-blue-200">
-                              {m.body}
-                            </p>
-                          ))}
+                  return (
+                    <div className="mx-3 sm:mx-4 mt-3 mb-1 rounded-lg border border-blue-200 bg-blue-50/60 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-blue-100/50">
+                        <div className="flex items-center gap-2">
+                          <HelpCircle className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-semibold text-blue-900">
+                            {unanswered.length} unanswered question{unanswered.length !== 1 ? 's' : ''}
+                          </span>
                         </div>
-                      ))}
+                        <button
+                          onClick={() => setShowQuestionSummary(false)}
+                          className="text-blue-400 hover:text-blue-600 p-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="p-3 space-y-2 max-h-32 overflow-y-auto">
+                        {Object.entries(grouped).map(([label, msgs]) => (
+                          <div key={label}>
+                            {label !== 'General' && (
+                              <p className="text-xs font-medium text-blue-700 mb-0.5 flex items-center gap-1">
+                                <MessageSquare className="w-3 h-3" />
+                                {label}
+                              </p>
+                            )}
+                            {msgs.map(m => (
+                              <p key={m.id} className="text-xs text-gray-700 line-clamp-2 pl-3 border-l-2 border-blue-200">
+                                {m.body}
+                              </p>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="px-3 py-2 bg-blue-100/30 border-t border-blue-200/50">
+                        <p className="text-xs text-blue-600">
+                          Your reply below will be sent to the customer and will address all open questions.
+                        </p>
+                      </div>
                     </div>
-                    <div className="px-3 py-2 bg-blue-100/30 border-t border-blue-200/50">
-                      <p className="text-xs text-blue-600">
-                        Your reply below will be sent to the customer and will address all open questions.
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
 
-              {/* Reply context tag selector for proposal threads */}
-              {selectedThread.proposal_id && !isInternal && (() => {
-                const contextLabels = [...new Set(
-                  messages
-                    .filter(m => m.author_type === 'customer' && m.context_label)
-                    .map(m => m.context_label!)
-                )];
-                if (contextLabels.length === 0) return null;
-                return (
-                  <div className="mx-3 sm:mx-4 mt-2 flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-gray-500">Tag reply to:</span>
-                    <button
-                      onClick={() => setReplyContextLabel(null)}
-                      className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
-                        !replyContextLabel ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      General
-                    </button>
-                    {contextLabels.map(label => (
+                {/* Reply context tag selector for proposal threads */}
+                {selectedThread.proposal_id && !isInternal && (() => {
+                  const contextLabels = [...new Set(
+                    messages
+                      .filter(m => m.author_type === 'customer' && m.context_label)
+                      .map(m => m.context_label!)
+                  )];
+                  if (contextLabels.length === 0) return null;
+                  return (
+                    <div className="mx-3 sm:mx-4 mt-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-500">Tag reply to:</span>
                       <button
-                        key={label}
-                        onClick={() => setReplyContextLabel(label)}
-                        className={`text-xs px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
-                          replyContextLabel === label ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        onClick={() => setReplyContextLabel(null)}
+                        className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                          !replyContextLabel ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
-                        <MessageSquare className="w-2.5 h-2.5" />
-                        {label}
+                        General
                       </button>
-                    ))}
-                  </div>
-                );
-              })()}
+                      {contextLabels.map(label => (
+                        <button
+                          key={label}
+                          onClick={() => setReplyContextLabel(label)}
+                          className={`text-xs px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
+                            replyContextLabel === label ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          <MessageSquare className="w-2.5 h-2.5" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+              </div>
 
               {/* Composer */}
-              <div className="p-3 sm:p-4 border-t border-gray-200">
+              <div className="conversation-reply shrink-0 p-3 sm:p-4 border-t border-gray-200">
                 {pendingAttachment && (
                   <div className="mb-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
                     {pendingAttachment.type === 'image' ? (
@@ -1047,7 +1050,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     }}
                     placeholder={isInternal ? 'Internal note… Type @ to mention a teammate' : 'Type your message…'}
                     rows={2}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
+                    className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
                   />
                   <button
                     onClick={handleSendMessage}

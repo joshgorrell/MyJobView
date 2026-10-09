@@ -39,7 +39,7 @@ function eventKind(event: FlowEvent): string {
 }
 const ICONS = { work: Wrench, service: Wrench, sales: FileText, materials: Package, scheduling: Calendar, customer: User, financial: DollarSign, update: MessageSquare, communication: MessageSquare };
 
-export default function Flow({ contactId, projectId, workOrderId, dark = false, ...conversationProps }: FlowScope & { dark?: boolean } & CustomerConversationsProps) {
+export default function Flow({ contactId, projectId, workOrderId, dark = false, createRequested, onCreateOpened, ...conversationProps }: FlowScope & { dark?: boolean } & CustomerConversationsProps) {
   const controlId = useId();
   const searchId = `${controlId}-search`;
   const filtersId = `${controlId}-filters`;
@@ -47,14 +47,13 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const { hasModuleAccess } = useDepartments();
   const scoped = !!(contactId || projectId || workOrderId);
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
-  const [view, setView] = useState<FlowView>(conversationProps.openThreadId || conversationProps.createRequested ? 'messages' : 'all');
+  const [view, setView] = useState<FlowView>(conversationProps.openThreadId ? 'messages' : 'all');
   const [messageFilter, setMessageFilter] = useState<MessageFilter>('all');
   const [threadId, setThreadId] = useState<string | null>(null);
-  const [createCustomer, setCreateCustomer] = useState(false);
   const canMessageCustomers = hasModuleAccess('messages');
   useEffect(() => {
-    if (conversationProps.openThreadId || conversationProps.createRequested) { setView('messages'); setMessageFilter('customer'); setThreadId(null); }
-  }, [conversationProps.openThreadId, conversationProps.createRequested]);
+    if (conversationProps.openThreadId) { setView('messages'); setMessageFilter('customer'); setThreadId(null); }
+  }, [conversationProps.openThreadId]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(false);
@@ -109,6 +108,12 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const flow = useFlow(filters);
   const scopeModule = workOrderId ? 'work_orders' : projectId ? 'projects' : contactId ? 'contacts' : null;
   const canPost = scopeModule ? hasModuleAccess(scopeModule) : ['contacts', 'projects', 'work_orders'].some(hasModuleAccess);
+  useEffect(() => {
+    if (createRequested && canPost) {
+      setChoosingMessage(false); setComposing(false); setMessaging(true); setView('all');
+      onCreateOpened?.();
+    }
+  }, [createRequested, canPost, onCreateOpened]);
   useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(timer); }, [search]);
   useEffect(() => {
     if (!profile?.organization_id) return;
@@ -161,21 +166,16 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
   return <section className={`flow ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
-      {(canPost || canMessageCustomers) && <div className="flow-heading-actions">
-        <button className="flow-message-action" aria-label="New message" ref={messageAction} aria-expanded={choosingMessage} aria-controls={`${controlId}-message-destination`}
-          onClick={() => {
-            if (canPost && canMessageCustomers) setChoosingMessage(!choosingMessage);
-            else if (canMessageCustomers) { setComposing(false); setCreateCustomer(true); setMessageFilter('customer'); setView('messages'); }
-            else { setComposing(false); setMessaging(!messaging); }
-          }}><MessageSquare size={15} /><span className="flow-desktop-label">New message</span><span className="flow-mobile-label">Message</span>{canPost && canMessageCustomers && <ChevronDown size={13} />}</button>
-        {canPost && <button className="flow-primary" onClick={() => { setComposing(!composing); setMessaging(false); setChoosingMessage(false); }}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button>}
+      {canPost && <div className="flow-heading-actions">
+        <button className="flow-primary flow-create-action" aria-label="Create in Flow" title="Create in Flow" ref={messageAction} aria-expanded={choosingMessage} aria-controls={`${controlId}-create-options`}
+          onClick={() => setChoosingMessage(!choosingMessage)}><Plus size={20} /></button>
       </div>}
     </header>
     {composing && <PostFlowUpdate scope={chosenScope} onClose={() => setComposing(false)} onPosted={() => { setComposing(false); void flow.refresh(); }} />}
-    {choosingMessage && <div ref={messageChoices} id={`${controlId}-message-destination`} className="flow-message-destinations" role="group" aria-label="Message destination">
+    {choosingMessage && <div ref={messageChoices} id={`${controlId}-create-options`} className="flow-message-destinations" role="group" aria-label="Create options">
       {canPost && <button onClick={() => { setChoosingMessage(false); setMessaging(true); setComposing(false); if (view === 'messages') setView('all'); }}><MessageSquare size={17} /><span><strong>Internal chat</strong><small>Teammates, departments or everyone</small></span></button>}
-      {canMessageCustomers && <button onClick={() => { setChoosingMessage(false); setMessaging(false); setCreateCustomer(true); setMessageFilter('customer'); setView('messages'); }}><User size={17} /><span><strong>Customer message</strong><small>Start a customer conversation</small></span></button>}
-      <button aria-label="Close message choices" onClick={() => { setChoosingMessage(false); messageAction.current?.focus(); }}><X size={16} /></button>
+      {canPost && <button onClick={() => { setChoosingMessage(false); setMessaging(false); setComposing(true); }}><Activity size={17} /><span><strong>Activity update</strong><small>Customer or job progress</small></span></button>}
+      <button aria-label="Close create options" onClick={() => { setChoosingMessage(false); messageAction.current?.focus(); }}><X size={16} /></button>
     </div>}
     {messaging && <div className="flow-message-composer"><DiscussionPostForm onSuccess={() => { setMessaging(false); void flow.refresh(); }} /></div>}
     <div className="flow-toolbar">
@@ -213,8 +213,6 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     {canMessageCustomers && (view === 'messages' && messageFilter !== 'coworkers') && <div className="flow-customer-inbox">
       {threadId && view !== 'messages' && <button onClick={() => setThreadId(null)}>Close conversation</button>}
       <CustomerConversations unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
-        createRequested={createCustomer || conversationProps.createRequested}
-        onCreateOpened={() => { setCreateCustomer(false); conversationProps.onCreateOpened?.(); }}
         onThreadSelected={id => { setThreadId(id); conversationProps.onThreadSelected?.(id); }} />
     </div>}
     {(view !== 'messages' || messageFilter !== 'customer') && <>

@@ -13,7 +13,7 @@ import { supabase } from '../../lib/supabase';
 interface HeaderProps {
   onCreateContact: () => void;
   onCreateLead: () => void;
-  onCreateMessage: () => void;
+  onCreateInternalChat?: () => void;
   onCreateFlowUpdate?: () => void;
   onCreateServiceRequest: () => void;
   onCreateTask: () => void;
@@ -31,7 +31,7 @@ interface HeaderProps {
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
   const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
@@ -231,26 +231,26 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                     </div>
                   </button>
 
-                  <button
+                  {onCreateInternalChat && <button
                     onClick={() => {
-                      onCreateMessage();
+                      onCreateInternalChat?.();
                       setShowCreateMenu(false);
                     }}
                     className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <MessageSquare className="w-4 h-4 text-purple-400" />
                     <div>
-                      <div className="font-medium">New Message</div>
-                      <div className="text-xs text-muted">Start a conversation</div>
+                      <div className="font-medium">Internal chat</div>
+                      <div className="text-xs text-muted">Teammates, departments or everyone</div>
                     </div>
-                  </button>
+                  </button>}
 
                   {onCreateFlowUpdate && <button
                     onClick={() => { onCreateFlowUpdate(); setShowCreateMenu(false); }}
                     className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="font-medium">Flow Update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                    <div><div className="font-medium">Activity update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
                   </button>}
 
                   <button
@@ -446,23 +446,23 @@ export function Header({ onCreateContact, onCreateLead, onCreateMessage, onCreat
                     </div>
                   </button>
 
-                  <button
-                    onClick={() => { onCreateMessage(); setMobileMenuOpen(false); }}
+                  {onCreateInternalChat && <button
+                    onClick={() => { onCreateInternalChat?.(); setMobileMenuOpen(false); }}
                     className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium">New Message</div>
-                      <div className="text-xs text-muted">Start a conversation</div>
+                      <div className="text-sm font-medium">Internal chat</div>
+                      <div className="text-xs text-muted">Teammates, departments or everyone</div>
                     </div>
-                  </button>
+                  </button>}
 
                   {onCreateFlowUpdate && <button
                     onClick={() => { onCreateFlowUpdate(); setMobileMenuOpen(false); }}
                     className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="text-sm font-medium">Flow Update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                    <div><div className="text-sm font-medium">Activity update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
                   </button>}
 
                   <button
