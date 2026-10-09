@@ -100,7 +100,10 @@ try {
   await page.getByRole('button',{name:'Delete',exact:true}).click();
   await page.getByText('Product is in use',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.getByPlaceholder('Search products...').fill('Bedroom');
   await page.getByLabel('Catalog status').selectOption('discontinued');
+  assert.equal(await page.getByPlaceholder('Search products...').inputValue(),'','Discontinued review clears filters that could hide items');
+  assert.ok((await page.getByLabel('Catalog status').textContent()).includes('Discontinued — to archive (1)'));
   await page.getByRole('button',{name:'Open TV-2',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Open TV-1',exact:true}).count(),0);
   await page.close();console.log('Archive, restore, discontinued filters and protected-delete recovery passed.');

@@ -130,6 +130,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
   const [formData, setFormData] = useState({
     is_discontinued: false,
+    is_active: true,
     // Basic Info
     manufacturer_id: '',
     manufacturer_model_number: '',
@@ -510,6 +511,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       const { data, error } = await supabase.from('products').select(`
         id,
         is_discontinued,
+        is_active,
         manufacturer_id,
         manufacturer_model_number,
         sku,
@@ -544,6 +546,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       if (data) {
         setFormData({
           is_discontinued: data.is_discontinued ?? false,
+          is_active: data.is_active !== false,
           manufacturer_id: data.manufacturer_id || '',
           manufacturer_model_number: data.manufacturer_model_number || '',
           sku: data.sku || '',
@@ -592,6 +595,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       const { data, error } = await supabase.from('products').select(`
         id,
         is_discontinued,
+        is_active,
         manufacturer_id,
         manufacturer_model_number,
         sku,
@@ -626,6 +630,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       if (data) {
         const baseData = {
           is_discontinued: data.is_discontinued ?? false,
+          is_active: true,
           manufacturer_id: data.manufacturer_id || '',
           manufacturer_model_number: data.manufacturer_model_number ? `${data.manufacturer_model_number}*copy*` : '',
           sku: '', // Clear SKU - user must enter a unique one
@@ -942,6 +947,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
       const productData = {
         is_discontinued: formData.is_discontinued,
+        is_active: formData.is_active,
         manufacturer_id: formData.manufacturer_id || null,
         manufacturer_model_number: formData.manufacturer_model_number,
         item_color: formData.item_color || null,
@@ -1362,10 +1368,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="sm:col-span-2 text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Basic Information</h3>
 
-            <label className="sm:col-span-2 flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" aria-label="Discontinued product" checked={formData.is_discontinued} onChange={event => setFormData(prev => ({ ...prev, is_discontinued: event.target.checked }))} className="mt-1" />
-              <span><span className="font-semibold text-red-600">Discontinued</span><span className="block text-xs text-gray-500">Remaining stock can still be sold. Purchasing may override after confirming vendor availability.</span></span>
-            </label>
             {/* Manufacturer */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2188,6 +2190,17 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           {productId && (
             <AccessoriesSection productId={productId} />
           )}
+          {!readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">Product status</h3>
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input type="checkbox" aria-label="Discontinue item" checked={formData.is_discontinued} onChange={event => setFormData(prev => ({ ...prev, is_discontinued: event.target.checked }))} className="mt-1" />
+              <span><span className="font-semibold text-red-600">Discontinue item</span><span className="block text-xs text-gray-500 mt-1">Remaining stock can still be sold. Purchasing may override after confirming vendor availability.</span></span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input type="checkbox" aria-label="Archive item" checked={!formData.is_active} onChange={event => setFormData(prev => ({ ...prev, is_active: !event.target.checked }))} className="mt-1" />
+              <span><span className="font-semibold">Archive item</span><span className="block text-xs text-gray-500 mt-1">Hide from the current catalog and discontinued review list. Existing records are preserved; this item cannot be added to new proposals or invoices.</span></span>
+            </label>
+          </section>}
         </div>
 
         {/* Footer Actions */}
