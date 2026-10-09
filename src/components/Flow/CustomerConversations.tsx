@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, AlertCircle, HelpCircle } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
+import { resolveMessageAttachments } from '../../lib/messageAttachments';
 import { useAuth } from '../../contexts/AuthContext';
 import { insertFlowTag, useFlowTags, TagChoice } from './useFlowTags';
 
@@ -57,6 +58,8 @@ interface Contact {
 }
 
 export interface CustomerConversationsProps {
+  hideFilters?: boolean;
+  unreadOnly?: boolean;
   contactId?: string;
   projectId?: string;
   workOrderId?: string;
@@ -119,7 +122,7 @@ function formatTime(dateString: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function CustomerConversations({ createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
+export function CustomerConversations({ hideFilters = false, unreadOnly = false, createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const [threads, setThreads] = useState<EnrichedThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<EnrichedThread | null>(null);
@@ -149,7 +152,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
     requestAnimationFrame(() => { messageInput.current?.focus(); messageInput.current?.setSelectionRange(inserted.cursor, inserted.cursor); });
   }
   const [uploading, setUploading] = useState(false);
-  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; preview?: string; type: 'image' | 'link' } | null>(null);
   const [firstImage, setFirstImage] = useState<File | null>(null);
   const [contactSearch, setContactSearch] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -193,7 +196,6 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
       return;
     }
     try {
-      setLoading(true);
       setLoadError('');
 
       let query = supabase
@@ -365,8 +367,8 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
         () => { loadThreads(); }
       )
       .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    const timer = window.setInterval(() => { void loadThreads(); }, 30000);
+    return () => { window.clearInterval(timer); supabase.removeChannel(channel); };
   }, [profile?.organization_id, loadThreads]);
 
   // Clear drafts between conversations and guard late responses from another thread.
@@ -378,12 +380,13 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
     const reload = async () => {
       const { data, error } = await supabase.from('messages').select('*')
         .eq('thread_id', selectedThread.id).order('created_at', { ascending: true });
-      if (!cancelled && !error) setMessages((data || []) as Message[]);
+      if (!cancelled && !error) { const resolved = await resolveMessageAttachments((data || []) as Message[]); if (!cancelled) setMessages(resolved); }
     };
     void reload();
     const channel = supabase.channel(`flow-thread-${selectedThread.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `thread_id=eq.${selectedThread.id}` }, () => void reload()).subscribe();
-    return () => { cancelled = true; void supabase.removeChannel(channel); };
+    const timer = window.setInterval(() => void reload(), 30000);
+    return () => { cancelled = true; window.clearInterval(timer); void supabase.removeChannel(channel); };
   }, [selectedThread?.id]);
 
   const openedRequest = useRef<string | null>(null);
@@ -416,7 +419,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      if (data && activeThreadId.current === threadId) setMessages(data as Message[]);
+      if (data) { const resolved = await resolveMessageAttachments(data as Message[]); if (activeThreadId.current === threadId) setMessages(resolved); }
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -431,6 +434,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
         .update({ is_read: true })
         .in('id', unreadMessages.map(m => m.id));
       if (error) return;
+      await supabase.from('notifications').update({ is_read: true }).eq('user_id', profile?.id).eq('related_id', selectedThread.id).in('type', ['message', 'message_mention']);
       if (activeThreadId.current === selectedThread.id) setMessages(old => old.map(m => unreadMessages.some(u => u.id === m.id) ? { ...m, is_read: true } : m));
       loadThreads();
     }
@@ -448,7 +452,8 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
         .upload(path, file, { contentType: file.type });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('message-attachments').getPublicUrl(path);
-      if (activeThreadId.current === selectedThread.id) setPendingAttachment({ url: urlData.publicUrl, type: 'image' });
+      const [resolved] = await resolveMessageAttachments([{attachment_url: urlData.publicUrl, attachment_type: 'image'}]);
+      if (activeThreadId.current === selectedThread.id) setPendingAttachment({ url: urlData.publicUrl, preview: resolved.attachment_url || undefined, type: 'image' });
     } catch (error) {
       console.error('Error uploading image:', error);
       alert('Failed to upload image. Please try again.');
@@ -479,7 +484,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
         author_type: 'staff',
         body,
         is_internal: selectedThread.visibility === 'internal' || isInternal,
-        is_read: true,
+        is_read: selectedThread.visibility === 'internal' || isInternal,
         attachment_url: attachmentUrl,
         attachment_type: attachmentType,
         context_label: replyContextLabel,
@@ -560,7 +565,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
         author_type: 'staff',
         body: newThreadForm.first_message.trim(),
         is_internal: newThreadForm.visibility === 'internal',
-        is_read: true,
+        is_read: newThreadForm.visibility === 'internal',
         attachment_url: firstAttachment,
         attachment_type: firstAttachmentType,
       });
@@ -583,6 +588,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
   }
 
   const filteredThreads = threads.filter((t) => {
+    if (unreadOnly && !t.unread_count) return false;
     const matchesSearch =
       t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -676,7 +682,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
               />
             </div>
 
-            <div className="flex gap-2">
+            {!hideFilters && <div className="flex gap-2">
               <button
                 onClick={() => setFilterCategory('all')}
                 className={`flex-1 px-3 py-2 sm:py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
@@ -709,7 +715,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
               >
                 Internal
               </button>
-            </div>
+            </div>}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -973,7 +979,7 @@ export function CustomerConversations({ createRequested, onCreateOpened, openThr
                 {pendingAttachment && (
                   <div className="mb-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
                     {pendingAttachment.type === 'image' ? (
-                      <img src={pendingAttachment.url} alt="Pending" className="w-10 h-10 rounded object-cover" />
+                      <img src={pendingAttachment.preview || pendingAttachment.url} alt="Pending" className="w-10 h-10 rounded object-cover" />
                     ) : (
                       <LinkIcon className="w-4 h-4 text-blue-600" />
                     )}

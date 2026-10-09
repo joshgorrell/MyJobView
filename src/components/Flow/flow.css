@@ -213,3 +213,6 @@
 
 @media(max-width:640px){.flow .flow-heading .flow-desktop-label{display:none}.flow .flow-heading .flow-mobile-label{display:inline}}
 @container (max-width:340px){.flow .flow-heading{flex-wrap:wrap}.flow .flow-heading>div:first-child{flex-basis:100%}.flow-heading-actions{margin-left:auto}}
+
+.flow-message-filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.flow-message-filters button { padding: 6px 12px; border: 1px solid var(--flow-border, #d1d5db); border-radius: 8px; }

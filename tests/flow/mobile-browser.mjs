@@ -38,7 +38,7 @@ try {
     assert.equal(await page.getByRole('textbox',{name:'Search activity',exact:true}).isVisible(),false);
     assert.equal(await page.locator('.flow-kind').count(),0);
     assert.equal(await page.locator('.flow-view-tabs').isVisible(),false);
-    await page.getByRole('combobox',{name:'Flow view',exact:true}).selectOption('company');
+    await page.getByRole('combobox',{name:'Flow view',exact:true}).selectOption('activity');
     await page.getByRole('combobox',{name:'Flow view',exact:true}).selectOption('all');
     const toolbarHeight=await page.locator('.flow-toolbar').evaluate(el=>el.getBoundingClientRect().height);
     assert.ok(toolbarHeight<50,JSON.stringify({width,toolbarHeight}));
@@ -70,7 +70,7 @@ try {
   }
   await page.setViewportSize({width:1280,height:900});await page.goto(url);await page.locator('.flow-row').first().waitFor();
   assert.equal(await page.getByRole('textbox',{name:'Search activity',exact:true}).isVisible(),false);
-  assert.equal(await page.locator('.flow-kind').count(),0);assert.equal(await page.locator('.flow-view-tabs').isVisible(),true);await page.getByRole('tab',{name:'Company',exact:true}).click();await page.getByRole('tab',{name:'All',exact:true}).click();assert.equal(await page.locator('.flow-column-head').isVisible(),true);assert.equal(await page.locator('.flow-footnote').isVisible(),true);
+  assert.equal(await page.locator('.flow-kind').count(),0);assert.equal(await page.locator('.flow-view-tabs').isVisible(),true);await page.getByRole('tab',{name:'Activity',exact:true}).click();await page.getByRole('tab',{name:'All',exact:true}).click();assert.equal(await page.locator('.flow-column-head').isVisible(),true);assert.equal(await page.locator('.flow-footnote').isVisible(),true);
   assert.equal(await page.locator('.flow-search-toggle').isVisible(),true);assert.equal(await page.locator('.flow-help-toggle').isVisible(),false);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   for(const width of [768,1024]){await page.setViewportSize({width,height:900});await page.goto(url);await page.locator('.flow-row').first().waitFor();assert.ok(await page.locator('.flow-toolbar').evaluate(el=>el.getBoundingClientRect().height<50));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
   assert.deepEqual(errors,[]);console.log('Desktop and scoped views pass; no browser errors');

@@ -1,4 +1,5 @@
 export interface Profile {
+  contact_id?: string | null;
   is_technician?: boolean;
   is_sales_rep?: boolean;
   id: string;

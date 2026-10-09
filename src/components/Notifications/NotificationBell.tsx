@@ -46,14 +46,14 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
       .channel(`notifications:${profile.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
         () => {
           loadAllNotifications();
         }
       )
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `author_id=neq.${profile.id}` },
+        { event: '*', schema: 'public', table: 'messages', filter: `author_id=neq.${profile.id}` },
         () => {
           loadAllNotifications();
         }
@@ -124,13 +124,14 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
         .neq('messages.author_id', profile.id)
         .eq('messages.author_type', 'customer')
         .eq('messages.is_internal', false)
+        .eq('messages.is_read', false)
         .order('last_message_at', { ascending: false })
         .limit(10);
 
       if (threads) {
         threads.forEach((thread: any) => {
           const latestMessage = thread.messages[0];
-          if (latestMessage) {
+          if (latestMessage && !notifs?.some(n => n.type === 'message' && n.related_id === thread.id)) {
             unified.push({
               id: `msg-${latestMessage.id}`,
               type: 'message',
@@ -180,7 +181,7 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
     const notifType = notification.notification_type;
 
     // A mention opens the whole thread, including the messages around it.
-    if (notifType === 'message_mention' && notification.related_id && onMessageClick) {
+    if ((notifType === 'message_mention' || notifType === 'message') && notification.related_id && onMessageClick) {
       await markAsRead(notification);
       onMessageClick(notification.related_id);
       setIsOpen(false);
