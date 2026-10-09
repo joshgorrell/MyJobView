@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type MouseEventHandler } from 'react';
-import { ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import './calendar.css';
 
 // Expands the actual calendar workspace, preserving its state and interactions.
@@ -30,7 +30,7 @@ export function CalendarWorkspace({ children, tabHref, className = '', onClick, 
   return <div ref={root} className={'calendar-workspace relative min-w-0 ' + (fallback ? 'calendar-expanded ' : '') + className} aria-busy={loading} data-calendar-workspace onClick={onClick}>
     <div className="relative z-30 flex flex-wrap items-center justify-end gap-2 pb-2">
       <button type="button" onClick={() => { void toggle(); }} aria-label={expanded || fallback ? 'Exit full screen calendar' : 'Full screen calendar'} className="min-h-11 inline-flex items-center gap-2 px-3 text-sm bg-white text-gray-900 border border-gray-200 rounded-lg hover:bg-blue-50">{expanded || fallback ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}{expanded || fallback ? 'Exit full screen' : 'Full screen'}</button>
-      {tabHref && <a href={tabHref} target="_blank" rel="noopener noreferrer" className="min-h-11 inline-flex items-center gap-2 px-3 text-sm bg-white text-gray-900 border border-gray-200 rounded-lg hover:bg-blue-50"><ExternalLink className="h-4 w-4" />Open in new tab</a>}
+      {tabHref && <a href={tabHref} target="_blank" rel="noopener noreferrer" aria-label="Pop out calendar" title="Pop out calendar" className="min-h-11 min-w-11 inline-flex items-center justify-center p-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-blue-500"><Maximize2 size={16} aria-hidden="true" /></a>}
     </div>
     {children}
     {loading && <div className="absolute inset-x-0 bottom-0 top-14 z-20 bg-white/80 flex items-start justify-center pt-16" role="status"><p className="rounded-lg bg-white px-4 py-3 text-sm text-gray-700">Loading calendar…</p></div>}
