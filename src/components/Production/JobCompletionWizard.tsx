@@ -1,3 +1,4 @@
+import { NotesPolishButton } from '../Shared/NotesPolishButton';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -467,9 +468,10 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes (Optional)
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+                <NotesPolishButton value={techNotes} onApply={setTechNotes} />
+              </div>
               <textarea
                 value={techNotes}
                 onChange={(e) => setTechNotes(e.target.value)}

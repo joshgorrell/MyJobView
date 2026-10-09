@@ -1,3 +1,4 @@
+import { NotesPolishButton } from '../Shared/NotesPolishButton';
 import {CreateInvoiceFromWorkOrderModal} from '../Invoices/CreateInvoiceFromWorkOrderModal';
 import {InvoiceDetailModal} from '../Invoices/InvoiceDetailModal';
 import { WorkOrderTimeControl } from './WorkOrderTimeControl';
@@ -1043,7 +1044,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="max-w-3xl space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div><h3 className="font-semibold text-gray-900">Work Order Notes</h3><p className="text-sm text-gray-500">Type normally or use your device keyboard's voice-to-text. Notes save automatically.</p></div>
+              <div className="flex shrink-0 items-center gap-2">
+                <NotesPolishButton key={workOrderId} value={notesDraft} onApply={changeNotesDraft} disabled={notesSaving} />
               {isAssignedTech && <button type="button" onClick={() => { setPhotoContext('work_order_notes'); setShowPhotoCapture(true); }} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-gray-600 hover:bg-gray-50" title="Take or upload photos" aria-label="Take or upload note photos"><Camera className="w-5 h-5" /></button>}
+              </div>
             </div>
             <textarea value={notesDraft} onChange={e => changeNotesDraft(e.target.value)} onBlur={() => { if (notesDirtyRef.current) void saveNotesDraft(); }} rows={10} className="w-full min-h-56 rounded-xl border border-gray-300 p-3 text-base sm:text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200" placeholder="Add technician notes, customer comments, visit recap, or anything the next person should know…" />
             <div className="flex items-center justify-between text-xs"><span className={notesError ? 'text-red-600' : 'text-gray-400'}>{notesError ? `Could not save notes: ${notesError}` : notesSaving ? 'Saving…' : notesDirtyRef.current ? 'Unsaved changes' : 'Saved'}</span><span className="text-gray-500">Camera supports multiple photos.</span></div>

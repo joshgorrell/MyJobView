@@ -1,0 +1,1 @@
+export const supabase={functions:{async invoke(){return {data:{cleaned:'Work Performed\nReplaced HDMI cable from truck stock and confirmed TV works.\n\nFollow-Up Required\nReturn for unresolved speaker issue.'},error:null};}}};
