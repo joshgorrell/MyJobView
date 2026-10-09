@@ -297,6 +297,7 @@ export default function ProductsManagement() {
   }
 
   const categories = Array.from(new Set(products.map(p => p.categoryName).filter(Boolean))).sort();
+  const discontinuedCount = products.filter(p => p.is_active !== false && p.is_discontinued).length;
   const missingPhotoCount = products.filter(p => !p.image_url?.trim()).length;
   const subcategories = Array.from(new Set(products.filter(p => filterCategory === 'all' || p.categoryName === filterCategory)
     .map(p => p.subcategoryName).filter(Boolean))).sort();
@@ -394,8 +395,8 @@ export default function ProductsManagement() {
           />
         </div>
 
-        {activeTab === 'products' && <select aria-label="Catalog status" value={filterStatus} onChange={event => setFilterStatus(event.target.value as typeof filterStatus)} className="max-w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
-          <option value="current">Current products</option><option value="discontinued">Discontinued</option><option value="archived">Archived</option><option value="all">All products</option>
+        {activeTab === 'products' && <select aria-label="Catalog status" value={filterStatus} onChange={event => { const status = event.target.value as typeof filterStatus; setFilterStatus(status); if (status === 'discontinued') { setSearchTerm(''); setShowMissingPhotos(false); setFilterType('all'); setFilterCategory('all'); setFilterSubcategory('all'); setFilterManufacturer('all'); setFilterVendor('all'); setFilterPhase('all'); } }} className="max-w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
+          <option value="current">Current products</option><option value="discontinued">Discontinued — to archive ({discontinuedCount})</option><option value="archived">Archived</option><option value="all">All products</option>
         </select>}
         {activeTab === 'products' && missingPhotoCount > 0 && (
           <button type="button" onClick={() => setShowMissingPhotos(value => !value)}
@@ -750,7 +751,7 @@ export default function ProductsManagement() {
           products={filteredProducts}
           groupBy={groupBy}
           viewMode={productsViewMode}
-          revealMatches={Boolean(searchTerm.trim()) || showMissingPhotos || [filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase].some(value => value !== 'all')}
+          revealMatches={filterStatus === 'discontinued' || Boolean(searchTerm.trim()) || showMissingPhotos || [filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase].some(value => value !== 'all')}
           canEdit={canEdit}
           hideCost={hideCost}
           onView={setViewingProductId}

@@ -237,7 +237,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
                 onClick={() => setActiveTab('history')}
                 className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
               >
-                Usage History
+                History
               </button>
             </div>
             <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
