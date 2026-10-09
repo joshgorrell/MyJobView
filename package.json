@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test:proposal-notifications:browser": "npm run build && node tests/reviews/proposal-notification-browser.mjs",
     "test:navigation:browser": "npm run build && node tests/navigation/responsive-browser.mjs",
     "test:themes": "node tests/themes/database.mjs",
     "test:themes:browser": "npm run build && node tests/themes/browser.mjs",
