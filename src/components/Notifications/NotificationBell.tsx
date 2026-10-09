@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { proposalFeedbackUrl } from '../../lib/proposalFeedbackLinks';
 import { Bell, MessageCircle, CheckSquare, AlertCircle, Info, FileText, X, ChevronDown, ChevronUp, Trash2, MessageSquareWarning } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Notification } from '../../lib/types';
@@ -362,7 +363,13 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
     }
 
     if (notifType === 'review_request' && notification.title === 'Proposal check feedback received') {
-      window.location.assign('/?tab=reviews&reviewType=proposal');
+      const url = notification.related_id
+        ? proposalFeedbackUrl({ emailId: notification.related_id, receivedAt: notification.created_at })
+        : '/?tab=reviews&reviewType=proposal';
+      window.history.pushState(window.history.state, '', url);
+      onTabChange?.('reviews');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      setIsOpen(false);
       return;
     }
 

@@ -9,7 +9,7 @@ const {handleProposalResponse}=await moduleFrom('const {isProposalChoice,proposa
 const sql=new PGlite();const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 const base=await readFile('tests/reviews/proposal-check-history.mjs','utf8');const start=base.indexOf('await sql.exec(`CREATE ROLE');const end=base.indexOf('`);',start)+3;
 await new Function('sql','id','return (async()=>{'+base.slice(start,end)+'})()')(sql,id);
-await sql.exec('CREATE TABLE notifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,organization_id uuid,type text,related_id uuid,title text,body text); GRANT ALL ON notifications,profiles TO service_role;');
+await sql.exec('CREATE TABLE notifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,organization_id uuid,type text,related_id uuid,title text,body text,created_at timestamptz DEFAULT now()); GRANT ALL ON notifications,profiles TO service_role;');
 await sql.exec(await readFile('supabase/migrations/20261007214346_proposal_check_history.sql','utf8'));
 await sql.exec(await readFile('supabase/migrations/20261008135304_proposal_check_responses.sql','utf8'));
 const token=crypto.randomUUID()+crypto.randomUUID();
@@ -27,7 +27,10 @@ const body={action:'message',choice:'needs_work',step:'Adjust the budget',messag
 assert.equal((await post(body)).status,200);assert.equal((await post(body)).status,200);
 assert.equal(globalThis.__messageAlerts[0],globalThis.__messageAlerts[1],'Submission retries reuse the event identity for email deduplication');
 assert.equal((await sql.query("SELECT count(*)::int AS n FROM proposal_check_events WHERE kind='message'")).rows[0].n,1,'Retry saves one message');
-const notice=(await sql.query('SELECT * FROM notifications')).rows;assert.equal(notice.length,1);assert.equal(notice[0].user_id,id(10),'Notify responsible salesperson');
+const notice=(await sql.query('SELECT *,created_at::text AS created_at FROM notifications')).rows;assert.equal(notice.length,1);assert.equal(notice[0].user_id,id(10),'Notify responsible salesperson');
+const target=(await sql.query("SELECT id FROM proposal_check_events WHERE email_id=$1 AND kind='message' AND created_at=$2",[notice[0].related_id,notice[0].created_at])).rows;
+assert.equal(target.length,1,'Existing notification email ID and transaction timestamp identify exactly the saved response');
+assert.equal(target[0].id,globalThis.__messageAlerts[0]);
 assert.equal((await sql.query('SELECT confirmed_choice FROM proposal_check_reporting')).rows[0].confirmed_choice,'needs_work');
 assert.equal((await post({...body,event_key:crypto.randomUUID(),step:'Invalid option'})).status,400);
 assert.equal((await post({...body,event_key:crypto.randomUUID(),message:'x'.repeat(5001)})).status,400);
@@ -77,6 +80,9 @@ for(const variant of ['owner','sales']) {
  assert.ok(outgoing.at(-1).payload.html.includes('More details &lt;please&gt;'));
  assert.ok(outgoing.at(-1).payload.text.includes('Volland Foundation'));
  assert.equal(outgoing.at(-1).headers['Idempotency-Key'],'proposal-check-message-event');
+ const link=new URL(outgoing.at(-1).payload.text.match(/https:\/\/[^\s]+/)[0]);
+ assert.equal(link.searchParams.get('tab'),'reviews');assert.equal(link.searchParams.get('reviewType'),'proposal');
+ assert.equal(link.searchParams.get('proposalCheckEmailId'),'email');assert.equal(link.searchParams.get('proposalCheckEventId'),'event');
 }
 providerOk=false;await assert.rejects(()=>notifyProposalMessage(feedbackDb,{id:'email',organization_id:'org',recipient_name:'Customer',recipient_email:'customer@example.com'},'event'),/notification failed/);
 providerOk=true;subdomain='another-dealer';await notifyProposalMessage(feedbackDb,{id:'email',organization_id:'org',recipient_name:'Customer',recipient_email:'customer@example.com'},'event');assert.deepEqual(outgoing.at(-1).payload.to,['office@example.com'],'Other dealers never send private feedback to Electronic Life');
