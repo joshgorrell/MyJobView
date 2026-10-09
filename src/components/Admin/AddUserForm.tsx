@@ -10,6 +10,7 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { X, AtSign, Shield, Briefcase, Eye, EyeOff, UserCircle, DollarSign, Check, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { effectiveModuleAccess, isPermissionModule } from '../../lib/permissionCatalog';
 import { generateUsername } from '../../lib/username';
 import { CompanyOffice } from '../../lib/types';
 
@@ -52,7 +53,7 @@ interface Role {
 
 export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   const [draftKey, setDraftKey] = useState('');
-  const pendingDraftOverrides = useRef<[string, boolean][] | null>(null);
+  const roleAccessRequest = useRef(0);
   const [dataLoadFailed, setDataLoadFailed] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const [draftMessage, setDraftMessage] = useState('');
@@ -68,7 +69,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         classification,
         offices: selectedOffices,
         notifications,
-        departmentOverrides: [...deptOverrides],
       }),
     );
     setDraftMessage('Draft saved for this browser session. Password must be re-entered.');
@@ -113,19 +113,18 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     can_create_purchase_orders: false,
     can_create_work_orders: false,
     can_view_prospects: true,
-    can_view_all_tasks: true,
+    can_view_all_tasks: false,
     can_view_all_messages: false,
-    can_view_all_pipeline: true,
+    can_view_all_pipeline: false,
     can_edit_contact_assignments: false,
-    can_edit_products: true,
+    can_edit_products: false,
     can_see_all_review_requests: false,
     can_send_lost_opportunity_reviews: true,
     can_view_lost_opportunity_submissions: false,
     notify_lost_opportunity_submissions: false,
     can_edit_contacts: true,
     has_calendar_access: true,
-    proposal_visibility_scope: 'company' as 'own' | 'office' | 'company',
-    discussion_visibility_scope: 'all' as 'all' | 'assigned_only' | 'private_only' | 'own_posts',
+    proposal_visibility_scope: 'own' as 'own' | 'office' | 'company',
     employment_type: 'hourly' as 'hourly' | 'job_time' | 'salary' | 'salary_no_clock',
     standard_start_time: '08:00',
     standard_end_time: '17:00',
@@ -140,7 +139,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   const [classification, setClassification] = useState<'employee' | 'non_employee' | ''>('');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roleDeptAccess, setRoleDeptAccess] = useState<Map<string, boolean>>(new Map());
-  const [deptOverrides, setDeptOverrides] = useState<Map<string, boolean>>(new Map());
   const [employeeForm, setEmployeeForm] = useState({
     hire_date: new Date().toISOString().split('T')[0],
     employment_status: 'active' as 'active' | 'inactive' | 'terminated',
@@ -173,7 +171,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           setClassification(d.classification || '');
           setSelectedOffices(d.offices || []);
           setNotifications(notificationDefaults(d.notifications));
-          pendingDraftOverrides.current = d.departmentOverrides || [];
           setDraftMessage('Saved draft restored. Review every section and re-enter the password.');
         } catch {
           sessionStorage.removeItem(key);
@@ -258,48 +255,32 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   }
 
   async function loadRoleDeptAccess(roleId: string) {
+    const request = ++roleAccessRequest.current;
     try {
-      const { data, error } = await supabase
-        .from('role_department_access')
-        .select('department_id, has_access')
-        .eq('role_id', roleId);
-      if (error) throw error;
+      const [modulesResult, grantsResult] = await Promise.all([
+        supabase.from('department_modules').select('*').eq('is_active', true),
+        supabase.from('role_module_access').select('module_id, has_access').eq('role_id', roleId),
+      ]);
+      if (request !== roleAccessRequest.current) return;
+      if (modulesResult.error) throw modulesResult.error;
+      if (grantsResult.error) throw grantsResult.error;
+      const modules = (modulesResult.data || []).filter(isPermissionModule);
+      const grants = new Map<string, boolean>((grantsResult.data || []).map(g => [g.module_id, g.has_access]));
       const accessMap = new Map<string, boolean>();
-      (data || []).forEach((item: { department_id: string; has_access: boolean }) => {
-        accessMap.set(item.department_id, item.has_access);
-      });
+      for (const module of modules) {
+        if (effectiveModuleAccess(module.module_key, modules, grants, new Map(), formData.role)) accessMap.set(module.department_id, true);
+      }
       setRoleDeptAccess(accessMap);
-      setDeptOverrides(new Map(pendingDraftOverrides.current || []));
-      pendingDraftOverrides.current = null;
     } catch (error) {
+      if (request !== roleAccessRequest.current) return;
       setDataLoadFailed(true);
       setError('Unable to load user setup data. Close and reopen this form.');
-      console.error('Error loading role department access:', error);
+      console.error('Error loading role page access:', error);
     }
   }
 
   function getEffectiveDeptAccess(deptId: string): boolean {
-    const override = deptOverrides.get(deptId);
-    if (override !== undefined) return override;
     return roleDeptAccess.get(deptId) ?? false;
-  }
-
-  function toggleDeptAccess(deptId: string) {
-    setReviewed((prev) => prev.filter((k) => k !== 'permissions'));
-    const roleHas = roleDeptAccess.get(deptId) ?? false;
-    const currentOverride = deptOverrides.get(deptId);
-    const newOverrides = new Map(deptOverrides);
-    if (currentOverride !== undefined) {
-      const newAccess = !currentOverride;
-      if (newAccess === roleHas) {
-        newOverrides.delete(deptId);
-      } else {
-        newOverrides.set(deptId, newAccess);
-      }
-    } else {
-      newOverrides.set(deptId, !roleHas);
-    }
-    setDeptOverrides(newOverrides);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -385,6 +366,9 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           is_sales_rep: formData.is_sales_rep,
           is_technician: formData.is_technician,
           can_view_prospects: formData.can_view_prospects,
+          can_create_proposals: formData.can_create_proposals,
+          can_create_work_orders: formData.can_create_work_orders,
+          can_create_purchase_orders: formData.can_create_purchase_orders,
           can_view_all_tasks: formData.can_view_all_tasks,
           can_view_all_messages: formData.can_view_all_messages,
           can_view_all_pipeline: formData.can_view_all_pipeline,
@@ -397,7 +381,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           can_edit_contacts: formData.can_edit_contacts,
           has_calendar_access: formData.has_calendar_access,
           proposal_visibility_scope: formData.proposal_visibility_scope,
-          discussion_visibility_scope: formData.discussion_visibility_scope,
           employment_type: formData.employment_type,
           standard_start_time: formData.standard_start_time,
           standard_end_time: formData.standard_end_time,
@@ -478,25 +461,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         if (rpcError) {
           console.error('Non-employee classification error:', rpcError);
           throw new Error(`Classification failed: ${rpcError.message}`);
-        }
-      }
-
-      const overridesToInsert: {
-        user_id: string;
-        department_id: string;
-        has_access: boolean;
-      }[] = [];
-      deptOverrides.forEach((hasAccess, deptId) => {
-        overridesToInsert.push({
-          user_id: newUserId,
-          department_id: deptId,
-          has_access: hasAccess,
-        });
-      });
-      if (overridesToInsert.length > 0) {
-        const { error: deptError } = await supabase.from('department_user_overrides').insert(overridesToInsert);
-        if (deptError) {
-          throw new Error(`Department setup failed: ${deptError.message}`);
         }
       }
 
@@ -657,6 +621,12 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                       ...formData,
                       role_id: e.target.value,
                       role: roleKey,
+                      can_create_proposals: ['admin', 'manager', 'sales'].includes(roleKey),
+                      can_create_work_orders: ['admin', 'manager'].includes(roleKey),
+                      can_edit_products: ['admin', 'manager', 'finance'].includes(roleKey),
+                      can_view_all_tasks: ['admin', 'manager', 'service_manager'].includes(roleKey),
+                      can_view_all_pipeline: ['admin', 'manager'].includes(roleKey),
+                      proposal_visibility_scope: ['admin', 'manager'].includes(roleKey) ? 'company' : 'own',
                       can_send_lost_opportunity_reviews: [
                         'sales',
                         'sales_v2',
@@ -1058,40 +1028,12 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                 </div>
               </div>
               <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Briefcase className="w-5 h-5 text-cyan-400 mt-2" />
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-white mb-2">
-                      Team Pulse (Discussion) Visibility
-                    </label>
-                    <select
-                      value={formData.discussion_visibility_scope}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          discussion_visibility_scope: e.target.value as any,
-                        })
-                      }
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    >
-                      <option value="all">All Discussion Posts</option>
-                      <option value="assigned_only">Only Assigned or Mentioned Posts</option>
-                      <option value="private_only">Only Private Posts (Assigned/Mentioned)</option>
-                      <option value="own_posts">Only Their Own Posts</option>
-                    </select>
-                    <p className="text-xs text-gray-400 mt-2">
-                      <span className="font-medium">All Posts:</span> User sees all company discussion posts (default)
-                      <br />
-                      <span className="font-medium">Assigned/Mentioned Only:</span> User only sees posts assigned to
-                      them or where they're mentioned
-                      <br />
-                      <span className="font-medium">Private Posts Only:</span> User only sees private posts they are
-                      part of
-                      <br />
-                      <span className="font-medium">Own Posts Only:</span> User only sees discussion posts they created
-                    </p>
-                  </div>
-                </div>
+                <h4 className="text-sm font-medium text-white mb-2">Flow Message Visibility</h4>
+                <p className="text-xs text-gray-400">
+                  Direct messages are visible to their participants. Department messages are visible
+                  to users with access to that department. Company messages are visible to users
+                  with Flow access. Customer conversations follow their assigned access.
+                </p>
               </div>
               <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
                 <div className="flex items-center gap-2">
@@ -1099,12 +1041,12 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                   <span className="text-sm font-medium text-white">Department Access *</span>
                 </div>
                 <p className="text-xs text-gray-400">
-                  Departments default to the selected role. Toggle to override. At least one department must be enabled.
+                  Page access comes from the selected role. After creating the user, use Manage Page Access to customize individual pages.
                 </p>
                 <div className="space-y-2">
                   {departments.map((dept) => {
                     const hasAccess = getEffectiveDeptAccess(dept.id);
-                    const isOverridden = deptOverrides.has(dept.id);
+                    const isOverridden = false;
                     const roleHas = roleDeptAccess.get(dept.id) ?? false;
                     return (
                       <div
@@ -1134,9 +1076,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                               )}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => toggleDeptAccess(dept.id)}
+                          <span
+                            aria-label={`${dept.display_name} role default`}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                               hasAccess
                                 ? 'bg-cyan-500 text-white hover:bg-cyan-600'
@@ -1144,7 +1085,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                             }`}
                           >
                             {hasAccess ? 'Enabled' : 'Disabled'}
-                          </button>
+                          </span>
                         </div>
                       </div>
                     );
@@ -1474,7 +1415,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
               access={departments.map((d) => ({
                 name: d.display_name,
                 enabled: getEffectiveDeptAccess(d.id),
-                custom: deptOverrides.has(d.id),
+                custom: false,
               }))}
             />
           )}

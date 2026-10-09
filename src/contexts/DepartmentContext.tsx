@@ -1,6 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { effectiveModuleAccess, isNavigationModule, isPermissionModule, isPreferredNavigationCopy, permissionLabel } from '../lib/permissionCatalog';
 import { useAuth } from './AuthContext';
+
+// Personal preferences live behind the avatar; Messages lives inside Flow.
+// Keep the module records for access checks and saved links, but omit their menus.
+const isDepartmentNavigationModule = (key: string) => isNavigationModule({id: '', department_id: '', module_key: key});
 
 export interface Department {
   id: string;
@@ -54,6 +59,7 @@ const DepartmentContext = createContext<DepartmentContextType | undefined>(undef
 
 export function DepartmentProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
+  const loadRequest = useRef(0);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [modules, setModules] = useState<DepartmentModule[]>([]);
   const [userDepartments, setUserDepartments] = useState<Department[]>([]);
@@ -61,11 +67,8 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   const [footerDepartments, setFooterDepartments] = useState<Department[]>([]);
   const [starredModules, setStarredModules] = useState<StarredModule[]>([]);
   const [quickAccessSuggestions, setQuickAccessSuggestions] = useState<DepartmentModule[]>([]);
-  const [roleAccess, setRoleAccess] = useState<Map<string, boolean>>(new Map());
   const [moduleRoleAccess, setModuleRoleAccess] = useState<Map<string, boolean>>(new Map());
-  const [userOverrides, setUserOverrides] = useState<Map<string, boolean>>(new Map());
   const [moduleUserOverrides, setModuleUserOverrides] = useState<Map<string, boolean>>(new Map());
-  const [adminModuleIdSet, setAdminModuleIdSet] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,7 +77,14 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
     }
   }, [profile]);
 
+  useEffect(() => {
+    const refresh = () => { void loadDepartments(); };
+    window.addEventListener('permissions-changed', refresh);
+    return () => window.removeEventListener('permissions-changed', refresh);
+  }, [profile]);
+
   async function loadDepartments() {
+    const request = ++loadRequest.current;
     try {
       setLoading(true);
 
@@ -145,36 +155,22 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
           .order('default_order')
       ]);
 
+      if (request !== loadRequest.current) return;
       if (deptsResult.error) throw deptsResult.error;
       if (modsResult.error) throw modsResult.error;
+      if (roleModAccessResult.error) throw roleModAccessResult.error;
+      if (userOverrideResult.error) throw userOverrideResult.error;
 
       const depts = deptsResult.data || [];
       // Keep navigation consistent with the Feedback page even before its label
       // migration is applied. Module keys/IDs continue to preserve saved bookmarks.
-      const mods = (modsResult.data || []).map(module => ({
+      const mods = (modsResult.data || []).filter(isPermissionModule).map(module => ({
         ...module,
-        display_name: module.module_key === 'reviews' ? 'Feedback' : module.display_name,
+        display_name: permissionLabel(module.module_key, module.display_name),
       }));
 
       setDepartments(depts);
       setModules(mods);
-
-      // Build set of module IDs belonging to the admin department for fallback deny
-      const adminDeptId = depts.find(d => d.name === 'admin')?.id;
-      const adminModuleIds = new Set(
-        adminDeptId ? mods.filter(m => m.department_id === adminDeptId).map(m => m.id) : []
-      );
-      setAdminModuleIdSet(adminModuleIds);
-
-      // Build a lookup from module_key to all module rows sharing that key.
-      // The same page (e.g. "invoices") can appear under multiple departments with
-      // different row IDs — access must be unified across all copies.
-      const modulesByKey = new Map<string, DepartmentModule[]>();
-      mods.forEach(m => {
-        const list = modulesByKey.get(m.module_key);
-        if (list) list.push(m);
-        else modulesByKey.set(m.module_key, [m]);
-      });
 
       // Build role-based module access map keyed by module_id
       const roleModAccessMap = new Map<string, boolean>();
@@ -193,23 +189,13 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       // Unified access check: a module is accessible if ANY copy sharing the
       // same module_key has an override or role grant that says "yes".
       const checkModuleAccess = (mod: DepartmentModule): boolean => {
-        const siblings = modulesByKey.get(mod.module_key) || [mod];
-        // If any sibling has a user override, the most permissive override wins
-        const overriddenSibling = siblings.find(s => userModAccessMap.has(s.id));
-        if (overriddenSibling) return userModAccessMap.get(overriddenSibling.id) || false;
-        // Admin sees everything (unless they have overrides)
-        if (profile.role === 'admin') return true;
-        // If any sibling has a role grant, use the most permissive
-        const grantedSibling = siblings.find(s => roleModAccessMap.has(s.id));
-        if (grantedSibling) return roleModAccessMap.get(grantedSibling.id) || false;
-        // Admin-department modules default to denied for non-admin roles
-        if (siblings.some(s => adminModuleIds.has(s.id))) return false;
-        return false;
+        if (mod.module_key === 'my_time_off' && (profile as any).employment_classification !== 'employee') return false;
+        return effectiveModuleAccess(mod.module_key, mods, roleModAccessMap, userModAccessMap, profile.role);
       };
 
       // Process starred modules (data already loaded in parallel)
-      const userStarred = userStarredResult.data || [];
-      const defaultStarred = defaultStarredResult.data || [];
+      const userStarred: any[] = userStarredResult.data || [];
+      const defaultStarred: any[] = defaultStarredResult.data || [];
 
       // Helper to check access inline (unified across all copies by module_key)
       const checkAccess = (moduleKey: string) => {
@@ -240,7 +226,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       }
 
       const starred = starredSource
-        .filter(s => s.module && (s.module as any).module_key !== 'messages' && checkAccess(s.module.module_key))
+        .filter(s => s.module && isDepartmentNavigationModule((s.module as any).module_key) && checkAccess(s.module.module_key))
         .slice(0, 6)
         .map(s => ({
           ...(s.module as any),
@@ -256,7 +242,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       // Calculate accessible departments - only show departments with at least one accessible module
       const accessible = depts.filter(dept => {
         const deptModules = mods.filter(m => m.department_id === dept.id);
-        return deptModules.some(mod => checkModuleAccess(mod));
+        return deptModules.some(mod => isDepartmentNavigationModule(mod.module_key) && isPreferredNavigationCopy(mod, mods, depts, profile.role) && checkModuleAccess(mod));
       });
 
       setUserDepartments(accessible);
@@ -265,20 +251,28 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
       // Load quick access suggestions (calculate after maps are set)
       const suggestions = mods.filter(m => {
-        if (!m.is_quick_access || m.module_key === 'messages') return false;
+        if (!m.is_quick_access || !isDepartmentNavigationModule(m.module_key)) return false;
         return checkModuleAccess(m);
       });
       setQuickAccessSuggestions(suggestions);
     } catch (error) {
+      if (request !== loadRequest.current) return;
+      setModules([]);
+      setUserDepartments([]);
+      setMainDepartments([]);
+      setFooterDepartments([]);
+      setStarredModules([]);
+      setModuleRoleAccess(new Map());
+      setModuleUserOverrides(new Map());
       console.error('Error loading departments:', error);
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current) setLoading(false);
     }
   }
 
   function getUserModules(departmentId: string): DepartmentModule[] {
     return modules.filter(mod => {
-      if (mod.department_id !== departmentId || mod.module_key === 'messages') return false;
+      if (mod.department_id !== departmentId || !isDepartmentNavigationModule(mod.module_key) || !isPreferredNavigationCopy(mod, modules, departments, profile?.role || '')) return false;
       return hasModuleAccess(mod);
     });
   }
@@ -287,43 +281,14 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
     const dept = departments.find(d => d.name === departmentName);
     if (!dept) return false;
 
-    // Admin sees everything
-    if (profile?.role === 'admin') return true;
-
-    // Check explicit department access (default true if no grant)
-    const hasAccess = userOverrides.get(dept.id);
-    return hasAccess === undefined ? true : hasAccess;
+    return getUserModules(dept.id).length > 0;
   }
 
   function hasModuleAccess(moduleKey: string | DepartmentModule): boolean {
-    const mod = typeof moduleKey === 'string'
-      ? modules.find(m => m.module_key === moduleKey)
-      : moduleKey;
-    if (!mod) return false;
-
-    // Find all copies of this module across every department (same module_key)
-    const siblings = modules.filter(m => m.module_key === mod.module_key);
-
-    // If any sibling has a user override, the most permissive override wins
-    const overriddenSibling = siblings.find(s => moduleUserOverrides.has(s.id));
-    if (overriddenSibling) {
-      return moduleUserOverrides.get(overriddenSibling.id) || false;
-    }
-
-    // Admin sees everything (unless they have overrides)
-    if (profile?.role === 'admin') return true;
-
-    // If any sibling has a role grant, use the most permissive
-    const grantedSibling = siblings.find(s => moduleRoleAccess.has(s.id));
-    if (grantedSibling) {
-      return moduleRoleAccess.get(grantedSibling.id) || false;
-    }
-
-    // Admin-department modules default to denied for non-admin roles
-    if (siblings.some(s => adminModuleIdSet.has(s.id))) return false;
-
-    // Deny by default — access requires an explicit role grant
-    return false;
+    if (!profile || profile.is_active === false) return false;
+    const key = typeof moduleKey === 'string' ? moduleKey : moduleKey.module_key;
+    if (key === 'my_time_off' && (profile as any).employment_classification !== 'employee') return false;
+    return effectiveModuleAccess(key, modules, moduleRoleAccess, moduleUserOverrides, profile.role);
   }
 
 

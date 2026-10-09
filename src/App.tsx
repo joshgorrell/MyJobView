@@ -1,3 +1,4 @@
+import { resolveLegacyPage } from './lib/permissionCatalog';
 import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -106,6 +107,7 @@ const PortalSignup = lazy(() => import('./components/Portal/PortalSignup').then(
 const PortalDashboard = lazy(() => import('./components/Portal/PortalDashboard').then(m => ({ default: m.PortalDashboard })));
 const PortalContactUs = lazy(() => import('./components/Portal/PortalContactUs').then(m => ({ default: m.PortalContactUs })));
 const PortalProposals = lazy(() => import('./components/Portal/PortalProposals').then(m => ({ default: m.PortalProposals })));
+const FinanceTimeWorkspace = lazy(() => import('./components/Finance/FinanceTimeWorkspace').then(m => ({ default: m.FinanceTimeWorkspace })));
 const DailyClock = lazy(() => import('./components/Technician/DailyClock').then(m => ({ default: m.DailyClock })));
 const TimeClockHistory = lazy(() => import('./components/Dispatch/TimeClockHistory').then(m => ({ default: m.TimeClockHistory })));
 const ContractManagement = lazy(() => import('./components/Finance/ContractOnboarding'));
@@ -209,13 +211,14 @@ function AppContent() {
     return urlParams.get('workOrderId');
   });
   const [showDesignBriefModal, setShowDesignBriefModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>(() => {
+  const [activeTab, setActiveTabState] = useState<string>(() => {
     // First check URL parameters, then localStorage, default to 'feed'
     const urlParams = new URLSearchParams(window.location.search);
     const urlTab = urlParams.get('tab');
     const savedTab = urlTab || localStorage.getItem('activeTab') || 'feed';
-    return savedTab === 'messages' ? 'feed' : savedTab;
+    return resolveLegacyPage(savedTab);
   });
+  const setActiveTab = React.useCallback((tab: string) => setActiveTabState(resolveLegacyPage(tab)), []);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('departmentSidebarOpen');
     return saved !== null ? saved === 'true' : false;
@@ -327,7 +330,7 @@ function AppContent() {
       const currentTab = activeTabRef.current;
       if (!currentTab || currentTab === 'feed') return;
 
-      if (currentTab === 'settings' && profile.role === 'admin') return;
+      if ((currentTab === 'settings' || currentTab.startsWith('settings_')) && profile.role === 'admin') return;
       if (currentTab === 'daily_sales_report_import' && profile.role === 'admin') return;
       if (currentTab === 'preferences') return;
 
@@ -995,6 +998,8 @@ function AppContent() {
             />
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
+          {activeTab === 'payroll' && checkModuleAccess('payroll') && <FinanceTimeWorkspace key={activeTab} onPayroll={() => setActiveTab('payroll')} />}
+          {activeTab === 'time_approval' && checkModuleAccess('time_approval') && <FinanceTimeWorkspace key={activeTab} review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
             <InvoicesView
@@ -1140,7 +1145,7 @@ function AppContent() {
 
           {activeTab === 'feature_suggestions' && <ImprovementsView key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
+
 
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
@@ -1192,7 +1197,7 @@ function AppContent() {
 
           {activeTab === 'daily_sales_report_import' && profile.role === 'admin' && <DailySalesReportImport key={activeTab} />}
 
-          {activeTab === 'my_time_off' && <MyTimeOff key={activeTab} />}
+          {activeTab === 'my_time_off' && checkModuleAccess('my_time_off') && <MyTimeOff key={activeTab} />}
         </Suspense>
 
         {/* MyJobView removed - features available in department modules */}

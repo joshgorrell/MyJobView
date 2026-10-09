@@ -43,7 +43,9 @@
     "test:catalog": "node tests/catalog/grouping.mjs && node tests/catalog/lifecycle-database.mjs && node tests/catalog/history.mjs",
     "test:catalog:browser": "node tests/catalog/browser.mjs && node tests/catalog/history-browser.mjs",
     "test:lead-emails": "node tests/lead-emails/runtime.mjs",
-    "test:projects": "node tests/projects/runtime.mjs && node tests/projects/browser.mjs"
+    "test:projects": "node tests/projects/runtime.mjs && node tests/projects/browser.mjs",
+    "test:permissions": "node tests/permissions/database.mjs && node tests/permissions/create-user.mjs",
+    "test:permissions:browser": "npm run build && node tests/permissions/browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

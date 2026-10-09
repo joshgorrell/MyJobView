@@ -108,6 +108,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
     // TV Dashboards should open in a new window for full-screen display
     if (moduleKey === 'tv_dashboard') {
       window.open('/tv-dashboard', '_blank', 'fullscreen=yes,width=1920,height=1080');
+      return;
     } else if (moduleKey === 'sales_tv_dashboard') {
       window.open('/sales-tv-dashboard', '_blank', 'fullscreen=yes,width=1920,height=1080');
       if (!isPinned) {
