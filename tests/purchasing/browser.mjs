@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 const directory = await mkdtemp(join(tmpdir(), "purchasing-"));
 const fixture = `export const useAuth=()=>({profile:{organization_id:'org',can_create_purchase_orders:true}});
-window.saved=[];const lines=['Jones','Weller','Wilson'].map((job_reference,n)=>({id:'line'+n,product_name:'Same Product',model_number:'MODEL',quantity:[3,5,1][n],quantity_requested:[3,5,1][n],unit_price:10,estimated_cost:[30,50,10][n],job_reference,vendor:'Vendor A'}));
+window.saved=[];const lines=['Jones','Weller','Wilson'].map((job_reference,n)=>({id:'line'+n,products:{is_discontinued:new URLSearchParams(location.search).has('discontinued')},product_name:'Same Product',model_number:'MODEL',quantity:[3,5,1][n],quantity_requested:[3,5,1][n],unit_price:10,estimated_cost:[30,50,10][n],job_reference,vendor:'Vendor A'}));
 const vendors=[{id:'a',vendor_name:'Vendor A'},{id:'b',vendor_name:'Vendor B'}];let bids=vendors.map(v=>({id:'bid'+v.id,vendor_id:v.id,unit_prices:{},shipping_cost:0,tax_amount:0,quoted_at:null}));
 const doc=()=>({id:'quote',document_type:'rfq',po_number:'PO-100',status:'draft',bill_to_name:'HQ',ship_to_name:'Warehouse',po_items:lines,purchase_quote_vendors:bids,converted:[]});
 export const supabase={rpc:async(name,args)=>{window.saved.push({name,args});return{data:args.p_quote?'quote':'po',error:null};},functions:{invoke:async(name,args)=>{window.saved.push({name,args});return{data:{},error:null};}},from(table){let id;let patch;const q={select:()=>q,eq:(k,v)=>{if(k==='id')id=v;return q;},in:()=>q,order:()=>q,update:p=>{patch=p;return q;},single:async()=>({data:id==='po'?{...doc(),document_type:'po',vendors:{vendor_name:'Vendor B'},total:97}:doc(),error:null}),then:resolve=>{if(patch){bids=bids.map(b=>b.id===id?{...b,...patch}:b);window.saved.push({name:'saveBid',patch});}return Promise.resolve({data:table==='vendors'?vendors:table==='warehouses'?[{id:'warehouse',name:'Main'}]:table==='company_offices'?[{id:'office',office_name:'HQ',is_headquarters:true}]:table==='product_request_items'?lines:[],error:null}).then(resolve);}};return q;}};`;
@@ -139,6 +139,16 @@ try {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     );
+    await page.goto(url + '?discontinued');
+    await page.getByLabel('Override discontinued items').waitFor();
+    assert.equal(await page.getByText('Discontinued',{exact:true}).count(),3);
+    await page.getByRole('button',{name:'Create PO',exact:true}).last().click();
+    await page.getByRole('alert').filter({hasText:'Confirm the discontinued item override'}).waitFor();
+    assert.equal(await page.evaluate(()=>window.saved.length),0);
+    await page.getByLabel('Override discontinued items').check();
+    await page.getByRole('button',{name:'Create PO',exact:true}).last().click();
+    await page.waitForFunction(()=>window.saved.length>0);
+    assert.equal(await page.evaluate(()=>window.saved[0].args.p_header.discontinued_override),true);
     await page.close();
   }
   assert.deepEqual(failures, []);

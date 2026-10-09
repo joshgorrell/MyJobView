@@ -370,6 +370,7 @@ export interface Product {
   portal_io_product_id: string | null;
   portal_io_data: Record<string, any> | null;
   is_active: boolean;
+  is_discontinued?: boolean;
   created_at: string;
   updated_at: string;
 }

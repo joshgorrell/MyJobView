@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
@@ -32,6 +33,7 @@ interface Project {
 }
 
 interface LineItem {
+  is_discontinued?: boolean;
   id: string;
   product_id?: string | null;
   sku?: string;
@@ -428,6 +430,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           product_id: product.id,
           sku: product.sku,
           description: product.name,
+          is_discontinued: product.is_discontinued,
           unit_price: price,
           cost: product.cost,
           amount: qty * price,
@@ -448,6 +451,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
         product_id: product.id,
         sku: product.sku,
         description: product.name,
+          is_discontinued: product.is_discontinued,
         quantity: 1,
         unit_price: product.our_price || 0,
         cost: product.cost,
@@ -1151,6 +1155,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
 
                       {/* SKU */}
                       <div className="flex-1 min-w-0">
+                        <ProductStatusNotice product={item} />
                         <InlineProductSearch
                           value={item.sku || ''}
                           onChange={(value) => updateLineItem(item.id, 'sku', value)}
@@ -1287,6 +1292,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       {/* SKU Search */}
                       <div>
                         <label className="block text-[11px] text-gray-400 mb-1">SKU / Search</label>
+                        <ProductStatusNotice product={item} />
                         <InlineProductSearch
                           value={item.sku || ''}
                           onChange={(value) => updateLineItem(item.id, 'sku', value)}

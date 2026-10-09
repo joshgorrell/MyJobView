@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
-import { ChevronDown, ChevronRight, Package, Eye, Pencil, Copy, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Package, Pencil, Copy, Trash2, Archive, ArchiveRestore } from 'lucide-react';
+import ProductStatusNotice from './ProductStatusNotice';
 import ProductsGridView from './ProductsGridView';
 import { groupCatalogProducts, type CatalogGrouping, type CatalogProduct } from './catalogGrouping';
 
@@ -14,6 +15,7 @@ interface Props {
   onEdit: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
+  onArchive: (id: string, archive: boolean) => void;
 }
 
 export default function ProductCatalogView(props: Props) {
@@ -61,12 +63,12 @@ export default function ProductCatalogView(props: Props) {
   </div>;
 }
 
-function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onDuplicate, onDelete }: Props) {
+function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onDuplicate, onDelete, onArchive }: Props) {
   const actions = (product: CatalogProduct) => <div className="flex items-center justify-end gap-1">
-    <button type="button" aria-label={`View ${product.sku || product.manufacturer_model_number}`} onClick={() => onView(product.id)} className="p-2 text-green-400"><Eye size={16} /></button>
     {canEdit && <>
       <button type="button" aria-label={`Edit ${product.sku || product.manufacturer_model_number}`} onClick={() => onEdit(product.id)} className="p-2 text-blue-400"><Pencil size={16} /></button>
       <button type="button" aria-label={`Duplicate ${product.sku || product.manufacturer_model_number}`} onClick={() => onDuplicate(product.id)} className="p-2 text-purple-400"><Copy size={16} /></button>
+      <button type="button" aria-label={`${product.is_active === false ? 'Restore' : 'Archive'} ${product.sku || product.manufacturer_model_number}`} onClick={() => onArchive(product.id, product.is_active !== false)} className="p-2 text-gray-400">{product.is_active === false ? <ArchiveRestore size={16} /> : <Archive size={16} />}</button>
       <button type="button" aria-label={`Delete ${product.sku || product.manufacturer_model_number}`} onClick={() => onDelete(product.id)} className="p-2 text-red-400"><Trash2 size={16} /></button>
     </>}
   </div>;
@@ -76,13 +78,14 @@ function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onD
   const identity = (product: CatalogProduct) => <>
     {groupBy !== 'brand' && product.brandName && <div className="text-xs text-gray-400 break-words">{product.brandName}</div>}
     <div className="font-mono text-sm font-medium text-white break-all">{product.sku || product.manufacturer_model_number}</div>
+    <ProductStatusNotice product={product} />
   </>;
   const category = (product: CatalogProduct) => <div className="text-xs text-gray-400 break-words">{[product.categoryName, product.subcategoryName].filter(Boolean).join(' / ')}</div>;
   const price = (product: CatalogProduct) => `$${Number(product.our_price ?? product.unit_price ?? 0).toFixed(2)}`;
   return <>
     <div className="sm:hidden divide-y divide-gray-700">
       {products.map(product => <article key={product.id} className="min-w-0 py-2">
-        <button type="button" onClick={() => onView(product.id)} className="flex w-full min-w-0 gap-2 text-left">
+        <button type="button" onClick={() => onView(product.id)} aria-label={`Open ${product.sku || product.manufacturer_model_number}`} className="flex w-full min-w-0 gap-2 text-left">
           {image(product)}<div className="min-w-0 flex-1">{identity(product)}
             <div className="line-clamp-2 break-words text-xs text-gray-300">{product.description || '-'}</div>{category(product)}
           </div>
@@ -107,13 +110,13 @@ function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onD
           {groupBy !== 'vendor' && <th className="p-2 text-left">Vendor</th>}
           <th className="p-2 text-right">Price</th>{!hideCost && <th className="p-2 text-right">Cost</th>}<th className="p-2 text-right">Actions</th>
         </tr></thead>
-        <tbody>{products.map(product => <tr key={product.id} className="border-b border-gray-700 hover:bg-gray-800">
-          <td className="p-2"><button type="button" className="flex w-full min-w-0 items-center gap-2 text-left" onClick={() => onView(product.id)}>{image(product)}<div className="min-w-0">{identity(product)}</div></button></td>
+        <tbody>{products.map(product => <tr key={product.id} className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer" onClick={() => onView(product.id)}>
+          <td className="p-2"><button type="button" aria-label={`Open ${product.sku || product.manufacturer_model_number}`} className="flex w-full min-w-0 items-center gap-2 text-left" onClick={event => { event.stopPropagation(); onView(product.id); }}>{image(product)}<div className="min-w-0">{identity(product)}</div></button></td>
           <td className="p-2 text-gray-300"><div className="line-clamp-2 break-words" title={product.description || ''}>{product.description || '-'}</div>{category(product)}</td>
           {groupBy !== 'vendor' && <td className="p-2 text-xs text-gray-400 break-words">{product.vendorName || '—'}</td>}
           <td className="p-2 text-right text-white whitespace-nowrap">{price(product)}</td>
           {!hideCost && <td className="p-2 text-right text-gray-300 whitespace-nowrap">${Number(product.cost ?? 0).toFixed(2)}</td>}
-          <td className="p-2">{actions(product)}</td>
+          <td className="p-2" onClick={event => event.stopPropagation()}>{actions(product)}</td>
         </tr>)}</tbody>
       </table>
     </div>

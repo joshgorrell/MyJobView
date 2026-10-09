@@ -129,6 +129,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const [newDefaultTaskPhase, setNewDefaultTaskPhase] = useState('');
 
   const [formData, setFormData] = useState({
+    is_discontinued: false,
     // Basic Info
     manufacturer_id: '',
     manufacturer_model_number: '',
@@ -508,6 +509,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
       const { data, error } = await supabase.from('products').select(`
         id,
+        is_discontinued,
         manufacturer_id,
         manufacturer_model_number,
         sku,
@@ -541,6 +543,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       if (error) throw error;
       if (data) {
         setFormData({
+          is_discontinued: data.is_discontinued ?? false,
           manufacturer_id: data.manufacturer_id || '',
           manufacturer_model_number: data.manufacturer_model_number || '',
           sku: data.sku || '',
@@ -588,6 +591,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     try {
       const { data, error } = await supabase.from('products').select(`
         id,
+        is_discontinued,
         manufacturer_id,
         manufacturer_model_number,
         sku,
@@ -621,6 +625,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       if (error) throw error;
       if (data) {
         const baseData = {
+          is_discontinued: data.is_discontinued ?? false,
           manufacturer_id: data.manufacturer_id || '',
           manufacturer_model_number: data.manufacturer_model_number ? `${data.manufacturer_model_number}*copy*` : '',
           sku: '', // Clear SKU - user must enter a unique one
@@ -936,6 +941,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       const selectedLaborPhase = laborPhases.find(lp => lp.id === formData.labor_phase_id);
 
       const productData = {
+        is_discontinued: formData.is_discontinued,
         manufacturer_id: formData.manufacturer_id || null,
         manufacturer_model_number: formData.manufacturer_model_number,
         item_color: formData.item_color || null,
@@ -1356,6 +1362,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="sm:col-span-2 text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Basic Information</h3>
 
+            <label className="sm:col-span-2 flex items-start gap-2 text-sm text-gray-700">
+              <input type="checkbox" aria-label="Discontinued product" checked={formData.is_discontinued} onChange={event => setFormData(prev => ({ ...prev, is_discontinued: event.target.checked }))} className="mt-1" />
+              <span><span className="font-semibold text-red-600">Discontinued</span><span className="block text-xs text-gray-500">Remaining stock can still be sold. Purchasing may override after confirming vendor availability.</span></span>
+            </label>
             {/* Manufacturer */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

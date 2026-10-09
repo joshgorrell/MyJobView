@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import LaborRemovalChoice, { itemHasLabor } from './LaborRemovalChoice';
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
@@ -745,6 +746,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const { data: allProducts } = await supabase
         .from('products')
         .select('id, name, description, unit_price, cost, unit, item_type, is_taxable, labor_phase_id')
+        .eq('is_active', true)
         .eq('active', true);
 
       const products = allProducts || [];
@@ -2484,6 +2486,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             name
           )
         `)
+        .eq('is_active', true)
         .order('sku');
 
       if (error) throw error;
@@ -4710,6 +4713,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                         {isNested && !isCoRemoved && '↳ '}
                                         {item.description}
                                       </span>
+                                      <ProductStatusNotice product={item.products} />
 
                                       {isCoAdded && (
                                         <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-emerald-800 text-emerald-300 shrink-0">NEW</span>
@@ -6748,7 +6752,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                             <span className="text-xs text-muted">| {product.manufacturers.name}</span>
                           )}
                         </div>
-                        <h3 className="text-primary font-medium mb-1">{product.name || product.description}</h3>
+                        <h3 className="text-primary font-medium mb-1">{product.name || product.description}</h3><ProductStatusNotice product={product} />
                         {product.description && product.name && (
                           <p className="text-sm text-muted line-clamp-2">{product.description}</p>
                         )}

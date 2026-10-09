@@ -21,7 +21,9 @@ create table organizations(id uuid primary key);insert into organizations values
 create table profiles(id uuid primary key,organization_id uuid,role text,can_create_purchase_orders boolean);insert into profiles values('${staff}','${org}','technician',true),('${viewer}','${org}','technician',false);
 create function get_user_org_id() returns uuid language sql set search_path=public as $$select organization_id from profiles where id=auth.uid()$$;
 create table work_orders(id uuid primary key);create table projects(id uuid primary key);create table sales_orders(id uuid primary key);create table service_requests(id uuid primary key);
-create table products(id uuid primary key,organization_id uuid);
+create table products(id uuid primary key,organization_id uuid,is_active boolean not null default true);
+insert into products(id,organization_id) values('${product}','${org}');
+create table purchase_order_items(id uuid primary key default gen_random_uuid(),product_id uuid references products,po_id uuid,organization_id uuid,quantity_ordered numeric);
 create table contacts(id uuid primary key,organization_id uuid);
 create table vendors(id uuid primary key,organization_id uuid,vendor_name text);insert into vendors values('${va}','${org}','Vendor A'),('${vb}','${org}','Vendor B'),('${foreign}','${other}','Foreign');
 create table warehouses(id uuid primary key,organization_id uuid);insert into warehouses values('${warehouse}','${org}');
@@ -61,6 +63,7 @@ await db.exec(
     "utf8",
   ),
 );
+await db.exec(await readFile("supabase/migrations/20261008222600_catalog_product_lifecycle.sql", "utf8"));
 await db.exec(
   "grant usage on schema public,auth to authenticated;grant select on profiles,vendors,warehouses,company_offices,product_requests,product_request_items to authenticated;grant all on purchase_orders,po_items to authenticated;set role authenticated",
 );
@@ -307,6 +310,23 @@ assert.equal(
   ).rows[0].purchase_order_id,
   null,
 );
+// Real purchasing RPCs: discontinued RFQ and PO require an explicit purchasing choice.
+await db.exec('reset role');
+await db.query('update products set is_discontinued=true where id=$1',[product]);
+await db.exec('set role authenticated');
+const overrideRetry='a0000000-0000-0000-0000-000000000020';
+const stockPayload=[{product_id:product,product_name:'Remaining vendor stock',model_number:'OLD',quantity:2,unit_price:10}];
+const overrideCreate=override=>db.query('select create_request_purchase_document($1,$2,$3,true,$4,$5) id',[stockPayload,[va],warehouse,{office_id:office,discontinued_override:override},overrideRetry]);
+await assert.rejects(overrideCreate(false),/explicitly override/);
+await overrideCreate(true);
+const overrideLines=(await db.query('select * from po_items where po_id=$1',[overrideRetry])).rows;
+assert.equal(overrideLines[0].discontinued_override_by,staff);
+await db.query('update purchase_quote_vendors set unit_prices=$1,quoted_at=now() where quote_id=$2',[{[overrideLines[0].id]:10},overrideRetry]);
+await assert.rejects(db.query('select convert_purchase_quote($1,$2,false)',[overrideRetry,va]),/explicitly override/);
+const overridePO=(await db.query('select convert_purchase_quote($1,$2,true) id',[overrideRetry,va])).rows[0].id;
+assert.equal((await db.query('select discontinued_override_by from po_items where po_id=$1',[overridePO])).rows[0].discontinued_override_by,staff);
+await db.exec('reset role');await db.query('update products set is_active=false where id=$1',[product]);await db.exec('set role authenticated');
+await assert.rejects(db.query('select create_request_purchase_document($1,$2,$3,false,$4,$5)',[stockPayload,[va],warehouse,{office_id:office,discontinued_override:true},'a0000000-0000-0000-0000-000000000021']),/Archived/);
 await db.exec(`set test.actor='${viewer}'`);
 assert.equal(
   (await db.query("select count(*) n from purchase_orders")).rows[0].n,

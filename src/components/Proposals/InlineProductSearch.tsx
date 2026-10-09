@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Package, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -17,6 +18,8 @@ interface ProductPackageItem {
     cost?: number;
     unit: string;
     is_taxable: boolean;
+    is_active?: boolean;
+    is_discontinued?: boolean;
   };
 }
 
@@ -145,14 +148,14 @@ export default function InlineProductSearch({
         (pkgData || []).map(async (pkg) => {
           const { data: items } = await supabase
             .from('product_package_items')
-            .select('id, product_id, quantity, include_labor, product:products(id, sku, name, our_price, cost, unit, is_taxable)')
+            .select('id, product_id, quantity, include_labor, product:products(id, sku, name, our_price, cost, unit, is_taxable, is_active, is_discontinued)')
             .eq('package_id', pkg.id)
             .order('sort_order');
           return { ...pkg, items: items || [] };
         })
       );
 
-      setPackages(packagesWithItems);
+      setPackages(packagesWithItems.filter(pkg => pkg.items.every(item => item.product?.is_active === true)));
     } catch (error) {
       console.error('Error loading packages:', error);
     }
@@ -315,7 +318,7 @@ export default function InlineProductSearch({
               >
                 <div className="flex items-start justify-between gap-2 w-full">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white text-sm leading-tight truncate">{item.data.name}</div>
+                    <div className="font-medium text-white text-sm leading-tight truncate">{item.data.name}</div><ProductStatusNotice product={item.data} />
                     {item.data.sku && (
                       <div className="text-gray-400 text-xs mt-0.5">
                         {item.data.sku}
@@ -361,6 +364,7 @@ export default function InlineProductSearch({
                         : (item.data.items || []).reduce((sum, i) => sum + (i.product?.our_price || 0) * i.quantity, 0).toFixed(2)
                       }
                     </div>
+                    {item.data.items?.some(item => item.product?.is_discontinued) && <ProductStatusNotice product={{ is_discontinued: true }} />}
                     <div className="text-gray-500 text-[10px]">{(item.data.items || []).length} items</div>
                   </div>
                 </div>

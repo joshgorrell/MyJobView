@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -170,7 +171,7 @@ export default function ProductSelector({ onSelect, onClose, showCreateActions =
                       onClick={() => onSelect(product)}
                       className="text-left p-4 bg-gray-900 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
                     >
-                      <div className="font-semibold text-white mb-1">{product.name}</div>
+                      <div className="font-semibold text-white mb-1">{product.name}</div><ProductStatusNotice product={product} />
                       {(product.categoryName || product.subcategoryName || product.vendorName) && <div className="text-xs text-blue-200 mb-1">
                         {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
                       </div>}

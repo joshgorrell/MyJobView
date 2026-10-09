@@ -41,6 +41,7 @@ export default function ProductsManagement() {
   });
   useEffect(() => { localStorage.setItem('productCatalog_groupBy', groupBy); }, [groupBy]);
   const [showMissingPhotos, setShowMissingPhotos] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'current' | 'archived' | 'discontinued' | 'all'>('current');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterSubcategory, setFilterSubcategory] = useState<string>('all');
@@ -137,7 +138,7 @@ export default function ProductsManagement() {
 
   useEffect(() => {
     filterProducts();
-  }, [products, searchTerm, showMissingPhotos, filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase]);
+  }, [filterStatus, products, searchTerm, showMissingPhotos, filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase]);
 
   async function loadProducts() {
     if (!profile) {
@@ -189,7 +190,7 @@ export default function ProductsManagement() {
   }
 
   function filterProducts() {
-    let filtered = [...products];
+    let filtered = products.filter(p => filterStatus === 'all' || (filterStatus === 'archived' ? p.is_active === false : p.is_active !== false && (filterStatus !== 'discontinued' || p.is_discontinued)));
 
     if (showMissingPhotos) filtered = filtered.filter(p => !p.image_url?.trim());
 
@@ -253,8 +254,16 @@ export default function ProductsManagement() {
     } catch (error: any) {
       console.error('Error deleting product:', error);
       const msg = error?.message || 'Failed to delete product';
-      alert(msg.includes('violates') ? 'This product is used in existing records and cannot be deleted. Please remove it from those records first.' : msg);
+      if (error?.code === '23503' || msg.includes('violates')) {
+        setConfirmModal({ title: 'Product is in use', message: 'This product cannot be deleted because it is used in existing records or has stock. Archive it to hide it from the current catalog?', onConfirm: () => handleArchive(id, true) });
+      } else alert(msg);
     }
+  }
+
+  async function handleArchive(id: string, archive: boolean) {
+    const { error } = await supabase.from('products').update({ is_active: !archive }).eq('id', id);
+    if (error) { alert(error.message); return; }
+    await loadProducts();
   }
 
   function handleEdit(productId: string) {
@@ -385,6 +394,9 @@ export default function ProductsManagement() {
           />
         </div>
 
+        {activeTab === 'products' && <select aria-label="Catalog status" value={filterStatus} onChange={event => setFilterStatus(event.target.value as typeof filterStatus)} className="max-w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
+          <option value="current">Current products</option><option value="discontinued">Discontinued</option><option value="archived">Archived</option><option value="all">All products</option>
+        </select>}
         {activeTab === 'products' && missingPhotoCount > 0 && (
           <button type="button" onClick={() => setShowMissingPhotos(value => !value)}
             aria-pressed={showMissingPhotos}
@@ -719,6 +731,7 @@ export default function ProductsManagement() {
           <button
             onClick={() => {
               setSearchTerm('');
+              setFilterStatus('current');
               setShowMissingPhotos(false);
               setFilterSubcategory('all');
               setFilterType('all');
@@ -743,7 +756,8 @@ export default function ProductsManagement() {
           onView={setViewingProductId}
           onEdit={handleEdit}
           onDuplicate={handleDuplicate}
-          onDelete={(id) => setConfirmModal({ title: 'Delete Product', message: 'Delete this product?', onConfirm: () => handleDelete(id) })}
+          onArchive={(id, archive) => setConfirmModal({ title: archive ? 'Archive Product' : 'Restore Product', message: archive ? 'Hide this product from the current catalog and prevent new proposal or invoice additions? Existing records are preserved.' : 'Restore this product to the current catalog?', onConfirm: () => handleArchive(id, archive) })}
+          onDelete={(id) => setConfirmModal({ title: 'Delete Product', message: 'Permanently delete this unused product? Products in use cannot be deleted; archive them instead.', onConfirm: () => handleDelete(id) })}
         />
       ) : activeTab === 'packages' ? (
         <PackagesList
@@ -804,6 +818,8 @@ export default function ProductsManagement() {
         isOpen={confirmModal !== null}
         title={confirmModal?.title ?? ''}
         message={confirmModal?.message ?? ''}
+        variant={confirmModal?.title === 'Delete Product' ? 'danger' : 'neutral'}
+        confirmLabel={confirmModal?.title === 'Delete Product' ? 'Delete' : confirmModal?.title === 'Restore Product' ? 'Restore' : 'Archive'}
         onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
         onCancel={() => setConfirmModal(null)}
       />

@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import {CreateInvoiceFromWorkOrderModal} from './CreateInvoiceFromWorkOrderModal';
 import {customerSecurityInvoiceLines} from '../../../supabase/functions/_shared/security-customer-invoice';
 import { useState, useEffect, useRef } from 'react';
@@ -18,6 +19,7 @@ import {
 } from '../../lib/taxCalculations';
 
 interface InvoiceLineItem {
+  products?: { is_discontinued?: boolean };
   id: string;
   description: string;
   quantity: number;
@@ -344,7 +346,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
           street_address, city, state, zip_code
         ),
         invoice_line_items (
-          id, description, quantity, unit_price, amount, is_taxable, item_type, notes, notes_visible_on_invoice
+          id, description, quantity, unit_price, amount, is_taxable, item_type, notes, notes_visible_on_invoice, products(is_discontinued)
         ),
         payments (
           id, amount, payment_date, payment_method
@@ -1081,7 +1083,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <span className="text-gray-800">{item.description}</span>
+                                <span className="text-gray-800">{item.description}</span><ProductStatusNotice product={item.products} />
                                 {!readonly && invoice.status==='draft' && (
                                   <button
                                     onClick={() => startEditingDescription(item)}

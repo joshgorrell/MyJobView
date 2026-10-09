@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -5,6 +6,8 @@ import { X, Search, Package, Clock } from 'lucide-react';
 import { CatalogTaxonomyFilters, catalogTaxonomy, type CatalogTaxonomy } from '../Products/CatalogTaxonomyFilters';
 
 interface Product extends CatalogTaxonomy {
+  is_active?: boolean;
+  is_discontinued?: boolean;
   id: string;
   sku: string;
   name: string;
@@ -57,7 +60,7 @@ export default function InvoiceCatalogBrowser({
 
       const { data, error } = await supabase
         .from('products')
-        .select('id, sku, name, description, our_price, cost, unit, is_taxable, category, vendor, manufacturer_model_number, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
+        .select('id, is_active, is_discontinued, sku, name, description, our_price, cost, unit, is_taxable, category, vendor, manufacturer_model_number, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
         .eq('company_id', profile?.company_id)
         .eq('is_active', true)
         .order('name');
@@ -87,8 +90,9 @@ export default function InvoiceCatalogBrowser({
 
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('id, sku, name, description, our_price, cost, unit, is_taxable, category, vendor, manufacturer_model_number, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
-          .in('id', productIds);
+          .select('id, is_active, is_discontinued, sku, name, description, our_price, cost, unit, is_taxable, category, vendor, manufacturer_model_number, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
+          .in('id', productIds)
+          .eq('is_active', true);
 
         if (productError) throw productError;
         setRecentProducts((productData || []).map(p => ({ ...p, ...catalogTaxonomy(p) })) as Product[]);
@@ -235,7 +239,7 @@ export default function InvoiceCatalogBrowser({
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
-                    <span className="text-sm font-medium text-white truncate">{product.name}</span>
+                    <span className="text-sm font-medium text-white truncate">{product.name}</span><ProductStatusNotice product={product} />
                     <span className="text-sm font-bold text-green-400 ml-2">${product.our_price?.toFixed(2) || '0.00'}</span>
                   </div>
                   <div className="text-xs text-gray-400 truncate">{[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}</div>
@@ -285,7 +289,7 @@ export default function InvoiceCatalogBrowser({
                             onClick={(e) => e.stopPropagation()}
                           />
                         )}
-                        <span className="font-medium text-white">{product.name}</span>
+                        <span className="font-medium text-white">{product.name}</span><ProductStatusNotice product={product} />
                       </div>
                       <div className="text-sm text-gray-400 mb-1">
                         SKU: {product.sku || 'N/A'}

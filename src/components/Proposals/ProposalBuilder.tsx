@@ -1,3 +1,4 @@
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import LaborRemovalChoice, { itemHasLabor, RemovalScope } from './LaborRemovalChoice';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -1379,6 +1380,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
                   title="Click to edit description"
                 >
                   {item.description}
+                  <ProductStatusNotice product={item.products} />
                   {isAddedInCO && <span className="ml-2 text-xs text-emerald-400 font-normal">+New</span>}
                   {isModifiedInCO && <span className="ml-2 text-xs text-amber-400 font-normal">Edited</span>}
                 </button>
