@@ -20,9 +20,11 @@ Dispatch Overview displays an attention banner; Needs attention lists incomplete
 
 ## Deployment gate
 
-The connected MJV project inspected on October 9 was behind current main: `create_work_order_assignments(uuid,jsonb,uuid)` was absent and legacy conversion triggers remained. This change has **not** been applied to that project.
+The deployed `https://myjobview.com` JavaScript bundle inspected on October 9 uses project `bqtsuzvuvqvgidipbsis`. That project's `create_work_order_assignments(uuid,jsonb,uuid)` is absent. Its schema also lacks the handoff migration's retry columns, task visit instructions/progress version, project-task room/covered-items/progress fields, proposal-task estimated-hours/covered-item fields and project sold-handoff snapshot. Work-order configuration and employee-time-authority migrations are recorded under different timestamps from the repository, so comparing filenames alone is insufficient. This change has **not** been applied to that project.
 
-1. Confirm the deployed application's Supabase project reference. Reconcile its migration history with current main; do not blindly run every historical migration against an existing database.
+Supabase reports `MIGRATIONS_FAILED` for main and both existing preview branches (`codex/commission-repairs` and `codex/payment-alerts`). This status does not identify the failed SQL statement; inspect the branching logs before attempting a replay. Do not reuse those branches for this work. The immediate prerequisite to validate in a dedicated staging environment is `20261001134611_project_task_visit_handoff.sql`, followed by this migration. Check its table/constraint/function dependencies against the actual staging schema first.
+
+1. Reconfirm the deployed application's Supabase project reference at rollout. Reconcile its migration history with current main; do not blindly run every historical migration against an existing database.
 2. In an isolated staging copy, apply required handoff/employee-time/work-order-configuration migrations and this migration. This migration fails before schema changes if the handoff RPC is absent.
 3. Run the read-only preflight below and database advisors. Verify all actual RLS grants/policies allow intended staff creation, scheduling and attention queries.
 4. Test signed-in admin/service manager creation from customer, project, request, Dispatch, emergency, split, duplicate and recurring paths; confirm the calendar, technician view and billing/history links. Test simultaneous booking from two sessions and appointment/work-order overlap. Test mobile Safari keyboard/focus handling.
