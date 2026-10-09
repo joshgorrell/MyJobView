@@ -54,7 +54,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const { tenant } = useTenant();
   const dealerName = tenant?.organizationName || 'Electronic Life';
   const dealerLogo = tenant?.logoUrl;
-  const [currentView, setCurrentView] = useState<string>(()=>new URLSearchParams(window.location.search).get('tab')==='invoices'?'invoices':defaultModule);
+  const [currentView, setCurrentView] = useState<string>(()=>['invoices', 'messages'].includes(new URLSearchParams(window.location.search).get('tab') || '') ? new URLSearchParams(window.location.search).get('tab')! : defaultModule);
   const [stats, setStats] = useState<DashboardStats>({
     activeProposals: 0,
     activeProjects: 0,
@@ -282,7 +282,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         supabase.from('projects').select('id', { count: 'exact', head: true }).eq('customer_id', contactId).in('status', ['planning', 'active']),
         supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).gte('appointment_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
         supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['submitted', 'partial', 'overdue']),
-        supabase.from('message_threads').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('is_internal', false),
+        supabase.from('messages').select('id', { count: 'exact', head: true }).eq('author_type', 'staff').eq('is_internal', false).eq('is_read', false),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('type', 'vip_program').gte('start_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
         supabase.from('punchlist_tasks').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['draft', 'requested', 'scheduled']),
         supabase.from('sales_orders').select('id', { count: 'exact', head: true }).eq('contact_id', contactId),
@@ -304,6 +304,21 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!contactId) return;
+    let cancelled = false;
+    const refreshUnread = async () => {
+      const {count, error} = await supabase.from('messages').select('id', {count: 'exact', head: true})
+        .eq('author_type', 'staff').eq('is_internal', false).eq('is_read', false);
+      if (!cancelled && !error) setStats(old => ({...old, unreadMessages: count || 0}));
+    };
+    void refreshUnread();
+    const channel = supabase.channel(`portal-message-count-${contactId}`)
+      .on('postgres_changes', {event: '*', schema: 'public', table: 'messages'}, () => void refreshUnread()).subscribe();
+    const timer = window.setInterval(() => void refreshUnread(), 30000);
+    return () => { cancelled = true; window.clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [contactId]);
 
   async function handleSignOut() {
     const isImpersonating = localStorage.getItem('admin_impersonating_contact');
@@ -337,8 +352,9 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   }
 
   if (portalAccessLevel === 'proposal_only') {
+    if (currentView === 'messages' && moduleSettings.portal_messages_enabled) return <div className="min-h-screen bg-gray-50 p-4"><button onClick={() => setCurrentView('dashboard')} className="mb-4 px-3 py-2 border rounded-lg bg-white text-gray-900">Back to Portal</button><PortalMessages /></div>;
     if(currentView==='invoices' && moduleSettings.portal_invoices_enabled) return <div className="min-h-screen bg-gray-50 p-4"><button onClick={()=>setCurrentView('dashboard')} className="mb-4 px-3 py-2 border rounded-lg bg-white text-gray-900">Back to Portal</button><PortalInvoices isEmbedded /></div>;
-    return <PortalLimitedDashboard onOpenInvoices={moduleSettings.portal_invoices_enabled?()=>setCurrentView('invoices'):undefined} />;
+    return <PortalLimitedDashboard onOpenMessages={moduleSettings.portal_messages_enabled ? () => setCurrentView('messages') : undefined} onOpenInvoices={moduleSettings.portal_invoices_enabled?()=>setCurrentView('invoices'):undefined} />;
   }
 
   const PortalHeader = ({ showBack = false }: { showBack?: boolean }) => (

@@ -14,18 +14,21 @@ import { CustomerConversations, CustomerConversationsProps } from './CustomerCon
 
 type Option = { id: string; name: string };
 const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Tasks', activity: 'Other activity' };
-type FlowView = 'all' | 'activity' | 'direct' | 'customers' | 'departments' | 'company';
+type FlowView = 'all' | 'activity' | 'messages';
+type MessageFilter = 'all' | 'customer' | 'coworkers' | 'unread';
 const FLOW_VIEWS: { id: FlowView; label: string }[] = [
-  { id: 'all', label: 'All' }, { id: 'activity', label: 'Activity' }, { id: 'direct', label: 'Direct' },
-  { id: 'customers', label: 'Messages' }, { id: 'departments', label: 'Departments' }, { id: 'company', label: 'Company' },
+  { id: 'all', label: 'All' }, { id: 'activity', label: 'Activity' }, { id: 'messages', label: 'Messages' },
 ];
-function matchesView(event: FlowEvent, view: FlowView) {
+const MESSAGE_FILTERS: { id: MessageFilter; label: string }[] = [
+  { id: 'all', label: 'All' }, { id: 'customer', label: 'Customer' },
+  { id: 'coworkers', label: 'Coworkers' }, { id: 'unread', label: 'Unread' },
+];
+function matchesView(event: FlowEvent, view: FlowView, filter: MessageFilter) {
   if (view === 'all') return true;
-  if (view === 'direct') return event.source_table === 'discussion_posts' && event.audience_type === 'direct';
-  if (view === 'customers') return event.source_table === 'messages' && !event.is_internal;
-  if (view === 'departments') return event.source_table === 'discussion_posts' && event.audience_type === 'department';
-  if (view === 'company') return event.source_table === 'discussion_posts' && event.audience_type === 'company';
-  return event.source_table !== 'messages' && event.source_table !== 'discussion_posts';
+  if (view === 'activity') return !['messages', 'discussion_posts'].includes(event.source_table);
+  // Customer conversations are rendered by the shared inbox below.
+  return filter !== 'customer' && event.source_table === 'discussion_posts'
+    && (filter !== 'unread' || !event.viewed);
 }
 function eventKind(event: FlowEvent): string {
   if (event.source_table === 'messages') return event.is_internal ? 'Internal message' : 'Customer message';
@@ -44,12 +47,13 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const { hasModuleAccess } = useDepartments();
   const scoped = !!(contactId || projectId || workOrderId);
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
-  const [view, setView] = useState<FlowView>(conversationProps.openThreadId || conversationProps.createRequested ? 'customers' : 'all');
+  const [view, setView] = useState<FlowView>(conversationProps.openThreadId || conversationProps.createRequested ? 'messages' : 'all');
+  const [messageFilter, setMessageFilter] = useState<MessageFilter>('all');
   const [threadId, setThreadId] = useState<string | null>(null);
   const [createCustomer, setCreateCustomer] = useState(false);
   const canMessageCustomers = hasModuleAccess('messages');
   useEffect(() => {
-    if (conversationProps.openThreadId || conversationProps.createRequested) { setView('customers'); setThreadId(null); }
+    if (conversationProps.openThreadId || conversationProps.createRequested) { setView('messages'); setMessageFilter('customer'); setThreadId(null); }
   }, [conversationProps.openThreadId, conversationProps.createRequested]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -152,7 +156,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   async function markShown() {
     setMarking(true); await flow.markViewed(visibleEvents.filter(e => !e.viewed).map(e => e.id)); setMarking(false);
   }
-  const visibleEvents = flow.events.filter(event => matchesView(event, view));
+  const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
   return <section className={`flow ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
@@ -161,7 +165,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
         <button className="flow-message-action" aria-label="New message" ref={messageAction} aria-expanded={choosingMessage} aria-controls={`${controlId}-message-destination`}
           onClick={() => {
             if (canPost && canMessageCustomers) setChoosingMessage(!choosingMessage);
-            else if (canMessageCustomers) { setComposing(false); setCreateCustomer(true); setView('customers'); }
+            else if (canMessageCustomers) { setComposing(false); setCreateCustomer(true); setMessageFilter('customer'); setView('messages'); }
             else { setComposing(false); setMessaging(!messaging); }
           }}><MessageSquare size={15} /><span className="flow-desktop-label">New message</span><span className="flow-mobile-label">Message</span>{canPost && canMessageCustomers && <ChevronDown size={13} />}</button>
         {canPost && <button className="flow-primary" onClick={() => { setComposing(!composing); setMessaging(false); setChoosingMessage(false); }}><Plus size={15} /><span className="flow-desktop-label">Post update</span><span className="flow-mobile-label">Update</span></button>}
@@ -169,15 +173,15 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     </header>
     {composing && <PostFlowUpdate scope={chosenScope} onClose={() => setComposing(false)} onPosted={() => { setComposing(false); void flow.refresh(); }} />}
     {choosingMessage && <div ref={messageChoices} id={`${controlId}-message-destination`} className="flow-message-destinations" role="group" aria-label="Message destination">
-      {canPost && <button onClick={() => { setChoosingMessage(false); setMessaging(true); setComposing(false); if (view === 'customers') setView('all'); }}><MessageSquare size={17} /><span><strong>Internal chat</strong><small>Teammates, departments or everyone</small></span></button>}
-      {canMessageCustomers && <button onClick={() => { setChoosingMessage(false); setMessaging(false); setCreateCustomer(true); setView('customers'); }}><User size={17} /><span><strong>Customer message</strong><small>Start a customer conversation</small></span></button>}
+      {canPost && <button onClick={() => { setChoosingMessage(false); setMessaging(true); setComposing(false); if (view === 'messages') setView('all'); }}><MessageSquare size={17} /><span><strong>Internal chat</strong><small>Teammates, departments or everyone</small></span></button>}
+      {canMessageCustomers && <button onClick={() => { setChoosingMessage(false); setMessaging(false); setCreateCustomer(true); setMessageFilter('customer'); setView('messages'); }}><User size={17} /><span><strong>Customer message</strong><small>Start a customer conversation</small></span></button>}
       <button aria-label="Close message choices" onClick={() => { setChoosingMessage(false); messageAction.current?.focus(); }}><X size={16} /></button>
     </div>}
     {messaging && <div className="flow-message-composer"><DiscussionPostForm onSuccess={() => { setMessaging(false); void flow.refresh(); }} /></div>}
     <div className="flow-toolbar">
       <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{FLOW_VIEWS.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
       <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => setView(e.target.value as FlowView)}>{FLOW_VIEWS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
-      {view !== 'customers' && <>
+      {view !== 'messages' && <>
       <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
       <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
       <button className={`flow-unread ${newOnly ? 'flow-selected' : ''}`} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" /><span className="flow-desktop-label">New only</span><span className="flow-mobile-label">New</span></button>
@@ -188,7 +192,8 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       </>}
     </div>
 
-    {view !== 'customers' && showFilters && <div className="flow-filters" id={filtersId}>
+    {view === 'messages' && <div className="flow-message-filters" role="group" aria-label="Message filters">{MESSAGE_FILTERS.map(item => <button key={item.id} aria-pressed={messageFilter === item.id} className={messageFilter === item.id ? 'flow-selected' : ''} onClick={() => { setMessageFilter(item.id); setThreadId(null); }}>{item.label}</button>)}</div>}
+    {view !== 'messages' && showFilters && <div className="flow-filters" id={filtersId}>
       <label>Content type<select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">All content types</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <div className="flow-filter-quick-controls">
         <button className={todayOnly ? 'flow-selected' : ''} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
@@ -204,15 +209,15 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       {pickingTarget && <div className="flow-picker-slot"><FlowTargetPicker contactId={contactId} onSelect={t => { setTarget(t); setPickingTarget(false); }} /></div>}
     </div>}
     {!!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
-    {view === 'customers' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
-    {canMessageCustomers && (view === 'customers' || threadId) && <div className="flow-customer-inbox">
-      {threadId && view !== 'customers' && <button onClick={() => setThreadId(null)}>Close conversation</button>}
-      <CustomerConversations {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
+    {view === 'messages' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
+    {canMessageCustomers && (view === 'messages' && messageFilter !== 'coworkers') && <div className="flow-customer-inbox">
+      {threadId && view !== 'messages' && <button onClick={() => setThreadId(null)}>Close conversation</button>}
+      <CustomerConversations unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
         createRequested={createCustomer || conversationProps.createRequested}
         onCreateOpened={() => { setCreateCustomer(false); conversationProps.onCreateOpened?.(); }}
         onThreadSelected={id => { setThreadId(id); conversationProps.onThreadSelected?.(id); }} />
     </div>}
-    {view !== 'customers' && <>
+    {(view !== 'messages' || messageFilter !== 'customer') && <>
     {flow.error && <div className="flow-error" role="alert">{flow.error} <button onClick={() => void flow.refresh()}>Retry</button></div>}
     {flow.pending > 0 && <button className="flow-new-banner" onClick={() => void flow.refresh()}>{flow.pending === 50 ? '50+' : flow.pending} new {flow.pending === 1 ? 'activity' : 'activities'} — show updates</button>}
     <div className="flow-list-meta"><span>{visibleEvents.length} shown · {newShown} new</span><div className="flow-meta-actions"><button aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={14} /><span className="flow-desktop-label">{marking ? 'Saving…' : 'Mark shown viewed'}</span><span className="flow-mobile-label">{marking ? 'Saving…' : 'Viewed'}</span></button><button className="flow-help-toggle" aria-label="About Flow unread indicators" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}><HelpCircle size={15} /></button></div></div>
@@ -236,7 +241,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
               {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           </div>
-          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{eventKind(event)} · {event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.preview ? <p className="flow-detail-body">{event.preview}</p> : event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small><div className="flow-links">{event.thread_id && canMessageCustomers && <button onClick={() => setThreadId(event.thread_id!)}>Read full conversation</button>}{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
+          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{eventKind(event)} · {event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.preview ? <p className="flow-detail-body">{event.preview}</p> : event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small><div className="flow-links">{event.thread_id && canMessageCustomers && <button onClick={() => { setThreadId(event.thread_id!); setView('messages'); setMessageFilter('customer'); }}>Read full conversation</button>}{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
         </Fragment>;
       })}
     </div>

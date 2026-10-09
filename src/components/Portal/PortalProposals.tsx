@@ -395,7 +395,7 @@ function RenewalModal({ proposal, contactId, onClose, onSuccess }: RenewalModalP
           context_type: 'proposal',
           context_id: proposal.id,
           subject: `Renewal Request: ${proposal.proposal_number}`,
-          visibility: 'internal',
+          visibility: 'public',
           last_message_at: new Date().toISOString(),
         })
         .select('id')
