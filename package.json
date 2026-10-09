@@ -42,7 +42,8 @@
     "test:purchasing:browser": "npm run build && node tests/purchasing/browser.mjs",
     "test:catalog": "node tests/catalog/grouping.mjs && node tests/catalog/lifecycle-database.mjs && node tests/catalog/history.mjs",
     "test:catalog:browser": "node tests/catalog/browser.mjs && node tests/catalog/history-browser.mjs",
-    "test:lead-emails": "node tests/lead-emails/runtime.mjs"
+    "test:lead-emails": "node tests/lead-emails/runtime.mjs",
+    "test:projects": "node tests/projects/runtime.mjs && node tests/projects/browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

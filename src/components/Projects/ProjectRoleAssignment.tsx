@@ -116,7 +116,7 @@ export function ProjectRoleAssignment({
     setSaving(roleKey);
     setOpenDropdown(null);
     try {
-      const dbField = roleKey;
+      const dbField = roleKey === 'project_manager_id' ? 'assigned_pm' : roleKey;
       const { error } = await supabase
         .from('projects')
         .update({ [dbField]: employeeId })

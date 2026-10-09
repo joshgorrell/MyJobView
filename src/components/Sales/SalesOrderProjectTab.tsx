@@ -1,3 +1,5 @@
+import { loadProjectSummaries, type ProjectSummary } from '../../lib/projectOverview';
+import { useAuth } from '../../contexts/AuthContext';
 import ProjectTasksList from '../Projects/ProjectTasksList';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -92,6 +94,9 @@ const GOAL_PCT = 0.95;
 const PM_ALLOWANCE_PCT = 0.05;
 
 export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabProps) {
+  const {profile} = useAuth();
+  const [summary,setSummary] = useState<ProjectSummary|null>(null);
+  const [summaryError,setSummaryError] = useState('');
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [laborBreakdown, setLaborBreakdown] = useState<LaborPhaseBreakdown[]>([]);
   const [soldLaborHours, setSoldLaborHours] = useState(0);
@@ -103,7 +108,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   const [notesValue, setNotesValue] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [showAllParts, setShowAllParts] = useState(false);
-  const [totalClockedHours, setTotalClockedHours] = useState(0);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
 
@@ -125,11 +129,10 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     if (project?.id) {
       setNotesValue(project.notes || '');
       loadProjectData();
-      loadSoldLaborHours();
     } else {
       setLoading(false);
     }
-  }, [project?.id]);
+  }, [project?.id, profile?.organization_id, order.updated_at]);
 
   async function loadLaborPhases() {
     const { data } = await supabase
@@ -138,23 +141,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
     setLaborPhases(data || []);
-  }
-
-  async function loadSoldLaborHours() {
-    if (!order.proposal_id) return;
-    try {
-      const { data } = await supabase
-        .from('proposal_line_items')
-        .select('labor_hours, labor_phase_id, labor_phase:labor_phases(id, name)')
-        .eq('proposal_id', order.proposal_id);
-
-      const total = (data || []).reduce((s, li) => s + (li.labor_hours || 0), 0);
-      setSoldLaborHours(total);
-      return data || [];
-    } catch (error) {
-      console.error('Error loading sold labor hours:', error);
-      return [];
-    }
   }
 
   async function loadProjectData() {
@@ -244,8 +230,17 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         buildLaborBreakdown(wos, soldItems, [], projectTimeEntries);
       }
 
+      if (!profile?.organization_id) throw new Error('Project labor requires an authenticated organization.');
+      const [shared] = await loadProjectSummaries(profile.organization_id,[project.id]);
+      if (!shared) throw new Error('Project labor is unavailable.');
+      setSummary(shared); setSummaryError('');
+      setSoldLaborHours(shared.soldHours);
+      setLaborBreakdown(previous=>shared.phases.map(phase=>({unassigned_sources:previous.find(row=>row.phase_id===phase.id)?.unassigned_sources,phase_id:phase.id,phase_name:phase.name+(phase.excluded?' (excluded from goal)':''),sold_hours:phase.sold_hours,goal_hours:phase.excluded?0:phase.goal_hours,actual_hours:phase.actual_hours,remaining_hours:phase.excluded?0:Math.max(0,phase.goal_hours-phase.actual_hours)})));
+
     } catch (error) {
       console.error('Error loading project data:', error);
+      setSummaryError((error as Error).message || 'Project labor could not be loaded.');
+      setSummary(null);
     } finally {
       setLoading(false);
     }
@@ -355,11 +350,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
 
     const filtered = breakdown.filter(r => r.sold_hours > 0 || r.actual_hours > 0);
     setLaborBreakdown(filtered);
-    const allHours = [
-      ...woTimeEntries.map(te => te.total_hours || 0),
-      ...projectTimeEntries.map(te => te.total_hours || 0),
-    ];
-    setTotalClockedHours(allHours.reduce((s, h) => s + h, 0));
+
   }
 
   async function assignPhaseToSource(source: UnassignedSource, newPhaseId: string) {
@@ -605,9 +596,9 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     );
   }
 
-  const totalSoldHours = soldLaborHours;
-  const goalHours = totalSoldHours * GOAL_PCT;
-  const totalActualHours = totalClockedHours;
+  const totalSoldHours = summary?.soldHours ?? 0;
+  const goalHours = summary?.goalHours ?? 0;
+  const totalActualHours = summary?.fieldHours ?? 0;
   const remainingHours = Math.max(0, goalHours - totalActualHours);
   const usedPct = goalHours > 0 ? (totalActualHours / goalHours) * 100 : 0;
   const overGoal = totalActualHours > goalHours && goalHours > 0;
@@ -649,6 +640,8 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
 
   return (
     <div className="space-y-6">
+      {summaryError && <p role="alert" className="text-red-500 p-3">{summaryError} <button onClick={()=>loadProjectData()} className="underline min-h-11">Retry</button></p>}
+      {summary && <p className="text-sm text-gray-400 px-1">Recorded field labor: {summary.fieldHours.toFixed(1)}h · Excluded labor: {summary.excludedHours.toFixed(1)}h{summary.pendingHours>0?` · ${summary.pendingHours.toFixed(1)}h awaiting time review`:''}{summary.goalHours==null?` · ${summary.budgetWarning||'No goal set'}`:''}. Labor used does not measure task completion.</p>}
 
       {/* Change Order Prompt */}
       {showChangeOrderPrompt && (

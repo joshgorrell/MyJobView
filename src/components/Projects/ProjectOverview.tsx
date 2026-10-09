@@ -1,3 +1,5 @@
+import { loadProjectSummaries } from '../../lib/projectOverview';
+import { useAuth } from '../../contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Calendar, DollarSign, FileText, CreditCard as Edit2, Save, X, Timer, Clock, AlertTriangle, CheckCircle, Flag } from 'lucide-react';
@@ -16,6 +18,8 @@ interface HoursData {
 }
 
 export default function ProjectOverview({ project, onUpdate, onRefresh }: ProjectOverviewProps) {
+  const {profile} = useAuth();
+  const [hoursError,setHoursError] = useState('');
   const [editing, setEditing] = useState(false);
   const [editedProject, setEditedProject] = useState<any>({});
   const [invoicesTotal, setInvoicesTotal] = useState({ total: 0, paid: 0, outstanding: 0 });
@@ -24,14 +28,14 @@ export default function ProjectOverview({ project, onUpdate, onRefresh }: Projec
   const [roleAssignments, setRoleAssignments] = useState({
     salesperson_id: project.salesperson_id || null,
     designer_id: project.designer_id || null,
-    project_manager_id: project.project_manager_id || null,
+    project_manager_id: project.assigned_pm || null,
   });
 
   useEffect(() => {
     loadInvoicesSummary();
     loadAppointmentsCount();
     loadHoursData();
-  }, [project.id]);
+  }, [project.id,profile?.organization_id]);
 
   async function loadInvoicesSummary() {
     try {
@@ -74,29 +78,14 @@ export default function ProjectOverview({ project, onUpdate, onRefresh }: Projec
 
   async function loadHoursData() {
     try {
-      const [woResult, actResult] = await Promise.all([
-        supabase
-          .from('work_orders')
-          .select('estimated_hours, actual_hours')
-          .eq('project_id', project.id),
-        supabase
-          .from('project_activity_logs')
-          .select('duration_minutes')
-          .eq('project_id', project.id),
-      ]);
+      if(!profile?.organization_id) return;
+      const [summary]=await loadProjectSummaries(profile.organization_id,[project.id]);
+      if(!summary) throw new Error('Project labor is unavailable.');
+      setHoursData({estimatedHours:summary.goalHours||0,actualHours:summary.fieldHours,activityHours:summary.excludedHours});
+      setHoursError('');
 
-      if (woResult.error) throw woResult.error;
-
-      const totalEstimated = (woResult.data || []).reduce((s, w) => s + (w.estimated_hours || 0), 0);
-      const totalActual = (woResult.data || []).reduce((s, w) => s + (w.actual_hours || 0), 0);
-      const totalActivityMins = (actResult.data || []).reduce((s, a) => s + (a.duration_minutes || 0), 0);
-      const activityHours = Math.round((totalActivityMins / 60) * 10) / 10;
-
-      if (totalEstimated > 0 || totalActual > 0 || activityHours > 0) {
-        setHoursData({ estimatedHours: totalEstimated, actualHours: totalActual, activityHours });
-      }
     } catch (error) {
-      console.error('Error loading hours data:', error);
+      setHoursData(null);setHoursError((error as Error).message||'Project labor could not be loaded.');
     }
   }
 
@@ -171,6 +160,7 @@ export default function ProjectOverview({ project, onUpdate, onRefresh }: Projec
           </div>
         </div>
 
+        {hoursError&&<p role="alert" className="text-red-500">{hoursError}</p>}
         {/* Hours Progress */}
         {hoursData && hoursData.estimatedHours > 0 && (
           <HoursProgressBar
@@ -183,7 +173,7 @@ export default function ProjectOverview({ project, onUpdate, onRefresh }: Projec
         {hoursData && hoursData.activityHours > 0 && (
           <div className="bg-gray-800 border border-gray-700 rounded-lg px-5 py-3 flex items-center gap-3">
             <Clock size={16} className="text-cyan-400 shrink-0" />
-            <span className="text-sm text-gray-400">Non-WO Activity:</span>
+            <span className="text-sm text-gray-400">Excluded labor:</span>
             <span className="text-sm font-semibold text-white">{hoursData.activityHours}h logged</span>
             <span className="text-xs text-gray-500">(site surveys, meetings &amp; other project time)</span>
           </div>
@@ -404,7 +394,7 @@ function HoursProgressBar({ estimatedHours, actualHours }: { estimatedHours: num
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
           <Timer size={18} className={textColor} />
-          <span className="text-sm font-semibold text-white">Hours Progress</span>
+          <span className="text-sm font-semibold text-white">Labor used / Goal</span>
         </div>
         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass}`}>
           {statusLabel}
@@ -417,7 +407,7 @@ function HoursProgressBar({ estimatedHours, actualHours }: { estimatedHours: num
         </div>
         <div className="pb-1 text-sm text-gray-400 leading-tight">
           <div className="font-medium text-white">{actualHours.toFixed(1)}h worked</div>
-          <div>of {estimatedHours.toFixed(1)}h estimated</div>
+          <div>of {estimatedHours.toFixed(1)}h goal</div>
         </div>
       </div>
 
@@ -446,7 +436,7 @@ function HoursProgressBar({ estimatedHours, actualHours }: { estimatedHours: num
             {estimatedHours.toFixed(1)}h
           </span>
         ) : (
-          <span className={`font-semibold ${textColor}`}>{estimatedHours.toFixed(1)}h limit</span>
+          <span className={`font-semibold ${textColor}`}>{estimatedHours.toFixed(1)}h goal</span>
         )}
       </div>
 
