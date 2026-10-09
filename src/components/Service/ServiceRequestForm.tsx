@@ -8,9 +8,7 @@ import {
   Search,
   MapPin,
   FileText,
-  Clock,
   User,
-  Calendar,
   Paperclip,
   Plus,
   RotateCcw,
@@ -112,6 +110,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const aiPrefillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [specificDate, setSpecificDate] = useState(!!(editingRequest?.earliest_date || editingRequest?.requested_date || aiPrefill?.requestedDate));
   const isEditMode = !!editingRequest;
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -178,6 +177,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   useEffect(() => {
     if (!aiPrefill || aiPrefillApplied.current || isEditMode) return;
     aiPrefillApplied.current = true;
+    if (aiPrefill.requestedDate) setSpecificDate(true);
 
     setFormData(prev => ({
       ...prev,
@@ -737,15 +737,17 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     <>
     <QuickActionModal
       title={isEditMode ? 'Update & Resubmit' : 'Work Order Request'}
-      subtitle={isEditMode ? 'Address feedback, then resubmit for review' : 'Request a new service or project work order'}
+      subtitle={isEditMode ? 'Address feedback, then resubmit for review' : 'Request service or project work'}
       icon={isEditMode ? <RotateCcw className="w-5 h-5 text-primary" /> : <FileText className="w-5 h-5 text-primary" />}
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
       onClose={onClose}
       stableHeight
+      scrollBody={false}
       showSuccess={showSuccess}
       successMessage="Work Order Request Created!"
     >
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 min-w-0">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+        <div className="qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-4 sm:p-5 space-y-3">
 
           {/* Kickback reason banner (edit mode only) */}
           {isEditMode && editingRequest?.kickback_reason && (
@@ -759,7 +761,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           )}
 
           {/* Customer Section */}
-          <div className="space-y-4 border-t border-subtle pt-4">
+          <div className="space-y-3">
             <h3 className="font-semibold text-primary flex items-center gap-2">
               <User className="w-5 h-5" />
               Customer
@@ -893,7 +895,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
                   placeholder="Customer Name *"
                   required
-                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
+                  className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative">
@@ -959,7 +961,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     if (proj) selectProject(proj);
                     else setSelectedProjectId(e.target.value);
                   }}
-                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-primary"
+                  className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-primary"
                 >
                   <option value="">Select a project *</option>
                   {customerProjects.map(p => (
@@ -974,7 +976,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
 <details className="border-t border-subtle pt-2"><summary className="min-h-11 cursor-pointer text-sm text-secondary">{formData.job_location_address || '+ Location (optional)'}</summary>
           {/* Location Section */}
-          <div className="space-y-4 border-t border-subtle pt-4">
+          <div className="space-y-3">
             <h3 className="font-semibold text-primary flex items-center gap-2">
               <MapPin className="w-5 h-5" />
               Job Location
@@ -1032,21 +1034,21 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 value={formData.job_location_city}
                 onChange={(e) => setFormData(prev => ({ ...prev, customer_location_id: null, job_location_city: e.target.value }))}
                 placeholder="City"
-                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
               <input
                 type="text"
                 value={formData.job_location_state}
                 onChange={(e) => setFormData(prev => ({ ...prev, customer_location_id: null, job_location_state: e.target.value }))}
                 placeholder="State"
-                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
               <input
                 type="text"
                 value={formData.job_location_zip}
                 onChange={(e) => setFormData(prev => ({ ...prev, customer_location_id: null, job_location_zip: e.target.value }))}
                 placeholder="ZIP"
-                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
               />
             </div>
             </div>}
@@ -1054,7 +1056,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
 </details>
           {/* Job Description */}
-          <div className="space-y-4 border-t border-subtle pt-4">
+          <div className="space-y-3">
             <h3 className="font-semibold text-primary flex items-center gap-2">
               <FileText className="w-5 h-5" />
               What do they need?
@@ -1065,7 +1067,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               placeholder="What needs to be done? *"
               required
               rows={3}
-              className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500 resize-none"
+              className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500 resize-none"
             />
           </div>
 
@@ -1081,15 +1083,16 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             <input list="service-request-warranty-references" aria-label="Warranty reference" placeholder="Project / work order / equipment reference" value={formData.warranty_reference} onChange={e => setFormData(prev => ({...prev, warranty_reference: e.target.value}))} className="w-full p-3 bg-surface border border-strong rounded-lg text-base text-primary" />
             <textarea aria-label="Warranty reason" placeholder="Why is this warranty?" value={formData.warranty_notes} onChange={e => setFormData(prev => ({...prev, warranty_notes: e.target.value}))} className="w-full p-3 bg-surface border border-strong rounded-lg text-base text-primary" />
           </div>}
-<details className="border-t border-subtle pt-3"><summary className="min-h-11 cursor-pointer text-primary">Billing / Internal</summary>
+<div className="space-y-2">
           {/* Billable By (Service mode only) */}
           {requestType === 'service' && (
             <div className="space-y-3 border-t border-subtle pt-4">
-              <h3 className="font-semibold text-primary">Billable By</h3>
+              <label htmlFor="request-billable-by" className="block text-sm font-medium text-secondary">Billable By</label>
               <select
+                id="request-billable-by"
                 value={formData.billable_by}
                 onChange={(e) => setFormData(prev => ({ ...prev, billable_by: e.target.value as any }))}
-                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
               >
                 <option value="admin">Admin</option>
                 <option value="dispatch">Dispatch</option>
@@ -1101,7 +1104,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 <select
                   value={formData.billable_by_user_id || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, billable_by_user_id: e.target.value || null }))}
-                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
+                  className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
                 >
                   <option value="">Select Sales Rep</option>
                   {salesReps.map(rep => (
@@ -1112,49 +1115,57 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </div>
           )}
 
-</details>
-          <details open={formData.priority === 'urgent' || undefined} className="border-t border-subtle pt-3"><summary className="min-h-11 cursor-pointer text-primary">Scheduling · ASAP by default</summary>
-          {/* Optional Fields */}
-          <div className="space-y-4 border-t border-subtle pt-4">
-            <label className="block text-sm text-secondary">Customer contact</label>
-            <select aria-label="Customer contact responsibility" value={formData.customer_contact_instruction} onChange={e => setFormData(prev => ({...prev, customer_contact_instruction: e.target.value}))} className="w-full min-h-11 bg-surface border border-strong rounded-lg text-base text-primary"><option value="dispatch">Dispatch should contact customer</option><option value="already_contacted">Customer already contacted / schedule as requested</option><option value="requester">Requester will coordinate with customer</option></select>
-            <label className="block text-sm text-secondary">Earliest date (optional)</label>
-            <input type="date" aria-label="Earliest date" value={formData.earliest_date} onChange={e => setFormData(prev => ({...prev, earliest_date: e.target.value}))} className="w-full min-w-0 p-3 bg-surface border border-strong rounded-lg text-base text-primary" />
-            <fieldset><legend className="text-sm text-secondary">Preferred tech · No preference by default</legend><p className="text-xs text-muted">Preference only — Dispatch makes final assignment.</p><div className="grid grid-cols-2 gap-2">{technicians.map(tech => <label key={tech.id} className="flex items-center gap-2 min-h-11 text-sm text-primary"><input type="checkbox" checked={formData.requested_tech_ids.includes(tech.id)} onChange={e => setFormData(prev => ({...prev, requested_tech_ids: e.target.checked ? [...prev.requested_tech_ids, tech.id] : prev.requested_tech_ids.filter(id => id !== tech.id)}))} />{tech.full_name}</label>)}</div></fieldset>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  <Clock className="w-4 h-4 inline mr-1" />
-                  Estimated Duration
-                </label>
-                <select
-                  value={formData.estimated_duration}
-                  onChange={(e) => setFormData(prev => ({ ...prev, estimated_duration: e.target.value }))}
-                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
-                >
-                  <option value="">Not Sure</option>
-                  <option value="30min">30 minutes</option>
-                  <option value="1hr">1 hour</option>
-                  <option value="2hrs">2 hours</option>
-                  <option value="half_day">Half day</option>
-                  <option value="full_day">Full day</option>
-                </select>
+</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+            <label className="block min-w-0 space-y-1">
+              <span className="text-sm font-medium text-secondary">Customer Contact</span>
+              <select aria-label="Customer contact responsibility" value={formData.customer_contact_instruction} onChange={e => setFormData(prev => ({ ...prev, customer_contact_instruction: e.target.value }))} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
+                <option value="dispatch">Dispatch contacts customer</option>
+                <option value="already_contacted">Customer already contacted</option>
+                <option value="requester">I will contact customer</option>
+              </select>
+            </label>
+            <label className="block min-w-0 space-y-1">
+              <span className="text-sm font-medium text-secondary">Preferred Technician</span>
+              <select aria-label="Preferred technician" value={formData.requested_tech_ids.length > 1 ? 'existing' : formData.requested_tech_ids[0] || ''} onChange={e => {
+                if (e.target.value !== 'existing') setFormData(prev => ({ ...prev, requested_tech_ids: e.target.value ? [e.target.value] : [] }));
+              }} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
+                <option value="">No preference</option>
+                {formData.requested_tech_ids.length > 1 && <option value="existing">Keep existing preferences</option>}
+                {formData.requested_tech_ids.length === 1 && !technicians.some(tech => tech.id === formData.requested_tech_ids[0]) && <option value={formData.requested_tech_ids[0]}>Existing preference</option>}
+                {technicians.map(tech => <option key={tech.id} value={tech.id}>{tech.full_name}</option>)}
+              </select>
+            </label>
+            <fieldset className="min-w-0">
+              <legend className="text-sm font-medium text-secondary mb-1">Scheduling</legend>
+              <div className="flex gap-2">
+                {[false, true].map(specific => <label key={String(specific)} className={`flex flex-1 items-center gap-2 min-h-11 px-3 rounded-lg border cursor-pointer text-sm text-primary ${specificDate === specific ? 'border-blue-500 bg-blue-500/10' : 'border-strong bg-surface'}`}>
+                  <input type="radio" name="request-scheduling" checked={specificDate === specific} onChange={() => {
+                    setSpecificDate(specific);
+                    if (!specific) setFormData(prev => ({ ...prev, earliest_date: '', requested_date: '', requested_time: '' }));
+                  }} />
+                  {specific ? 'Specific date' : 'ASAP'}
+                </label>)}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Need By (ASAP if blank)
-                </label>
-                <input
-                  type="date"
-                  value={formData.requested_date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, requested_date: e.target.value }))}
-                  className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary"
-                />
-              </div>
-            </div>
-
-          </div></details>
+            </fieldset>
+            <label className="block min-w-0 space-y-1">
+              <span className="text-sm font-medium text-secondary">Estimated Duration</span>
+              <select aria-label="Estimated duration" value={formData.estimated_duration} onChange={e => setFormData(prev => ({ ...prev, estimated_duration: e.target.value }))} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
+                <option value="">Not sure</option>
+                <option value="30min">30 minutes</option><option value="1hr">1 hour</option><option value="2hrs">2 hours</option><option value="half_day">Half day</option><option value="full_day">Full day</option>
+              </select>
+            </label>
+            {specificDate && <div className="grid grid-cols-2 gap-3 sm:col-span-2 min-w-0">
+              <label className="block min-w-0 space-y-1">
+                <span className="text-sm font-medium text-secondary">Earliest date</span>
+                <input type="date" aria-label="Earliest date" value={formData.earliest_date} onChange={e => setFormData(prev => ({ ...prev, earliest_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+              </label>
+              <label className="block min-w-0 space-y-1">
+                <span className="text-sm font-medium text-secondary">Need by</span>
+                <input type="date" aria-label="Need by" value={formData.requested_date} onChange={e => setFormData(prev => ({ ...prev, requested_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+              </label>
+            </div>}
+          </div>
           <details className="border-t border-subtle pt-3"><summary className="min-h-11 cursor-pointer text-primary">+ Details · notes, photos</summary><div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-secondary mb-2">Additional Notes</label>
@@ -1163,7 +1174,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Any additional context for the service team..."
                 rows={3}
-                className="w-full px-4 py-3 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder-gray-500 resize-none"
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder-gray-500 resize-none"
               />
             </div>
           </div>
@@ -1215,8 +1226,9 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           </div>
 
 </details>
+        </div>
           {/* Action Buttons */}
-          <div className="sticky bottom-0 z-10 flex gap-3 bg-surface border-t border-subtle pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="shrink-0 flex gap-2 bg-canvas border-t border-subtle px-4 py-3 sm:px-5">
             <button
               type="button"
               onClick={onClose}

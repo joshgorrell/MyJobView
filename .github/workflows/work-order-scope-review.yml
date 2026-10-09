@@ -20,6 +20,8 @@ on:
       - 'src/components/Shared/SchedulingCalendar.tsx'
       - 'src/components/Appointments/**'
       - 'src/components/Dispatch/**'
+      - 'src/components/Service/ServiceRequestForm.tsx'
+      - 'tests/service-requests/**'
       - 'tests/calendar/**'
       - 'supabase/migrations/*work_order_configuration*'
       - 'package*.json'
@@ -40,9 +42,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:work-orders
+      - run: npm run test:service-requests
       - run: npm run test:handoff
       - run: npm run test:program-access
       - run: npx eslint src/components/Shared/QuickActionModal.tsx
       - run: npx playwright install --with-deps chromium
       - run: node tests/work-orders/browser.mjs
       - run: npm run test:work-orders:scheduling:browser
+      - run: node tests/service-requests/intake-browser.mjs
