@@ -2,6 +2,10 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
+// Personal preferences live behind the avatar; Messages lives inside Flow.
+// Keep the module records for access checks and saved links, but omit their menus.
+const isDepartmentNavigationModule = (key: string) => !['messages', 'preferences'].includes(key);
+
 export interface Department {
   id: string;
   name: string;
@@ -240,7 +244,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       }
 
       const starred = starredSource
-        .filter(s => s.module && (s.module as any).module_key !== 'messages' && checkAccess(s.module.module_key))
+        .filter(s => s.module && isDepartmentNavigationModule((s.module as any).module_key) && checkAccess(s.module.module_key))
         .slice(0, 6)
         .map(s => ({
           ...(s.module as any),
@@ -256,7 +260,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       // Calculate accessible departments - only show departments with at least one accessible module
       const accessible = depts.filter(dept => {
         const deptModules = mods.filter(m => m.department_id === dept.id);
-        return deptModules.some(mod => checkModuleAccess(mod));
+        return deptModules.some(mod => isDepartmentNavigationModule(mod.module_key) && checkModuleAccess(mod));
       });
 
       setUserDepartments(accessible);
@@ -265,7 +269,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
       // Load quick access suggestions (calculate after maps are set)
       const suggestions = mods.filter(m => {
-        if (!m.is_quick_access || m.module_key === 'messages') return false;
+        if (!m.is_quick_access || !isDepartmentNavigationModule(m.module_key)) return false;
         return checkModuleAccess(m);
       });
       setQuickAccessSuggestions(suggestions);
@@ -278,7 +282,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
   function getUserModules(departmentId: string): DepartmentModule[] {
     return modules.filter(mod => {
-      if (mod.department_id !== departmentId || mod.module_key === 'messages') return false;
+      if (mod.department_id !== departmentId || !isDepartmentNavigationModule(mod.module_key)) return false;
       return hasModuleAccess(mod);
     });
   }

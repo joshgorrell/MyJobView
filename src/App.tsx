@@ -1140,7 +1140,7 @@ function AppContent() {
 
           {activeTab === 'feature_suggestions' && <ImprovementsView key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
+
 
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">

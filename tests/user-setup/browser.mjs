@@ -14,9 +14,10 @@ const config={id:'config',effective_from:'2026-01-01',effective_to:null,compensa
 const departments=Array.from({length:5},(_,i)=>({id:'dept'+i,display_name:['Pipeline','Production','Dispatch','Finance','Admin'][i],name:'dept'+i,color:'#0088cc',is_active:true}));
 const modules=departments.flatMap(d=>Array.from({length:8},(_,i)=>({id:d.id+'module'+i,department_id:d.id,display_name:d.display_name+' Module '+(i+1),module_key:'module'+i,is_active:true})));
 const records={roles:[{id:'role',role_key:'sales',display_name:'Sales',description:'Sales role'},{id:'adminrole',role_key:'admin',display_name:'Administrator',description:'Admin role'}],company_offices:[{id:'office',office_name:'Topeka'}],departments,role_department_access:departments.map(d=>({department_id:d.id,has_access:true})),department_modules:modules,role_module_access:modules.map(m=>({module_id:m.id,has_access:true})),pay_schedules:[{id:'schedule',name:'Weekly',frequency:'weekly',is_active:true}],profiles:[profile],employees:[{id:'emp',user_id:'employee',hire_date:'2026-01-01',employment_status:'active',termination_date:null,employee_number:'100'}],employee_payroll_configs:[config],user_offices:[{office_id:'office'}],user_setup_reviews:[{user_id:'employee',reviewed_sections:['profile','access','permissions','notifications','pay','sales']}]};
-export const supabase={from(table){let one=false;let operation='select';let input;let columns='*';const filters=[];const result=()=>{let data=records[table]||[];if(table==='profiles'&&filters.some(f=>f[0]==='id'&&f[1]==='admin'))data=[{id:'admin',role:'admin'}];if(operation!=='select')window.calls.push({table,operation,input});if(window.fixtureFail===table)return Promise.resolve({data:null,error:{message:'Fixture failure'}});if(operation==='upsert'&&table==='user_setup_reviews')records[table]=[input];return Promise.resolve({data:one?(data[0]||null):data,error:null});};const q=new Proxy({},{get(_,k){if(k==='then')return (done,fail)=>result().then(done,fail);if(k==='single'||k==='maybeSingle')return ()=>{one=true;return result()};if(k==='select')return c=>{columns=c;return q};if(k==='eq')return (k,v)=>{filters.push([k,v]);return q};if(['update','insert','delete','upsert'].includes(k))return v=>{operation=k;input=v;return q};return()=>q}});return q},auth:{getUser:async()=>({data:{user:{id:'admin'}}}),getSession:async()=>({data:{session:{access_token:'fixture'}}})},rpc:async(name,input)=>{window.calls.push({rpc:name,input});return {error:null}}};
+if(location.search.includes('unreviewed')){profile.employment_classification='unreviewed';records.employees=[];records.employee_payroll_configs=[];}
+export const supabase={from(table){let one=false;let operation='select';let input;let columns='*';const filters=[];const result=()=>{let data=records[table]||[];if(table==='profiles'&&filters.some(f=>f[0]==='id'&&f[1]==='admin'))data=[{id:'admin',role:'admin'}];if(operation!=='select')window.calls.push({table,operation,input});if(operation==='update'&&table==='profiles'&&window.fixtureUpdateError)return Promise.resolve({data:null,error:{message:'Fixture update rejected',code:'TEST'}});if(window.fixtureFail===table)return Promise.resolve({data:null,error:{message:'Fixture failure'}});if(operation==='upsert'&&table==='user_setup_reviews')records[table]=[input];return Promise.resolve({data:one?(data[0]||null):data,error:null});};const q=new Proxy({},{get(_,k){if(k==='then')return (done,fail)=>result().then(done,fail);if(k==='single'||k==='maybeSingle')return ()=>{one=true;return result()};if(k==='select')return c=>{columns=c;return q};if(k==='eq')return (k,v)=>{filters.push([k,v]);return q};if(['update','insert','delete','upsert'].includes(k))return v=>{operation=k;input=v;return q};return()=>q}});return q},auth:{getUser:async()=>({data:{user:{id:'admin'}}}),getSession:async()=>({data:{session:{access_token:'fixture'}}})},rpc:async(name,input)=>{window.calls.push({rpc:name,input});return {error:window.fixtureRpcError===name?{message:'Fixture setup rejected'}:null}}};
 export {profile};`;
-const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {AddUserForm} from './src/components/Admin/AddUserForm';import {EditUserForm} from './src/components/Admin/EditUserForm';import {profile} from 'fixture';window.fetch=async(url,options)=>{window.calls.push({create:true,input:JSON.parse(options.body)});return {ok:true,json:async()=>({user:{id:'newuser'}})}};createRoot(document.getElementById('root')).render(location.search.includes('edit')?<EditUserForm user={profile} onClose={()=>{window.closed=true}} onSuccess={()=>{window.saved=true}}/>:<AddUserForm onClose={()=>{}} onSuccess={()=>{window.created=true}}/>);`;
+const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {AddUserForm} from './src/components/Admin/AddUserForm';import {EditUserForm} from './src/components/Admin/EditUserForm';import {profile} from 'fixture';window.fetch=async(url,options)=>{window.calls.push({create:true,input:JSON.parse(options.body)});return {ok:true,json:async()=>({user:{id:'newuser'}})}};createRoot(document.getElementById('root')).render(location.search.includes('edit')?<EditUserForm user={profile} onClose={()=>{window.formClosed=true}} onSuccess={()=>{window.saved=true}}/>:<AddUserForm onClose={()=>{}} onSuccess={()=>{window.created=true}}/>);`;
 let browser;
 const server = createServer(async (req, res) => {
   try {
@@ -119,7 +120,7 @@ try {
   const effective = page.locator('input[type="date"]');
   await effective.fill('2026-11-01');
   await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
-  await page.waitForFunction(() => window.saved && window.closed);
+  await page.waitForFunction(() => window.saved && window.formClosed);
   assert.ok(await page.evaluate(() => window.calls.some(c => c.table === 'profiles' && c.operation === 'update' && c.input.is_technician === true && c.input.is_sales_rep === true)));
   assert.ok(
     await page.evaluate(() =>
@@ -201,6 +202,51 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   if (process.env.USER_SETUP_SCREENSHOT_DIR)
     await page.screenshot({ path: join(resolve(process.env.USER_SETUP_SCREENSHOT_DIR), 'mobile.png') });
+  // The legacy restriction must be absent in both forms; selection must be visible
+  // and save through the classification RPC without enabling employee payroll.
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 960 });
+    await page.goto(url + '/?edit&unreviewed');
+    await page.getByRole('button', { name: 'Permissions', exact: true }).click();
+    assert.equal(await page.getByText('Team Pulse (Discussion) Visibility').count(), 0);
+    assert.equal(await page.getByText('Flow Message Visibility', { exact: true }).count(), 1);
+    await page.getByRole('button', { name: 'Access & Employment', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm as Non-Employee User', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: 'Non-Employee Selected', exact: true }).getAttribute('aria-pressed'), 'true');
+    assert.ok((await page.getByRole('status').innerText()).includes('Save the user'));
+    assert.equal(await page.getByText('This legacy user has not been classified yet.', { exact: false }).count(), 0);
+    // Switching to Employee cancels the pending non-employee action.
+    await page.getByRole('button', { name: 'Make this person an Employee', exact: true }).click();
+    assert.equal(await page.getByRole('status').count(), 0);
+    await page.getByRole('button', { name: 'Select Non-Employee Instead', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: 'Non-Employee Selected', exact: true }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
+    await page.waitForFunction(() => window.saved && window.formClosed);
+    assert.ok(await page.evaluate(() => window.calls.some(c => c.rpc === 'classify_as_non_employee' && c.input.p_user_id === 'employee' && c.input.p_reviewed_by === 'admin')));
+    assert.equal(await page.evaluate(() => window.calls.some(c => c.rpc === 'classify_as_employee' || c.rpc === 'update_employee_and_config')), false);
+    assert.equal(await page.evaluate(() => window.calls.some(c => c.table === 'profiles' && Object.hasOwn(c.input || {}, 'discussion_visibility_scope'))), false);
+  }
+  await page.goto(url + '/?edit&unreviewed');
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.locator('input[type="text"]').first().fill('');
+  await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
+  assert.ok((await page.getByRole('alert').innerText()).includes('Enter a full name and valid email'));
+  assert.equal(await page.evaluate(() => window.calls.some(c => c.table === 'profiles' && c.operation === 'update')), false);
+  await page.locator('input[type="text"]').first().fill('Test Employee');
+  await page.evaluate(() => {window.fixtureUpdateError=true;});
+  await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
+  await page.getByRole('alert').filter({hasText:'Fixture update rejected'}).waitFor();
+  assert.equal(await page.evaluate(() => !!window.formClosed), false);
+  await page.goto(url + '/?edit');
+  await page.evaluate(() => {window.fixtureRpcError='update_employee_and_config';});
+  await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
+  await page.getByRole('alert').filter({hasText:'The profile saved, but the remaining setup did not finish'}).waitFor();
+  assert.equal(await page.evaluate(() => !!window.formClosed), false);
+  await page.goto(url);
+  await page.getByRole('button', { name: /^Permissions/ }).click();
+  assert.equal(await page.getByText('Team Pulse (Discussion) Visibility').count(), 0);
+  assert.equal(await page.getByText('Flow Message Visibility', { exact: true }).count(), 1);
   assert.deepEqual(errors, []);
   console.log('Browser setup, save payloads, future effective date, print content, desktop/mobile navigation passed.');
 } finally {

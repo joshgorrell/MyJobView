@@ -168,8 +168,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     can_edit_contacts: (user as any).can_edit_contacts ?? true,
     has_calendar_access: (user as any).has_calendar_access ?? true,
     proposal_visibility_scope: (user as any).proposal_visibility_scope || ('company' as 'own' | 'office' | 'company'),
-    discussion_visibility_scope:
-      (user as any).discussion_visibility_scope || ('all' as 'all' | 'assigned_only' | 'private_only' | 'own_posts'),
     travel_bonus_enabled: (user as any).travel_bonus_enabled || false,
     travel_bonus_rate: (user as any).travel_bonus_rate || '0.50',
     travel_bonus_method: (user as any).travel_bonus_method || 'round_trip',
@@ -646,11 +644,20 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     setError(null);
     setSuccessMessage(null);
 
+    let profileSaved = false;
+
     try {
       if (!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
         throw new Error('Enter a full name and valid email.');
+      if (!formData.username.trim()) throw new Error('Enter a username on Profile before saving.');
       if (isEmployee && (!employeeForm.hire_date || !employeeForm.pay_schedule_id))
         throw new Error('Employees require a hire date and pay schedule.');
+      if (isEmployee && employeeForm.expected_weekly_hours !== '' &&
+        (!Number.isFinite(Number(employeeForm.expected_weekly_hours)) || Number(employeeForm.expected_weekly_hours) < 0))
+        throw new Error('Expected weekly hours must be a non-negative number on Pay & Time.');
+      if (formData.travel_bonus_enabled &&
+        (!Number.isFinite(Number(formData.travel_bonus_rate)) || Number(formData.travel_bonus_rate) < 0))
+        throw new Error('Travel bonus rate must be a non-negative number on Pay & Time.');
       if (!formData.role_id) throw new Error('Please select a role for this user');
 
       const {
@@ -712,7 +719,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         can_edit_contacts: formData.can_edit_contacts,
         has_calendar_access: formData.has_calendar_access,
         proposal_visibility_scope: formData.proposal_visibility_scope,
-        discussion_visibility_scope: formData.discussion_visibility_scope,
         travel_bonus_enabled: formData.travel_bonus_enabled,
         travel_bonus_rate: formData.travel_bonus_enabled ? parseFloat(formData.travel_bonus_rate as string) : null,
         travel_bonus_method: formData.travel_bonus_enabled ? formData.travel_bonus_method : null,
@@ -728,6 +734,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
       if (updateError) throw new Error(`Database error: ${updateError.message} (${updateError.code})`);
       if (!updatedProfile) throw new Error('Update succeeded but no data returned.');
+      profileSaved = true;
 
       if (['sales', 'admin', 'manager', 'sales_manager'].includes(formData.role)) {
         await supabase.rpc('recalculate_sales_quota_for_user', {
@@ -817,7 +824,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       onClose();
     } catch (err: any) {
       console.error('Error during update:', err);
-      setError(err.message || 'Failed to update user');
+      const detail = err.message || 'Failed to update user';
+      setError(profileSaved
+        ? `The profile saved, but the remaining setup did not finish: ${detail}`
+        : `Changes were not saved: ${detail}`);
+      contentRef.current?.scrollTo({ top: 0 });
     } finally {
       setLoading(false);
     }
@@ -903,7 +914,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
             {error && (
-              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">{error}</div>
+              <div role="alert" className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">{error}</div>
             )}
             {successMessage && (
               <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-sm">
@@ -927,6 +938,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         {/* Tab content */}
         <form
           id="edit-user-form"
+          noValidate
           ref={contentRef}
           onSubmit={handleSubmit}
           onChange={() => setReviewed((prev) => prev.filter((k) => k !== activeTab))}
@@ -1229,6 +1241,10 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
             {activeTab === 'permissions' && (
               <div className="space-y-5">
+                <p className="text-sm text-blue-200 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  Department and module access switches save immediately. Other permission checkboxes
+                  save when you select Save Changes.
+                </p>
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Permissions</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1355,29 +1371,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
 
                     <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-white mb-2">
-                        Team Pulse (Discussion) Visibility
-                      </label>
-                      <select
-                        value={formData.discussion_visibility_scope}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            discussion_visibility_scope: e.target.value as any,
-                          })
-                        }
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      >
-                        <option value="all">All Discussion Posts</option>
-                        <option value="assigned_only">Only Assigned or Mentioned Posts</option>
-                        <option value="private_only">Only Private Posts (Assigned/Mentioned)</option>
-                        <option value="own_posts">Only Their Own Posts</option>
-                      </select>
-                      <p className="text-xs text-gray-400 mt-2">
-                        <span className="font-medium">All:</span> sees all posts &middot;{' '}
-                        <span className="font-medium">Assigned:</span> only posts assigned to or mentioning them
-                        &middot; <span className="font-medium">Private:</span> only private posts they're part of
-                        &middot; <span className="font-medium">Own:</span> only posts they created
+                      <h4 className="text-sm font-medium text-white mb-2">Flow Message Visibility</h4>
+                      <p className="text-xs text-gray-400">
+                        Direct messages are visible to their participants. Department messages are visible
+                        to users with access to that department. Company messages are visible to users
+                        with Flow access. Customer conversations follow their assigned access.
                       </p>
                     </div>
                   </div>
@@ -1680,7 +1678,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                 <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-4">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                     <UserCircle className="w-4 h-4 text-blue-400" />
-                    Employee Classification
+                    Employment Classification
                   </h3>
 
                   {!isEmployee ? (
@@ -1691,7 +1689,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           <span>Classified as Non-Employee. Payroll and timekeeping are not enabled.</span>
                         </div>
                       )}
-                      {classification === 'unreviewed' && (
+                      {classification === 'unreviewed' && !showNonEmployeeConfirm && (
                         <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
                           <AlertCircle className="w-4 h-4 flex-shrink-0" />
                           <span>This legacy user has not been classified yet. Choose a classification below.</span>
@@ -1708,6 +1706,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                           setIsEmployee(true);
                           setShowEmployeeSetup(true);
+                          setShowNonEmployeeConfirm(false);
                         }}
                         className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                       >
@@ -1719,15 +1718,38 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           onClick={() => {
                             setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                             setShowNonEmployeeConfirm(true);
+                            setShowEmployeeSetup(false);
                           }}
+                          aria-pressed={showNonEmployeeConfirm}
                           className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
                         >
-                          Confirm as Non-Employee User
+                          {showNonEmployeeConfirm ? 'Non-Employee Selected' : 'Confirm as Non-Employee User'}
                         </button>
+                      )}
+                      {showNonEmployeeConfirm && (
+                        <div role="status" className="p-3 bg-blue-500/10 border border-blue-500/40 rounded-lg text-blue-200 text-sm">
+                          Non-Employee selected. Save the user to apply this classification.
+                          Subcontractors and other external users can retain their assigned access;
+                          employee payroll and timekeeping will not be enabled.
+                        </div>
                       )}
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {!employeeRecord && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
+                            setIsEmployee(false);
+                            setShowEmployeeSetup(false);
+                            setShowNonEmployeeConfirm(true);
+                          }}
+                          className="w-full px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm border border-gray-600"
+                        >
+                          Select Non-Employee Instead
+                        </button>
+                      )}
                       {currentConfig && !currentConfig.reviewed_at && (
                         <div className="flex items-center gap-2 p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-300 text-xs">
                           <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -2031,7 +2053,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         </form>
 
         {/* Footer buttons */}
-        <div className="flex gap-3 p-4 sm:p-6 border-t border-gray-700 flex-shrink-0">
+        <div className="p-4 sm:p-6 border-t border-gray-700 flex-shrink-0">
+          {(dataLoading || dataLoadFailed) && (
+            <p role="status" className="text-sm text-amber-200 mb-3">
+              {dataLoading ? 'Loading user setup before saving…'
+                : 'Saving is unavailable because setup data did not load. Access switches that showed a saved confirmation are already saved.'}
+            </p>
+          )}
+          <div className="flex gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -2047,6 +2076,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </button>
+          </div>
         </div>
       </div>
     </div>

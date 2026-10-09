@@ -125,7 +125,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     can_edit_contacts: true,
     has_calendar_access: true,
     proposal_visibility_scope: 'company' as 'own' | 'office' | 'company',
-    discussion_visibility_scope: 'all' as 'all' | 'assigned_only' | 'private_only' | 'own_posts',
     employment_type: 'hourly' as 'hourly' | 'job_time' | 'salary' | 'salary_no_clock',
     standard_start_time: '08:00',
     standard_end_time: '17:00',
@@ -397,7 +396,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           can_edit_contacts: formData.can_edit_contacts,
           has_calendar_access: formData.has_calendar_access,
           proposal_visibility_scope: formData.proposal_visibility_scope,
-          discussion_visibility_scope: formData.discussion_visibility_scope,
           employment_type: formData.employment_type,
           standard_start_time: formData.standard_start_time,
           standard_end_time: formData.standard_end_time,
@@ -1058,40 +1056,12 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                 </div>
               </div>
               <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Briefcase className="w-5 h-5 text-cyan-400 mt-2" />
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-white mb-2">
-                      Team Pulse (Discussion) Visibility
-                    </label>
-                    <select
-                      value={formData.discussion_visibility_scope}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          discussion_visibility_scope: e.target.value as any,
-                        })
-                      }
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    >
-                      <option value="all">All Discussion Posts</option>
-                      <option value="assigned_only">Only Assigned or Mentioned Posts</option>
-                      <option value="private_only">Only Private Posts (Assigned/Mentioned)</option>
-                      <option value="own_posts">Only Their Own Posts</option>
-                    </select>
-                    <p className="text-xs text-gray-400 mt-2">
-                      <span className="font-medium">All Posts:</span> User sees all company discussion posts (default)
-                      <br />
-                      <span className="font-medium">Assigned/Mentioned Only:</span> User only sees posts assigned to
-                      them or where they're mentioned
-                      <br />
-                      <span className="font-medium">Private Posts Only:</span> User only sees private posts they are
-                      part of
-                      <br />
-                      <span className="font-medium">Own Posts Only:</span> User only sees discussion posts they created
-                    </p>
-                  </div>
-                </div>
+                <h4 className="text-sm font-medium text-white mb-2">Flow Message Visibility</h4>
+                <p className="text-xs text-gray-400">
+                  Direct messages are visible to their participants. Department messages are visible
+                  to users with access to that department. Company messages are visible to users
+                  with Flow access. Customer conversations follow their assigned access.
+                </p>
               </div>
               <div className="bg-gray-800 border border-cyan-500/30 rounded-lg p-4 space-y-4">
                 <div className="flex items-center gap-2">

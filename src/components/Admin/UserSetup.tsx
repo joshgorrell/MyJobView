@@ -64,7 +64,7 @@ export function UserNotifications({
   return (
     <div className="space-y-4 text-gray-200">
       <p className="text-sm">
-        These are the same event preferences used in My Settings. Employees enable push notifications on their own
+        These are the same event preferences available through the profile avatar. Users enable push notifications on their own
         devices.
       </p>
       {Object.entries(notificationLabels).map(([key, label]) => (
