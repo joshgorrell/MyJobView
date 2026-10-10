@@ -20,7 +20,6 @@ interface Props {
 
 export default function ProductCatalogView(props: Props) {
   const { products, groupBy, revealMatches } = props;
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [closedMatches, setClosedMatches] = useState<Set<string>>(new Set());
   const [previousProducts, setPreviousProducts] = useState(products);
