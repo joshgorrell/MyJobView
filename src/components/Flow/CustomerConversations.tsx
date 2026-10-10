@@ -4,54 +4,11 @@ import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { resolveMessageAttachments } from '../../lib/messageAttachments';
 import { useConversationHeight } from './useConversationHeight';
+import { EnrichedThread, Message } from './conversationTypes';
+import { loadCoworkerThreads, loadCoworkerMessages, markCoworkerMessagesRead, sendCoworkerReply } from './coworkerConversations';
 import { useAuth } from '../../contexts/AuthContext';
 import { insertFlowTag, useFlowTags, TagChoice } from './useFlowTags';
 
-interface EnrichedThread {
-  id: string;
-  subject: string;
-  context_type: string;
-  context_id: string | null;
-  proposal_id: string | null;
-  visibility: string;
-  created_by: string;
-  last_message_at: string;
-  assigned_sales_rep_id: string | null;
-  organization_id: string;
-  contact_id: string | null;
-  message_count: number;
-  last_message_preview: string;
-  last_message_author_type: string;
-  contact_name: string;
-  proposal_number: string;
-  proposal_title: string;
-  proposal_status: string;
-  rep_name: string;
-  unread_count: number;
-  last_rep_response_at: string | null;
-  last_customer_message_at?: string | null;
-  related_context_name?: string;
-  context_label: string | null;
-  attachment_url: string | null;
-  attachment_type: string | null;
-}
-
-interface Message {
-  id: string;
-  thread_id: string;
-  author_id: string;
-  author_name: string;
-  author_type: 'staff' | 'customer';
-  body: string;
-  is_read: boolean;
-  is_internal: boolean;
-  created_at: string;
-  context_room_id: string | null;
-  context_line_item_id: string | null;
-  context_label: string | null;
-  attachment_url: string | null;
-  attachment_type: 'image' | 'link' | null;
-}
 
 interface Contact {
   id: string;
@@ -60,6 +17,9 @@ interface Contact {
 
 export interface CustomerConversationsProps {
   hideFilters?: boolean;
+  conversationType?: 'all' | 'customer' | 'coworkers';
+  includeCustomers?: boolean;
+  includeCoworkers?: boolean;
   unreadOnly?: boolean;
   contactId?: string;
   projectId?: string;
@@ -123,12 +83,19 @@ function formatTime(dateString: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function CustomerConversations({ hideFilters = false, unreadOnly = false, createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
+export function CustomerConversations({ hideFilters = false, unreadOnly = false, conversationType = 'customer', includeCustomers = true, includeCoworkers = false, createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
   const { profile, loading: authLoading } = useAuth();
+  const loadVersion = useRef(0);
+  const loadHistoryVersion = useRef(0);
+  const showCustomers = includeCustomers && conversationType !== 'coworkers';
+  const showCoworkers = includeCoworkers && conversationType !== 'customer';
   const [threads, setThreads] = useState<EnrichedThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<EnrichedThread | null>(null);
   const activeThreadId = useRef<string | null>(null);
   activeThreadId.current = selectedThread?.id || null;
+  useEffect(() => {
+    setSelectedThread(current => current && (current.source === 'coworker' ? !showCoworkers : !showCustomers) ? null : current);
+  }, [showCoworkers, showCustomers]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [messageCursor, setMessageCursor] = useState(0);
@@ -197,30 +164,31 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
       setLoading(false);
       return;
     }
+    const version = ++loadVersion.current;
     try {
       setLoadError('');
 
-      let query = supabase
+      let query = showCustomers ? supabase
         .from('message_threads')
         .select(`
           id, subject, context_type, context_id, proposal_id, visibility,
           created_by, last_message_at, assigned_sales_rep_id, organization_id, contact_id
         `)
         .eq('organization_id', profile.organization_id)
-        .order('last_message_at', { ascending: false });
+        .order('last_message_at', { ascending: false }) : null;
 
-      if (contactId) query = query.eq('contact_id', contactId);
-      if (projectId && !workOrderId) {
+      if (contactId && query) query = query.eq('contact_id', contactId);
+      if (query && projectId && !workOrderId) {
         const { data: orders, error: ordersError } = await supabase.from('work_orders').select('id').eq('project_id', projectId).eq('organization_id', profile.organization_id);
         if (ordersError) throw ordersError;
         query = query.in('context_type', ['project', 'work_order']).in('context_id', [projectId, ...(orders || []).map(w => w.id)]);
       }
-      if (workOrderId) query = query.eq('context_type', 'work_order').eq('context_id', workOrderId);
+      if (workOrderId && query) query = query.eq('context_type', 'work_order').eq('context_id', workOrderId);
 
       // Row-level security resolves customer, project, service, and executive access.
       // Filtering here by the assigned sales rep would hide a rep's other customer threads.
 
-      const { data: threadsData, error } = await query;
+      const { data: threadsData, error } = query ? await query : { data: [], error: null };
       if (error) throw error;
 
       const enriched: EnrichedThread[] = [];
@@ -323,16 +291,19 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         });
       }
 
+      if (showCoworkers) enriched.push(...await loadCoworkerThreads(profile.organization_id, profile.id, { contactId, projectId, workOrderId }));
+      enriched.sort((a, b) => b.last_message_at.localeCompare(a.last_message_at));
+      if (version !== loadVersion.current) return;
       setThreads(enriched);
+      setSelectedThread(current => current ? enriched.find(t => t.id === current.id && t.source === current.source) || null : null);
       return enriched;
     } catch (error) {
       console.error('Error loading threads:', error);
-      setLoadError('Unable to load conversations. Please try again.');
-      setThreads([]);
+      if (version === loadVersion.current) { setLoadError('Unable to load conversations. Please try again.'); setThreads([]); }
     } finally {
-      setLoading(false);
+      if (version === loadVersion.current) setLoading(false);
     }
-  }, [profile?.id, profile?.organization_id, contactId, projectId, workOrderId]);
+  }, [profile?.id, profile?.organization_id, contactId, projectId, workOrderId, showCustomers, showCoworkers]);
 
   async function loadContacts() {
     const { data } = await supabase
@@ -346,11 +317,12 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   useEffect(() => {
     if (!authLoading && profile) {
       loadThreads();
-      loadContacts();
+      if (showCustomers) loadContacts();
     } else if (!authLoading && !profile) {
       setLoading(false);
     }
-  }, [authLoading, profile, loadThreads]);
+    return () => { loadVersion.current++; };
+  }, [authLoading, profile?.id, profile?.organization_id, loadThreads]);
 
   // Real-time subscription
   useEffect(() => {
@@ -368,6 +340,8 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         { event: '*', schema: 'public', table: 'message_threads' },
         () => { loadThreads(); }
       )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'discussion_posts', filter: `organization_id=eq.${profile.organization_id}` }, () => { if (showCoworkers) void loadThreads(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'flow_event_views', filter: `user_id=eq.${profile.id}` }, () => { if (showCoworkers) void loadThreads(); })
       .subscribe();
     const timer = window.setInterval(() => { void loadThreads(); }, 30000);
     return () => { window.clearInterval(timer); supabase.removeChannel(channel); };
@@ -379,17 +353,14 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
     setIsInternal(selectedThread?.visibility === 'internal');
     if (!selectedThread) return;
     let cancelled = false;
-    const reload = async () => {
-      const { data, error } = await supabase.from('messages').select('*')
-        .eq('thread_id', selectedThread.id).order('created_at', { ascending: true });
-      if (!cancelled && !error) { const resolved = await resolveMessageAttachments((data || []) as Message[]); if (!cancelled) setMessages(resolved); }
-    };
+    const reload = async () => { if (!cancelled) await loadMessages(selectedThread.id, selectedThread.source); };
     void reload();
-    const channel = supabase.channel(`flow-thread-${selectedThread.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `thread_id=eq.${selectedThread.id}` }, () => void reload()).subscribe();
+    const table = selectedThread.source === 'coworker' ? 'discussion_posts' : 'messages';
+    const channel = supabase.channel(`flow-thread-${table}-${selectedThread.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table, filter: table === 'messages' ? `thread_id=eq.${selectedThread.id}` : `organization_id=eq.${profile?.organization_id}` }, () => void reload()).subscribe();
     const timer = window.setInterval(() => void reload(), 30000);
-    return () => { cancelled = true; window.clearInterval(timer); void supabase.removeChannel(channel); };
-  }, [selectedThread?.id]);
+    return () => { cancelled = true; loadHistoryVersion.current++; window.clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [selectedThread?.id, selectedThread?.source]);
 
   const openedRequest = useRef<string | null>(null);
   // Auto-select thread when openThreadId is provided
@@ -413,8 +384,14 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
     }
   }, [messages, selectedThread]);
 
-  async function loadMessages(threadId: string) {
+  async function loadMessages(threadId: string, source = selectedThread?.source) {
+    const version = ++loadHistoryVersion.current;
     try {
+      if (source === 'coworker' && profile?.organization_id) {
+        const loaded = await loadCoworkerMessages(profile.organization_id, profile.id, threadId);
+        if (version === loadHistoryVersion.current && activeThreadId.current === threadId) setMessages(loaded);
+        return;
+      }
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -422,14 +399,25 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      if (data) { const resolved = await resolveMessageAttachments(data as Message[]); if (activeThreadId.current === threadId) setMessages(resolved); }
+      if (data) { const resolved = await resolveMessageAttachments(data as Message[]); if (version === loadHistoryVersion.current && activeThreadId.current === threadId) setMessages(resolved); }
     } catch (error) {
       console.error('Error loading messages:', error);
+      if (version === loadHistoryVersion.current && activeThreadId.current === threadId) setLoadError('Unable to load this conversation. Please try again.');
     }
   }
 
   async function markMessagesAsRead() {
     if (!selectedThread) return;
+    if (selectedThread.source === 'coworker' && profile?.organization_id) {
+      const unread = messages.filter(m => !m.is_read);
+      if (!unread.length) return;
+      try {
+        await markCoworkerMessagesRead(profile.organization_id, profile.id, unread.map(m => m.id));
+        if (activeThreadId.current === selectedThread.id) setMessages(old => old.map(m => unread.some(u => u.id === m.id) ? { ...m, is_read: true } : m));
+        void loadThreads();
+      } catch { setLoadError('Viewed status could not be saved. Please try again.'); }
+      return;
+    }
     const unreadMessages = messages.filter(m => m.author_type !== 'staff' && !m.is_read);
     if (unreadMessages.length > 0) {
       const { error } = await supabase
@@ -466,7 +454,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   }
 
   async function handleSendMessage() {
-    if (!selectedThread || (!newMessage.trim() && !pendingAttachment) || sending || !profile) return;
+    if (!selectedThread || (!newMessage.trim() && !pendingAttachment) || sending || !profile?.organization_id) return;
 
     setSending(true);
     try {
@@ -480,6 +468,9 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         attachmentType = 'link';
       }
 
+      if (selectedThread.source === 'coworker') {
+        await sendCoworkerReply(profile.organization_id, profile.id, selectedThread.id, body);
+      } else {
       const { error } = await supabase.from('messages').insert({
         thread_id: selectedThread.id,
         author_id: profile.id,
@@ -494,6 +485,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
       });
 
       if (error) throw error;
+      }
 
       if (activeThreadId.current === selectedThread.id) {
         setNewMessage('');
@@ -591,12 +583,14 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   }
 
   const filteredThreads = threads.filter((t) => {
+    if (t.source === 'coworker' ? !showCoworkers : !showCustomers) return false;
     if (unreadOnly && !t.unread_count) return false;
     const matchesSearch =
       t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.proposal_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.last_message_preview?.toLowerCase().includes(searchQuery.toLowerCase());
+      t.last_message_preview?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.related_context_name?.toLowerCase().includes(searchQuery.toLowerCase());
 
     if (filterCategory === 'customer') {
       return matchesSearch && t.visibility === 'public';
@@ -612,7 +606,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
   const stats = {
     total: threads.length,
-    unanswered: threads.filter(t => !!t.last_customer_message_at && (!t.last_rep_response_at || t.last_customer_message_at > t.last_rep_response_at)).length,
+    unanswered: threads.filter(t => t.source !== 'coworker' && !!t.last_customer_message_at && (!t.last_rep_response_at || t.last_customer_message_at > t.last_rep_response_at)).length,
     unread: threads.filter(t => t.unread_count > 0).length,
   };
 
@@ -629,8 +623,8 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
   return (
     <div className="customer-conversations w-full min-w-0 px-2 sm:px-4 py-4 sm:py-6">
-      {loadError && <div role="alert" className="p-3 text-red-600">{loadError} <button onClick={() => void loadThreads()}>Retry</button></div>}
-      {openThreadId && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert">This conversation is unavailable or you do not have access.</p>}
+      {loadError && <div role="alert" className="p-3 text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }}>Retry</button></div>}
+      {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert">This conversation is unavailable or you do not have access.</p>}
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
         <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
@@ -669,7 +663,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-blue-600" />
-                Customer conversations
+                {conversationType === 'customer' ? 'Customer conversations' : conversationType === 'coworkers' ? 'Coworker conversations' : 'Conversations'}
               </h2>
 
             </div>
@@ -736,7 +730,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                   return (
                     <button
                       key={thread.id}
-                      onClick={() => { setSelectedThread(thread); onThreadSelected?.(thread.id); setShowQuestionSummary(true); }}
+                      onClick={() => { setSelectedThread(thread); if (!thread.source) onThreadSelected?.(thread.id); setShowQuestionSummary(true); }}
                       className={`w-full p-3 sm:p-4 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation ${
                         selectedThread?.id === thread.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                       } ${thread.unread_count > 0 ? 'bg-blue-50/50' : ''}`}
@@ -754,7 +748,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                               thread.visibility === 'internal' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
                             }`}
                           >
-                            {thread.visibility === 'internal' ? 'Internal' : 'Customer'}
+                            {thread.source === 'coworker' ? thread.audience_label : thread.visibility === 'internal' ? 'Internal' : 'Customer'}
                           </span>
                         </div>
                       </div>
@@ -784,7 +778,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         {thread.attachment_type === 'image' && thread.attachment_url && (
                           <img src={thread.attachment_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                         )}
-                        <p className="text-sm text-gray-500 line-clamp-2">{thread.last_message_author_type === 'customer' ? 'Customer: ' : 'Staff: '}{thread.last_message_preview}</p>
+                        <p className="text-sm text-gray-500 line-clamp-2">{thread.source === 'coworker' ? '' : thread.last_message_author_type === 'customer' ? 'Customer: ' : 'Staff: '}{thread.last_message_preview}</p>
                       </div>
 
                       <div className="flex items-center justify-between mt-2">
@@ -817,6 +811,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
               <div className="shrink-0 p-3 sm:p-4 border-b border-gray-200">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <button
+                    aria-label="Back to conversations"
                     onClick={() => setSelectedThread(null)}
                     className="sm:hidden p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg touch-manipulation"
                   >
@@ -824,10 +819,12 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                   </button>
                   <div className="flex-1 min-w-0">
                     <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">{selectedThread.subject}</h2>
+                    {selectedThread.source === 'coworker' && <p className="text-sm text-gray-600 truncate">{selectedThread.audience_label} · {selectedThread.related_context_name}</p>}
                     {selectedThread.contact_name && (
                       <p className="text-sm text-gray-600 truncate">{selectedThread.contact_name}</p>
                     )}
                   </div>
+                  {selectedThread.source === 'coworker' && ['task', 'question'].includes(selectedThread.discussion_type || '') && <a href={`?tab=feed&postId=${selectedThread.id}`} title="Open discussion actions" className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5 shrink-0"><ExternalLink className="w-4 h-4" /><span className="hidden sm:inline">Open discussion</span></a>}
                   {selectedThread.proposal_id && onOpenProposal && (
                     <button
                       onClick={() => onOpenProposal(selectedThread.proposal_id!, selectedThread.id)}
@@ -842,7 +839,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
               <div ref={historyRef} className="conversation-history flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
                 {messages.map((message) => {
-                  const isOwnMessage = message.author_id === profile?.id || message.author_type === 'staff';
+                  const isOwnMessage = message.author_id === profile?.id || (selectedThread.source !== 'coworker' && message.author_type === 'staff');
 
                   return (
                     <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
@@ -850,7 +847,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         <div className="flex items-center gap-2 px-1">
                           <span className="text-xs font-medium text-gray-600">{message.author_name}</span>
                           <span className="text-xs text-gray-400">{formatTime(message.created_at)}</span>
-                          {message.is_internal && (
+                          {message.is_internal && selectedThread.source !== 'coworker' && (
                             <span className="text-xs font-medium text-orange-600">Internal</span>
                           )}
                         </div>
@@ -1001,7 +998,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     </button>
                   </div>
                 )}
-                <div className="mb-2">
+                {selectedThread.source !== 'coworker' && <div className="mb-2">
                   <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1012,7 +1009,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     />
                     <span>Internal note (customer won't see this)</span>
                   </label>
-                </div>
+                </div>}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1026,7 +1023,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                 />
                 {staffChoices.length > 0 && <div className="mb-2 max-h-40 overflow-auto rounded border border-blue-200 bg-white" role="listbox" aria-label="Mention teammates">{staffChoices.map((choice, index) => <button key={choice.id} type="button" role="option" aria-selected={index === mentionHighlight} onClick={() => chooseMessageMention(choice)} className={`block w-full px-3 py-2 text-left text-sm ${index === mentionHighlight ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}>@{choice.kind === 'person' ? choice.username : ''} · {choice.label}</button>)}</div>}
                 <div className="flex gap-2 items-end">
-                  <button
+                  {selectedThread.source !== 'coworker' && <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading || sending}
@@ -1034,7 +1031,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     title="Attach image"
                   >
                     {uploading ? <Loader className="w-4 h-4 animate-spin text-gray-500" /> : <ImagePlus className="w-4 h-4 text-gray-500" />}
-                  </button>
+                  </button>}
                   <textarea
                     ref={messageInput}
                     value={newMessage}
@@ -1048,7 +1045,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         handleSendMessage();
                       }
                     }}
-                    placeholder={isInternal ? 'Internal note… Type @ to mention a teammate' : 'Type your message…'}
+                    placeholder={selectedThread.source === 'coworker' ? 'Reply… Type @ to mention a teammate' : isInternal ? 'Internal note… Type @ to mention a teammate' : 'Type your message…'}
                     rows={2}
                     className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
                   />
