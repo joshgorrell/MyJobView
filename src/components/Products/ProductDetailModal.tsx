@@ -177,7 +177,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
         installVideoUrl: p.install_video_url || null,
         description: p.description || null,
         specifications: p.specifications || null,
-        unitPrice: Number(p.our_price || p.unit_price || 0),
+        unitPrice: Number(p.our_price ?? p.unit_price ?? 0),
         cost: Number(p.cost || 0),
         msrp: p.msrp ? Number(p.msrp) : null,
         quantity: 1,
@@ -192,7 +192,6 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
         isTaxable: p.taxable ?? false,
         isHidden: false,
         isCustomerSupplied: false,
-        isLaborItem: false,
       });
     } catch (error) {
       console.error('Error loading product:', error);
