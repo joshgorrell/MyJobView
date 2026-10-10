@@ -163,7 +163,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
       <div className="navigation-header-content w-full px-2 sm:px-4 lg:px-8">
         <div className="relative flex h-14 w-full items-center justify-between gap-2 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}
-          <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-3 md:flex-none">
             {onMenuToggle && (
               <button
                 onClick={onMenuToggle}
@@ -175,13 +175,13 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
             )}
             <button
               onClick={() => onTabChange('feed')}
-              className="flex min-w-0 items-center hover:opacity-80 transition-opacity"
+              className="flex min-w-0 w-full max-w-[120px] md:w-auto md:max-w-[160px] items-center hover:opacity-80 transition-opacity"
               aria-label="Open Flow"
             >
               <img
                 src={headerLogoUrl || companyLogoUrl || '/el_logo_color_(2).png'}
                 alt="Logo"
-                className="h-8 w-auto max-w-full md:max-w-[160px] object-contain"
+                className="h-8 w-full min-w-0 object-contain object-left"
               />
             </button>
           </div>
