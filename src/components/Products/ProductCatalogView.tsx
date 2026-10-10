@@ -20,7 +20,7 @@ interface Props {
 
 export default function ProductCatalogView(props: Props) {
   const { products, groupBy, revealMatches } = props;
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [closedMatches, setClosedMatches] = useState<Set<string>>(new Set());
   const [previousProducts, setPreviousProducts] = useState(products);
   const [previousReveal, setPreviousReveal] = useState(revealMatches);
@@ -32,9 +32,9 @@ export default function ProductCatalogView(props: Props) {
     setClosedMatches(new Set());
   }
   const groups = groupCatalogProducts(products, groupBy);
-  const isOpen = (key: string) => revealMatches ? !closedMatches.has(key) : expanded.has(key);
+  const isOpen = (key: string) => revealMatches ? !closedMatches.has(key) : !collapsed.has(key);
   const toggle = (key: string) => {
-    const setter = revealMatches ? setClosedMatches : setExpanded;
+    const setter = revealMatches ? setClosedMatches : setCollapsed;
     setter(previous => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   };
   const content = (items: CatalogProduct[]) => props.viewMode === 'grid'
@@ -44,8 +44,8 @@ export default function ProductCatalogView(props: Props) {
   if (groupBy === 'none') return content(groups.flatMap(group => group.products));
   return <div className="min-w-0 space-y-2">
     <div className="flex justify-end gap-3 text-xs">
-      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set()) : setExpanded(new Set(groups.map(group => group.key)))}>Expand all</button>
-      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set(groups.map(group => group.key))) : setExpanded(new Set())}>Collapse all</button>
+      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set()) : setCollapsed(new Set())}>Expand all</button>
+      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set(groups.map(group => group.key))) : setCollapsed(new Set(groups.map(group => group.key)))}>Collapse all</button>
     </div>
     {groups.map((group, index) => {
       const open = isOpen(group.key);
