@@ -302,6 +302,7 @@ export default function ProductsManagement() {
   }
 
   const categories = Array.from(new Set(products.map(p => p.categoryName).filter(Boolean))).sort();
+  const activeFilterCount = [filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase].filter(value => value !== 'all').length;
   const discontinuedCount = products.filter(p => p.is_active !== false && p.is_discontinued).length;
   const missingPhotoCount = products.filter(p => !p.image_url?.trim()).length;
   const subcategories = Array.from(new Set(products.filter(p => filterCategory === 'all' || p.categoryName === filterCategory)
@@ -400,7 +401,7 @@ export default function ProductsManagement() {
           />
         </div>
 
-        {activeTab === 'products' && <select aria-label="Catalog status" value={filterStatus} onChange={event => { const status = event.target.value as typeof filterStatus; setFilterStatus(status); if (status === 'discontinued') { setSearchTerm(''); setShowMissingPhotos(false); setFilterType('all'); setFilterCategory('all'); setFilterSubcategory('all'); setFilterManufacturer('all'); setFilterVendor('all'); setFilterPhase('all'); } }} className="max-w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
+        {activeTab === 'products' && <select aria-label="Catalog status" value={filterStatus} onChange={event => setFilterStatus(event.target.value as typeof filterStatus)} className="max-w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
           <option value="current">Current products</option><option value="discontinued">Discontinued — to archive ({discontinuedCount})</option><option value="archived">Archived</option><option value="all">All products</option>
         </select>}
         {activeTab === 'products' && missingPhotoCount > 0 && (
@@ -490,6 +491,26 @@ export default function ProductsManagement() {
         )}
       </div>
 
+      {activeTab === 'products' && (activeFilterCount > 0 || showMissingPhotos) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Active product filters">
+          {[
+            { label: filterCategory, clear: () => { setFilterCategory('all'); setFilterSubcategory('all'); } },
+            { label: filterSubcategory, clear: () => setFilterSubcategory('all') },
+            { label: manufacturers.find(m => m.id === filterManufacturer)?.name || '', clear: () => setFilterManufacturer('all') },
+            { label: vendors.find(v => v.id === filterVendor)?.vendor_name || '', clear: () => setFilterVendor('all') },
+            { label: filterType === 'all' ? '' : filterType, clear: () => setFilterType('all') },
+            { label: phases.find(p => p.id === filterPhase)?.name || '', clear: () => setFilterPhase('all') },
+            { label: showMissingPhotos ? 'Missing photos' : '', clear: () => setShowMissingPhotos(false) },
+          ].filter(item => item.label && item.label !== 'all').map((item, index) => (
+            <button key={index} type="button" onClick={item.clear} className="inline-flex items-center gap-1 rounded-full border border-blue-500/50 bg-blue-900/30 px-2.5 py-1 text-blue-100">
+              {item.label} <X size={12} aria-hidden="true" />
+            </button>
+          ))}
+          <button type="button" onClick={() => { setFilterType('all'); setFilterCategory('all'); setFilterSubcategory('all'); setFilterManufacturer('all'); setFilterVendor('all'); setFilterPhase('all'); setShowMissingPhotos(false); }} className="px-2 py-1 text-blue-300 underline">Clear filters</button>
+          <span className="text-gray-400">{filteredProducts.length} results</span>
+        </div>
+      )}
+
       {/* Products Filter Panel */}
       {activeTab === 'products' && showFilterPanel && (
         <>
@@ -498,7 +519,7 @@ export default function ProductsManagement() {
             className="fixed inset-0 z-[9998]"
             onClick={() => setShowFilterPanel(false)}
           />
-          <div className="fixed right-4 top-32 w-80 max-w-[calc(100vw-2rem)] bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999] p-4 space-y-4 max-h-[calc(100vh-150px)] overflow-y-auto">
+          <div className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:right-4 sm:top-24 sm:bottom-auto w-full sm:w-80 bg-gray-800 border border-gray-700 rounded-t-xl sm:rounded-lg shadow-xl z-[9999] p-4 space-y-3 max-h-[85dvh] sm:max-h-[calc(100dvh-120px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-white font-semibold">Filter Products</h3>
             <button
