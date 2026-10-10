@@ -195,13 +195,14 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       {pickingTarget && <div className="flow-picker-slot"><FlowTargetPicker contactId={contactId} onSelect={t => { setTarget(t); setPickingTarget(false); }} /></div>}
     </div>}
     {!!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
-    {view === 'messages' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
-    {canMessageCustomers && (view === 'messages' && messageFilter !== 'coworkers') && <div className="flow-customer-inbox">
+    {view === 'messages' && messageFilter === 'customer' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
+    {view === 'messages' && messageFilter === 'coworkers' && !hasModuleAccess('feed') && <p>You do not have coworker messaging access.</p>}
+    {(view === 'messages' && (canMessageCustomers || hasModuleAccess('feed'))) && <div className="flow-customer-inbox">
       {threadId && view !== 'messages' && view !== 'followups' && <button onClick={() => setThreadId(null)}>Close conversation</button>}
-      <CustomerConversations unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
+      <CustomerConversations conversationType={messageFilter === 'customer' ? 'customer' : messageFilter === 'coworkers' ? 'coworkers' : 'all'} includeCustomers={canMessageCustomers} includeCoworkers={hasModuleAccess('feed')} unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
         onThreadSelected={id => { setThreadId(id); conversationProps.onThreadSelected?.(id); }} />
     </div>}
-    {(view !== 'followups' && (view !== 'messages' || messageFilter !== 'customer')) && <>
+    {(view !== 'followups' && view !== 'messages') && <>
     {flow.error && <div className="flow-error" role="alert">{flow.error} <button onClick={() => void flow.refresh()}>Retry</button></div>}
     {flow.pending > 0 && <button className="flow-new-banner" onClick={() => void flow.refresh()}>{flow.pending === 50 ? '50+' : flow.pending} new {flow.pending === 1 ? 'activity' : 'activities'} — show updates</button>}
     <div className="flow-list-meta"><span>{visibleEvents.length} shown · {newShown} new</span><div className="flow-meta-actions"><button aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={14} /><span className="flow-desktop-label">{marking ? 'Saving…' : 'Mark shown viewed'}</span><span className="flow-mobile-label">{marking ? 'Saving…' : 'Viewed'}</span></button><button className="flow-help-toggle" aria-label="About Flow unread indicators" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}><HelpCircle size={15} /></button></div></div>
