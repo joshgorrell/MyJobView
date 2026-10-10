@@ -806,6 +806,9 @@ export default function ProductsManagement() {
         <ProductDetailModal
           productId={viewingProductId}
           onSaved={loadProducts}
+          onDuplicate={() => { const id = viewingProductId; setViewingProductId(null); handleDuplicate(id); }}
+          onArchive={() => { const id = viewingProductId; const product = products.find(p => p.id === id); const archive = product?.is_active !== false; setViewingProductId(null); setConfirmModal({ title: archive ? 'Archive Product' : 'Restore Product', message: archive ? 'Hide this product from the current catalog and prevent new proposal or invoice additions? Existing records are preserved.' : 'Restore this product to the current catalog?', onConfirm: () => handleArchive(id, archive) }); }}
+          onDelete={() => { const id = viewingProductId; setViewingProductId(null); setConfirmModal({ title: 'Delete Product', message: 'Permanently delete this unused product? Products in use cannot be deleted; archive them instead.', onConfirm: () => handleDelete(id) }); }}
           onClose={() => setViewingProductId(null)}
           onEdit={() => {
             setEditingProductId(viewingProductId);
