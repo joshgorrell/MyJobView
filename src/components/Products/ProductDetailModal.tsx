@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Pencil as Edit, Search, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Pencil as Edit, Search, Upload, ChevronLeft, ChevronRight, Copy, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ProductUsageHistory } from './ProductUsageHistory';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,9 +12,12 @@ interface ProductDetailModalProps {
   onClose: () => void;
   onEdit?: () => void;
   onSaved?: () => void;
+  onDuplicate?: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
 }
 
-export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: ProductDetailModalProps) {
+export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDuplicate, onArchive, onDelete }: ProductDetailModalProps) {
   const { profile } = useAuth();
   const canEdit = profile?.can_edit_products ?? false;
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
@@ -246,6 +249,11 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
           </div>
         </div>
 
+        {canEdit && <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-2 sm:px-6">
+          {onDuplicate && <button type="button" onClick={onDuplicate} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"><Copy size={15} /> Duplicate</button>}
+          {onArchive && <button type="button" onClick={onArchive} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">{productStatus.is_active === false ? <ArchiveRestore size={15} /> : <Archive size={15} />}{productStatus.is_active === false ? 'Restore' : 'Archive'}</button>}
+          {onDelete && <button type="button" onClick={onDelete} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={15} /> Delete</button>}
+        </div>}
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 bg-gray-50/50">
           {activeTab === 'details' ? (
