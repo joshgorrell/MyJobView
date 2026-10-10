@@ -190,7 +190,12 @@ export default function ProductsManagement() {
   }
 
   function filterProducts() {
-    let filtered = products.filter(p => filterStatus === 'all' || (filterStatus === 'archived' ? p.is_active === false : p.is_active !== false && (filterStatus !== 'discontinued' || p.is_discontinued)));
+    let filtered = products.filter(p => {
+      if (filterStatus === 'all') return true;
+      if (filterStatus === 'archived') return p.is_active === false;
+      if (filterStatus === 'discontinued') return p.is_active !== false && p.is_discontinued === true;
+      return p.is_active !== false && p.is_discontinued !== true;
+    });
 
     if (showMissingPhotos) filtered = filtered.filter(p => !p.image_url?.trim());
 
