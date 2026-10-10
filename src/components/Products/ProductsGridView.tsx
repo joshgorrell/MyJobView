@@ -106,7 +106,7 @@ export default function ProductsGridView({
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-1 pt-2 border-t border-strong" onClick={event => event.stopPropagation()}>
+              <div className="hidden sm:flex items-center gap-1 pt-2 border-t border-strong" onClick={event => event.stopPropagation()}>
                 {canEdit && (
                   <>
                     <button
