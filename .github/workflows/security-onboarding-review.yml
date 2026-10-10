@@ -7,6 +7,7 @@ on:
       - 'supabase/**'
       - 'tests/security-onboarding/**'
       - 'tests/punchlist/**'
+      - 'tests/catalog/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/security-onboarding-review.yml'
@@ -44,5 +45,7 @@ jobs:
         run: npm install --no-save --package-lock=false playwright@1.55.1
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Product catalog filters, phone and tablet interactions
+        run: node tests/catalog/grouping.mjs && node tests/catalog/history.mjs && npm run test:catalog:browser
       - name: Mobile resume, signing and printable agreement
         run: node tests/security-onboarding/browser.mjs
