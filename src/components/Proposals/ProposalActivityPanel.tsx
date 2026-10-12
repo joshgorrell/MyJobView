@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ENGAGEMENT_ACTIONS, sectionLabel, summarizeEngagement } from '../../lib/proposalEngagement';
 import { supabase } from '../../lib/supabase';
 import {
@@ -67,6 +67,7 @@ interface ProposalActivityPanelProps {
 }
 
 export function ProposalActivityPanel({ proposalId, compact = false }: ProposalActivityPanelProps) {
+  const loadGeneration = useRef(0);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -76,6 +77,7 @@ export function ProposalActivityPanel({ proposalId, compact = false }: ProposalA
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setLoadError(null);
     try {
@@ -83,6 +85,7 @@ export function ProposalActivityPanel({ proposalId, compact = false }: ProposalA
         supabase.from('proposal_activity').select('*').eq('proposal_id', proposalId).order('created_at', { ascending: false }),
         supabase.from('proposal_rooms').select('id,name').eq('proposal_id', proposalId),
       ]);
+      if (generation !== loadGeneration.current) return;
       const { data, error } = activityResult;
       if (roomResult.error) throw roomResult.error;
       setRoomNames(Object.fromEntries((roomResult.data || []).map(room => [room.id, room.name])));
@@ -106,15 +109,16 @@ export function ProposalActivityPanel({ proposalId, compact = false }: ProposalA
         lastActivity: rows[0]?.created_at ?? null,
       });
     } catch (error) {
+      if (generation !== loadGeneration.current) return;
       console.error('Failed to load proposal activity', error);
       setActivities([]); setStats(null);
       setLoadError('Customer activity could not be loaded. Please try again.');
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }, [proposalId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); return () => { loadGeneration.current++; }; }, [load]);
 
   const filtered = typeFilter === 'all' ? activities : activities.filter(a => a.activity_type === typeFilter);
 

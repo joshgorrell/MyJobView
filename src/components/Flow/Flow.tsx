@@ -1,3 +1,4 @@
+import { proposalActivityPath } from '../../lib/proposalActivityLinks';
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, HelpCircle, MessageSquare, Package, Plus, RefreshCw, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -144,7 +145,9 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     if (event.contact_id && hasModuleAccess('contacts')) result.push({ label: 'Open customer', url: `?tab=contacts&contactId=${event.contact_id}` });
     if (event.project_id && hasModuleAccess('projects')) result.push({ label: 'Open project', url: `?tab=projects&projectId=${event.project_id}` });
     if (event.work_order_id && hasModuleAccess('work_orders')) result.push({ label: 'Open work order', url: `?tab=work_orders&workOrderId=${event.work_order_id}` });
-    if (event.source_table === 'proposals' && hasModuleAccess('proposals')) result.push({ label: 'Open proposal', url: `?tab=proposals&proposalId=${event.source_id}` });
+    if (event.source_table === 'proposals' && hasModuleAccess('proposals')) result.push(event.event_type === 'proposal_first_opened'
+      ? { label: 'View Activity', url: proposalActivityPath(event.source_id) }
+      : { label: 'Open proposal', url: `?tab=proposals&proposalId=${event.source_id}` });
     if (event.source_table === 'change_orders' && hasModuleAccess('change_orders')) result.push({ label: 'Open change order', url: `?tab=change_orders&coId=${event.source_id}` });
     return result;
   }

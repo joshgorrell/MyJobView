@@ -1,3 +1,4 @@
+import { ProposalActivityDialog } from './ProposalActivityDialog';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import LaborRemovalChoice, { itemHasLabor } from './LaborRemovalChoice';
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
@@ -609,7 +610,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [showPromoteRevisionModal, setShowPromoteRevisionModal] = useState(false);
   const [showEmailProposalModal, setShowEmailProposalModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [activityData, setActivityData] = useState<any>(null);
   const [proposalReadiness, setProposalReadiness] = useState<any>(null);
   const [pdfDisplayOptions, setPdfDisplayOptions] = useState({
     showRoomScope: true,
@@ -957,12 +957,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   async function fetchActivityData() {
     try {
-      const { data, error } = await supabase.rpc('get_proposal_activity_summary', {
-        p_proposal_id: proposalId
-      });
-
-      if (error) throw error;
-      setActivityData(data?.[0] || null);
       setShowActivityModal(true);
       setShowMoreOptionsMenu(false);
 
@@ -6962,137 +6956,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         /></Suspense>
       )}
 
-      {showActivityModal && proposal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-surface rounded-lg shadow-2xl w-full max-w-full sm:max-w-2xl border border-subtle">
-            <div className="p-6 border-b border-subtle">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Activity className="text-blue-400" size={24} />
-                  <div>
-                    <h2 className="text-xl font-bold text-primary">
-                      Customer Activity
-                    </h2>
-                    <p className="text-sm text-muted">
-                      Proposal {proposal.proposal_number}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowActivityModal(false);
-                    setActivityData(null);
-                  }}
-                  className="text-muted hover:text-primary transition-colors"
-                >
-                  <XCircle size={24} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
-              {activityData ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-elevated p-4 rounded-lg">
-                      <div className="text-muted text-sm mb-1">Total Views</div>
-                      <div className="text-2xl font-bold text-primary">
-                        {activityData.total_views || 0}
-                      </div>
-                    </div>
-                    <div className="bg-elevated p-4 rounded-lg">
-                      <div className="text-muted text-sm mb-1">Unique Sessions</div>
-                      <div className="text-2xl font-bold text-primary">
-                        {activityData.unique_sessions || 0}
-                      </div>
-                    </div>
-                    <div className="bg-elevated p-4 rounded-lg">
-                      <div className="text-muted text-sm mb-1">Total Time</div>
-                      <div className="text-2xl font-bold text-primary">
-                        {activityData.total_time_seconds
-                          ? `${Math.floor(activityData.total_time_seconds / 60)}m ${activityData.total_time_seconds % 60}s`
-                          : '0m 0s'
-                        }
-                      </div>
-                    </div>
-                    <div className="bg-elevated p-4 rounded-lg">
-                      <div className="text-muted text-sm mb-1">Last Viewed</div>
-                      <div className="text-sm font-bold text-primary">
-                        {activityData.last_viewed_at
-                          ? new Date(activityData.last_viewed_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            })
-                          : 'Never'
-                        }
-                      </div>
-                    </div>
-                  </div>
-
-                  {activityData.activity_timeline && activityData.activity_timeline.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-secondary mb-3 uppercase tracking-wide">
-                        Activity Timeline
-                      </h3>
-                      <div className="space-y-2">
-                        {activityData.activity_timeline.map((activity: any, index: number) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between bg-elevated p-3 rounded-lg"
-                          >
-                            <div className="flex items-center gap-3">
-                              {activity.type === 'viewed' && <Eye className="text-blue-400" size={16} />}
-                              {activity.type === 'downloaded' && <Download className="text-green-400" size={16} />}
-                              {activity.type === 'accepted' && <CheckCircle2 className="text-green-400" size={16} />}
-                              {activity.type === 'declined' && <XCircle className="text-red-400" size={16} />}
-                              <div>
-                                <div className="text-sm text-primary capitalize">{activity.type}</div>
-                                {activity.duration > 0 && (
-                                  <div className="text-xs text-muted">
-                                    {Math.floor(activity.duration / 60)}m {activity.duration % 60}s
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-xs text-muted">
-                              {new Date(activity.created_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: 'numeric',
-                                minute: '2-digit'
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12 text-muted">
-                  <Activity className="mx-auto mb-3 text-gray-600" size={48} />
-                  <p>No activity recorded yet</p>
-                  <p className="text-sm mt-2">Customer hasn't viewed this proposal</p>
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 border-t border-subtle">
-              <button
-                onClick={() => {
-                  setShowActivityModal(false);
-                  setActivityData(null);
-                }}
-                className="w-full py-2 bg-elevated hover:bg-strong/25 text-primary rounded-lg transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showActivityModal && proposal && <ProposalActivityDialog proposalId={proposalId} onClose={() => setShowActivityModal(false)} />}
 
       {/* Portal Preview — full-screen overlay rendered to document.body */}
       {showPortalPreview && createPortal(
