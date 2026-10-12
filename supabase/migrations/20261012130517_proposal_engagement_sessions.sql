@@ -60,7 +60,7 @@ RETURNS TABLE (
 BEGIN
   RETURN QUERY
   WITH ip_counts AS (
-    SELECT 
+    SELECT
       ip_address,
       COUNT(*) as view_count,
       MAX(created_at) as last_seen,
@@ -68,38 +68,38 @@ BEGIN
       MAX(metadata->>'browser') as browser,
       MAX(metadata->>'os') as os
     FROM public.proposal_activity
-    WHERE proposal_id = p_proposal_id 
+    WHERE proposal_id = p_proposal_id
       AND activity_type = 'viewed'
       AND ip_address IS NOT NULL
       AND ip_address != 'Unknown'
     GROUP BY ip_address
   ),
   device_stats AS (
-    SELECT 
+    SELECT
       metadata->>'deviceType' as device_type,
       COUNT(*) as count
     FROM public.proposal_activity
-    WHERE proposal_id = p_proposal_id 
+    WHERE proposal_id = p_proposal_id
       AND activity_type = 'viewed'
       AND metadata->>'deviceType' IS NOT NULL
     GROUP BY metadata->>'deviceType'
   ),
   browser_stats AS (
-    SELECT 
+    SELECT
       metadata->>'browser' as browser,
       COUNT(*) as count
     FROM public.proposal_activity
-    WHERE proposal_id = p_proposal_id 
+    WHERE proposal_id = p_proposal_id
       AND activity_type = 'viewed'
       AND metadata->>'browser' IS NOT NULL
     GROUP BY metadata->>'browser'
   ),
   os_stats AS (
-    SELECT 
+    SELECT
       metadata->>'os' as os,
       COUNT(*) as count
     FROM public.proposal_activity
-    WHERE proposal_id = p_proposal_id 
+    WHERE proposal_id = p_proposal_id
       AND activity_type = 'viewed'
       AND metadata->>'os' IS NOT NULL
     GROUP BY metadata->>'os'
