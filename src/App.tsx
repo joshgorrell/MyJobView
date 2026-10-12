@@ -1,3 +1,4 @@
+import { pageFromLocation, workspacePage, workspaceUrl, isPortalProposalRoute } from './lib/workspaceRoutes';
 import { resolveLegacyPage } from './lib/permissionCatalog';
 import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
@@ -192,17 +193,17 @@ function AppContent() {
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('leadId'));
+  const [openTaskId, setOpenTaskId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('taskId'));
   const [openFlowThreadId, setOpenFlowThreadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('threadId'));
-  const [openProposalId, setOpenProposalId] = useState<string | null>(null);
+  const [openProposalId, setOpenProposalId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('proposalId'));
   const [aiProposalPrefill, setAiProposalPrefill] = useState<ProposalPrefill | null>(null);
   const [aiServiceRequestPrefill, setAiServiceRequestPrefill] = useState<ServiceRequestPrefill | null>(null);
   const [showAiSecurityContractModal, setShowAiSecurityContractModal] = useState(false);
   const [aiSecurityContractPrefill, setAiSecurityContractPrefill] = useState<SecurityContractPrefill | null>(null);
-  const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(null);
+  const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('openOrderId'));
   const [invoiceContactFilter, setInvoiceContactFilter] = useState<string | null>(null);
-  const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(null);
+  const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('coId'));
   const [salesRepAIContext, setSalesRepAIContext] = useState<SalesRepAIContext | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -210,13 +211,20 @@ function AppContent() {
   });
   const [showDesignBriefModal, setShowDesignBriefModal] = useState(false);
   const [activeTab, setActiveTabState] = useState<string>(() => {
-    // First check URL parameters, then localStorage, default to 'feed'
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlTab = urlParams.get('tab');
-    const savedTab = urlTab || localStorage.getItem('activeTab') || 'feed';
-    return resolveLegacyPage(savedTab);
+    return pageFromLocation(window.location, localStorage.getItem('activeTab') || 'feed');
   });
-  const setActiveTab = React.useCallback((tab: string) => setActiveTabState(resolveLegacyPage(tab)), []);
+  const setActiveTab = React.useCallback((tab: string) => {
+    const page = resolveLegacyPage(tab);
+    const current = new URL(window.location.href);
+    if (profile && !isPortalUser && (current.pathname === '/' || workspacePage(current.pathname))) {
+      const next = workspaceUrl(current, page);
+      if (next && pageFromLocation(current) !== page) {
+        window.history.pushState({}, '', next);
+        setCurrentPath(window.location.pathname);
+      }
+    }
+    setActiveTabState(page);
+  }, [profile, isPortalUser]);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('departmentSidebarOpen');
     return saved !== null ? saved === 'true' : false;
@@ -348,7 +356,6 @@ function AppContent() {
 
       // Restore state from URL when using browser back/forward
       const urlParams = new URLSearchParams(window.location.search);
-      const urlTab = urlParams.get('tab');
       const urlProposalId = urlParams.get('proposalId');
       const urlLeadId = urlParams.get('leadId');
       const urlTaskId = urlParams.get('taskId');
@@ -357,11 +364,7 @@ function AppContent() {
       const urlSalesOrderId = urlParams.get('openOrderId');
       const urlWorkOrderId = urlParams.get('workOrderId');
 
-      if (urlTab) {
-        setActiveTab(urlTab === 'messages' ? 'feed' : urlTab);
-      } else {
-        setActiveTab('feed');
-      }
+      setActiveTabState(pageFromLocation(window.location));
 
       setOpenProposalId(urlProposalId);
       setSelectedLeadId(urlLeadId);
@@ -386,22 +389,12 @@ function AppContent() {
 
   // Save active tab to localStorage and update URL whenever state changes
   useEffect(() => {
-    if(['/proposals-fullscreen','/sales-order-fullscreen'].includes(currentPath))return;
+    if (!profile || isPortalUser || isPasswordRecovery || loading) return;
+    if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) return;
+    if (currentPath !== '/' && !workspacePage(currentPath)) return;
     localStorage.setItem('activeTab', activeTab);
-
-    // Skip URL manipulation for standalone routes that don't use tab-based navigation
-    const standaloneRoutes = ['/kiosk', '/portal', '/business-card', '/public', '/eula', '/privacy', '/auth-bridge', '/auth-callback'];
-    if (standaloneRoutes.some(r => currentPath.startsWith(r))) return;
-
-    // Update URL to persist state across refreshes
     const urlParams = new URLSearchParams(window.location.search);
-
-    // Update tab parameter
-    if (activeTab && activeTab !== 'feed') {
-      urlParams.set('tab', activeTab);
-    } else {
-      urlParams.delete('tab');
-    }
+    urlParams.delete('tab');
 
     // Update opened item parameters
     if (openProposalId) {
@@ -447,9 +440,14 @@ function AppContent() {
     }
 
     // Update the URL without reloading the page
-    const newUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams.toString()}` : window.location.pathname;
-    window.history.replaceState({}, '', newUrl);
-  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath]);
+    const location = new URL(window.location.href);
+    location.search = urlParams.toString();
+    const newUrl = workspaceUrl(location, activeTab);
+    if (newUrl) {
+      window.history.replaceState({}, '', newUrl);
+      setCurrentPath(window.location.pathname);
+    }
+  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath, profile, isPortalUser, isPasswordRecovery, loading]);
 
   // Close all modals when switching tabs to prevent overlay issues
   useEffect(() => {
@@ -589,8 +587,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/proposals' || currentPath.startsWith('/proposals/') ||
-      currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
+  if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalModuleGuard moduleKey="portal_proposals_enabled">
@@ -637,7 +634,7 @@ function AppContent() {
     return null;
   }
 
-  const publicCardSlug = getBusinessCardSlugFromLocation(currentPath, window.location.hostname);
+  const publicCardSlug = workspacePage(currentPath) ? null : getBusinessCardSlugFromLocation(currentPath, window.location.hostname);
   if (publicCardSlug) {
     return (
       <Suspense fallback={<LoadingFallback />}>
@@ -784,7 +781,7 @@ function AppContent() {
     // If already logged in on root domain with redirect_to, send to bridge
     const redirectParam = new URLSearchParams(window.location.search).get('redirect_to');
     if (!isPasswordRecovery && user && redirectParam && isValidReturnHost(redirectParam)) {
-      const returnPath = new URLSearchParams(window.location.search).get('return_path') || window.location.pathname;
+      const returnPath = new URLSearchParams(window.location.search).get('return_path') || (window.location.pathname + window.location.search + window.location.hash);
       const bridgeUrl = new URL('/auth-bridge', window.location.origin);
       bridgeUrl.searchParams.set('return_to', redirectParam);
       bridgeUrl.searchParams.set('path', returnPath);
