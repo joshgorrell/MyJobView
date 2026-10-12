@@ -161,7 +161,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
   return (
     <header className="theme-chrome theme-header bg-canvas border-b border-subtle">
       <div className="navigation-header-content w-full px-2 sm:px-4 lg:px-8">
-        <div className="relative flex h-14 w-full items-center justify-between gap-2 sm:gap-4">
+        <div className="relative grid h-14 w-full grid-cols-[minmax(0,1fr)_auto] md:flex items-center justify-between gap-2 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}
           <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-3 md:flex-none">
             {onMenuToggle && (
@@ -369,7 +369,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
             {avatar}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="w-11 h-11 flex items-center justify-center text-muted hover:text-primary hover:bg-surface rounded-lg transition-colors"
+              className="w-11 h-11 shrink-0 flex items-center justify-center text-muted hover:text-primary hover:bg-surface rounded-lg transition-colors"
               aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileMenuOpen}
             >
