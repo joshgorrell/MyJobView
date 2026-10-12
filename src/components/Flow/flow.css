@@ -220,12 +220,12 @@
 .flow .flow-heading-actions .flow-create-action{width:40px;height:40px;min-height:40px;padding:0;border-radius:8px}
 @media(max-width:640px){.flow .flow-heading-actions .flow-create-action{width:44px;height:44px}}
 
-/* Flow fills the available workspace; only its content scrolls. */
+/* Activity grows naturally; the workspace page owns vertical scrolling. */
 .flow-workspace,.flow-embedded{width:100%;min-width:0;max-width:100%}
-.flow--workspace{height:100%;display:flex;flex-direction:column;min-height:0;min-width:0}
+.flow--workspace{display:flex;flex-direction:column;min-width:0}
 .flow--workspace>.flow-heading,.flow--workspace>.flow-toolbar,.flow--workspace>.flow-footnote{flex-shrink:0}
 .flow-content{min-width:0;min-height:0}
-.flow--workspace>.flow-content{flex:1;overflow:auto;overscroll-behavior:contain}
+.flow--workspace>.flow-content{overflow:visible}
 .flow-column-head{grid-template-columns:32px 78px minmax(0,1.15fr) minmax(0,2fr) minmax(50px,115px) 20px}
 .flow .flow-row-main{grid-template-columns:78px minmax(0,1.15fr) minmax(0,2fr) minmax(50px,115px) 20px}
 .flow-create-modal{min-width:0}.flow-create-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px}

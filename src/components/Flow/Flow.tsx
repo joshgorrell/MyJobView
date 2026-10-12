@@ -9,7 +9,6 @@ import { useFlow } from '../../lib/flow/useFlow';
 import { dayLabel, FLOW_CATEGORIES, FlowEvent, FlowFilters, FlowScope, FlowTarget, scopeFilters, targetScope } from '../../lib/flow/types';
 import { FlowCreateModal } from './FlowCreateModal';
 import { FlowFollowUps } from './FlowFollowUps';
-import { useConversationHeight } from './useConversationHeight';
 import { FlowTargetPicker } from './FlowTargetPicker';
 import { FlowWaveIcon } from './FlowWaveIcon';
 import './flow.css';
@@ -82,7 +81,6 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const [locations, setLocations] = useState<Option[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [createMode,setCreateMode]=useState<'choose'|'chat'|null>(null);
-  const workspace=useConversationHeight(!scoped);
   const [marking, setMarking] = useState(false);
   const scope = useMemo(() => ({ contactId, projectId, workOrderId }), [contactId, projectId, workOrderId]);
   const chosenScope = target ? { ...scope, ...targetScope(target) } : scope;
@@ -158,7 +156,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
-  return <div ref={workspace.ref} className={scoped?'flow-embedded':'flow-workspace'} style={scoped?undefined:{height:workspace.height}}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
+  return <div className={scoped?'flow-embedded':'flow-workspace'}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
       {canPost && <div className="flow-heading-actions">
         <button className="flow-primary flow-create-action" aria-label="Create in Flow" title="Create in Flow" aria-haspopup="dialog" aria-expanded={createMode!==null} aria-controls={`${controlId}-create-options`}
