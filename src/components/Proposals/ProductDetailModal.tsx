@@ -3,6 +3,7 @@ import { X, Save, Plus, Trash2, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ProductDetailPanel, { type ProductDetailPanelData, type LaborPhaseOption, type ClassOption } from '../Products/ProductDetailPanel';
 import { catalogTaxonomy } from '../Products/CatalogTaxonomyFilters';
+import { proposalItemChanges, proposalItemUpdate } from './proposalItemChanges';
 import type { ProposalLineItem } from '../../lib/types';
 
 interface ProductDetailModalProps {
@@ -14,10 +15,14 @@ interface ProductDetailModalProps {
 export default function ProductDetailModal({ lineItemId, onClose, onSaved }: ProductDetailModalProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
+  const [roomId, setRoomId] = useState('');
+  const [roomError, setRoomError] = useState(false);
   const [lineItem, setLineItem] = useState<any>(null);
   const [laborPhases, setLaborPhases] = useState<LaborPhaseOption[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
-  const [updateScope, setUpdateScope] = useState<'single' | 'proposal' | 'master'>('single');
+  const [matchingItems, setMatchingItems] = useState<any[] | null>(null);
+  const [initialPanelData, setInitialPanelData] = useState<ProductDetailPanelData | null>(null);
   const [newImage, setNewImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -84,8 +89,16 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
         const product = item.products || null;
         const taxonomy = product ? catalogTaxonomy(product) : null;
         setLineItem(item);
+        setRoomId(item.room_id || '');
+        const { data: proposalRooms, error: roomsError } = await supabase
+          .from('proposal_rooms')
+          .select('id, name')
+          .eq('proposal_id', item.proposal_id)
+          .order('sort_order');
+        setRoomError(!!roomsError);
+        setRooms(proposalRooms || []);
 
-        setPanelData({
+        const initialData: ProductDetailPanelData = {
           productId: item.product_id || null,
           productName: product?.name || item.description || '',
           modelNumber: product?.manufacturer_model_number || null,
@@ -120,7 +133,9 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
           isTaxable: item.is_taxable ?? false,
           isHidden: item.is_hidden ?? false,
           isCustomerSupplied: item.is_customer_supplied ?? false,
-        });
+        };
+        setPanelData(initialData);
+        setInitialPanelData(initialData);
       }
 
       setLaborPhases(phasesRes.data || []);
@@ -252,89 +267,73 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
     }
   }
 
-  async function handleSave() {
-    if (!panelData) return;
+  function pendingChanges() {
+    if (!panelData || !initialPanelData) return {};
+    const changes = proposalItemChanges(initialPanelData, panelData);
+    if (roomId !== (lineItem.room_id || '')) changes.room_id = roomId;
+    return changes;
+  }
+
+  async function requestSave() {
+    if (!panelData || saving) return;
+    const changes = pendingChanges();
+    if (!Object.keys(changes).length && !newImage) { onSaved(); return; }
+    if ('room_id' in changes && !rooms.some(room => room.id === roomId)) {
+      alert('Select a valid proposal room before saving');
+      return;
+    }
+    setSaving(true);
     try {
-      setSaving(true);
-
-      let newImageUrl: string | null = null;
-      if (newImage && lineItem?.product_id) {
-        newImageUrl = await uploadProductImage(lineItem.product_id);
-        if (newImageUrl) {
-          await supabase
-            .from('products')
-            .update({ thumbnail_url: newImageUrl, image_url: newImageUrl })
-            .eq('id', lineItem.product_id);
-        }
-      }
-
-      const laborTotal = (panelData.laborHours || 0) * panelData.quantity * (panelData.laborRate || 0);
-      const lineTotal = panelData.isCustomerSupplied ? 0 : panelData.quantity * panelData.unitPrice;
-      const effectiveCost = panelData.isCustomerSupplied ? 0 : panelData.cost;
-
-      const updateData = {
-        description: panelData.description,
-        quantity: panelData.quantity,
-        unit: panelData.unit,
-        unit_price: panelData.isCustomerSupplied ? 0 : panelData.unitPrice,
-        cost: effectiveCost,
-        labor_hours: panelData.laborHours || null,
-        labor_rate: panelData.laborRate || null,
-        labor_total: laborTotal || null,
-        labor_phase_id: panelData.laborPhaseId || null,
-        class_id: panelData.classId || null,
-        task_notes: panelData.taskNotes || null,
-        show_task_notes: panelData.showTaskNotes,
-        is_taxable: panelData.isTaxable,
-        is_hidden: panelData.isHidden,
-        is_customer_supplied: panelData.isCustomerSupplied,
-        line_total: lineTotal,
-      };
-
-      if (updateScope === 'single') {
-        const { error } = await supabase
+      if (lineItem.product_id && Object.keys(changes).some(field => field !== 'room_id')) {
+        const { data, error } = await supabase
           .from('proposal_line_items')
-          .update(updateData)
-          .eq('id', lineItemId);
+          .select('*')
+          .eq('proposal_id', lineItem.proposal_id)
+          .eq('product_id', lineItem.product_id);
         if (error) throw error;
-      } else {
-        if (lineItem?.product_id) {
-          const { error } = await supabase
-            .from('proposal_line_items')
-            .update(updateData)
-            .eq('proposal_id', lineItem.proposal_id)
-            .eq('product_id', lineItem.product_id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('proposal_line_items')
-            .update(updateData)
-            .eq('id', lineItemId);
-          if (error) throw error;
-        }
-
-        if (updateScope === 'master' && lineItem?.product_id) {
-          const { error } = await supabase
-            .from('products')
-            .update({
-              name: panelData.productName,
-              description: panelData.description,
-              unit_price: panelData.unitPrice,
-              cost: panelData.cost,
-              default_labor_hours: panelData.laborHours || null,
-              labor_phase_id: panelData.laborPhaseId || null,
-              class_id: panelData.classId || null,
-              is_taxable: panelData.isTaxable,
-            })
-            .eq('id', lineItem.product_id);
-          if (error) throw error;
+        if ((data || []).some(item => item.id !== lineItemId)) {
+          setMatchingItems(data);
+          return;
         }
       }
+      await handleSave([lineItem]);
+    } catch (error) {
+      console.error('Error checking matching items:', error);
+      alert('Unable to check matching items. Please try saving again.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
+  async function handleSave(targets: any[]) {
+    if (!panelData) return;
+    setSaving(true);
+    try {
+      const changes = pendingChanges();
+      if (newImage && lineItem?.product_id) {
+        const newImageUrl = await uploadProductImage(lineItem.product_id);
+        if (!newImageUrl) return;
+        const { error } = await supabase.from('products')
+          .update({ thumbnail_url: newImageUrl, image_url: newImageUrl }).eq('id', lineItem.product_id);
+        if (error) throw error;
+      }
+      for (const target of targets) {
+        const { error } = await supabase.from('proposal_line_items')
+          .update(proposalItemUpdate(target, changes, target.id === lineItemId))
+          .eq('proposal_id', lineItem.proposal_id).eq('id', target.id);
+        if (error) throw error;
+      }
+      if ('room_id' in changes) {
+        const { error } = await supabase.from('proposal_line_items')
+          .update({ room_id: roomId }).eq('proposal_id', lineItem.proposal_id)
+          .eq('parent_item_id', lineItemId);
+        if (error) throw error;
+      }
+      setMatchingItems(null);
       onSaved();
     } catch (error) {
       console.error('Error saving line item:', error);
-      alert('Failed to save changes');
+      alert('Failed to save all changes. Please retry.');
     } finally {
       setSaving(false);
     }
@@ -362,8 +361,8 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
   const totalRevenue = materialTotal + laborTotal;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ maxHeight: '92vh' }}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div role="dialog" aria-modal="true" aria-label="Edit Item Details" className="bg-white rounded-xl shadow-2xl w-full max-w-5xl min-w-0 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[92dvh]">
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between shrink-0">
           <div className="min-w-0">
@@ -379,9 +378,20 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
+          <div className="mb-4">
+            <label htmlFor="proposal-item-room" className="block text-sm font-medium text-gray-700 mb-1">Room / Area</label>
+            <select id="proposal-item-room" value={roomId} onChange={e => setRoomId(e.target.value)} disabled={roomError || saving}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base text-gray-900 bg-white">
+              {!rooms.some(room => room.id === roomId) && <option value={roomId}>{roomId ? 'Current room' : 'Select room'}</option>}
+              {rooms.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
+            </select>
+            {roomError && <p className="text-xs text-red-600 mt-1">Unable to load rooms. Close and reopen the item to retry.</p>}
+            <p className="text-xs text-gray-500 mt-1">Room changes apply to this item and its accessories only.</p>
+          </div>
           <ProductDetailPanel
             mode="edit"
+            compactDescription
             data={panelData}
             laborPhases={laborPhases}
             classes={classes}
@@ -492,38 +502,19 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 min-w-0">
             {/* Line total */}
             <div>
               <div className="text-xs text-gray-500 uppercase tracking-wide">Line Total</div>
               <div className="text-xl font-bold text-gray-900">{formatCurrency(totalRevenue)}</div>
+              <div className="text-xs text-gray-500">Material {formatCurrency(materialTotal)} · Labor {formatCurrency(laborTotal)}</div>
             </div>
 
-            {/* Update scope */}
-            {lineItem?.product_id && (
-              <div className="flex items-center gap-3 pl-4 border-l border-gray-300">
-                <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Save to:</span>
-                {(['single', 'proposal', 'master'] as const).map(scope => (
-                  <label key={scope} className="flex items-center gap-1.5 cursor-pointer group">
-                    <input
-                      type="radio"
-                      name="updateScope"
-                      value={scope}
-                      checked={updateScope === scope}
-                      onChange={() => setUpdateScope(scope)}
-                      className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-xs text-gray-700 group-hover:text-gray-900 whitespace-nowrap">
-                      {scope === 'single' ? 'This item' : scope === 'proposal' ? 'All matching' : 'All + Catalog'}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center justify-end gap-2 shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-1.5 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
@@ -531,7 +522,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={requestSave}
               disabled={saving || uploadingImage}
               className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium shadow-sm"
             >
@@ -541,6 +532,20 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
           </div>
         </div>
       </div>
+      {matchingItems && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center p-4 z-10">
+          <div role="dialog" aria-modal="true" aria-labelledby="item-scope-title" className="w-full max-w-md bg-white rounded-xl shadow-2xl p-5">
+            <h3 id="item-scope-title" className="text-base font-bold text-gray-900">Apply changes to which items?</h3>
+            <p className="text-sm text-gray-600 mt-2">There are {matchingItems.length - 1} other matching items in this proposal. Apply the item detail changes to just this item or all matching items?</p>
+            {'room_id' in pendingChanges() && <p className="text-sm text-gray-600 mt-2">The room change applies only to the item you opened and its accessories. Other matching items stay in their current rooms.</p>}
+            <div className="flex flex-col gap-2 mt-4">
+              <button autoFocus disabled={saving} onClick={() => handleSave([lineItem])} className="px-4 py-2 border border-blue-600 text-blue-700 rounded-lg disabled:opacity-50">This item only</button>
+              <button disabled={saving} onClick={() => handleSave(matchingItems)} className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50">All matching items in this proposal</button>
+              <button disabled={saving} onClick={() => setMatchingItems(null)} className="px-4 py-2 text-gray-600 rounded-lg">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

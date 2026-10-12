@@ -34,6 +34,8 @@ const ApprovalActionModal = lazy(() => import('./ApprovalActionModal'));
 const PreSendValidationModal = lazy(() => import('./PreSendValidationModal').then(m => ({ default: m.PreSendValidationModal })));
 const ReactivateProposalModal = lazy(() => import('./ReactivateProposalModal').then(m => ({ default: m.ReactivateProposalModal })));
 const ProposalQA = lazy(() => import('./ProposalQA').then(m => ({ default: m.ProposalQA })));
+import MatchingItemActionDialog from './MatchingItemActionDialog';
+import { proposalSubstitutionUpdate } from './proposalItemChanges';
 import BulkUpdateConfirmationModal from './BulkUpdateConfirmationModal';
 import BulkUpdateProjectInfoModal from './BulkUpdateProjectInfoModal';
 const TwoPhaseLaborEditor = lazy(() => import('./TwoPhaseLaborEditor'));
@@ -556,6 +558,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [selectedRoomsToCopy, setSelectedRoomsToCopy] = useState<Set<string>>(new Set());
   const [quickAddAreaName, setQuickAddAreaName] = useState('');
   const [showProductDetail, setShowProductDetail] = useState<string | null>(null);
+  const [matchingAction, setMatchingAction] = useState<{ action: 'delete' | 'substitute'; itemId: string; items: ProposalLineItem[]; newProductId?: string } | null>(null);
   const [substituteItemId, setSubstituteItemId] = useState<string | null>(null);
   const [substituteSearchQuery, setSubstituteSearchQuery] = useState('');
   const [substituteProducts, setSubstituteProducts] = useState<Product[]>([]);
@@ -1998,7 +2001,18 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     }
   }
 
-  async function handleDeleteItem(itemId: string) {
+  async function matchingProposalItems(itemId: string) {
+    const { data: selected, error: selectedError } = await supabase.from('proposal_line_items')
+      .select('*').eq('proposal_id', proposalId).eq('id', itemId).single();
+    if (selectedError) throw selectedError;
+    if (!selected.product_id) return [selected] as ProposalLineItem[];
+    const { data, error } = await supabase.from('proposal_line_items').select('*')
+      .eq('proposal_id', proposalId).eq('product_id', selected.product_id);
+    if (error) throw error;
+    return (data || []) as ProposalLineItem[];
+  }
+
+  async function handleDeleteItem(itemId: string, confirmedItems?: ProposalLineItem[]) {
     if (isCoMode && changeOrderId) {
       const item = rooms.flatMap(r => r.line_items).find(i => i.id === itemId);
       if (!item) return;
@@ -2033,16 +2047,22 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       return;
     }
 
-    if (!confirm('Delete this line item?')) return;
-
     setSaving(true);
     try {
+      const targets = confirmedItems || await matchingProposalItems(itemId);
+      if (!confirmedItems && targets.length > 1) {
+        setMatchingAction({ action: 'delete', itemId, items: targets });
+        return;
+      }
+      if (!confirmedItems && !confirm('Delete this line item?')) return;
       const { error } = await supabase
         .from('proposal_line_items')
         .delete()
-        .eq('id', itemId);
+        .eq('proposal_id', proposalId)
+        .in('id', targets.map(item => item.id));
 
       if (error) throw error;
+      setMatchingAction(null);
       await loadData();
     } catch (error: any) {
       console.error('Error deleting item:', error);
@@ -2454,11 +2474,17 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     }
   }
 
-  async function substituteItem(newProductId: string) {
+  async function substituteItem(newProductId: string, confirmedItems?: ProposalLineItem[]) {
     if (!substituteItemId) return;
 
     setSaving(true);
     try {
+      const targets = confirmedItems || await matchingProposalItems(substituteItemId);
+      if (!confirmedItems && targets.length > 1 && !isCoMode) {
+        setMatchingAction({ action: 'substitute', itemId: substituteItemId, items: targets, newProductId });
+        return;
+      }
+      const selectedTargets = confirmedItems || targets.filter(item => item.id === substituteItemId);
       // Get the new product details
       const { data: product, error: productError } = await supabase
         .from('products')
@@ -2475,31 +2501,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       if (productError) throw productError;
       if (!product) throw new Error('Product not found');
 
-      // Get the current item
-      const currentItem = rooms
-        .flatMap(r => r.line_items)
-        .find(item => item.id === substituteItemId);
-
-      if (!currentItem) throw new Error('Item not found');
-
-      // Update the line item with new product details
-      const { error: updateError } = await supabase
-        .from('proposal_line_items')
-        .update({
-          product_id: product.id,
-          description: product.name || product.description,
-          manufacturer: product.manufacturers?.name || null,
-          model: product.model,
-          sku: product.sku,
-          unit_price: product.price || currentItem.unit_price,
-          unit_cost: product.cost || currentItem.unit_cost,
-          labor_hours: product.labor_hours || currentItem.labor_hours,
-          labor_rate: product.labor_rate || currentItem.labor_rate,
-          labor_phase_id: product.labor_phase_id || currentItem.labor_phase_id
-        })
-        .eq('id', substituteItemId);
-
-      if (updateError) throw updateError;
+      for (const target of selectedTargets) {
+        const { error: updateError } = await supabase.from('proposal_line_items')
+          .update(proposalSubstitutionUpdate(target, product))
+          .eq('proposal_id', proposalId).eq('id', target.id);
+        if (updateError) throw updateError;
+      }
+      setMatchingAction(null);
 
       setSubstituteItemId(null);
       setSubstituteSearchQuery('');
@@ -6630,6 +6638,22 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             loadData();
           }}
         /></Suspense>
+      )}
+
+      {matchingAction && (
+        <MatchingItemActionDialog
+          action={matchingAction.action} count={matchingAction.items.length} saving={saving}
+          onCancel={() => setMatchingAction(null)}
+          onSingle={() => {
+            const items = matchingAction.items.filter(item => item.id === matchingAction.itemId);
+            if (matchingAction.action === 'delete') handleDeleteItem(matchingAction.itemId, items);
+            else substituteItem(matchingAction.newProductId!, items);
+          }}
+          onAll={() => {
+            if (matchingAction.action === 'delete') handleDeleteItem(matchingAction.itemId, matchingAction.items);
+            else substituteItem(matchingAction.newProductId!, matchingAction.items);
+          }}
+        />
       )}
 
       {/* Substitute Item Modal */}
