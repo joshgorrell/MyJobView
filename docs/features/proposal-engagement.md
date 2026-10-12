@@ -21,7 +21,7 @@ Deploy the migration and frontend close together. Older browser bundles lose the
 - Actions distinguish opening approval or clicking payment from completing either. Completed approvals/downloads/declines continue to use their existing event workflows. No form values, messages, payment details, URLs, or cursor coordinates are collected by the new tracker.
 - Only published proposals belonging to the authenticated customer's contact can start or update a visit. Employee identities are excluded. Read access requires existing proposal visibility, the same dealer, and current Proposals module permission. The legacy summary RPC now respects RLS.
 - New visit creation is idempotent by verified identity and visit ID. Tabs/navigation have separate IDs. Updates validate elapsed time, allowlisted actions, room ownership, nonnegative integer counts, and monotonic snapshots. Public RPC wrappers invoke narrowly authorized functions in the private schema.
-- Visual heat maps, anonymous/shared-link tracking, and option selection analytics are outside this change. The first-open Flow event and weekly email are covered in proposal-activity-weekly.md. The current viewer's actual actions are instrumented; no new proposal options are introduced.
+- Visual heat maps, anonymous/shared-link tracking, and option selection analytics are outside this change. The first-open Flow event and weekly Flow post are covered in proposal-activity-weekly.md. The current viewer's actual actions are instrumented; no new proposal options are introduced.
 
 ## Validation
 

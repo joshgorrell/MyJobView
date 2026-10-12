@@ -75,7 +75,7 @@ INSERT INTO proposals(id,organization_id,contact_id,proposal_number,status,creat
 INSERT INTO proposal_rooms VALUES('${uid(60)}','${uid(50)}','Home Theater');
 `);
 async function as(id,role='authenticated'){await db.exec(`RESET ROLE;SET request.jwt.claim.sub='${id||''}';SET ROLE ${role}`);}
-async function worker(action,id=null,lease=null,payload={}){return (await db.query('SELECT proposal_activity_weekly_worker($1,$2,$3,$4) result',[action,id,lease,JSON.stringify(payload)])).rows[0].result;}
+
 async function events(filters={}){return (await db.query('SELECT * FROM get_flow_events($1,NULL,50)',[JSON.stringify(filters)])).rows.map(r=>r.get_flow_events);}
 await as(uid(90));
 const activity=(await db.query('SELECT start_proposal_engagement($1,$2) id',[uid(50),uid(70)])).rows[0].id;
@@ -96,44 +96,40 @@ assert.equal((await window('America/Los_Angeles','2026-10-12T13:00:00Z')).due,fa
 const fall=await window('America/Chicago','2026-11-02T14:00:00Z');assert.equal((Date.parse(fall.period_end)-Date.parse(fall.period_start))/3600000,169,'Fall DST week');
 const spring=await window('America/Chicago','2026-03-09T13:00:00Z');assert.equal((Date.parse(spring.period_end)-Date.parse(spring.period_start))/3600000,167,'Spring DST week');
 assert.equal((await window('Invalid/Zone','2026-10-12T13:00:00Z')).timezone,'America/Chicago');
-await as(user);await assert.rejects(worker('generate'),'Browser cannot run worker');await assert.rejects(db.query('SELECT report_data,email_payload FROM proposal_activity_weekly_reports'),'Private payloads not exposed');
-await as(null,'service_role');assert.equal(await worker('generate'),3,'One report per owner/dealer');assert.equal(await worker('generate'),0,'Weekly generation idempotent');
-let report=await worker('claim');assert.ok(report);
-if(report.recipient_user_id!==user){await worker('sent',report.id,report.lease_token);report=await worker('claim');}
-if(report.recipient_user_id!==user){await worker('sent',report.id,report.lease_token);report=await worker('claim');}
-assert.equal(report.recipient_user_id,user);
-let other;while((other=await worker('claim'))){await worker('sent',other.id,other.lease_token);}assert.equal(report.report_data.length,2,'Only own proposals');
-const row=report.report_data.find(r=>r.bucket==='engaged');assert.equal(row.visits,2);assert.equal(row.active_seconds,125);assert.equal(row.sections[0].label,'Home Theater');assert.equal(row.clicks.approval_clicked,1);
-assert.equal(report.report_data[1].bucket,'unopened');
-await assert.rejects(worker('sent',report.id,uid(99)),'Stale lease cannot acknowledge');
-await assert.rejects(worker('store_payload',report.id,report.lease_token,{to:['wrong@example.com']}),'Wrong recipient rejected');
-const cached=await worker('store_payload',report.id,report.lease_token,{to:[report.recipient_email],subject:'Weekly Activity'});
-assert.deepEqual(await worker('store_payload',report.id,report.lease_token,{to:[report.recipient_email],subject:'Changed'}),cached,'Frozen retry payload');
-await worker('failed',report.id,report.lease_token,{error:'Temporary error'});
-await db.exec("RESET ROLE; SET test.now='2026-10-12T14:00:00Z'");
-await as(null,'service_role');const retried=await worker('claim');assert.equal(retried.id,report.id);assert.notEqual(retried.lease_token,report.lease_token);assert.deepEqual(retried.email_payload,cached);
-await worker('sent',retried.id,retried.lease_token);
-await as(user);assert.equal((await db.query('SELECT id,status FROM proposal_activity_weekly_reports')).rows.length,1,'Rep reads only own send status');
-await as(colleague);assert.equal((await db.query('SELECT recipient_user_id FROM proposal_activity_weekly_reports')).rows.every(r=>r.recipient_user_id===colleague),true);
-await db.exec(`RESET ROLE; UPDATE profiles SET is_active=false WHERE id='${user}'; SET test.now='2026-10-19T13:00:00Z'`);
-await as(null,'service_role');assert.equal(await worker('generate'),2,'Deactivated recipient excluded');
-await db.exec(`RESET ROLE; UPDATE profiles SET is_active=true WHERE id='${user}'; SET test.now='2026-10-26T13:00:00Z'; SET test.denied_rep='${colleague}'`);
-await as(null,'service_role');assert.equal(await worker('generate'),2,'Revoked proposal permission excluded');
-// Reassignment between preparing and retrying must cancel the old recipient's report.
-let assigned=await worker('claim');while(assigned&&assigned.recipient_user_id!==user){await worker('sent',assigned.id,assigned.lease_token);assigned=await worker('claim');}
-assert.ok(assigned);await worker('failed',assigned.id,assigned.lease_token,{error:'Retry test'});
-await db.exec(`RESET ROLE;UPDATE proposals SET created_by='${colleague}' WHERE id='${uid(51)}';SET test.now='2026-10-26T14:00:00Z'`);
-await as(null,'service_role');let remaining;while((remaining=await worker('claim')))await worker('sent',remaining.id,remaining.lease_token);
-assert.equal((await db.query('SELECT status FROM proposal_activity_weekly_reports WHERE id=$1',[assigned.id])).rows[0].status,'skipped','Changed assignments are not emailed to old owner');
-await as(null,'anon');await assert.rejects(worker('claim'));await assert.rejects(db.query('SELECT * FROM proposal_activity_weekly_reports'));
-await db.exec(`RESET ROLE;CREATE SCHEMA vault;CREATE TABLE vault.decrypted_secrets(name text,decrypted_secret text);CREATE SCHEMA net;CREATE SCHEMA cron;
-CREATE TABLE net.requests(url text,headers jsonb,body jsonb);CREATE TABLE cron.jobs(name text,schedule text,command text);
+await db.exec(`CREATE SCHEMA vault;CREATE TABLE vault.decrypted_secrets(name text,decrypted_secret text);CREATE SCHEMA net;CREATE SCHEMA cron;
+CREATE TABLE net.requests(url text,headers jsonb,body jsonb);
+CREATE TABLE cron.job(jobid bigint GENERATED ALWAYS AS IDENTITY,jobname text UNIQUE,schedule text,command text);
 CREATE FUNCTION net.http_post(url text,headers jsonb,body jsonb,timeout_milliseconds integer) RETURNS bigint LANGUAGE plpgsql AS $$ BEGIN INSERT INTO net.requests VALUES(url,headers,body);RETURN 1;END $$;
-CREATE FUNCTION cron.schedule(name text,schedule text,command text) RETURNS bigint LANGUAGE plpgsql AS $$ BEGIN INSERT INTO cron.jobs VALUES(name,schedule,command);RETURN 1;END $$;
-INSERT INTO vault.decrypted_secrets VALUES('security_billing_project_url','https://exampleproject.supabase.co'),('security_billing_worker_secret','${'x'.repeat(40)}');`);
+CREATE FUNCTION cron.schedule(name text,schedule text,command text) RETURNS bigint LANGUAGE plpgsql AS $$ DECLARE result bigint; BEGIN INSERT INTO cron.job(jobname,schedule,command) VALUES(name,schedule,command) ON CONFLICT(jobname) DO UPDATE SET schedule=excluded.schedule,command=excluded.command RETURNING jobid INTO result;RETURN result;END $$;
+CREATE FUNCTION cron.unschedule(job_id bigint) RETURNS boolean LANGUAGE plpgsql AS $$ BEGIN DELETE FROM cron.job WHERE jobid=job_id;RETURN FOUND;END $$;
+INSERT INTO proposal_activity_weekly_reports(organization_id,recipient_user_id,week_start,timezone,period_start,period_end,report_data,email_payload)
+ VALUES('${org}','${user}','2026-10-05','America/Chicago','2026-10-05T05:00:00Z','2026-10-12T05:00:00Z','[]','{"to":["old@example.com"]}');
+`);
 await db.exec(await readFile(new URL('../../supabase/migrations/20261012132915_proposal_activity_weekly_schedule.sql',import.meta.url),'utf8'));
-const job=(await db.query('SELECT * FROM cron.jobs')).rows[0];assert.equal(job.schedule,'*/15 * * * *');assert.ok(!job.command.includes('Bearer'));assert.equal(await db.query('SELECT private.invoke_proposal_activity_weekly()').then(r=>r.rows[0].invoke_proposal_activity_weekly),1);
-const request=(await db.query('SELECT * FROM net.requests')).rows[0];assert.ok(request.url.endsWith('/functions/v1/proposal-activity-weekly'));assert.equal(request.headers.Authorization,'Bearer '+'x'.repeat(40));
-await as(user);await assert.rejects(db.query('SELECT private.invoke_proposal_activity_weekly()'),'Browser cannot dispatch scheduler');await as(null,'service_role');await assert.rejects(db.query('SELECT private.invoke_proposal_activity_weekly()'),'Only DB scheduler can dispatch');
-await db.exec("RESET ROLE;DELETE FROM vault.decrypted_secrets WHERE name='security_billing_project_url'");assert.equal((await db.query('SELECT private.invoke_proposal_activity_weekly() result')).rows[0].result,null,'Missing endpoint does not dispatch');
-await db.close();console.log('Weekly database: targeted Flow, My Work, dealer/owner privacy, DST/due windows, aggregation, generation, leases, frozen retries, and inactive/permission exclusion pass');
+await db.exec((await readFile(new URL('../../supabase/migrations/20261012140748_weekly_proposal_activity_flow_posts.sql',import.meta.url),'utf8')).replaceAll('clock_timestamp()','public.test_report_now()'));
+const job=(await db.query('SELECT * FROM cron.job')).rows[0];assert.equal(job.schedule,'*/15 * * * *');assert.equal(job.command,'select private.publish_weekly_proposal_activity();');
+assert.equal((await db.query('SELECT status FROM proposal_activity_weekly_reports')).rows[0].status,'skipped','Pending email cancelled');
+assert.equal((await db.query("SELECT to_regprocedure('public.proposal_activity_weekly_worker(text,uuid,uuid,jsonb)') value")).rows[0].value,null,'Email worker RPC removed');
+assert.equal((await db.query("SELECT to_regprocedure('private.invoke_proposal_activity_weekly()') value")).rows[0].value,null,'HTTP scheduler removed');
+await as(user);await assert.rejects(db.query('SELECT private.publish_weekly_proposal_activity()'),'Browser cannot dispatch publication');await assert.rejects(db.query('SELECT report_data,email_payload FROM proposal_activity_weekly_reports'),'Private snapshots not directly exposed');
+await as(null,'service_role');await assert.rejects(db.query('SELECT private.publish_weekly_proposal_activity()'),'Only database scheduler dispatches');
+await db.exec(`RESET ROLE;SET test.now='2026-10-12T12:59:59Z';UPDATE profiles SET email=NULL WHERE id='${user}'`);
+const publish=async()=>{await db.exec('RESET ROLE');return (await db.query('SELECT private.publish_weekly_proposal_activity() count')).rows[0].count;};
+assert.equal(await publish(),0,'No post before Monday 8am');
+await db.exec("SET test.now='2026-10-12T13:00:00Z'");assert.equal(await publish(),3,'One private report per rep; email address not needed');assert.equal(await publish(),0,'Retries do not duplicate posts');
+await as(user);const mine=(await events({my_work:true})).filter(e=>e.event_type==='proposal_activity_weekly');assert.equal(mine.length,1,'Weekly post appears in rep My Work');
+const reportId=mine[0].source_id;
+const load=async id=>(await db.query('SELECT get_weekly_proposal_activity($1) data',[id])).rows[0].data;
+const report=await load(reportId);assert.equal(report.report_data.length,2,'Only own proposals');assert.ok(!('email_payload' in report));
+const row=report.report_data.find(r=>r.bucket==='engaged');assert.equal(row.visits,2);assert.equal(row.active_seconds,125);assert.equal(row.sections[0].label,'Home Theater');assert.equal(row.clicks.approval_clicked,1);assert.equal(report.report_data[1].bucket,'unopened');
+await as(colleague);assert.equal(await load(reportId),null,'Other rep cannot read digest');assert.equal((await events()).some(e=>e.source_id===reportId),false,'Targeted weekly post invisible to other rep');
+await as(outsider);assert.equal(await load(reportId),null,'Other dealer cannot read digest');
+await db.exec(`RESET ROLE;UPDATE proposals SET created_by='${colleague}' WHERE id='${uid(51)}'`);
+await as(user);assert.equal((await load(reportId)).report_data.length,1,'Reassigned proposal removed from old rep snapshot response');
+await db.exec(`SET test.denied_rep='${user}'`);assert.equal(await load(reportId),null,'Revoked module access removes digest access');await db.exec("SET test.denied_rep=''");
+await db.exec(`RESET ROLE;UPDATE profiles SET is_active=false WHERE id='${user}'`);await as(user);assert.equal(await load(reportId),null,'Inactive recipient blocked');
+await db.exec(`RESET ROLE;SET test.now='2026-10-19T13:00:00Z'`);assert.equal(await publish(),2,'Inactive recipient excluded from future publication');
+await db.exec(`SET test.now='2026-10-26T13:00:00Z';SET test.denied_rep='${colleague}'`);assert.equal(await publish(),1,'Revoked permissions excluded; empty reports not posted');
+assert.equal((await db.query('SELECT * FROM net.requests')).rows.length,0,'No HTTP worker or email dispatch');
+await as(null,'anon');await assert.rejects(load(reportId));await assert.rejects(db.query('SELECT private.publish_weekly_proposal_activity()'));
+await db.close();console.log('Weekly Flow database: first-open/My Work, private posts, Monday/DST windows, atomic publication, duplicate prevention, snapshot permissions, reassignment, inactive recipients, and no email/HTTP dispatch pass');
