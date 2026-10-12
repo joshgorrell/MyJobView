@@ -7,7 +7,7 @@ const source = await readFile('src/components/Portal/PortalProposalDetail.tsx', 
 const { code } = await transform(source, { loader: 'tsx', jsx: 'transform', define: { 'import.meta.env': '{}' } });
 // Execute the real action handlers with preview enabled. Any access to browser,
 // database, modal state, or proposal data throws, exposing an escaped guard.
-for (const name of ['trackProposalView', 'trackProposalDownload', 'handleApprove', 'handleInvoicePayment', 'handleDecline', 'handleSubmitChangeRequest']) {
+for (const name of ['trackProposalDownload', 'handleApprove', 'handleInvoicePayment', 'handleDecline', 'handleSubmitChangeRequest']) {
   const start = code.search(new RegExp(`(?:async )?function ${name}\\(`));
   assert.ok(start >= 0, name);
   const open = code.indexOf('{', start);

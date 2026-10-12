@@ -3,6 +3,7 @@ import { Activity, ChevronDown, Eye, FileText, Globe2, Lock, Send, Settings, Unl
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { PortalProposalDetail } from '../Portal/PortalProposalDetail';
+import { summarizeEngagement } from '../../lib/proposalEngagement';
 import { ProposalActivityPanel } from './ProposalActivityPanel';
 import ProposalTemplateManager from './ProposalTemplateManager';
 import { UnlockProposalModal } from './UnlockProposalModal';
@@ -55,7 +56,7 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
         .order('name'),
       supabase
         .from('proposal_activity')
-        .select('activity_type,duration_seconds')
+        .select('activity_type,duration_seconds,metadata,viewer_user_id')
         .eq('proposal_id', proposalId),
     ]);
 
@@ -63,7 +64,7 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
     setTemplates((t || []) as TemplateOption[]);
     const rows = activity || [];
     setViewCount(rows.filter((r: any) => r.activity_type === 'viewed').length);
-    setEngagedSeconds(rows.reduce((sum: number, r: any) => sum + Math.max(0, r.duration_seconds || 0), 0));
+    setEngagedSeconds(summarizeEngagement(rows).activeSeconds);
 
     const { data: thread } = await supabase
       .from('message_threads')
