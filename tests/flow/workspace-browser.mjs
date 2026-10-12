@@ -16,7 +16,7 @@ const { chromium } = await import(
 );
 const dir = await mkdtemp(join(tmpdir(), "mjv-flow-workspace-"));
 const fixture = `import{useState}from'react';export const useAuth=()=>({profile:{id:'rep',organization_id:'org',full_name:'Josh'},user:{id:'rep'}});export const useDepartments=()=>({hasModuleAccess:()=>true});window.calls=[];window.fail=false;
-const records=Array.from({length:50},(_,i)=>({id:i+1,created_at:new Date(Date.now()-i*60000).toISOString(),customer_name:'Customer with a long company name '+i,project_name:'Home theater project',actor_name:'Josh Gorrell',category:'sales',source_table:'connections',source_id:'interaction-'+i,summary:'Phone call: a longer note about the next steps for the customer',details:'Original notes',viewed:false}));
+const records=Array.from({length:50},(_,i)=>({id:i+1,created_at:new Date(Date.now()-i*60000).toISOString(),customer_name:'Customer with a long company name '+i,project_name:'Home theater project',actor_name:'Josh Gorrell',category:'sales',source_table:i===0?'proposals':'connections',source_id:i===0?'00000000-0000-0000-0000-000000000040':'interaction-'+i,event_type:i===0?'proposal_first_opened':'connections.insert',summary:i===0?'Customer first opened proposal PRO-100':'Phone call: a longer note about the next steps for the customer',details:'Original notes',viewed:false}));
 export function useFlow(filters){const [events,setEvents]=useState(records);return{events,loading:false,loadingMore:false,hasMore:false,error:'',pending:0,connected:true,refresh:async()=>window.calls.push({name:'refresh'}),markViewed:async(ids)=>setEvents(old=>old.map(e=>ids.includes(e.id)?{...e,viewed:true}:e))};}
 export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>Promise.resolve({data:[],error:null}).then(a,b);return()=>q;}});return q;},channel(){const c={on(){return c},subscribe(){return c},unsubscribe(){}};return c;},removeChannel(){},async rpc(name,input){window.calls.push({name,input});if(name==='search_flow_targets')return{data:[{kind:'contact',id:'c1',label:'Test Customer'}],error:null};if(name==='get_flow_followups')return{data:{items:[{id:'reminder1',kind:'reminder',contact_id:'c1',label:'Test Customer',type:'call',due:new Date().toISOString(),reason:'Discuss next steps'}],schedules:[{id:'schedule1',label:'Test Customer',recurrence_pattern:'weekly',is_active:true}]},error:null};return window.fail?{error:{message:'Fixture save rejected'}}:{data:'new',error:null};}};`;
 const source = `import React from'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<Flow/>);`;
@@ -112,6 +112,11 @@ try {
     );
     assert.ok(bounds.client > 200, JSON.stringify({ width, bounds }));
     assert.ok(bounds.scroll > bounds.client);
+    await page.locator('.flow-row').first().locator('.flow-row-main').click();
+    const activityLink = page.getByRole('link', { name: 'View Activity ↗', exact: true });
+    assert.equal(new URL(await activityLink.getAttribute('href'), url).searchParams.get('proposalActivity'), 'true');
+    assert.equal(new URL(await activityLink.getAttribute('href'), url).searchParams.get('proposalId'), '00000000-0000-0000-0000-000000000040');
+    await page.locator('.flow-row').first().locator('.flow-row-main').click();
     const plus = page.getByRole("button", {
       name: "Create in Flow",
       exact: true,

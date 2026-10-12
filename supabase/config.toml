@@ -271,3 +271,7 @@ verify_jwt = false
 
 [functions.proposal-check-response]
 verify_jwt = false
+
+# Server-only Vault worker credential is checked by the handler; no browser JWTs.
+[functions.proposal-activity-weekly]
+verify_jwt = false

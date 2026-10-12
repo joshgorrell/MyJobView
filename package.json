@@ -48,7 +48,9 @@
     "test:lead-emails": "node tests/lead-emails/runtime.mjs",
     "test:projects": "node tests/projects/runtime.mjs && node tests/projects/browser.mjs",
     "test:permissions": "node tests/permissions/database.mjs && node tests/permissions/create-user.mjs",
-    "test:permissions:browser": "npm run build && node tests/permissions/browser.mjs"
+    "test:permissions:browser": "npm run build && node tests/permissions/browser.mjs",
+    "test:proposal-engagement": "node tests/proposal-engagement/runtime.mjs && node tests/proposal-engagement/database.mjs && node tests/proposal-engagement/report-worker.mjs && node tests/proposal-engagement/report-database.mjs",
+    "test:proposal-engagement:browser": "node tests/proposal-engagement/browser.mjs && node tests/proposal-engagement/activity-link-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
