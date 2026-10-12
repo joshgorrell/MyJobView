@@ -3226,7 +3226,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     };
   }
 
-  const containerClass = isCoMode ? "h-full flex flex-col bg-canvas overflow-hidden" : "h-screen flex flex-col bg-canvas overflow-hidden";
+  const containerClass = isCoMode ? "h-full min-w-0 w-full flex flex-col bg-canvas overflow-hidden" : "h-screen min-w-0 w-full flex flex-col bg-canvas overflow-hidden";
 
   const containerStyle = {};
 
@@ -3307,9 +3307,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* Header */}
       <div className="sticky top-0 bg-surface border-b border-subtle flex-shrink-0 z-30">
         {/* Compact Header — single row */}
-        <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
+        <div className="px-3 sm:px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           {/* Left: Back + Title + Customer */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 min-w-0 w-full sm:w-auto flex-1">
               <button
                 type="button"
                 onClick={(e) => {
@@ -3329,7 +3329,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     {proposal?.title || proposal?.proposal_number || 'Proposal Builder'}
                   </h1>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
+                <div className="flex items-center flex-wrap gap-1.5 text-xs text-muted mt-0.5">
                   <User className="w-3 h-3 flex-shrink-0" />
                   <span className="truncate">{proposal?.contacts?.full_name || 'Loading...'}</span>
                   <span className="text-gray-600">•</span>
@@ -3339,7 +3339,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           </div>
 
           {/* Right: Badges + All Actions */}
-          <div className="flex items-center gap-1.5 flex-wrap justify-end min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end min-w-0 w-full sm:w-auto">
               {/* Combined Locked/Live Badge */}
               {getCombinedStatusBadge()}
 
@@ -4399,7 +4399,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         )}
 
         {/* Line Items Area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-auto overscroll-contain">
             {rooms.length === 0 && unassignedItems.filter(i => isCoMode || !i.is_hidden).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <Package className="w-16 h-16 text-gray-600 mb-4" />
@@ -4431,6 +4431,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     )}
                   </button>
                 </div>
+                <div className="max-w-full overflow-x-auto overscroll-x-contain" role="region" aria-label="Proposal line items — scroll horizontally for more columns" tabIndex={0}>
                 <table className="w-full text-xs sm:text-xs">
                   <thead className="bg-surface text-muted">
                     <tr>
@@ -4970,6 +4971,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       })}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
         </div>
