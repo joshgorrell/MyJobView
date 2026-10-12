@@ -104,8 +104,8 @@ export function ReactivateProposalModal({
 
       onSuccess();
     } catch (error) {
-      console.error('Error reactivating proposal:', error);
-      alert('Failed to reactivate proposal. Please try again.');
+      console.error('Error reopening proposal:', error);
+      alert('Failed to reopen proposal. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -119,7 +119,7 @@ export function ReactivateProposalModal({
             <div className="p-2 bg-orange-100 rounded-lg">
               <RotateCcw size={20} className="text-orange-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Reactivate Proposal {proposalNumber}</h2>
+            <h2 className="text-xl font-bold text-gray-900">Reopen for Customer {proposalNumber}</h2>
           </div>
           <button
             onClick={onClose}
@@ -139,7 +139,7 @@ export function ReactivateProposalModal({
                   This proposal is {getDaysOld()} old
                 </p>
                 <p className="text-sm text-orange-800">
-                  Please review pricing and terms before reactivating to ensure they are still accurate.
+                  Please review pricing and terms before reopening to ensure they are still accurate.
                 </p>
               </div>
             </div>
@@ -258,7 +258,7 @@ export function ReactivateProposalModal({
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any notes about this reactivation for internal tracking..."
+              placeholder="Add any notes about reopening this proposal for internal tracking..."
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             />
@@ -286,7 +286,7 @@ export function ReactivateProposalModal({
               className="px-6 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 disabled:opacity-50 font-medium transition-all flex items-center gap-2"
             >
               <RotateCcw size={18} />
-              {submitting ? 'Reactivating...' : 'Reactivate Now'}
+              {submitting ? 'Reopening...' : 'Reopen for Customer'}
             </button>
           </div>
         </div>

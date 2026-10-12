@@ -1,3 +1,4 @@
+import { proposalStatusLabel } from '../../lib/proposalPresentation';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -237,7 +238,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       // Apply status filter
       if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
+        query = filterStatus === 'sent' ? query.in('status', ['sent', 'portal']) : query.eq('status', filterStatus);
       }
 
       // Proposals with a linked sales order have transitioned — never show them here
@@ -525,7 +526,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       case 'ready_to_submit':
         return <ThumbsUp size={18} className="text-info" title="Ready to Submit" />;
       case 'sent':
-        return <Send size={18} className="text-info" title="Submitted to Portal" />;
+        return <Send size={18} className="text-info" title="Sent to Customer" />;
       case 'viewed':
         return <Eye size={18} className="text-purple-400" />;
       case 'approved':
@@ -571,16 +572,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   }
 
   function formatStatusText(status: string): string {
-    switch (status) {
-      case 'ready_to_submit':
-        return 'Ready to Submit';
-      case 'approved_pending_action':
-        return 'Approved - Pending Action';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status.charAt(0).toUpperCase() + status.slice(1);
-    }
+    return proposalStatusLabel(status);
   }
 
   function formatDate(dateString: string) {
@@ -867,9 +859,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         >
                           <option value="all">All Status</option>
                           <option value="designing">Designing</option>
-                          <option value="ready_to_submit">Ready to Submit</option>
-                          <option value="sent">Sent</option>
-                          <option value="portal">Portal</option>
+                          <option value="ready_to_submit">Ready to Send</option>
+                          <option value="sent">Sent to Customer</option>
+                          <option value="viewed">Viewed by Customer</option>
                           <option value="approved">Approved</option>
                           <option value="declined">Declined</option>
                           <option value="cancelled">Cancelled</option>
@@ -1067,9 +1059,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         >
                           <option value="all">All Status</option>
                           <option value="designing">Designing</option>
-                          <option value="ready_to_submit">Ready to Submit</option>
-                          <option value="sent">Sent</option>
-                          <option value="portal">Portal</option>
+                          <option value="ready_to_submit">Ready to Send</option>
+                          <option value="sent">Sent to Customer</option>
+                          <option value="viewed">Viewed by Customer</option>
                           <option value="approved">Approved</option>
                           <option value="declined">Declined</option>
                           <option value="cancelled">Cancelled</option>
@@ -1493,7 +1485,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               className="w-full px-4 py-3 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RotateCcw className="w-4 h-4 flex-shrink-0" />
-                              Reactivate Proposal
+                              Reopen for Customer
                             </button>
                           )}
                           {isStale(proposal) && (
@@ -1797,7 +1789,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             className="w-full px-3 py-2 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
-                            Reactivate Proposal
+                            Reopen for Customer
                           </button>
                         )}
                         {isStale(proposal) && (
