@@ -15,7 +15,7 @@ try{
  const css=(await readdir('dist/assets')).find(f=>f.startsWith('index-')&&f.endsWith('.css'));await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));await writeFile(join(directory,'index.html'),'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"></head><body class="theme-workspace"><div id="root"></div><script src="app.js"></script></body></html>');
  await new Promise(r=>server.listen(0,'127.0.0.1',r));browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH,args:['--no-sandbox']});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  for(const width of [390,1280]){
- await page.setViewportSize({width,height:850});await page.goto('http://127.0.0.1:'+server.address().port+'/?tab=proposals&proposalId='+proposal+'&proposalActivity=true');
+ await page.setViewportSize({width,height:850});await page.goto('http://127.0.0.1:'+server.address().port+(width===390?'/?tab=proposals&proposalId=':'/proposals?proposalId=')+proposal+'&proposalActivity=true');
  await page.getByRole('dialog',{name:'Activity',exact:true}).waitFor();await page.getByText('Most active viewing in Home Theater.',{exact:false}).waitFor();
  assert.ok(await page.getByText('Proposal editor: '+proposal,{exact:true}).isVisible());assert.ok((await page.evaluate(()=>window.queries)).every(q=>q.proposal===proposal),'Link overrides old saved proposal');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

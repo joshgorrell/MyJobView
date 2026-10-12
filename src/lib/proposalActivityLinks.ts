@@ -1,6 +1,6 @@
 export function proposalActivityPath(proposalId: string) {
-  const query = new URLSearchParams({ tab: 'proposals', proposalId, proposalActivity: 'true' });
-  return `?${query}`;
+  const query = new URLSearchParams({ proposalId, proposalActivity: 'true' });
+  return `/proposals?${query}`;
 }
 export function linkedProposalActivity(search: string): string | null {
   const params = new URLSearchParams(search);
