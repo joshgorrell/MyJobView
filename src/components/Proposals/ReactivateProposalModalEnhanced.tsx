@@ -66,7 +66,7 @@ export function ReactivateProposalModalEnhanced({
       }
     } catch (error) {
       console.error('Error analyzing pricing:', error);
-      alert('Failed to analyze pricing. You can still reactivate the proposal.');
+      alert('Failed to analyze pricing. You can still reopen the proposal.');
     } finally {
       setAnalyzing(false);
     }
@@ -158,8 +158,8 @@ export function ReactivateProposalModalEnhanced({
 
       onSuccess();
     } catch (error) {
-      console.error('Error reactivating proposal:', error);
-      alert('Failed to reactivate proposal. Please try again.');
+      console.error('Error reopening proposal:', error);
+      alert('Failed to reopen proposal. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +176,7 @@ export function ReactivateProposalModalEnhanced({
             <div className="p-2 bg-orange-100 rounded-lg">
               <RotateCcw size={20} className="text-orange-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Reactivate Archived Proposal {proposalNumber}</h2>
+            <h2 className="text-xl font-bold text-gray-900">Reopen Proposal {proposalNumber}</h2>
           </div>
           <button
             onClick={onClose}
@@ -197,8 +197,8 @@ export function ReactivateProposalModalEnhanced({
                 </p>
                 <p className={`text-sm text-${ageColor}-800`}>
                   {ageInfo.color === 'red'
-                    ? 'Important: Pricing and product availability should be reviewed carefully before reactivating.'
-                    : 'Please review pricing and terms before reactivating to ensure they are still accurate.'}
+                    ? 'Important: Pricing and product availability should be reviewed carefully before reopening.'
+                    : 'Please review pricing and terms before reopening to ensure they are still accurate.'}
                 </p>
               </div>
             </div>
@@ -375,9 +375,9 @@ export function ReactivateProposalModalEnhanced({
             </div>
           )}
 
-          {/* Reactivation Settings */}
+          {/* Reopening Options */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Reactivation Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Reopening Options</h3>
 
             {/* Status Selection */}
             <div className="mb-4">
@@ -404,7 +404,7 @@ export function ReactivateProposalModalEnhanced({
                       : 'border-gray-200 text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <p className="font-semibold">Sent</p>
+                  <p className="font-semibold">Sent to Customer</p>
                   <p className="text-xs mt-1">Ready for customer</p>
                 </button>
               </div>
@@ -497,7 +497,7 @@ export function ReactivateProposalModalEnhanced({
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes about this reactivation for internal tracking..."
+                placeholder="Add any notes about reopening this proposal for internal tracking..."
                 rows={3}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               />
@@ -526,7 +526,7 @@ export function ReactivateProposalModalEnhanced({
               className="px-6 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 disabled:opacity-50 font-medium transition-all flex items-center gap-2"
             >
               <RotateCcw size={18} />
-              {submitting ? 'Reactivating...' : 'Reactivate Proposal'}
+              {submitting ? 'Reopening...' : (newStatus === 'designing' ? 'Return to Designing' : 'Reopen for Customer')}
             </button>
           </div>
         </div>

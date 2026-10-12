@@ -20,3 +20,15 @@ export function proposalPresentation(proposal?: ProposalState | null) {
   }
   return { status, locked: !!proposal?.is_locked, expired: status === 'expired', portalLabel };
 }
+
+export function proposalStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    designing: 'Designing',
+    ready_to_submit: 'Ready to Send',
+    sent: 'Sent to Customer',
+    portal: 'Sent to Customer',
+    viewed: 'Viewed by Customer',
+    approved_pending_action: 'Accepted — Billing Pending',
+  };
+  return labels[status] || status.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+}

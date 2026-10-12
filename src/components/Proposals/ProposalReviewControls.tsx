@@ -15,7 +15,7 @@ export function ProposalReviewControls({ expired, onReactivate, onPreview }: {
     {expired && <button type="button" onClick={onReactivate}
       className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700"
       title="Extend the approval window and choose portal visibility">
-      <RefreshCw className="w-4 h-4" /><span>Reactivate</span>
+      <RefreshCw className="w-4 h-4" /><span>Reopen for Customer</span>
     </button>}
     <button type="button" onClick={onPreview}
       className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-subtle bg-elevated text-primary hover:bg-strong/25"

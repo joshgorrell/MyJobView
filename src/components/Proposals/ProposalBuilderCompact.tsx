@@ -1,4 +1,4 @@
-import { proposalPresentation } from '../../lib/proposalPresentation';
+import { proposalPresentation, proposalStatusLabel } from '../../lib/proposalPresentation';
 import { ProposalLockControl, ProposalReviewControls } from './ProposalReviewControls';
 import { ProposalActivityDialog } from './ProposalActivityDialog';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
@@ -1441,9 +1441,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   function getStatusBadge(status: string) {
     const statusConfig: Record<string, { label: string; bgColor: string; textColor: string; icon?: React.ReactNode }> = {
       'designing': { label: 'Designing', bgColor: 'bg-pink-700', textColor: 'text-white' },
-      'ready_to_submit': { label: 'Ready', bgColor: 'bg-yellow-400', textColor: 'text-gray-900' },
-      'sent': { label: 'Sent', bgColor: 'bg-blue-600', textColor: 'text-white' },
-      'portal': { label: 'Portal', bgColor: 'bg-blue-600', textColor: 'text-white' },
+      'ready_to_submit': { label: 'Ready to Send', bgColor: 'bg-yellow-400', textColor: 'text-gray-900' },
+      'sent': { label: 'Sent to Customer', bgColor: 'bg-blue-600', textColor: 'text-white' },
+      'portal': { label: 'Sent to Customer', bgColor: 'bg-blue-600', textColor: 'text-white' },
       'accepted': { label: 'Accepted', bgColor: 'bg-green-600', textColor: 'text-white', icon: <CheckCircle2 className="w-3 h-3" /> },
       'declined': { label: 'Declined', bgColor: 'bg-red-600', textColor: 'text-white' },
       'expired': { label: 'Expired', bgColor: 'bg-orange-600', textColor: 'text-white' }
@@ -3437,7 +3437,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         title={proposalReadiness?.isReady ? "Submit to customer portal" : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
                       >
                         <Globe className="w-4 h-4" />
-                        <span className="flex-1">Submit to Portal</span>
+                        <span className="flex-1">Send to Customer</span>
                         {!proposalReadiness?.isReady && (
                           <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
                         )}
@@ -3536,11 +3536,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         : 'bg-surface/60 text-muted hover:bg-elevated/60 border border-strong/40'
                     }`}
                     title="Proposal status — open available actions"
-                    aria-label={`${proposal?.status?.replace(/_/g, ' ') || 'Proposal'} — proposal actions`}
+                    aria-label={`${proposalStatusLabel(proposal?.status || 'designing')} — proposal actions`}
                     aria-expanded={showStatusDropdown}
                   >
                     {presentation.expired ? <Clock className="w-4 h-4 text-orange-400" /> : <FileText className="w-4 h-4" />}
-                    <span>{proposal?.status?.replaceAll("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) || "Status"}</span>
+                    <span>{proposalStatusLabel(proposal?.status || 'designing')}</span>
                     <ChevronDown className="w-3 h-3" />
                   </button>
 
@@ -3587,7 +3587,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               className="w-full px-3 py-2 text-left text-warning hover:bg-warningSoft flex items-center gap-2 text-sm disabled:opacity-50"
                             >
                               <ThumbsUp className="w-4 h-4" />
-                              Mark Ready
+                              Mark Ready to Send
                             </button>
                           </>
                         )}
