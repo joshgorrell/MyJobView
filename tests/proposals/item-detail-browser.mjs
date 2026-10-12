@@ -1,0 +1,60 @@
+import { build } from 'esbuild';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createServer } from 'node:http';
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+const directory = await mkdtemp(join(tmpdir(), 'mjv-proposals-mobile-'));
+const fixture = `
+window.writes=[];
+const item={id:'item',proposal_id:'proposal',room_id:'living',product_id:'product',quantity:2,unit:'ea',unit_price:100,cost:50,labor_hours:1,labor_rate:80,description:'Speaker',products:{id:'product',name:'Speaker',sku:'SP',manufacturers:{name:'Episode'}}};
+export const supabase={from(table){let filters=[];let update;let single=false;const result=()=>{if(update){window.writes.push({table,update,filters});return Promise.resolve({data:null,error:null})};let data=table==='proposal_rooms'?[{id:'living',name:'Living Room'},{id:'kitchen',name:'Kitchen'}]:table==='labor_phases'?[{id:'install',name:'Install'}]:table==='proposal_line_items'?(filters.some(([k,v])=>k==='parent_item_id')?[]:filters.some(([k,v])=>k==='product_id')?[item,{...item,id:'matching',quantity:5}]:[item]):[];return Promise.resolve({data:single?data[0]:data,error:null})};const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>result().then(a,b);if(key==='update')return value=>{update=value;return q};if(key==='eq'||key==='or'||key==='in')return(...v)=>{filters.push(key==='or'?['or',v[0]]:v);return q};if(key==='single'||key==='maybeSingle')return()=>{single=true;return result()};return()=>q}});return q}};
+`;
+const source=`import React from 'react';import {createRoot} from 'react-dom/client';import ProductDetailModal from './src/components/Proposals/ProductDetailModal';window.saved=0;createRoot(document.getElementById('root')).render(<ProductDetailModal lineItemId="item" onClose={()=>{}} onSaved={()=>window.saved++}/>);`;
+let browser;
+const server=createServer(async(req,res)=>{try{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,file)));}catch{res.writeHead(404);res.end();}});
+try {
+  await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/lib\/supabase$|contexts\/AuthContext$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture}));}}]});
+  const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));
+  await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
+  await writeFile(join(directory,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="style.css"></head><body><div id="root"></div><script src="app.js"></script></body></html>');
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH || undefined,args:['--no-sandbox']});
+  const page=await browser.newPage();
+  for(const size of [{width:375,height:667},{width:430,height:840},{width:1280,height:900}]){
+    await page.setViewportSize(size);await page.goto('http://127.0.0.1:'+server.address().port);
+    await page.getByLabel('Room / Area').waitFor();
+    assert.equal(await page.getByLabel('Room / Area').inputValue(),'living');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    const save=page.getByRole('button',{name:'Save Changes',exact:true});
+    const box=await save.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=size.width&&box.y+box.height<=size.height);
+    for(const text of ['Material','Labor'])await page.getByText(text,{exact:true}).first().scrollIntoViewIfNeeded();
+    assert.ok((await page.getByRole('dialog').innerText()).includes('$360.00'));
+    await page.getByLabel('Room / Area').selectOption('kitchen');
+    await page.locator('input[type=number]').filter({visible:true}).nth(2).fill('60');
+    await save.click();
+    const prompt=page.getByRole('dialog',{name:'Apply changes to which items?',exact:true});
+    await prompt.waitFor();assert.deepEqual(await page.evaluate(()=>window.writes),[]);
+    await prompt.getByRole('button',{name:'Cancel',exact:true}).click();
+    assert.deepEqual(await page.evaluate(()=>window.writes),[]);
+    await save.click();await prompt.waitFor();
+    await prompt.getByRole('button',{name:'All matching items in this proposal',exact:true}).click();
+    await page.waitForFunction(()=>window.saved===1);
+    const writes=await page.evaluate(()=>window.writes);
+    const parents=writes.filter(w=>w.filters.some(([k])=>k==='id'));
+    assert.equal(parents.length,2);assert.equal(parents[0].update.room_id,'kitchen');assert.equal(parents[1].update.room_id,undefined);
+    assert.ok(parents.every(w=>w.update.quantity===undefined&&w.update.unit_price===60));
+    assert.deepEqual(parents.map(w=>w.update.line_total),[120,300]);
+    const child=writes.find(w=>w.filters.some(([k])=>k==='parent_item_id'));assert.ok(child);
+    assert.ok(child.filters.some(([k])=>k==='proposal_id'));
+    assert.ok(child.filters.some(([k,v])=>k==='parent_item_id'&&v==='item'));
+    await page.goto('http://127.0.0.1:'+server.address().port);
+    await page.getByLabel('Room / Area').selectOption('kitchen');
+    await page.getByRole('button',{name:'Save Changes',exact:true}).click();
+    await page.waitForFunction(()=>window.saved===1);
+    assert.equal(await page.getByRole('dialog',{name:'Apply changes to which items?',exact:true}).count(),0);
+    assert.equal(await page.evaluate(()=>window.writes.filter(w=>w.filters.some(([k])=>k==='id')).length),1);
+    console.log(size.width+'px: room, material/labor visibility, scope prompt, cancel, and local room plus matching price save, and footer bounds pass');
+  }
+} finally {await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}
