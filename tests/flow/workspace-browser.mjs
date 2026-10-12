@@ -103,15 +103,23 @@ try {
       main: document.querySelector("main").getBoundingClientRect().toJSON(),
       scroll: document.querySelector(".flow-content").scrollHeight,
       client: document.querySelector(".flow-content").clientHeight,
+      mainScroll: document.querySelector("main").scrollHeight,
+      mainClient: document.querySelector("main").clientHeight,
+      contentOverflow: getComputedStyle(document.querySelector(".flow-content")).overflowY,
       overflow: document.documentElement.scrollWidth > innerWidth,
     }));
     assert.equal(bounds.overflow, false);
     assert.ok(
-      bounds.card.bottom <= bounds.main.bottom,
+      bounds.card.bottom > bounds.main.bottom,
       JSON.stringify({ width, bounds }),
     );
     assert.ok(bounds.client > 200, JSON.stringify({ width, bounds }));
-    assert.ok(bounds.scroll > bounds.client);
+    assert.equal(bounds.contentOverflow, "visible");
+    assert.ok(bounds.scroll <= bounds.client + 1);
+    assert.ok(bounds.mainScroll > bounds.mainClient);
+    await page.locator("main").evaluate(el => { el.scrollTop = el.scrollHeight; });
+    assert.ok(await page.locator("main").evaluate(el => el.scrollTop > 0));
+    await page.locator("main").evaluate(el => { el.scrollTop = 0; });
     await page.locator('.flow-row').first().locator('.flow-row-main').click();
     const activityLink = page.getByRole('link', { name: 'View Activity ↗', exact: true });
     assert.equal(new URL(await activityLink.getAttribute('href'), url).searchParams.get('proposalActivity'), 'true');
