@@ -1031,7 +1031,7 @@ export function TechStats({ onNavigate }: TechStatsProps) {
                     ) : allDailyBreakdowns[tech.technician_id].length === 0 ? (
                       <div className="text-center py-4 text-gray-500 text-sm">No daily data for this period</div>
                     ) : (
-                      <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+                      <div className="space-y-1.5">
                         {allDailyBreakdowns[tech.technician_id].map(day => (
                           <div
                             key={day.date}

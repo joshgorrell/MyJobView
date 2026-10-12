@@ -150,7 +150,7 @@ export function ProductionView({ initialView }: ProductionViewProps) {
   ].filter(view => view.show);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="min-w-0 flex flex-col">
       {/* Navigation Tabs */}
       {!selectedWorkOrderId && (
         <div className="border-b border-subtle bg-canvas">
@@ -184,7 +184,7 @@ export function ProductionView({ initialView }: ProductionViewProps) {
       )}
 
       {/* Active View Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="min-w-0">
         {selectedWorkOrderId ? (
           <div className="p-6">
             <WorkOrderDetail

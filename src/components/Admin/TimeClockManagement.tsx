@@ -760,7 +760,7 @@ export function TimeClockManagement() {
               )}
             </button>
           </div>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2">
             {pendingAutoClockOuts.map(entry => (
               <div key={entry.id} className="flex items-center justify-between bg-white border border-yellow-200 p-3 rounded">
                 <div>
@@ -799,7 +799,7 @@ export function TimeClockManagement() {
           </div>
 
           {showRecentAutoClockOuts && (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
               {recentAutoClockOuts.map((entry, idx) => (
                 <div key={idx} className="flex items-center justify-between bg-gray-50 border border-gray-200 p-3 rounded">
                   <div className="flex-1">
@@ -885,7 +885,7 @@ export function TimeClockManagement() {
             <p>No home clock events to review</p>
           </div>
         ) : (
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-3">
             {homeClockEvents.map(event => (
               <div
                 key={event.id}

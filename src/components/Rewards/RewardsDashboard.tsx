@@ -162,7 +162,7 @@ export function RewardsDashboard() {
             <Trophy className="w-5 h-5 text-yellow-500" />
             <h3 className="text-lg font-bold text-white">Top Performers</h3>
           </div>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2">
             {topPerformers.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-4">No points earned yet. Be the first!</p>
             ) : (

@@ -1296,7 +1296,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
               {approvingAutoClockOut === 'all' ? 'Approving...' : 'Approve All'}
             </button>
           </div>
-          <div className="space-y-1.5 max-h-80 overflow-y-auto">
+          <div className="space-y-1.5">
             {autoClockOutsPendingApproval.map(entry => (
               <div key={entry.id} className="bg-white rounded p-2 flex items-center justify-between gap-2 text-sm">
                 <div className="flex-1 min-w-0">
@@ -1342,7 +1342,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
             </h3>
             <span className="text-xs text-yellow-300/70">Will be auto-clocked out at cutoff time</span>
           </div>
-          <div className="space-y-1.5 max-h-80 overflow-y-auto">
+          <div className="space-y-1.5">
             {pendingAutoClockOutEntries.map(entry => (
               <div key={entry.id} className="bg-white rounded p-2 flex items-center justify-between gap-2 text-sm">
                 <div className="flex-1 min-w-0">
