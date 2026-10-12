@@ -562,7 +562,7 @@ export function TechMap() {
                 Active Technicians ({techLocations.length})
               </h3>
             </div>
-            <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+            <div className="divide-y divide-gray-200">
               {techLocations.map(tech => (
                 <div
                   key={tech.id}

@@ -225,7 +225,7 @@ export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="min-w-0 flex flex-col">
       <div className="border-b border-gray-200 bg-white">
         <div className="px-6">
           <nav className="flex gap-1 overflow-x-auto">
@@ -258,7 +258,7 @@ export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="min-w-0">
         <div className="p-6">
           {activeView === 'by_office' ? (
             <OfficeSalesBreakdown onNavigateToOffice={handleNavigateToOffice} />

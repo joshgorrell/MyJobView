@@ -20,7 +20,7 @@ export default function RecurView() {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="min-w-0 flex flex-col bg-gray-900">
       <div className="bg-gray-800 border-b border-gray-700 px-4 sm:px-6 py-4">
         <div className="flex items-center gap-2 sm:gap-3 mb-4">
           <RefreshCw className="text-blue-400 flex-shrink-0" size={24} />
@@ -52,7 +52,7 @@ export default function RecurView() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="min-w-0">
         {activeTab === 'dashboard' && <RecurringDashboard />}
         {activeTab === 'vip' && <RecurringPlans planType="vip_plan" />}
         {activeTab === 'security' && <SubscriptionsList planType="security_contract" />}

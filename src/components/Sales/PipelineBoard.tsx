@@ -803,7 +803,7 @@ export function PipelineBoard() {
                 </div>
               </div>
 
-              <div className="bg-gray-50 border-l-2 border-r-2 border-b-2 border-gray-200 rounded-b-lg p-2 space-y-2 min-h-[500px] max-h-[600px] overflow-y-auto">
+              <div className="bg-gray-50 border-l-2 border-r-2 border-b-2 border-gray-200 rounded-b-lg p-2 space-y-2 min-h-[500px]">
                 {stage.count === 0 ? (
                   <div className="text-center py-8 text-sm text-gray-400">
                     No items

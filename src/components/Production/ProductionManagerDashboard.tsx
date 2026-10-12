@@ -558,7 +558,7 @@ export function ProductionManagerDashboard() {
               </select>
             </div>
 
-            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+            <div className="space-y-2">
               {filteredWorkOrders.length === 0 ? (
                 <div className="text-center py-14">
                   <CheckCircle className="w-14 h-14 text-gray-200 mx-auto mb-3" />

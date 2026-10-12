@@ -1564,7 +1564,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
 
           {/* Agenda List */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="max-h-[700px] overflow-y-auto">
+            <div className="min-w-0">
               {agendaAppointments.length === 0 ? (
                 <div className="text-center py-16 text-gray-500">
                   <CalendarIcon className="w-16 h-16 mx-auto mb-4 text-gray-300" />
