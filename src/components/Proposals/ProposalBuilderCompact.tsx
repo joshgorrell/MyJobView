@@ -1,3 +1,5 @@
+import { proposalPresentation } from '../../lib/proposalPresentation';
+import { ProposalLockControl, ProposalReviewControls } from './ProposalReviewControls';
 import { ProposalActivityDialog } from './ProposalActivityDialog';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import LaborRemovalChoice, { itemHasLabor } from './LaborRemovalChoice';
@@ -7,7 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, Lock, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare, Monitor, ListChecks } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare, Monitor, ListChecks } from 'lucide-react';
 import {
   recordCOAction,
   recordCOModifierChange,
@@ -1457,45 +1459,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     );
   }
 
-  function getCombinedStatusBadge() {
-    const isLive = proposal?.is_portal_visible && proposal?.is_active_revision;
-    const isLocked = proposal?.is_locked;
-
-    if (!isLive && !isLocked) return null;
-
-    if (isLive && isLocked) {
-      return (
-        <button
-          onClick={() => setShowUnlockWarningModal(true)}
-          className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
-          title="Proposal is locked and live — click to unlock"
-        >
-          <Lock className="w-3 h-3" />
-          <span>Locked / Live</span>
-        </button>
-      );
-    }
-
-    if (isLive && !isLocked) {
-      return (
-        <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium bg-green-600 text-white">
-          <Globe className="w-3 h-3" />
-          <span>Live</span>
-        </span>
-      );
-    }
-
-    return (
-      <button
-        onClick={() => setShowUnlockWarningModal(true)}
-        className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
-        title="Proposal is locked — click to unlock"
-      >
-        <Lock className="w-3 h-3" />
-        <span>Locked</span>
-      </button>
-    );
-  }
+  const presentation = proposalPresentation(proposal);
 
   async function loadColumnPreferences() {
     try {
@@ -3340,8 +3304,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
           {/* Right: Badges + All Actions */}
           <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end min-w-0 w-full sm:w-auto">
-              {/* Combined Locked/Live Badge */}
-              {getCombinedStatusBadge()}
+              {/* Editing lock is independent of approval and portal visibility. */}
+              {presentation.locked && <ProposalLockControl onUnlock={() => setShowUnlockWarningModal(true)} />}
 
               {/* Expiration Badge — countdown only for sent/portal; expired status is shown in the status control */}
               {(proposal?.status === 'sent' || proposal?.status === 'portal') && proposal?.sent_at && (() => {
@@ -3533,25 +3497,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
                       >
                         <Monitor className="w-4 h-4" />
-                        <span>Present Live</span>
+                        <span>Present to Customer</span>
                       </button>
 
                       {/* Portal management for already-sent proposals */}
-                      {(proposal?.status === 'sent' || proposal?.status === 'portal' || proposal?.status === 'expired') && (
+                      {(proposal?.status === 'sent' || proposal?.status === 'portal') && (
                         <>
                           <div className="border-t border-subtle my-1" />
-                          {proposal?.status === 'expired' ? (
-                            <button
-                              onClick={() => {
-                                setShowReactivateModal(true);
-                                setShowDeliverDropdown(false);
-                              }}
-                              className="w-full px-3 py-2 text-left text-success hover:bg-successSoft flex items-center gap-2 text-sm"
-                            >
-                              <RefreshCw className="w-4 h-4" />
-                              Reactivate
-                            </button>
-                          ) : (
+                          {!presentation.expired && (
                             <button
                               onClick={() => {
                                 handleRecallProposal();
@@ -3582,9 +3535,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         ? 'bg-elevated text-primary hover:bg-strong/25'
                         : 'bg-surface/60 text-muted hover:bg-elevated/60 border border-strong/40'
                     }`}
-                    title={proposalReadiness?.isReady ? "Status Actions" : `Complete proposal settings before approving (${proposalReadiness?.overallProgress ?? 0}% ready)`}
+                    title="Proposal status — open available actions"
+                    aria-label={`${proposal?.status?.replace(/_/g, ' ') || 'Proposal'} — proposal actions`}
+                    aria-expanded={showStatusDropdown}
                   >
-                    <CheckCircle2 className="w-4 h-4" />
+                    {presentation.expired ? <Clock className="w-4 h-4 text-orange-400" /> : <FileText className="w-4 h-4" />}
                     <span>{proposal?.status?.replaceAll("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) || "Status"}</span>
                     <ChevronDown className="w-3 h-3" />
                   </button>
@@ -3657,15 +3612,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             )}
 
             {proposal?.status === 'approved' && getStatusBadge(proposal.status)}
-            <button
-              type="button"
-              onClick={openPortalPreview}
-              className="p-2 shrink-0 text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
-              title="Preview as Customer"
-              aria-label="Preview as Customer"
-            >
-              <Eye className="w-4 h-4" />
-            </button>
+            <ProposalReviewControls expired={presentation.expired}
+              onReactivate={() => setShowReactivateModal(true)} onPreview={openPortalPreview} />
 
             {/* Add Item Button */}
             <button
@@ -6969,17 +6917,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               <span className="text-sm font-semibold text-primary">Customer Preview</span>
               <span className="text-xs text-muted">Read only — customer actions disabled</span>
             </div>
-            {proposal?.is_portal_visible ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-xs text-green-300 font-medium">Live — customer can see this now</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                <span className="text-xs text-amber-300 font-medium">Not live — customer cannot see this yet</span>
-              </div>
-            )}
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${presentation.expired ? 'text-orange-400 border-orange-500/30 bg-orange-500/10' : 'text-secondary border-subtle bg-elevated'}`}>
+              {presentation.portalLabel}
+            </span>
             <div className="flex-1" />
             <button
               onClick={() => setPreviewHideCosts(!previewHideCosts)}
