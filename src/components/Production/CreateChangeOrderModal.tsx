@@ -1,3 +1,4 @@
+import { accessoryPricing } from '../../lib/accessoryPricing';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -481,11 +482,11 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       const { data: accessories } = await supabase
         .from('product_accessories')
         .select(`
-          accessory_product_id,
+          accessory_product_id, quantity, unit_price_override, labor_hours_override, labor_rate_override,
           is_default_selected,
           sort_order,
           accessory:products!product_accessories_accessory_product_id_fkey(
-            id, name, description, retail_price, item_type
+            id, name, description, retail_price, our_price, item_type, default_labor_hours, labor_phase_id, labor_phases(name,default_price)
           )
         `)
         .eq('parent_product_id', productId)
@@ -497,9 +498,10 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
         const parentIdx = index;
         const accessoryItems: LineItem[] = defaultAccessories.map((acc, i) => {
           const accProduct = acc.accessory as any;
-          const accUnitPrice = accProduct.retail_price || 0;
-          const accQty = 1;
-          const accTotal = accQty * accUnitPrice;
+          const pricing = accessoryPricing(acc, updated[parentIdx].new_quantity || 1);
+          const accUnitPrice = pricing.price;
+          const accQty = pricing.quantity;
+          const accTotal = pricing.material;
           return {
             action_type: updated[parentIdx].action_type,
             product_id: accProduct.id,
@@ -509,11 +511,13 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
             new_quantity: accQty,
             new_unit_price: accUnitPrice,
             new_total: accTotal,
-            labor_hours: 0,
-            labor_rate: 0,
-            labor_total: 0,
+            labor_phase_id: accProduct.labor_phase_id || undefined,
+            labor_phase_name: accProduct.labor_phases?.name || undefined,
+            labor_hours: pricing.hours,
+            labor_rate: pricing.rate,
+            labor_total: pricing.labor,
             is_taxable: true,
-            change_amount: updated[parentIdx].action_type === 'add' ? accTotal : -accTotal,
+            change_amount: updated[parentIdx].action_type === 'add' ? pricing.total : -pricing.total,
             sort_order: updated.length + i,
             parent_index: parentIdx,
           };

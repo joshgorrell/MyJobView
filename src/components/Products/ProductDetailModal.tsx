@@ -1,9 +1,11 @@
+import CatalogProductOverview from './CatalogProductOverview';
+import ProductAccessories from './ProductAccessories';
 import { useState, useEffect, useRef } from 'react';
-import { X, Pencil as Edit, Search, Upload, ChevronLeft, ChevronRight, Copy, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
+import { X, Pencil as Edit, Search, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ProductUsageHistory } from './ProductUsageHistory';
 import { useAuth } from '../../contexts/AuthContext';
-import ProductDetailPanel, { type ProductDetailPanelData } from './ProductDetailPanel';
+import { type ProductDetailPanelData } from './ProductDetailPanel';
 import ProductStatusNotice from './ProductStatusNotice';
 import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 
@@ -17,14 +19,16 @@ interface ProductDetailModalProps {
   onDelete?: () => void;
 }
 
-export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDuplicate, onArchive, onDelete }: ProductDetailModalProps) {
+export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: ProductDetailModalProps) {
   const { profile } = useAuth();
   const canEdit = profile?.can_edit_products ?? false;
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
   const [productStatus, setProductStatus] = useState<{is_active?: boolean; is_discontinued?: boolean}>({});
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'details' | 'history'>('details');
+  const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'instructions' | 'accessories' | 'history'>('overview');
   const [auditInfo, setAuditInfo] = useState<{ createdAt: string; createdBy: string; updatedAt: string; updatedBy: string } | null>(null);
+  const [catalogNotes, setCatalogNotes] = useState<any>({});
+  const [defaultTasks, setDefaultTasks] = useState<any[]>([]);
   const [manufacturerId, setManufacturerId] = useState<string | null>(null);
   const [model, setModel] = useState('');
   const [photoOpen, setPhotoOpen] = useState(false);
@@ -130,6 +134,9 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
 
       if (error) throw error;
 
+      setCatalogNotes({ sales: p.sales_description || p.description, purchase: p.purchase_description, instructions: p.default_install_task, specifications: p.specifications });
+      const { data: tasks } = await supabase.from('catalog_item_default_tasks').select('id,title,description').eq('product_id', productId).order('sort_order');
+      setDefaultTasks(tasks || []);
       const userIds = [p.created_by, p.updated_by].filter(Boolean);
       let createdByName = 'Unknown';
       let updatedByName = 'Unknown';
@@ -171,17 +178,17 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
         manufacturerName: p.manufacturers?.name || null,
         vendorName: taxonomy.vendorName || null,
         imageUrl: p.image_url || p.thumbnail_url || null,
-        manufacturerUrl: p.manufacturer_url || null,
+        manufacturerUrl: p.manufacturer_url || p.product_link || null,
         supplierUrl: p.supplier_url || null,
         productSheetUrl: p.product_sheet_url || null,
         installVideoUrl: p.install_video_url || null,
-        description: p.description || null,
+        description: p.sales_description || p.description || null,
         specifications: p.specifications || null,
         unitPrice: Number(p.our_price ?? p.unit_price ?? 0),
         cost: Number(p.cost || 0),
         msrp: p.msrp ? Number(p.msrp) : null,
-        quantity: 1,
-        unit: 'ea',
+        quantity: Number(p.default_qty || 1),
+        unit: p.unit || 'ea',
         laborHours: Number(p.default_labor_hours || 0),
         laborRate: Number(p.labor_phases?.default_price || 0),
         laborPhaseId: p.labor_phase_id || null,
@@ -215,7 +222,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92dvh] min-h-0">
+      <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-6xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92dvh] min-h-0">
         {/* Header */}
         <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
@@ -228,19 +235,8 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
             )}
           </div>
           <div className="contents">
-            <div className="order-3 w-full sm:w-auto sm:order-none flex bg-gray-100 p-1 rounded-xl">
-              <button
-                onClick={() => setActiveTab('details')}
-                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'details' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-              >
-                Details
-              </button>
-              <button
-                onClick={() => setActiveTab('history')}
-                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-              >
-                History
-              </button>
+            <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
+              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
             <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X className="w-4 h-4" />
@@ -248,17 +244,13 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
           </div>
         </div>
 
-        {canEdit && <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-2 sm:px-6">
-          {onDuplicate && <button type="button" onClick={onDuplicate} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"><Copy size={15} /> Duplicate</button>}
-          {onArchive && <button type="button" onClick={onArchive} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">{productStatus.is_active === false ? <ArchiveRestore size={15} /> : <Archive size={15} />}{productStatus.is_active === false ? 'Restore' : 'Archive'}</button>}
-          {onDelete && <button type="button" onClick={onDelete} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={15} /> Delete</button>}
-        </div>}
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 bg-gray-50/50">
-          {activeTab === 'details' ? (
+          {activeTab === 'overview' ? (
             <>
-              <ProductDetailPanel mode="view" data={panelData} showIdentity={false}
-                onRequestImage={canEdit ? () => setPhotoOpen(true) : undefined} />
+              <CatalogProductOverview data={panelData} />
+              <div className="mt-3"><ProductAccessories productId={productId} readOnly summaryOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} /></div>
+              {canEdit && <button type="button" onClick={() => setPhotoOpen(true)} className="mt-2 text-xs text-blue-700">Change photo</button>}
               {photoOpen && canEdit && (
                 <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3" onPaste={e => {
                   const file = Array.from(e.clipboardData.files).find(item => item.type.startsWith('image/'));
@@ -304,6 +296,12 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved, onDupl
                 </div>
               )}
             </>
+          ) : activeTab === 'details' ? (
+            <div className="grid md:grid-cols-2 gap-4">{[['Sales description',catalogNotes.sales],['Purchase description',catalogNotes.purchase],['Specifications',catalogNotes.specifications]].map(([label,value]) => <section key={label} className="rounded-lg border bg-white p-4"><h3 className="text-sm font-semibold mb-2">{label}</h3><p className="text-sm whitespace-pre-wrap break-words">{value || 'Not provided.'}</p></section>)}</div>
+          ) : activeTab === 'instructions' ? (
+            <div className="grid md:grid-cols-2 gap-4"><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Install Instructions</h3><p className="text-xs text-gray-500 mt-1">A general note for installing this product.</p><p className="text-sm whitespace-pre-wrap mt-3">{catalogNotes.instructions || 'No install instructions.'}</p></section><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Default Tasks</h3><p className="text-xs text-gray-500 mt-1">Individual work items created for this product on the project.</p>{defaultTasks.length ? defaultTasks.map(task => <div key={task.id} className="mt-3"><h4 className="text-sm font-medium">{task.title}</h4><p className="text-xs whitespace-pre-wrap">{task.description}</p></div>) : <p className="text-sm mt-3">No default tasks.</p>}</section></div>
+          ) : activeTab === 'accessories' ? (
+            <ProductAccessories productId={productId} readOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} />
           ) : (
             <ProductUsageHistory productId={productId} />
           )}
