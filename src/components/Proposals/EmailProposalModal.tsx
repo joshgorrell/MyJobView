@@ -79,6 +79,7 @@ export function EmailProposalModal({
 }: EmailProposalModalProps) {
   const [toEmail, setToEmail] = useState(contactEmail);
   const [ccEmails, setCcEmails] = useState('');
+  const [showCc, setShowCc] = useState(false);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -244,7 +245,7 @@ export function EmailProposalModal({
               <Mail className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-white">Send Proposal</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-white">Email Proposal</h2>
               <p className="text-xs text-gray-400">#{proposalNumber}</p>
             </div>
           </div>
@@ -284,10 +285,14 @@ export function EmailProposalModal({
             </div>
           </div>
 
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setShowCc(value => !value)} className="min-h-[44px] px-2 text-sm text-blue-300 hover:text-blue-200" aria-expanded={showCc}>Cc</button>
+          </div>
+
           {/* CC */}
-          <div>
+          {showCc && <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
-              CC (optional)
+              Cc (optional)
             </label>
             <input
               type="text"
@@ -298,7 +303,7 @@ export function EmailProposalModal({
               disabled={loading}
             />
             <p className="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
-          </div>
+          </div>}
 
           {/* Subject */}
           <div>
