@@ -1840,21 +1840,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (updateError) throw updateError;
 
-      // Send email notification
-      const { error: emailError } = await supabase.functions.invoke('send-proposal-email', {
-        body: { proposalId: proposalId }
-      });
-
-      if (emailError) {
-        console.error('Email sending error:', emailError);
-        // Don't throw - proposal was updated successfully
-      }
-
-      const successMessage = sendToPortal
-        ? 'Proposal sent successfully! Customer will receive an email notification.'
-        : 'Proposal marked as sent. Email sent to customer.';
-
-      alert(successMessage);
+      // Submission and delivery are separate customer-facing actions.
+      // Email is sent only when the user explicitly chooses Email Proposal.
+      alert(sendToPortal
+        ? 'Proposal submitted and visible in the customer portal. No email was sent.'
+        : 'Proposal submitted. No email was sent.');
 
       await loadData();
     } catch (error: any) {
