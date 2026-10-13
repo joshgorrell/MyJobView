@@ -6,7 +6,8 @@ interface PreSendValidationModalProps {
   proposalId: string;
   proposalNumber: string;
   onClose: () => void;
-  onSend: (approvalWindow: number) => void;
+  onSend: (approvalWindow: number, visibleInPortal: boolean) => void;
+  initialPortalVisibility?: boolean;
   onNavigateToSettings: (section: ValidationSection['name']) => void;
 }
 
@@ -17,11 +18,13 @@ export function PreSendValidationModal({
   proposalNumber,
   onClose,
   onSend,
+  initialPortalVisibility = false,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
   const [loading, setLoading] = useState(true);
   const [validationData, setValidationData] = useState<any>(null);
   const [approvalWindow, setApprovalWindow] = useState(30);
+  const [visibleInPortal, setVisibleInPortal] = useState(initialPortalVisibility);
   const [sending, setSending] = useState(false);
   const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
 
@@ -68,12 +71,12 @@ export function PreSendValidationModal({
   function handleSend() {
     if (!validationData?.isReady || sending) return;
     setSending(true);
-    onSend(approvalWindow);
+    onSend(approvalWindow, visibleInPortal);
   }
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
         <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg p-8 flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
           <p className="text-gray-300 text-sm">Validating proposal...</p>
@@ -87,7 +90,7 @@ export function PreSendValidationModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-xl flex flex-col">
+      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-xl max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/60">
@@ -217,6 +220,13 @@ export function PreSendValidationModal({
             ))}
             <span className="text-xs text-gray-500 ml-1">from submission</span>
           </div>
+        </div>
+
+        <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
+          <label className="flex items-center justify-between gap-3 text-sm text-white cursor-pointer min-h-[44px]">
+            <span><span className="block font-medium">Visible in Customer Portal</span><span className="block text-xs text-gray-400 mt-1">Controls the customer's portal listing. Submitting does not send an email.</span></span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-500" checked={visibleInPortal} onChange={event => setVisibleInPortal(event.target.checked)} />
+          </label>
         </div>
 
         {/* Footer */}
