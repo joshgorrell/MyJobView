@@ -1,3 +1,4 @@
+import { showWorkspaceMenu, workspaceMenuLabel } from '../lib/workspaceNavigation';
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { effectiveModuleAccess, isNavigationModule, isPermissionModule, isPreferredNavigationCopy, permissionLabel } from '../lib/permissionCatalog';
@@ -5,7 +6,8 @@ import { useAuth } from './AuthContext';
 
 // Personal preferences live behind the avatar; Messages lives inside Flow.
 // Keep the module records for access checks and saved links, but omit their menus.
-const isDepartmentNavigationModule = (key: string) => isNavigationModule({id: '', department_id: '', module_key: key});
+const isDepartmentNavigationModule = (key: string, access: (key: string) => boolean = () => false) =>
+  showWorkspaceMenu(key, access) && isNavigationModule({id: '', department_id: '', module_key: key});
 
 export interface Department {
   id: string;
@@ -226,12 +228,12 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       }
 
       const starred = starredSource
-        .filter(s => s.module && isDepartmentNavigationModule((s.module as any).module_key) && checkAccess(s.module.module_key))
+        .filter(s => s.module && isDepartmentNavigationModule((s.module as any).module_key, checkAccess) && checkAccess(s.module.module_key))
         .slice(0, 6)
         .map(s => ({
           ...(s.module as any),
           display_name: (s.module as any).module_key === 'reviews'
-            ? 'Feedback' : (s.module as any).display_name,
+            ? 'Feedback' : workspaceMenuLabel((s.module as any).module_key, (s.module as any).display_name),
           star_order: (s as any).star_order || (s as any).default_order,
           department_name: (s.module as any).department.name,
           department_color: (s.module as any).department.color,
@@ -242,7 +244,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       // Calculate accessible departments - only show departments with at least one accessible module
       const accessible = depts.filter(dept => {
         const deptModules = mods.filter(m => m.department_id === dept.id);
-        return deptModules.some(mod => isDepartmentNavigationModule(mod.module_key) && isPreferredNavigationCopy(mod, mods, depts, profile.role) && checkModuleAccess(mod));
+        return deptModules.some(mod => isDepartmentNavigationModule(mod.module_key, checkAccess) && isPreferredNavigationCopy(mod, mods, depts, profile.role) && checkModuleAccess(mod));
       });
 
       setUserDepartments(accessible);
@@ -251,7 +253,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
       // Load quick access suggestions (calculate after maps are set)
       const suggestions = mods.filter(m => {
-        if (!m.is_quick_access || !isDepartmentNavigationModule(m.module_key)) return false;
+        if (!m.is_quick_access || !isDepartmentNavigationModule(m.module_key, checkAccess)) return false;
         return checkModuleAccess(m);
       });
       setQuickAccessSuggestions(suggestions);
@@ -272,9 +274,9 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
   function getUserModules(departmentId: string): DepartmentModule[] {
     return modules.filter(mod => {
-      if (mod.department_id !== departmentId || !isDepartmentNavigationModule(mod.module_key) || !isPreferredNavigationCopy(mod, modules, departments, profile?.role || '')) return false;
+      if (mod.department_id !== departmentId || !isDepartmentNavigationModule(mod.module_key, hasModuleAccess) || !isPreferredNavigationCopy(mod, modules, departments, profile?.role || '')) return false;
       return hasModuleAccess(mod);
-    });
+    }).map(mod => ({ ...mod, display_name: workspaceMenuLabel(mod.module_key, mod.display_name) }));
   }
 
   function hasAccess(departmentName: string): boolean {
