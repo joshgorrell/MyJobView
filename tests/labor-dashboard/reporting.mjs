@@ -11,4 +11,5 @@ b.holidays=['2026-10-12'];assert.equal(laborHistory(b,'s','2026-10-12','2026-10-
 b.configs.push({...b.configs[1],expected_weekly_hours:20,effective_from:'2026-10-12'});b.snapshots[1].payload.records[1].leave_hours=0;assert.equal(laborHistory(b,'s','2026-10-12','2026-10-12','2026-10-12')[0].payroll,4);
 const empty={...b,snapshots:[],roster:[{id:'a',name:'Hourly'}]};assert.equal(laborHistory(empty,'a','2026-10-11','2026-10-11','2026-10-12')[0].flags.length,0);
 const vacation={...b,snapshots:[{kind:'payroll',day:'2026-10-12',payload:{records:[{user_id:1,worked_hours:0,leave_hours:8,unknown_hours:0,flags:[]}]}}]};assert.equal(laborHistory(vacation,'a','2026-10-12','2026-10-12','2026-10-12')[0].flags.length,0);
+assert.equal(laborHistory({...b,snapshots:[]},'s','2026-10-12','2026-10-12','2026-10-12')[0].payroll,null,'Unknown leave coverage cannot manufacture available salary hours');
 console.log('Labor reporting: matched dates, no duplicate native/imported hours, salary/PTO, missing values, flagged totals, cutover and month-to-date passed.');

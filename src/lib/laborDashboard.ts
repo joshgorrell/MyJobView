@@ -162,7 +162,7 @@ export function laborHistory(
       workdays.includes(week[new Date(day + "T12:00:00Z").getUTCDay()]) &&
       !b.holidays.includes(day);
     const payroll = assumed
-      ? cfg.expected_weekly_hours == null
+      ? !p || cfg.expected_weekly_hours == null
         ? null
         : workday
           ? Math.max(
