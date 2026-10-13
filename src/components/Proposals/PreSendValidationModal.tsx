@@ -8,6 +8,8 @@ interface PreSendValidationModalProps {
   onClose: () => void;
   onSend: (approvalWindow: number, visibleInPortal: boolean) => void;
   initialPortalVisibility?: boolean;
+  onEmailProposal?: () => void;
+  onPrintProposal?: () => void;
   onNavigateToSettings: (section: ValidationSection['name']) => void;
 }
 
@@ -19,6 +21,8 @@ export function PreSendValidationModal({
   onClose,
   onSend,
   initialPortalVisibility = false,
+  onEmailProposal,
+  onPrintProposal,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
   const [loading, setLoading] = useState(true);
@@ -227,6 +231,21 @@ export function PreSendValidationModal({
             <span><span className="block font-medium">Visible in Customer Portal</span><span className="block text-xs text-gray-400 mt-1">Controls the customer's portal listing. Submitting does not send an email.</span></span>
             <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-500" checked={visibleInPortal} onChange={event => setVisibleInPortal(event.target.checked)} />
           </label>
+        </div>
+
+        <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Proposal Actions</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={onEmailProposal} disabled={!onEmailProposal}
+              className="min-h-[44px] rounded-lg border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              Email Proposal
+            </button>
+            <button type="button" onClick={onPrintProposal} disabled={!onPrintProposal}
+              className="min-h-[44px] rounded-lg border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              Print
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-400">Email and Print are independent of submission and remain available later.</p>
         </div>
 
         {/* Footer */}
