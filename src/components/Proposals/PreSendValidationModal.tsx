@@ -244,7 +244,7 @@ export function PreSendValidationModal({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Send Proposal
+                Submit Proposal
               </>
             )}
           </button>
