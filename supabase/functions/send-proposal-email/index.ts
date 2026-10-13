@@ -89,11 +89,11 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     // Use override email if provided, otherwise fall back to contact email
-    const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const normalizeRecipients = (value: unknown): string[] => {
       if (Array.isArray(value)) return value.flatMap(normalizeRecipients);
       if (typeof value !== 'string') return [];
-      return value.split(/[;,\\n]+/).map(email => email.trim()).filter(Boolean);
+      return value.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
     };
     const recipientEmails = normalizeRecipients(toEmail || proposal.contacts?.email);
     const ccRecipients = normalizeRecipients(ccEmails);
