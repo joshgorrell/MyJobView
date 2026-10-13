@@ -128,7 +128,7 @@ export default function LaborDashboard() {
       const { data, error } = await supabase
         .rpc("get_labor_dashboard", {
           p_start: start,
-          p_end: end < lastDay(timezone) ? end : lastDay(timezone),
+          p_end: end,
         })
         .abortSignal(abort.signal);
       if (error) throw error;

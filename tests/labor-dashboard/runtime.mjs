@@ -11,7 +11,7 @@ const nodes=t=>Array.isArray(t)?t.flatMap(nodes):t&&typeof t==='object'?[t,...no
 const text=t=>Array.isArray(t)?t.map(text).join(''):t&&typeof t==='object'?text(t.props?.children):t==null?'':String(t);
 const render=()=>{cursor=0;return component();};const settle=async()=>{effects.splice(0).forEach(fn=>fn());for(let i=0;i<20;i++)await Promise.resolve();};
 let tree=render();await settle();tree=render();await settle();tree=render();
-assert.equal(requests[0].name,'get_labor_dashboard');assert.ok(requests[0].args.p_end<='2026-10-12');assert.ok(text(tree).includes('75.00%'));
+assert.equal(requests[0].name,'get_labor_dashboard');assert.equal(requests[0].args.p_end,'2026-10-31','Project snapshots retain their actual as-of dates within the selected month');assert.ok(text(tree).includes('75.00%'));
 nodes(tree).find(n=>n.type==='button'&&text(n)==='Hourly').props.onClick();tree=render();assert.ok(nodes(tree).some(n=>n.props?.role==='dialog'));assert.ok(text(tree).includes('Hourly · Time history'));assert.ok(text(tree).includes('Project'));
 nodes(tree).find(n=>n.props?.['aria-label']==='Close history').props.onClick();tree=render();assert.ok(!nodes(tree).some(n=>n.props?.role==='dialog'));
 nodes(tree).find(n=>n.props?.['aria-label']==='Rank technicians by').props.onChange({target:{value:'job'}});tree=render();assert.equal(nodes(tree).find(n=>n.type==='Bar'&&n.props.cursor==='pointer').props.dataKey,'job');
