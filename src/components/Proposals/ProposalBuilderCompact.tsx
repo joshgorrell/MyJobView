@@ -1819,8 +1819,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
 
   async function handleConfirmSubmission(sendToPortal: boolean, approvalWindowDays: number) {
+    if (sending) return;
     setSending(true);
-    setShowSubmissionModal(false);
 
     try {
       // Calculate expiration date
@@ -1847,9 +1847,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         : 'Proposal submitted. No email was sent.');
 
       await loadData();
+      setShowSubmissionModal(false);
     } catch (error: any) {
-      console.error('Error sending proposal:', error);
-      alert('Failed to send proposal: ' + (error.message || 'Unknown error'));
+      console.error('Error submitting proposal:', error);
+      alert('Failed to submit proposal: ' + (error.message || 'Unknown error'));
+      throw error;
     } finally {
       setSending(false);
     }
