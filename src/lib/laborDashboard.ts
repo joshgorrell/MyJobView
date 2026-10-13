@@ -277,3 +277,12 @@ export function laborRanking(
           ) + 1,
   }));
 }
+
+export function laborProjectIsNative(
+  b: LaborBundle,
+  periodEnd: string,
+  today: string,
+) {
+  const cutoff = b.sources.find((s) => s.source === "ipoint")?.native_from;
+  return !!cutoff && (periodEnd < today ? periodEnd : today) >= cutoff;
+}
