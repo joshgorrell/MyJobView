@@ -118,6 +118,7 @@ const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => (
 const AuthCallback = lazy(() => import('./components/Auth/AuthCallback').then(m => ({ default: m.AuthCallback })));
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
 const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxInstructions').then(m => ({ default: m.default })));
+const LaborDashboard = lazy(() => import('./components/Production/LaborDashboard/LaborDashboard'));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
 
 const PTOManagement = lazy(() => import('./components/Admin/PTOManagement').then(m => ({ default: m.PTOManagement })));
@@ -993,9 +994,10 @@ function AppContent() {
             />
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
-          {['payroll', 'time_approval'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
+          {['payroll', 'time_approval', 'labor_dashboard'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
             ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Review', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
             ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
+            ...(profile.role === 'admin' ? [{ key: 'labor_dashboard', label: 'Labor dashboard', content: <LaborDashboard /> }] : []),
           ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
@@ -1162,7 +1164,7 @@ function AppContent() {
 
           {activeTab === 'rewards_dashboard' && checkModuleAccess('rewards_dashboard') && <RewardsDashboard key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
+          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('labor_dashboard')} />}
 
 
 
