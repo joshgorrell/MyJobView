@@ -329,6 +329,9 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
       await Promise.all([
         loadActiveSessions(),
         loadUserStats(),
+        loadLocationStats(),
+        loadDeviceStats(),
+        loadAllUsers(),
         loadUsageAnalytics()
       ]);
     } finally {
@@ -371,7 +374,7 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
       }
     });
 
-    const usersWithStats = profiles.map(profile => {
+    const usersWithStats: UserStats[] = profiles.map(profile => {
       const lastSession = lastSessionMap[profile.id] || null;
       return {
         user_id: profile.id,
@@ -994,9 +997,6 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
     );
   }
 
-  const totalActiveUsers = new Set(activeSessions.map(s => s.user_id)).size;
-  const totalTimeToday = userStats.reduce((sum, user) => sum + user.total_time_seconds, 0);
-  const uniqueLocations = new Set(activeSessions.map(s => s.ip_address).filter(Boolean)).size;
 
   return (
     <div className="space-y-6">
