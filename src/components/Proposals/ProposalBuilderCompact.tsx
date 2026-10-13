@@ -3392,6 +3392,22 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </>
             )}
 
+            {/* Persistent proposal actions: available even after approval or prior delivery. */}
+            {proposal && (
+              <div className="flex items-center gap-1 sm:gap-2">
+                <button type="button" onClick={() => setShowEmailProposalModal(true)}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25"
+                  title="Email or resend this proposal">
+                  <Mail className="h-4 w-4" /><span className="hidden sm:inline">Email Proposal</span>
+                </button>
+                <button type="button" onClick={() => setShowPdfModal(true)}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25"
+                  title="Print this proposal">
+                  <FileText className="h-4 w-4" /><span className="hidden sm:inline">Print</span>
+                </button>
+              </div>
+            )}
+
             {/* Deliver Dropdown */}
             {proposal?.status !== 'approved' && (
               <div className="relative">
