@@ -6937,12 +6937,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         /></Suspense>
       )}
 
-      {showEmailProposalModal && proposal && proposal.contacts && (
+      {showEmailProposalModal && proposal && (
         <Suspense fallback={null}><EmailProposalModal
           proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
-          contactEmail={proposal.contacts.email || ''}
-          contactName={proposal.contacts.full_name || proposal.contacts.contact_name}
+          contactEmail={proposal.contacts?.email || ''}
+          contactName={proposal.contacts?.full_name || proposal.contacts?.contact_name || ''}
           onClose={() => setShowEmailProposalModal(false)}
         /></Suspense>
       )}
