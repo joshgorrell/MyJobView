@@ -6,7 +6,7 @@ interface PreSendValidationModalProps {
   proposalId: string;
   proposalNumber: string;
   onClose: () => void;
-  onSend: (approvalWindow: number, visibleInPortal: boolean) => void;
+  onSend: (approvalWindow: number, visibleInPortal: boolean) => Promise<void>;
   initialPortalVisibility?: boolean;
   onEmailProposal?: () => void;
   onPrintProposal?: () => void;
@@ -72,10 +72,17 @@ export function PreSendValidationModal({
     onClose();
   }
 
-  function handleSend() {
+  async function handleSend() {
     if (!validationData?.isReady || sending) return;
     setSending(true);
-    onSend(approvalWindow, visibleInPortal);
+    try {
+      await onSend(approvalWindow, visibleInPortal);
+    } catch (error) {
+      // The parent displays the failure; leave this dialog open so the user can retry.
+      console.error('Proposal submission failed:', error);
+    } finally {
+      setSending(false);
+    }
   }
 
   if (loading) {
