@@ -1,3 +1,4 @@
+import { loadTeamLeave } from '../../lib/timeOff';
 import ConfirmModal from '../ui/ConfirmModal';
 import { rescheduleAppointment, rescheduleWorkOrder } from '../../lib/scheduling';
 import { CalendarMonthGrid } from '../Shared/Calendar/CalendarMonthGrid';
@@ -93,7 +94,7 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
       try {
         const ids = allIdsKey.split(',');
         const dateFilter = (column: string) => 'and(' + column + '.gte.' + dateStart + ',' + column + '.lte.' + dateEnd + ')' + (extraDate ? ',' + column + '.eq.' + extraDate : '');
-        const ptoFilter = 'and(start_date.lte.' + dateEnd + ',end_date.gte.' + dateStart + ')' + (extraDate ? ',and(start_date.lte.' + extraDate + ',end_date.gte.' + extraDate + ')' : '');
+
         const results = await Promise.all([
           loadCalendarPages(supabase.from('work_orders').select('id,title,scheduled_date,scheduled_start_time,scheduled_end_time,assigned_to,status', { count: 'exact' })
             .eq('organization_id', organizationId).in('assigned_to', ids)
@@ -103,9 +104,7 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
             .eq('organization_id', organizationId).in('assigned_technician', ids)
             .or(dateFilter('appointment_date'))
             .not('status', 'in', '("completed","cancelled","archived")').order('id').abortSignal(controller.signal)),
-          loadCalendarPages(supabase.from('pto_requests').select('id,employee_id,start_date,end_date', { count: 'exact' })
-            .eq('organization_id', organizationId).in('employee_id', ids).eq('status', 'approved')
-            .or(ptoFilter).order('id').abortSignal(controller.signal)),
+          Promise.all([loadTeamLeave(dateStart,dateEnd),...(extraDate?[loadTeamLeave(extraDate,extraDate)]:[])]).then(results=>({data:results.flat(),error:null})),
         ]);
         const items: CalendarBooking[] = [
           ...(results[0].data || []).filter(wo => !excludedIdsKey.split(',').includes(wo.id)).map(wo => ({ id: wo.id, technicianId: wo.assigned_to, date: wo.scheduled_date,
@@ -118,9 +117,7 @@ export function WorkOrderSchedulePicker({ organizationId, technicians, technicia
             title: apt.is_private ? 'Busy' : apt.title || 'Appointment', kind: 'appointment' as const, canMove: !apt.is_private && apt.status !== 'completed' && !apt.all_day && Boolean(apt.start_time && apt.end_time) })),
         ];
         for (const pto of results[2].data || []) {
-          for (const date of datesToLoad) {
-            if (date >= pto.start_date && date <= pto.end_date) items.push({ id: pto.id + date, technicianId: pto.employee_id, date, start: '00:00', end: '24:00', title: 'Time off', kind: 'time_off' });
-          }
+          if (allIdsKey.split(',').includes(pto.employee_id)) items.push({id:pto.request_id+pto.leave_date,technicianId:pto.employee_id,date:pto.leave_date,start:pto.full_day?'00:00':(pto.start_time||'00:00').slice(0,5),end:pto.full_day?'24:00':(pto.end_time||'24:00').slice(0,5),title:'Approved time off',kind:'time_off'});
         }
         if (!cancelled) { setBookings(items); setLoadedKey(queryKey); }
       } catch (error) {

@@ -191,7 +191,11 @@ export const supabase = {
       return { data: null, error: null };
     },
   },
-  async rpc(name: string, args: any) {
+  rpc(name: string, args: any) {
+    const result=this.runRpc(name,args);
+    return Object.assign(result,{range:()=>result});
+  },
+  async runRpc(name: string, args: any) {
     if (name === "get_work_order_project_context")
       return { data: packet, error: null };
     if (name === "create_work_order_assignments") {

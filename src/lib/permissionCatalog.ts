@@ -1,6 +1,7 @@
 // Only implemented pages and named capabilities belong in the permission editor.
 // Legacy database rows retain their IDs for historical references and bookmarks.
 const retiredKeys = new Set([
+  "pto_management",
   "connections",
   "sales_activity",
   "preferences",

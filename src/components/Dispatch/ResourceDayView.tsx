@@ -1,3 +1,5 @@
+import { TeamTimeOffPanel } from '../Shared/TeamTimeOffPanel';
+import { TeamLeave, overlapsLeave, leaveLabel } from '../../lib/timeOff';
 import { AppointmentsCalendar } from '../Appointments/AppointmentsCalendar';
 import { CALENDAR_EVENT_STYLES } from '../Shared/Calendar/calendarStyles';
 import { CALENDAR_FIRST_MINUTE, CALENDAR_LAST_MINUTE, CALENDAR_ROW_HEIGHT } from '../Shared/Calendar/CalendarTimeGrid';
@@ -61,11 +63,7 @@ interface UnscheduledWorkOrder {
   project_name: string | null;
 }
 
-interface TimeOffEntry {
-  user_id: string;
-  start_date: string;
-  end_date: string;
-}
+
 
 interface ConfirmState {
   message: string;
@@ -118,7 +116,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
   const [anchor, setAnchor] = useState<Date>(new Date());
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [unscheduled, setUnscheduled] = useState<UnscheduledWorkOrder[]>([]);
-  const [timeOff, setTimeOff] = useState<TimeOffEntry[]>([]);
+  const [timeOff, setTimeOff] = useState<TeamLeave[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
@@ -240,11 +238,10 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           .eq('appointment_date', start)
           .neq('status', 'cancelled'),
 
-        supabase.from('pto_requests').select('employee_id, start_date, end_date, status')
-          .in('employee_id', techIds).eq('status', 'approved')
-          .lte('start_date', end).gte('end_date', start),
+        supabase.rpc('team_time_off',{p_from:start,p_to:end}),
       ]);
 
+      if (woRes.error) throw woRes.error; if (aptRes.error) throw aptRes.error; if (ptoRes.error) throw ptoRes.error;
       const woEvents: ScheduleEvent[] = (woRes.data || []).map((wo: any) => {
         const startT = wo.scheduled_start_time || '08:00';
         let endT = wo.scheduled_end_time;
@@ -281,7 +278,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
       }));
 
       setEvents([...woEvents, ...aptEvents]);
-      setTimeOff((ptoRes.data || []).map((r: any) => ({ user_id: r.employee_id, start_date: r.start_date, end_date: r.end_date })));
+      setTimeOff((ptoRes.data || []).filter((r:TeamLeave)=>techIds.includes(r.employee_id)));
     } catch (e) {
       console.error('Error loading schedule data:', e);
       setErrorMessage('Schedule could not be loaded. Refresh before scheduling.');
@@ -327,8 +324,10 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
   }
 
   function isTechOnTimeOff(techId: string): boolean {
-    return timeOff.some(t => t.user_id === techId && ds >= t.start_date && ds <= t.end_date);
+    return timeOff.some(t => t.employee_id === techId && t.leave_date === ds && t.full_day);
   }
+
+  function hasLeaveConflict(techId:string,start:number,end:number):boolean { return timeOff.some(t=>t.employee_id===techId&&t.leave_date===ds&&overlapsLeave(t,padTime(Math.floor(start/60),start%60),padTime(Math.floor(end/60),end%60))); }
 
   function getEventsForTech(techId: string): ScheduleEvent[] {
     return events.filter(e => e.technician_id === techId);
@@ -405,7 +404,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
     const endMin = Math.min(startMin + duration, HOUR_END * 60);
 
     const hasConflict = checkConflict(techId, startMin, endMin, draggedEvent?.id);
-    const hasPto = isTechOnTimeOff(techId);
+    const hasPto = hasLeaveConflict(techId,startMin,endMin);
     setDropTarget({ techId, minutes: startMin });
     setConflictAtTarget(hasConflict);
     setPtoConflictAtTarget(hasPto);
@@ -418,7 +417,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
     const duration = draggedEvent ? toMinutes(draggedEvent.end_time) - toMinutes(draggedEvent.start_time) : (draggedUnscheduled?.estimated_hours || 2) * 60;
     if (duration <= 0 || startMin + duration >= HOUR_END * 60) { setErrorMessage('Choose an earlier time so the full booking fits within this day.'); return; }
     const dropConflict = checkConflict(techId, startMin, Math.min(startMin + duration, HOUR_END * 60), draggedEvent?.id);
-    const dropPtoConflict = isTechOnTimeOff(techId);
+    const dropPtoConflict = hasLeaveConflict(techId,startMin,startMin+duration);
     const newStart = padTime(Math.floor(startMin / 60), startMin % 60);
     const techName = techs.find(t => t.id === techId)?.full_name || 'Unknown';
 
@@ -628,6 +627,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
 
   return (
     <CalendarWorkspace tabHref={'/calendar?' + new URLSearchParams({ popup: 'true', view: 'technicians', viewMode: calendarView, date: ds, technicianIds: visibleTechs.map(tech => tech.id).join(',') }).toString()} className="flex flex-col h-full" onClick={() => setEventPopover(null)}>
+      <details className="mb-3 rounded-lg border border-subtle p-3"><summary className="cursor-pointer font-semibold text-primary">Team Availability · week, month & upcoming leave</summary><div className="mt-3"><TeamTimeOffPanel/></div></details>
       {calendarView !== 'day' ? <AppointmentsCalendar embedded technicianOnly initialView={calendarView} initialDate={ds} initialTechnicianIds={visibleTechs.map(tech => tech.id)} onWorkOrderSelect={id => { if (onNavigate) onNavigate('work_orders', { workOrderId: id }); else window.location.assign(`/?tab=work_orders&workOrderId=${id}`); }} onDayView={date => { setAnchor(new Date(date + 'T12:00:00')); setCalendarView('day'); }} onDateChange={date => setAnchor(new Date(date + 'T12:00:00'))} onViewChange={view => { if (view !== 'agenda') setCalendarView(view); }} /> : <>
       {/* Toolbar */}
       <div className="flex flex-wrap gap-3 items-center justify-between px-1 pb-3 shrink-0">
@@ -844,17 +844,13 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
                           ))}
 
                           {/* PTO overlay */}
-                          {onPto && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                              <div className="rotate-[-20deg] text-gray-400 font-bold text-xl select-none">PTO</div>
-                            </div>
-                          )}
+                          {timeOff.filter(t=>t.employee_id===tech.id&&t.leave_date===ds).map(t=><div key={t.request_id} className="absolute w-full bg-gray-200/80 border border-gray-400 text-gray-800 pointer-events-none z-0 flex items-center justify-center text-xs" style={t.full_day?{inset:0}:{top:Math.max(0,(toMinutes(t.start_time||'08:00')-HOUR_START*60)/60*SLOT_HEIGHT),height:Math.max(16,(toMinutes(t.end_time||'17:00')-toMinutes(t.start_time||'08:00'))/60*SLOT_HEIGHT)}}>{leaveLabel(t)}</div>)}
 
                           {/* Clickable hour slots */}
                           {!onPto && Array.from({ length: TOTAL_HOURS * 2 }, (_, i) => {
                             const hour = HOUR_START + Math.floor(i / 2), minute = i % 2 * 30;
                             const start = hour * 60 + minute;
-                            const busy = techEvents.some(event => start < toMinutes(event.end_time) && start + 60 > toMinutes(event.start_time));
+                            const busy = hasLeaveConflict(tech.id,start,start+60) || techEvents.some(event => start < toMinutes(event.end_time) && start + 60 > toMinutes(event.start_time));
                             return <button type="button" key={`slot-${i}`} aria-label={`Schedule ${tech.full_name} on ${ds} at ${formatTime12(padTime(hour, minute))}`}
                               disabled={busy} className="absolute w-full hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 disabled:cursor-default"
                               style={{ top: `${i * CALENDAR_ROW_HEIGHT}px`, height: `${CALENDAR_ROW_HEIGHT}px`, zIndex: 1 }} onClick={() => handleSlotClick(tech.id, hour, minute)} />;

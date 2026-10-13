@@ -51,7 +51,9 @@ export function DailyClock() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveBalances, setLeaveBalances] = useState<Array<{ id: string; policy: { id: string; policy_name: string; pto_type: string; is_paid: boolean }; current_balance_hours: number }>>([]);
   const [selectedLeavePolicy, setSelectedLeavePolicy] = useState('');
-  const [leaveHours, setLeaveHours] = useState('8');
+  const [leaveStartTime,setLeaveStartTime] = useState('08:00');
+  const [leaveEndTime,setLeaveEndTime] = useState('16:00');
+  const [leaveFullDay,setLeaveFullDay] = useState(true);
   const [leaveReason, setLeaveReason] = useState('');
   const [submittingLeave, setSubmittingLeave] = useState(false);
   const breakMenuRef = useRef<HTMLDivElement>(null);
@@ -242,17 +244,6 @@ export function DailyClock() {
     const policy = leaveBalances.find(b => b.policy.id === selectedLeavePolicy);
     if (!policy) return;
 
-    const hours = parseFloat(leaveHours);
-    if (isNaN(hours) || hours <= 0) {
-      alert('Please enter valid hours');
-      return;
-    }
-
-    if (hours > policy.current_balance_hours) {
-      alert(`You only have ${policy.current_balance_hours.toFixed(1)} hours available for ${policy.policy.policy_name}.`);
-      return;
-    }
-
     const today = formatDateInTimezone(new Date().toISOString(),orgTimezone);
     const isSameDay = true;
 
@@ -265,24 +256,17 @@ export function DailyClock() {
 
     setSubmittingLeave(true);
     try {
-      const { error } = await supabase
-        .from('pto_requests')
-        .insert({
-          employee_id: profile.id,
-          policy_id: selectedLeavePolicy,
-          request_type: 'hours',
-          start_date: today,
-          end_date: today,
-          total_hours: hours,
-          reason: leaveReason || `Same-day ${policy.policy.pto_type} call-in`,
-        });
+      const { error } = await supabase.rpc('submit_time_off', {
+        p_policy:selectedLeavePolicy,p_start:today,p_end:today,p_type:leaveFullDay?'full_day':'hours',
+        p_start_time:leaveFullDay?null:leaveStartTime,p_end_time:leaveFullDay?null:leaveEndTime,
+        p_reason:leaveReason||`Same-day ${policy.policy.pto_type} call-in`
+      });
 
       if (error) throw error;
 
       alert('Leave request submitted. Your manager will review and approve it.');
       setShowLeaveModal(false);
       setSelectedLeavePolicy('');
-      setLeaveHours('8');
       setLeaveReason('');
       loadLeaveBalances();
     } catch (error: any) {
@@ -596,7 +580,7 @@ export function DailyClock() {
                 className="w-full mt-3 bg-blue-500/20 border border-blue-300/50 text-blue-100 rounded-xl py-4 text-lg font-semibold hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
               >
                 <HeartPulse className="w-6 h-6" />
-                Clock In as Leave (Sick / Vacation)
+                Request Leave (Sick / Vacation)
               </button>
             )}
           </>
@@ -749,18 +733,8 @@ export function DailyClock() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hours *</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  max="24"
-                  value={leaveHours}
-                  onChange={(e) => setLeaveHours(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+              <label className="block text-gray-900"><input type="checkbox" checked={leaveFullDay} onChange={e=>setLeaveFullDay(e.target.checked)}/> Full scheduled workday</label>
+              {!leaveFullDay && <div className="grid grid-cols-2 gap-3 text-gray-900"><label>Leave Starts<input type="time" value={leaveStartTime} onChange={e=>setLeaveStartTime(e.target.value)} className="min-h-11 w-full rounded border p-2"/></label><label>Leave Ends<input type="time" value={leaveEndTime} onChange={e=>setLeaveEndTime(e.target.value)} className="min-h-11 w-full rounded border p-2"/></label></div>}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Reason (Optional)</label>
                 <textarea
