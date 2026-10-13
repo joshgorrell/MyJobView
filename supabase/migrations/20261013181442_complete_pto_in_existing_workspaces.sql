@@ -59,6 +59,17 @@ CREATE POLICY pto_history_read ON public.pto_accrual_history FOR SELECT TO authe
 REVOKE ALL ON public.pto_requests,public.pto_balances,public.pto_accrual_history FROM anon,authenticated;
 GRANT SELECT ON public.pto_requests,public.pto_balances,public.pto_accrual_history TO authenticated;
 
+-- Respect an existing company holiday calendar without requiring the reporting add-on.
+CREATE OR REPLACE FUNCTION pto_private.is_company_holiday(p_org uuid,p_date date) RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE holiday boolean;
+BEGIN
+ IF to_regclass('public.labor_dashboard_calendars') IS NULL THEN RETURN false; END IF;
+ EXECUTE 'SELECT $1=ANY(holidays) FROM public.labor_dashboard_calendars WHERE organization_id=$2' INTO holiday USING p_date,p_org;
+ RETURN coalesce(holiday,false);
+END $$;
+REVOKE ALL ON FUNCTION pto_private.is_company_holiday(uuid,date) FROM PUBLIC,anon,authenticated;
+
 -- Snapshot the employee's actual workdays/hours for consistent approval, payroll and calendar results.
 CREATE OR REPLACE FUNCTION pto_private.request_days(p_employee uuid,p_start date,p_end date,p_type text,p_start_time time,p_end_time time)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
@@ -81,8 +92,8 @@ BEGIN
   IF p_type='half_day' AND abs(hrs-daily/2)>0.01 THEN RAISE EXCEPTION 'Half-day leave must equal half your daily working hours'; END IF;
  END IF;
  FOR day IN SELECT generate_series(p_start::timestamp,p_end::timestamp,interval '1 day')::date LOOP
-  IF names[extract(dow FROM day)::int+1]=ANY(cfg.work_days) THEN
-   days:=days||jsonb_build_array(jsonb_build_object('date',day,'hours',round(CASE WHEN p_type='full_day' THEN daily ELSE hrs END,4),'start',CASE WHEN p_type='full_day' THEN st ELSE p_start_time END,'end',CASE WHEN p_type='full_day' THEN en ELSE p_end_time END));
+  IF names[extract(dow FROM day)::int+1]=ANY(cfg.work_days) AND NOT pto_private.is_company_holiday(public.get_user_org_id(),day) THEN
+   days:=days||jsonb_build_array(jsonb_build_object('date',day,'hours',round(CASE WHEN p_type='full_day' THEN daily ELSE hrs END,2),'start',CASE WHEN p_type='full_day' THEN st ELSE p_start_time END,'end',CASE WHEN p_type='full_day' THEN en ELSE p_end_time END));
   END IF;
  END LOOP;
  IF jsonb_array_length(days)=0 THEN RAISE EXCEPTION 'No scheduled workdays in this date range'; END IF;
@@ -235,10 +246,10 @@ BEGIN
  SELECT organization_id INTO org FROM public.profiles WHERE id=auth.uid() AND is_active;
  IF org IS NULL THEN RAISE EXCEPTION 'Sign in to view team availability'; END IF;
  IF p_from IS NULL OR p_to IS NULL OR p_to<p_from OR p_to-p_from>366 THEN RAISE EXCEPTION 'Select a date range of one year or less'; END IF;
- RETURN QUERY SELECT p.id,p.full_name,d.day::date,CASE WHEN c.work_days IS NULL THEN NULL ELSE names[extract(dow FROM d.day)::int+1]=ANY(c.work_days) END
+ RETURN QUERY SELECT p.id,p.full_name,d.day::date,CASE WHEN c.work_days IS NULL THEN NULL ELSE names[extract(dow FROM d.day)::int+1]=ANY(c.work_days) AND NOT pto_private.is_company_holiday(org,d.day::date) END
  FROM public.profiles p CROSS JOIN generate_series(p_from::timestamp,p_to::timestamp,interval '1 day') d(day)
  LEFT JOIN LATERAL(SELECT cfg.work_days FROM public.employee_payroll_configs cfg JOIN public.employees e ON e.id=cfg.employee_id WHERE e.user_id=p.id AND cfg.organization_id=org AND cfg.effective_from<=d.day::date AND (cfg.effective_to IS NULL OR cfg.effective_to>=d.day::date) ORDER BY cfg.effective_from DESC LIMIT 1)c ON true
- WHERE p.organization_id=org AND p.is_active AND p.employment_classification='employee' ORDER BY p.full_name,d.day;
+ WHERE p.organization_id=org AND p.is_active AND p.employment_classification='employee' ORDER BY p.full_name,p.id,d.day;
 END $$;
 REVOKE ALL ON FUNCTION public.team_work_schedule(date,date) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.team_work_schedule(date,date) TO authenticated;

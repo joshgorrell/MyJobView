@@ -67,7 +67,9 @@ export function TechStatusDashboard() {
       })
       .subscribe();
 
+    const timer=window.setInterval(loadTechStatuses,60000);
     return () => {
+      clearInterval(timer);
       channel.unsubscribe();
     };
   }, []);

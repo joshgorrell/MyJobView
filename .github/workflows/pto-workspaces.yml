@@ -1,0 +1,29 @@
+name: PTO workspace checks
+on:
+  pull_request:
+    paths:
+      - 'src/components/Admin/PTOManagement.tsx'
+      - 'src/components/Admin/TimeClockManagement.tsx'
+      - 'src/components/Dispatch/MyTimeOff.tsx'
+      - 'src/components/Dispatch/ResourceDayView.tsx'
+      - 'src/components/Dispatch/TechStatusDashboard.tsx'
+      - 'src/components/Shared/TeamTimeOffPanel.tsx'
+      - 'src/lib/timeOff.ts'
+      - 'supabase/migrations/*pto*'
+      - 'tests/pto/**'
+      - '.github/workflows/pto-workspaces.yml'
+permissions:
+  contents: read
+jobs:
+  pto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:pto
+      - run: npm run build

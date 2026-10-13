@@ -5,6 +5,7 @@ const db=new PGlite();const id=n=>`00000000-0000-0000-0000-${String(n).padStart(
 await db.exec(`CREATE ROLE authenticated;CREATE ROLE anon;CREATE SCHEMA auth;CREATE SCHEMA time_private;CREATE SCHEMA work_order_private;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('test.uid',true),'')::uuid $$;
 CREATE TABLE organizations(id uuid PRIMARY KEY,timezone text);
+CREATE TABLE labor_dashboard_calendars(organization_id uuid,holidays date[]);
 CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,full_name text,role text,is_active boolean DEFAULT true,employment_classification text,points_earned int DEFAULT 100);
 CREATE FUNCTION get_user_org_id() RETURNS uuid LANGUAGE sql SECURITY DEFINER AS $$ SELECT organization_id FROM public.profiles WHERE id=auth.uid() $$;
 CREATE TABLE employees(id uuid PRIMARY KEY,user_id uuid,organization_id uuid);
@@ -35,6 +36,7 @@ for(const name of ['assert_open_time_period','guard_time_entry_authority']){
 }
 await db.exec(`CREATE TRIGGER guard_time BEFORE INSERT OR UPDATE ON time_entries FOR EACH ROW EXECUTE FUNCTION time_private.guard_time_entry_authority();
 INSERT INTO organizations VALUES('${id(1)}','America/Chicago'),('${id(2)}','America/Los_Angeles');
+INSERT INTO labor_dashboard_calendars VALUES('${id(1)}',ARRAY['2027-01-01'::date]);
 INSERT INTO profiles(id,organization_id,full_name,role,employment_classification) VALUES('${id(10)}','${id(1)}','Employee A','tech','employee'),('${id(11)}','${id(1)}','Employee B','sales','employee'),('${id(12)}','${id(1)}','Manager','admin','employee'),('${id(13)}','${id(2)}','Other tenant','admin','employee');
 INSERT INTO employees VALUES('${id(20)}','${id(10)}','${id(1)}'),('${id(21)}','${id(11)}','${id(1)}');
 INSERT INTO employee_payroll_configs VALUES('${id(30)}','${id(20)}','${id(1)}','2020-01-01',null,ARRAY['monday','tuesday','wednesday','thursday','friday'],40,'08:00','17:00',true,'work_allocation',null),('${id(31)}','${id(21)}','${id(1)}','2020-01-01',null,ARRAY['monday','tuesday','wednesday','thursday','friday'],40,'08:00','17:00',true,'daily_clock',null);
@@ -51,7 +53,7 @@ assert.equal((await db.query('SELECT * FROM pto_balances')).rows.length,1,'Emplo
 await assert.rejects(db.query('UPDATE pto_balances SET current_balance_hours=1000'),/permission denied/);
 await assert.rejects(db.query('INSERT INTO pto_requests(employee_id,policy_id,request_type,start_date,end_date,total_hours) VALUES($1,$2,\'full_day\',\'2027-01-04\',\'2027-01-04\',8)',[id(10),vacation]),/permission denied/);
 await assert.rejects(db.query('SELECT set_time_off_balance($1,$2,80,$3)',[id(10),vacation,'Unauthorized']),/authorized managers/);
-const preview=await scalar("SELECT preview_time_off('2027-01-01','2027-01-08','full_day') days");assert.equal(preview.days.length,6);assert.equal(preview.days.reduce((s,d)=>s+Number(d.hours),0),48,'Configured weekends excluded');
+const preview=await scalar("SELECT preview_time_off('2027-01-01','2027-01-08','full_day') days");assert.equal(preview.days.length,5);assert.equal(preview.days.reduce((s,d)=>s+Number(d.hours),0),40,'Configured weekends and company holidays excluded');
 await assert.rejects(db.query("SELECT preview_time_off('2027-01-04','2027-01-04','half_day','08:00','11:00')"),/half your/);
 const req=(await scalar("SELECT submit_time_off($1,'2027-01-04','2027-01-08','full_day',null,null,'Private medical details') id",[vacation])).id;
 assert.equal(Number((await scalar('SELECT pending_hours FROM pto_balances')).pending_hours),40);

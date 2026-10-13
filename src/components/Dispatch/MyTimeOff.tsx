@@ -453,7 +453,7 @@ export function MyTimeOff() {
               </div>
             )}
             <p className="text-sm text-muted">
-              Only your configured workdays are charged. Half days must match
+              Only your configured workdays are charged; company holidays are excluded. Half days must match
               half your configured daily hours.
             </p>
             {previewLoading ? (
