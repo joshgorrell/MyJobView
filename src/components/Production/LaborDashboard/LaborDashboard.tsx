@@ -14,6 +14,7 @@ import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
   laborHistory,
+  laborProjectIsNative,
   laborRanking,
   laborSummary,
   periodDates,
@@ -28,13 +29,17 @@ const f = (n: number | null | undefined) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
-function lastDay(zone = "America/Chicago") {
-  const now = new Intl.DateTimeFormat("en-CA", {
+function companyToday(zone = "America/Chicago") {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: zone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function lastDay(zone = "America/Chicago") {
+  const now = companyToday(zone);
   const d = new Date(now + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() - 1);
   while ([0, 6].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() - 1);
@@ -234,8 +239,7 @@ export default function LaborDashboard() {
       : null;
   const projects = bundle?.project_snapshot?.payload.records ?? [];
   const nativeProjectMode =
-    !!bundle?.sources.find((s) => s.source === "ipoint")?.native_from &&
-    end >= bundle!.sources.find((s) => s.source === "ipoint")!.native_from!;
+    !!bundle && laborProjectIsNative(bundle, end, companyToday(timezone));
   const projectRows = nativeProjectMode
       ? (bundle?.native_projects ?? [])
       : projects,
