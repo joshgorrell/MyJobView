@@ -1,3 +1,4 @@
+import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { useEffect, useRef } from 'react';
@@ -12,7 +13,7 @@ interface QuickAccessNavigationProps {
 }
 
 export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAccessNavigationProps) {
-  const { starredModules, loading } = useDepartments();
+  const { starredModules, loading, hasModuleAccess } = useDepartments();
   const taskCount = useTaskCount();
   const fishbowlCount = useFishbowlCount();
   const navigationRef = useRef<HTMLElement>(null);
@@ -55,11 +56,11 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
       ) : (
         <nav ref={navigationRef} className="flex gap-2 overflow-x-auto min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
           {starredModules.map((module) => {
-          const isActive = activeModule === module.module_key;
+          const isActive = activeModule === module.module_key || workspaceMenuKey(activeModule) === module.module_key;
 
           const badgeCount =
-            module.module_key === 'tasks' ? taskCount :
-            module.module_key === 'fishbowl' ? fishbowlCount :
+            (module.module_key === 'tasks' || (module.module_key === 'feed' && hasModuleAccess('tasks'))) ? taskCount :
+            (module.module_key === 'fishbowl' || (module.module_key === 'pipeline_board' && hasModuleAccess('fishbowl'))) ? fishbowlCount :
             0;
           const showBadge = badgeCount > 0;
 

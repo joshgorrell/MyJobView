@@ -1,3 +1,4 @@
+import { WorkspaceTabs } from './components/Shared/WorkspaceTabs';
 import { pageFromLocation, workspacePage, workspaceUrl, isPortalProposalRoute } from './lib/workspaceRoutes';
 import { resolveLegacyPage } from './lib/permissionCatalog';
 import { syncVisitEvents } from './lib/jobOffline';
@@ -66,7 +67,6 @@ const DispatchConsole = lazy(() => import('./components/Dispatch/DispatchConsole
 const ServiceRequestConsole = lazy(() => import('./components/Dispatch/ServiceRequestConsole').then(m => ({ default: m.ServiceRequestConsole })));
 const TravelBonusQueue = lazy(() => import('./components/Dispatch/TravelBonusQueue').then(m => ({ default: m.TravelBonusQueue })));
 const ProjectWorkOrdersQueue = lazy(() => import('./components/Dispatch/ProjectWorkOrdersQueue').then(m => ({ default: m.ProjectWorkOrdersQueue })));
-const DispatchCustomerComms = lazy(() => import('./components/Dispatch/DispatchCustomerComms').then(m => ({ default: m.DispatchCustomerComms })));
 const WorkOrdersList = lazy(() => import('./components/Production/WorkOrdersList').then(m => ({ default: m.WorkOrdersList })));
 const WorkOrderDetail = lazy(() => import('./components/Production/WorkOrderDetail').then(m => ({ default: m.WorkOrderDetail })));
 const ChangeOrdersView = lazy(() => import('./components/Production/ChangeOrdersView').then(m => ({ default: m.ChangeOrdersView })));
@@ -952,10 +952,11 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'leads' && checkModuleAccess('leads') && <LeadsHistory key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
-          {activeTab === 'feed' && (checkModuleAccess('feed') || checkModuleAccess('messages')) && (
+          {(activeTab === 'feed' || activeTab === 'tasks') && (checkModuleAccess('feed') || checkModuleAccess('messages') || checkModuleAccess('tasks')) && (
             <MasterFeed
               key={activeTab}
+              initialTaskView={activeTab === 'tasks' && checkModuleAccess('tasks')}
+              tasksContent={checkModuleAccess('tasks') ? <TasksView initialShowForm={showTaskForm} onFormClose={() => setShowTaskForm(false)} openTaskId={openTaskId} onTaskOpened={() => setOpenTaskId(null)} /> : undefined}
               onLeadClick={setSelectedLeadId}
               createRequested={createInternalChatRequested}
               onCreateOpened={() => setCreateInternalChatRequested(false)}
@@ -973,7 +974,7 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'fishbowl' && checkModuleAccess('fishbowl') && <FishbowlView key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
+
           {(activeTab === 'proposals' || activeTab === 'sales') && checkModuleAccess('proposals') && (
             <ProposalsView
               key={activeTab}
@@ -992,8 +993,10 @@ function AppContent() {
             />
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
-          {activeTab === 'payroll' && checkModuleAccess('payroll') && <FinanceTimeWorkspace key={activeTab} onPayroll={() => setActiveTab('payroll')} />}
-          {activeTab === 'time_approval' && checkModuleAccess('time_approval') && <FinanceTimeWorkspace key={activeTab} review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} />}
+          {['payroll', 'time_approval'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
+            ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Review', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
+            ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
+          ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
             <InvoicesView
@@ -1073,8 +1076,12 @@ function AppContent() {
             />
           )}
           {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'pipeline_board' && checkModuleAccess('pipeline_board') && <PipelineBoard key={activeTab} />}
-          {activeTab === 'prospects' && checkModuleAccess('prospects') && <ProspectsPage key={activeTab} />}
+          {['pipeline_board', 'prospects', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
+            ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard /> }] : []),
+            ...(checkModuleAccess('prospects') ? [{ key: 'prospects', label: 'Prospects', content: <ProspectsPage /> }] : []),
+            ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
+            ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Fishbowl', content: <FishbowlView onLeadClick={setSelectedLeadId} /> }] : []),
+          ]} />}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}
           {activeTab === 'sales_service_requests' && checkModuleAccess('service_requests') && <SalesServiceRequestsView key={activeTab} />}
           {activeTab === 'sticky-notes' && checkModuleAccess('sticky-notes') && <StickyNotes key={activeTab} />}
@@ -1099,7 +1106,7 @@ function AppContent() {
           {activeTab === 'project_work_orders' && checkModuleAccess('work_orders') && <ProjectWorkOrdersQueue key={activeTab} />}
           {activeTab === 'job_status' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_status" />}
           {activeTab === 'job_acceptance' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_acceptance" />}
-          {activeTab === 'customer_comms' && checkModuleAccess('dispatch_dashboard') && <DispatchCustomerComms key={activeTab} />}
+          {activeTab === 'customer_comms' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="communications" />}
           {activeTab === 'tech_skills' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="tech_skills" />}
           {activeTab === 'daily_clock' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} />}
           {activeTab === 'daily_clock_sessions' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} initialTab="sessions" />}
@@ -1123,15 +1130,6 @@ function AppContent() {
 
           {activeTab === 'portal_punchlist' && checkModuleAccess('punchlist') && <PortalPunchlist key={activeTab} />}
 
-          {activeTab === 'tasks' && checkModuleAccess('tasks') && (
-            <TasksView
-              key={activeTab}
-              initialShowForm={showTaskForm}
-              onFormClose={() => setShowTaskForm(false)}
-              openTaskId={openTaskId}
-              onTaskOpened={() => setOpenTaskId(null)}
-            />
-          )}
           {activeTab === 'mycard' && <MyCardView key={activeTab} />}
           {activeTab === 'help' && <HowItWorks key={activeTab} />}
           {activeTab === 'improvements' && <ImprovementsView key={activeTab} />}

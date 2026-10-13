@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import Flow from '../Flow/Flow';
 import type { CustomerConversationsProps } from '../Flow/CustomerConversations';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
@@ -9,6 +9,8 @@ import { DiscussionPostForm } from './DiscussionPostForm';
 
 interface MasterFeedProps extends CustomerConversationsProps {
   onLeadClick: (leadId: string) => void;
+  tasksContent?: ReactNode;
+  initialTaskView?: boolean;
 }
 
 function LegacyDiscussionFeed({ onLeadClick, focusPostId }: MasterFeedProps & { focusPostId?: string | null }) {
