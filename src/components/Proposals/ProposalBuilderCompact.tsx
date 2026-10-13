@@ -6844,6 +6844,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           proposalNumber={proposal.proposal_number}
           onClose={() => setShowSubmissionModal(false)}
           initialPortalVisibility={Boolean(proposal.is_portal_visible)}
+          onEmailProposal={() => {
+            setShowSubmissionModal(false);
+            setShowEmailProposalModal(true);
+          }}
+          onPrintProposal={() => {
+            setShowSubmissionModal(false);
+            setShowPdfModal(true);
+          }}
           onSend={(approvalWindow, visibleInPortal) => handleConfirmSubmission(visibleInPortal, approvalWindow)}
           onNavigateToSettings={(section) => {
             setShowSubmissionModal(false);
