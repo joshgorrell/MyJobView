@@ -34,3 +34,5 @@ tree=render({status:'requested',service_request_id:'sr',service_request:{id:'sr'
 tree=render({status:'scheduled',work_order_id:'wo'});assert.ok(!buttons(tree).some(n=>text(n)==='Schedule'||text(n)==='Request Service'));
 tree=render({},false);assert.ok(!buttons(tree).some(n=>text(n)==='Schedule'||text(n)==='Request Service'));
 console.log('Detail footer actions, requested/scheduled states, and staff-only action visibility passed.');
+
+for(const status of ['draft','requested','scheduled','completed']){tree=render({status,installer_notes:'PRIVATE TECH NOTE'},false);assert.ok(!text(tree).includes('PRIVATE TECH NOTE'));}console.log('Technician notes never render in customer details, including completed items.');

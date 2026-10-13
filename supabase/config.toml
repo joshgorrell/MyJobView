@@ -271,3 +271,6 @@ verify_jwt = false
 
 [functions.proposal-check-response]
 verify_jwt = false
+
+[functions.process-test-tune-starts]
+verify_jwt = false

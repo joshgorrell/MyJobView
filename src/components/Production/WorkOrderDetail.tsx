@@ -17,6 +17,7 @@ import { JobPhotoCapture } from './JobPhotoCapture';
 import { JobCompletionWizard } from './JobCompletionWizard';
 import { AddPartsModal } from './AddPartsModal';
 import { CreateTaskFromWorkOrderModal } from './CreateTaskFromWorkOrderModal';
+import WorkOrderPunchlistChecklist from './WorkOrderPunchlistChecklist';
 import WorkOrderTasksChecklist from './WorkOrderTasksChecklist';
 import ServiceWorkOrderTaskManager from './ServiceWorkOrderTaskManager';
 import VipMaintenanceChecklist from './VipMaintenanceChecklist';
@@ -42,6 +43,11 @@ interface WorkOrder {
   scheduled_date: string | null;
   scheduled_start_time: string | null;
   scheduled_end_time: string | null;
+  service_location_address?: string | null;
+  service_location_city?: string | null;
+  service_location_state?: string | null;
+  service_location_zip?: string | null;
+  address?: string | null;
   target_completion_date: string;
   actual_completion_date: string | null;
   estimated_hours: number;
@@ -709,7 +715,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
     { id: 'overview', label: 'Overview', icon: FileText },
     { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'tasks', label: "Today's Work", icon: CheckSquare, count: tasks.length },
+    { id: 'tasks', label: "Today's Work", icon: CheckSquare },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
     { id: 'photos', label: 'Photos', icon: Camera, count: jobPhotos.length },
     { id: 'materials', label: 'Materials', icon: Package, count: materials.length + partsUsed.length },
@@ -951,7 +957,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       {/* Stats Row */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {[
-          { icon: CheckSquare, label: 'Tasks', value: `${completedTasks}/${tasks.length}`, color: 'text-blue-600' },
+          ...(tasks.length ? [{ icon: CheckSquare, label: 'Internal Tasks', value: `${completedTasks}/${tasks.length}`, color: 'text-blue-600' }] : []),
           { icon: Clock, label: 'Hours', value: `${totalTimeHours.toFixed(2)}h`, color: 'text-slate-600' },
           { icon: Package, label: 'Parts Used', value: partsUsed.length, color: 'text-green-600' },
           { icon: Wrench, label: 'Part Requests', value: partRequests.length, sub: pendingParts > 0 ? `${pendingParts} pending` : undefined, color: 'text-orange-600' },
@@ -1350,10 +1356,23 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         {/* Tasks */}
         {activeTab === 'tasks' && (
           <div className="space-y-6">
-            <section className="border border-blue-200 bg-blue-50 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Instructions for this work order</h3>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">{workOrder.description || 'No instructions provided.'}</p>
+            <section aria-label="Visit location" className="border border-subtle bg-surface rounded-xl p-4 space-y-2">
+              <h2 className="font-semibold text-primary">Where am I going?</h2>
+              <p className="font-medium text-primary break-words">{workOrder.contact?.full_name || workOrder.contact?.company_name || 'Customer'}</p>
+              {(() => {
+                const address = [workOrder.service_location_address || workOrder.address || workOrder.contact?.street_address,
+                  workOrder.service_location_city || workOrder.contact?.city, workOrder.service_location_state || workOrder.contact?.state,
+                  workOrder.service_location_zip || workOrder.contact?.zip_code].filter(Boolean).join(', ');
+                return address ? <><p className="text-sm text-secondary break-words">{address}</p><a className="inline-flex items-center gap-2 min-h-11 text-blue-600" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer"><Navigation className="w-4 h-4" />Directions</a></> : <p className="text-sm text-amber-700">No visit address recorded.</p>;
+              })()}
+              <p className="text-sm text-secondary">{(workOrder.scheduled_date || workOrder.start_date)?.split('T')[0] || 'Date not set'} · {workOrder.scheduled_start_time?.slice(0, 5) || 'Time not set'}{workOrder.scheduled_end_time ? `–${workOrder.scheduled_end_time.slice(0, 5)}` : ''}</p>
+              <p className="text-sm text-secondary break-words">Technician: {workOrder.technician?.full_name || 'Unassigned'}{linkedWorkOrders.length > 0 ? ` · Also assigned: ${linkedWorkOrders.map(order => order.technician?.full_name).filter(Boolean).join(', ')}` : ''}</p>
             </section>
+            <section className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-2">Scope / Description</h3>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
+            </section>
+            <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
             <WorkOrderTasksChecklist
               workOrderId={workOrderId}
               projectId={workOrder.project_id}
@@ -1365,7 +1384,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
             {!workOrder.project_id && canEdit && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Manage Service Tasks</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Manage Internal Tasks</h3>
                 <ServiceWorkOrderTaskManager
                   workOrderId={workOrderId}
                   workOrderGroupId={workOrder.work_order_group_id || undefined}

@@ -102,6 +102,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   const securityPortalEnabled = useSecurityPortalEnabled();
   const { profile, user } = useAuth();
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
+  const [accessError, setAccessError] = useState('');
   const [tasks, setTasks] = useState<PunchlistTask[]>([]);
   const [showCompleted, setShowCompleted] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -138,7 +139,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     const impersonatingContactId = localStorage.getItem('admin_impersonating_contact');
     if (impersonatingContactId) return impersonatingContactId;
     if (profile?.contact_id) return profile.contact_id;
-    return user?.user_metadata?.contact_id || null;
+    return user?.app_metadata?.contact_id || null;
   };
 
   const getCustomerName = () => {
@@ -150,14 +151,17 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   };
 
   useEffect(() => {
+    const orgId = profile?.organization_id || user?.app_metadata?.organization_id;
+    if (!orgId) return;
     supabase
       .from('company_settings')
       .select('app_url')
+      .eq('organization_id', orgId)
       .maybeSingle()
       .then(({ data }) => {
         if (data?.app_url) setAppUrl(data.app_url);
       });
-  }, []);
+  }, [profile?.organization_id, user?.app_metadata?.organization_id]);
 
   useEffect(() => {
     const contactId = getContactId();
@@ -197,12 +201,14 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         subscription.unsubscribe();
       };
     } else {
+      setAccessError('No customer account is selected. Open your customer portal access link.');
       setLoading(false);
     }
-  }, [previewContactId, profile?.contact_id, user?.user_metadata?.contact_id]);
+  }, [previewContactId, profile?.contact_id, user?.app_metadata?.contact_id]);
 
   async function checkAccess(contactId: string) {
     if (!contactId) return;
+    setAccessError('');
 
     try {
       const { data: pendingGrants } = await supabase
@@ -240,6 +246,8 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       }
     } catch (error) {
       console.error('Error checking access:', error);
+      setAccessError('We could not verify your access. Refresh or try again before making changes.');
+      setAccessInfo({ has_access: false, access_type: null, days_remaining: null, expiration_date: null, subscription_plan_name: null });
     } finally {
       setLoading(false);
     }
@@ -280,7 +288,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
     if (!contactId || !newTask.details.trim()) return;
 
-    const orgId = contactOrgId || user?.user_metadata?.organization_id || null;
+    const orgId = contactOrgId || user?.app_metadata?.organization_id || null;
     if (!orgId) {
       alert('Unable to determine your organization. Please refresh and try again.');
       return;
@@ -389,7 +397,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     setDeleteConfirmTaskId(null);
 
     try {
-      const { error } = await supabase.from('punchlist_tasks').delete().eq('id', taskId);
+      const { error } = await supabase.rpc('update_punchlist_item', { p_task_id: taskId, p_action: 'delete' });
 
       if (error) throw error;
 
@@ -397,6 +405,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       if (contactId) loadTasks(contactId);
     } catch (error) {
       console.error('Error deleting task:', error);
+      alert((error as { message?: string }).message || 'This item could not be removed. Please contact your service manager.');
     }
   }
 
@@ -694,6 +703,10 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         <div className="text-gray-400">Loading...</div>
       </div>
     );
+  }
+
+  if (!loading && accessError) {
+    return <div role="alert" className="p-4 space-y-3 text-gray-800 bg-white rounded-xl"><p>{accessError}</p><button type="button" onClick={() => { const contactId = getContactId(); if (contactId) { setLoading(true); void checkAccess(contactId).then(() => loadTasks(contactId)); } }} className="min-h-11 px-4 bg-blue-600 text-white rounded-lg">Retry access check</button></div>;
   }
 
   if (!loading && accessInfo !== null && !accessInfo.has_access) {
@@ -1486,12 +1499,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                       <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
                         {task.details && <p className="text-sm text-gray-500">{task.details}</p>}
 
-                        {task.installer_notes && (
-                          <div className="p-3 bg-gray-50 rounded border border-gray-200">
-                            <div className="text-xs text-gray-600 mb-1 font-medium">Installer Notes:</div>
-                            <div className="text-sm text-gray-700">{task.installer_notes}</div>
-                          </div>
-                        )}
+
 
                         {task.service_request?.work_order && (
                           <a

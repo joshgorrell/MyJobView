@@ -50,6 +50,7 @@ interface PunchlistTask {
   completed_at: string | null;
   completed_by_customer?: boolean;
   installer_notes: string | null;
+  internal_work_note?: { notes: string | null } | null;
   service_request_id?: string | null;
   work_order_id?: string | null;
   combined_description?: string | null;
@@ -87,6 +88,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   const [tasks, setTasks] = useState<PunchlistTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [listOrder, setListOrder] = useState<'newest' | 'customer'>('newest');
   const [batchMode, setBatchMode] = useState<'request' | 'schedule'>('request');
@@ -139,6 +141,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           contact:contacts!inner(full_name, first_name, last_name, email, phone),
           access_grant:punchlist_access_grants(access_type, expiration_date),
           photos:punchlist_task_photos(*),
+          internal_work_note:punchlist_staff_notes(notes),
           service_request:service_requests!service_request_id(
             id,
             status,
@@ -338,26 +341,29 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
   return (
     <div className="space-y-2 sm:space-y-4 px-1 sm:px-0">
-      <div data-testid="punchlist-toolbar" className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 min-w-0">
+      <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2 min-w-0">
         <select aria-label="Punchlist page" value={activeTab} onChange={e => changeView(() => setActiveTab(e.target.value as 'punchlist' | 'customers'))}
           className="shrink-0 min-h-11 max-w-[110px] text-xs bg-surface border border-subtle rounded-lg text-primary px-1.5">
           <option value="punchlist">Punchlist</option><option value="customers">Customers</option>
         </select>
         {activeTab === 'punchlist' && (<>
-          <div className="relative flex-1 min-w-[100px]">
+          <button type="button" aria-expanded={showMobileFilters} aria-controls="punchlist-mobile-filters" onClick={() => setShowMobileFilters(value => !value)} className="sm:hidden min-h-11 px-3 rounded-lg border border-subtle text-primary">Filters</button>
+          <div className="relative order-last sm:order-none basis-full sm:basis-auto sm:flex-1 min-w-0">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
             <input aria-label="Search punchlist items" value={searchQuery} onChange={e => changeView(() => setSearchQuery(e.target.value))} placeholder="Search…"
               className="w-full min-h-11 pl-7 pr-2 text-base bg-surface border border-subtle rounded-lg text-primary" />
           </div>
+          <div id="punchlist-mobile-filters" className={`${showMobileFilters ? 'grid' : 'hidden'} sm:flex order-last sm:order-none grid-cols-2 gap-2 basis-full sm:basis-auto min-w-0`}>
           <select aria-label="Punchlist order" value={listOrder} onChange={e => changeView(() => setListOrder(e.target.value as 'newest' | 'customer'))}
-            className="shrink-0 min-h-11 max-w-[110px] px-1.5 text-xs bg-surface border border-subtle rounded-lg text-primary">
+            className="shrink-0 min-h-11 w-full sm:w-auto sm:max-w-[130px] px-2 text-base sm:text-xs bg-surface border border-subtle rounded-lg text-primary">
             <option value="newest">Newest</option><option value="customer">By Customer</option>
           </select>
           <select aria-label="Punchlist status" value={selectedFilter} onChange={e => changeView(() => setSelectedFilter(e.target.value))}
-            className="shrink-0 min-h-11 max-w-[90px] px-1.5 text-xs bg-surface border border-subtle rounded-lg text-primary">
+            className="shrink-0 min-h-11 w-full sm:w-auto sm:max-w-[130px] px-2 text-base sm:text-xs bg-surface border border-subtle rounded-lg text-primary">
             <option value="all">All ({stats.total})</option><option value="draft">Not Requested ({stats.draft})</option>
             <option value="requested">Requested ({stats.requested})</option><option value="scheduled">Scheduled ({stats.scheduled})</option><option value="completed">Completed ({stats.completed})</option>
           </select>
+          </div>
           {contactFilter && <button onClick={() => changeView(() => setContactFilter(null))} title={`Clear customer filter: ${contactFilter.name}`}
             className="shrink-0 min-h-11 px-2 text-xs text-primary bg-elevated rounded-lg max-w-[120px] truncate">{contactFilter.name} ×</button>}
           {(searchQuery || selectedFilter !== 'all') && <button aria-label="Clear filters" onClick={() => changeView(() => {setSearchQuery('');setSelectedFilter('all');})} className="shrink-0 min-h-11 px-2 text-primary bg-elevated rounded-lg"><X className="w-4 h-4" /></button>}
@@ -469,11 +475,11 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                     )}
 
                     {/* Installer Notes */}
-                    {task.installer_notes && (
+                    {task.internal_work_note?.notes && (
                       <div>
-                        <div className="text-xs font-medium text-secondary mb-1">Installer Notes</div>
+                        <div className="text-xs font-medium text-secondary mb-1">Internal Work Notes</div>
                         <p className="text-xs text-muted whitespace-pre-wrap bg-surface p-2 rounded">
-                          {task.installer_notes}
+                          {task.internal_work_note?.notes}
                         </p>
                       </div>
                     )}
