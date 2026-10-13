@@ -80,6 +80,8 @@ export function EmailProposalModal({
   const [toEmail, setToEmail] = useState(contactEmail);
   const [ccEmails, setCcEmails] = useState('');
   const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [bccEmails, setBccEmails] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -216,6 +218,7 @@ export function EmailProposalModal({
           proposalId,
           toEmail,
           ccEmails: ccEmails.split(',').map(e => e.trim()).filter(Boolean),
+          bccEmails: bccEmails.split(',').map(e => e.trim()).filter(Boolean),
           subject,
           message,
           attachments: emailAttachments,
@@ -287,6 +290,7 @@ export function EmailProposalModal({
 
           <div className="flex justify-end">
             <button type="button" onClick={() => setShowCc(value => !value)} className="min-h-[44px] px-2 text-sm text-blue-300 hover:text-blue-200" aria-expanded={showCc}>Cc</button>
+            <button type="button" onClick={() => setShowBcc(value => !value)} className="min-h-[44px] px-2 text-sm text-blue-300 hover:text-blue-200" aria-expanded={showBcc}>Bcc</button>
           </div>
 
           {/* CC */}
@@ -303,6 +307,11 @@ export function EmailProposalModal({
               disabled={loading}
             />
             <p className="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
+          </div>}
+
+          {showBcc && <div>
+            <label htmlFor="proposal-bcc" className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Bcc (optional)</label>
+            <input id="proposal-bcc" type="text" value={bccEmails} onChange={event => setBccEmails(event.target.value)} disabled={loading} placeholder="email1@example.com, email2@example.com" className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:ring-2 focus:ring-blue-500" />
           </div>}
 
           {/* Subject */}
