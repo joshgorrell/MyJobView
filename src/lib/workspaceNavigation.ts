@@ -1,7 +1,7 @@
 // Keep original module keys for permissions and links; consolidate only menus.
 export const workspaceParents: Record<string, string> = {
   tasks: 'feed', prospects: 'pipeline_board', leads: 'pipeline_board',
-  fishbowl: 'pipeline_board', customer_comms: 'dispatch_dashboard', time_approval: 'payroll',
+  fishbowl: 'pipeline_board', customer_comms: 'dispatch_dashboard', time_approval: 'payroll', labor_dashboard: 'payroll',
 };
 export function workspaceMenuKey(key: string) { return workspaceParents[key] || key; }
 export function showWorkspaceMenu(key: string, access: (key: string) => boolean) {

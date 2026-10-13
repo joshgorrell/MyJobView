@@ -88,7 +88,7 @@ interface PendingTimeRequest {
   assigned_profile: { full_name: string | null } | null;
 }
 
-export function TimeClockManagement() {
+export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>void}) {
   const { user } = useAuth();
   const [autoClockOutSettings, setAutoClockOutSettings] = useState<AutoClockOutSettings>({
     auto_clock_out_enabled: true,
@@ -504,7 +504,8 @@ export function TimeClockManagement() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col gap-4 items-center justify-center h-64">
+        {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open labor dashboard</button>}
         <div className="text-gray-500">Loading settings...</div>
       </div>
     );
@@ -524,6 +525,7 @@ export function TimeClockManagement() {
         </div>
       </div>
 
+      {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open labor dashboard</button>}
       {/* Tab Navigation */}
       <div className="flex flex-wrap gap-1 border-b border-gray-200">
         <button

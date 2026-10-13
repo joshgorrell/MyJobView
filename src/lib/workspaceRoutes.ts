@@ -85,6 +85,7 @@ const pages = [
   "time",
   "time_approval",
   "time_clock_management",
+  "labor_dashboard",
   "travel_bonus",
   "travel_bonus_settings",
   "vehicle-tracking",

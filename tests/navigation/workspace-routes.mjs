@@ -2,7 +2,7 @@ import {build} from 'esbuild';
 import assert from 'node:assert/strict';
 const result=await build({entryPoints:['src/lib/workspaceRoutes.ts'],bundle:true,format:'esm',write:false,platform:'node'});
 const {workspacePath,workspacePage,pageFromLocation,workspaceUrl,isPortalProposalRoute}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
-for(const [page,path] of [['feed','/flow'],['leads','/leads'],['proposals','/proposals'],['calendar','/schedule'],['punchlist','/project-punchlist'],['settings_company','/settings/company']]){
+for(const [page,path] of [['feed','/flow'],['leads','/leads'],['proposals','/proposals'],['calendar','/schedule'],['punchlist','/project-punchlist'],['settings_company','/settings/company'],['labor_dashboard','/labor-dashboard']]){
  assert.equal(workspacePath(page),path); assert.equal(workspacePage(path+'/'),page);
  assert.equal(pageFromLocation(new URL('https://elife.myjobview.com'+path)),page);
 }

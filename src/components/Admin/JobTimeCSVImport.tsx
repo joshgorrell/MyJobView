@@ -91,6 +91,7 @@ export function JobTimeCSVImport() {
     const { data } = await supabase
       .from('time_entry_import_profiles')
       .select('*')
+      .or('import_type.eq.job_time,import_type.eq.legacy')
       .order('last_used_at', { ascending: false, nullsFirst: false });
 
     if (data) setProfiles(data);
@@ -497,6 +498,7 @@ export function JobTimeCSVImport() {
         imported_by: profile?.id,
         batch_id: batchId,
         file_name: file?.name,
+        import_type: 'job_time',
         profile_id: selectedProfile || null,
         total_rows: results.length,
         status: 'processing'

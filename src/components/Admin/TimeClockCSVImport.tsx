@@ -516,11 +516,11 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
 
         const { data: techProfile } = await supabase
           .from('profiles')
-          .select('office_id, org_id, organization_id')
+          .select('primary_office_id, organization_id')
           .eq('id', result.matchedEmployee!.id)
           .maybeSingle();
 
-        const orgId = techProfile?.org_id || techProfile?.organization_id || profile?.org_id;
+        const orgId = techProfile?.organization_id || profile?.organization_id;
 
         const { error } = await supabase
           .from('daily_clock_entries')
@@ -537,8 +537,8 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
             adjustment_reason: `CSV Import - Batch ${batchId}`,
             notes: row.notes || `Imported from ${file?.name}`,
             break_minutes: parseInt(row.breakMinutes || '0'),
-            office_id: techProfile?.office_id || null,
-            org_id: orgId
+            office_id: techProfile?.primary_office_id || null,
+            organization_id: orgId
           });
 
         if (error) {
@@ -552,7 +552,7 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
         }
       }
 
-      await supabase.from('time_entry_import_history').insert({
+      const {error: historyError}=await supabase.from('time_entry_import_history').insert({
         batch_id: batchId,
         import_type: 'daily_time',
         file_name: file?.name || 'unknown.csv',
@@ -560,9 +560,11 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
         successful_rows: successCount,
         failed_rows: failCount,
         status: failCount === 0 ? 'completed' : 'partial',
-        imported_by: user.id
+        imported_by: user.id,
+        organization_id: profile?.organization_id
       });
 
+      if(historyError) importErrors.push({row:0,error:'Import history could not be saved: '+historyError.message});
       if (selectedProfile) {
         await supabase
           .from('time_entry_import_profiles')
