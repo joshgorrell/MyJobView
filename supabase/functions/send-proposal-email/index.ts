@@ -38,6 +38,7 @@ Deno.serve(async (req: Request) => {
       proposalId,
       toEmail,
       ccEmails,
+      bccEmails,
       subject: customSubject,
       message: customMessage,
       // Array of { filename, content } where content is base64-encoded HTML
@@ -225,6 +226,11 @@ Deno.serve(async (req: Request) => {
     // Add CC recipients if provided
     if (Array.isArray(ccEmails) && ccEmails.length > 0) {
       resendPayload.cc = ccEmails;
+    }
+
+    // Bcc recipients are passed privately to the mail provider, not included in visible headers.
+    if (Array.isArray(bccEmails) && bccEmails.length > 0) {
+      resendPayload.bcc = bccEmails;
     }
 
     // Add attachments if any (Resend accepts { filename, content } where content is base64)
