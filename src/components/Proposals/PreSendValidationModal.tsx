@@ -92,7 +92,7 @@ export function PreSendValidationModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/60">
           <div>
-            <h2 className="text-lg font-semibold text-white">Send Proposal</h2>
+            <h2 className="text-lg font-semibold text-white">Submit Proposal</h2>
             <p className="text-gray-400 text-xs mt-0.5">#{proposalNumber}</p>
           </div>
           <button
@@ -192,7 +192,7 @@ export function PreSendValidationModal({
             <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-red-300">
               {invalidSections.length === 1
-                ? '1 section needs attention before sending.'
+                ? '1 section needs attention before submission.'
                 : `${invalidSections.length} sections need attention before sending.`}
             </p>
           </div>
@@ -239,7 +239,7 @@ export function PreSendValidationModal({
             {sending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Sending...
+                Submitting...
               </>
             ) : (
               <>
@@ -253,7 +253,7 @@ export function PreSendValidationModal({
         {isReady && (
           <p className="text-center text-xs text-green-400 pb-3 -mt-2 flex items-center justify-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
-            Ready to send
+            Ready to submit
           </p>
         )}
       </div>
