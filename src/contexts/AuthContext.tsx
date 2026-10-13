@@ -3,6 +3,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
+import { browserInstallationId } from '../lib/sessionDevices';
 import { isValidReturnHost } from '../lib/crossDomainAuth';
 
 interface AuthContextType {
@@ -339,11 +340,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       cleanupSessionTracking();
 
-      const deviceInfo = parseUserAgent(navigator.userAgent);
+      const deviceInfo = parseUserAgent(navigator.userAgent, navigator.maxTouchPoints);
 
-      const { data, error } = await supabase.rpc('start_user_session', {
-        p_user_id: userId,
-        p_ip_address: null,
+      const { data, error } = await supabase.rpc('start_browser_session', {
+        p_browser_id: browserInstallationId(),
         p_user_agent: navigator.userAgent,
         p_device_type: deviceInfo.deviceType,
         p_browser_name: deviceInfo.browserName,
@@ -391,11 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const handleVisibilityChange = async () => {
           if (document.visibilityState === 'visible') {
             try {
-              await supabase.rpc('update_session_activity', {
-                p_user_id: userId,
-                p_page: null,
-                p_session_id: data
-              });
+              await startSessionTracking(userId);
             } catch (err) {
               console.error('⚠️ Error updating session activity on visibility change:', err);
             }
@@ -404,36 +400,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.addEventListener('visibilitychange', handleVisibilityChange);
         (window as any).__visibilityHandler = handleVisibilityChange;
 
-        // Handle visibility change to hidden — mark session inactive when tab is closed
-        // We use visibilitychange instead of beforeunload because beforeunload fires
-        // on every SPA navigation (React router), killing sessions constantly.
-        const handleHide = () => {
-          if (document.visibilityState === 'hidden') {
-            try {
-              const sessionIdToEnd = (window as any).__currentSessionId;
-              const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/end_user_session`;
-              const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-              const { data: { session } } = (supabase.auth as any)._session
-                ? { data: { session: (supabase.auth as any)._session } }
-                : { data: { session: null } };
-              const token = session?.access_token || anonKey;
-              const blob = new Blob(
-                [JSON.stringify({ p_session_id: sessionIdToEnd })],
-                { type: 'application/json' }
-              );
-              const headers = new Headers({
-                'Authorization': `Bearer ${token}`,
-                'apikey': anonKey,
-                'Content-Type': 'application/json',
-              });
-              fetch(url, { method: 'POST', headers, body: blob, keepalive: true }).catch(() => {});
-            } catch (err) {
-              // non-critical
-            }
-          }
-        };
-        document.addEventListener('visibilitychange', handleHide);
-        (window as any).__hideHandler = handleHide;
         (window as any).__currentSessionId = data;
       }
     } catch (error) {

@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+import vm from 'node:vm';
+import { readFile } from 'node:fs/promises';
+function compile(source, globals = {}) {
+  const exports = {}; const context = { exports, ...globals };
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, context);
+  return exports;
+}
+const cache = new Map(); let n=0;
+const helpers = compile(await readFile('src/lib/sessionDevices.ts','utf8'), { localStorage: { getItem: k => cache.get(k), setItem: (k,v) => cache.set(k,v) }, crypto: { randomUUID: () => `00000000-0000-4000-8000-${String(++n).padStart(12,'0')}` } });
+assert.equal(helpers.browserInstallationId(),helpers.browserInstallationId());
+cache.clear(); assert.notEqual(helpers.browserInstallationId(),'00000000-0000-4000-8000-000000000001');
+const now = Date.now(); const session={is_active:true,session_end:null,last_activity:new Date(now-1000).toISOString()};
+assert.equal(helpers.sessionStatus(session,now),'Online');
+assert.equal(helpers.sessionStatus({...session,last_activity:new Date(now-7*60000).toISOString()},now),'Idle');
+assert.equal(helpers.sessionStatus({...session,last_activity:new Date(now-31*60000).toISOString()},now),'Ended');
+assert.equal(helpers.sessionStatus({...session,session_end:new Date().toISOString()},now),'Ended');
+assert.equal(helpers.sessionStatus({...session,last_activity:'invalid'},now),'Ended');
+const device={device_signature:null,user_id:'one',device_type:'desktop',browser_name:'Chrome',os_name:'Windows'};
+assert.notEqual(helpers.sessionDeviceKey(device),helpers.sessionDeviceKey({...device,user_id:'two'}));
+assert.notEqual(helpers.sessionDeviceKey({...device,device_signature:'one'}),helpers.sessionDeviceKey({...device,device_signature:'two'}));
+const parser=compile(await readFile('src/lib/userAgentParser.ts','utf8'));
+const ipad='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15';
+assert.equal(parser.parseUserAgent(ipad,5).deviceType,'tablet');
+assert.equal(parser.parseUserAgent(ipad,0).deviceType,'desktop');
+const auth=await readFile('src/contexts/AuthContext.tsx','utf8');
+assert.ok(!auth.includes('keepalive: true'), 'Hiding a tab must not end a session');
+assert.ok(auth.includes("supabase.rpc('start_browser_session'"));
+console.log('Stable browser identity, per-user legacy grouping, status boundaries, iPad desktop mode and background-tab behavior pass');
