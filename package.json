@@ -51,7 +51,8 @@
     "test:permissions:browser": "npm run build && node tests/permissions/browser.mjs",
     "test:workspace-routes": "node tests/navigation/workspace-routes.mjs && node tests/navigation/workspace-browser.mjs",
     "test:proposal-engagement": "node tests/proposal-engagement/runtime.mjs && node tests/proposal-engagement/database.mjs && node tests/proposal-engagement/report-database.mjs",
-    "test:proposal-engagement:browser": "node tests/proposal-engagement/browser.mjs && node tests/proposal-engagement/activity-link-browser.mjs && node tests/proposal-engagement/weekly-flow-browser.mjs"
+    "test:proposal-engagement:browser": "node tests/proposal-engagement/browser.mjs && node tests/proposal-engagement/activity-link-browser.mjs && node tests/proposal-engagement/weekly-flow-browser.mjs",
+    "test:sessions": "node tests/sessions/runtime.mjs && node tests/sessions/database.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

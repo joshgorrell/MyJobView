@@ -178,14 +178,14 @@ const DEVICE_PRESET_NICKNAMES = [
   { label: 'Conf. Room TV', icon: 'tv', color: '#6366F1' },
 ];
 
-export function UserSessionsViewerEnhanced() {
+export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?: 'usage' | 'schedule' }) {
   const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
   const [userStats, setUserStats] = useState<UserStats[]>([]);
   const [locationStats, setLocationStats] = useState<LocationStats[]>([]);
   const [deviceStats, setDeviceStats] = useState<DeviceStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'all'>('today');
-  const [activeTab, setActiveTab] = useState<'active' | 'users' | 'usage' | 'locations' | 'devices' | 'schedule'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'users' | 'usage' | 'locations' | 'devices' | 'schedule'>(initialTab);
   const [pageUsage, setPageUsage] = useState<any[]>([]);
   const [departmentUsage, setDepartmentUsage] = useState<any[]>([]);
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
@@ -329,9 +329,6 @@ export function UserSessionsViewerEnhanced() {
       await Promise.all([
         loadActiveSessions(),
         loadUserStats(),
-        loadLocationStats(),
-        loadDeviceStats(),
-        loadAllUsers(),
         loadUsageAnalytics()
       ]);
     } finally {
@@ -509,8 +506,6 @@ export function UserSessionsViewerEnhanced() {
   }
 
   async function loadActiveSessions() {
-    await supabase.rpc('cleanup_stale_sessions');
-
     const { data, error } = await supabase
       .from('user_sessions')
       .select(`
@@ -522,6 +517,7 @@ export function UserSessionsViewerEnhanced() {
         )
       `)
       .eq('is_active', true)
+      .gte('last_activity', new Date(Date.now() - 30 * 60_000).toISOString())
       .order('last_activity', { ascending: false });
 
     if (error) {
@@ -1007,57 +1003,7 @@ export function UserSessionsViewerEnhanced() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-gray-900">
           <Activity className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-bold">User Sessions</h2>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Active Now</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{totalActiveUsers}</p>
-            </div>
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="w-5 h-5 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">All Users</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{allUsers.length}</p>
-            </div>
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Locations</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{uniqueLocations}</p>
-            </div>
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <MapPin className="w-5 h-5 text-orange-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Session Time ({timeRange})</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{formatTotalTime(totalTimeToday)}</p>
-            </div>
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <Clock className="w-5 h-5 text-gray-600" />
-            </div>
-          </div>
+          <h2 className="text-xl font-bold">Session Settings & Reports</h2>
         </div>
       </div>
 
@@ -1066,52 +1012,10 @@ export function UserSessionsViewerEnhanced() {
           <div className="px-3 sm:px-6 py-3 sm:py-4">
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
               <button
-                onClick={() => setActiveTab('active')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'active'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="hidden sm:inline">Active Sessions</span>
-                <span className="sm:hidden">Active</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'users'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="hidden sm:inline">All Users</span>
-                <span className="sm:hidden">Users</span>
-              </button>
-              <button
                 onClick={() => setActiveTab('usage')}
                 className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${activeTab === 'usage' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               >
                 Usage Analytics
-              </button>
-              <button
-                onClick={() => setActiveTab('locations')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'locations'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Locations
-              </button>
-              <button
-                onClick={() => setActiveTab('devices')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'devices'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Devices
               </button>
               <button
                 onClick={() => setActiveTab('schedule')}
@@ -2153,3 +2057,5 @@ export function UserSessionsViewerEnhanced() {
     </div>
   );
 }
+
+export { UserSessionsDashboard as UserSessionsViewerEnhanced } from './UserSessionsDashboard';
