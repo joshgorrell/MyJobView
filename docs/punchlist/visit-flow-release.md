@@ -30,3 +30,5 @@ The processor preserves the established Day-7 invitation eligibility while the 9
 - `npm run test:punchlist:handoff:browser` and `node tests/punchlist/dashboard-browser.mjs` after a build, with Playwright Chromium available: actual work-order/component fixtures at phone and desktop widths, both themes, description-only visits, six entries, individual/unfinished updates, customer note privacy, and accessible dashboard controls.
 
 Tests do not send real emails or alter production. This PR alone does not activate the scheduler or deploy the application.
+
+Follow-up verification on October 13 loaded the production Punchlist history, service-request cancellation, and existing Internal Task completion triggers into the isolated database suite. The suite passes with those definitions, including portal history privacy, cancelled-request recovery, and independent completion requirements for Internal Tasks. This covers those interactions, not the entire production trigger graph. The available Supabase preview branches reported failed migrations; full-schema staging remains outstanding.

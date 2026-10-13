@@ -16,7 +16,10 @@ CREATE TABLE recurring_subscriptions(id uuid PRIMARY KEY,contact_id uuid,organiz
 CREATE TABLE punchlist_access_grants(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),contact_id uuid,organization_id uuid,project_id uuid,subscription_id uuid,access_type text,status text,granted_date date,expiration_date date,suspended_at timestamptz,suspended_by uuid,notes text,updated_at timestamptz);
 CREATE TABLE work_orders(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,assigned_to uuid,status text,creation_request_id uuid);
 CREATE TABLE work_order_assignments(work_order_id uuid,user_id uuid);
-CREATE TABLE work_order_tasks(id uuid PRIMARY KEY,organization_id uuid);
+CREATE TABLE work_order_tasks(id uuid PRIMARY KEY,organization_id uuid,work_order_id uuid,status text);
+CREATE TABLE punchlist_task_history(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),task_id uuid,changed_by uuid,change_type text,old_values jsonb,new_values jsonb,organization_id uuid);
+ALTER TABLE punchlist_task_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY existing_history_read ON punchlist_task_history FOR SELECT TO authenticated USING(organization_id=(SELECT organization_id FROM profiles WHERE id=auth.uid()));
 ALTER TABLE work_orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY existing_work_order_read ON work_orders FOR SELECT TO authenticated USING(organization_id=(SELECT organization_id FROM profiles WHERE id=auth.uid()));
 CREATE POLICY existing_work_order_update ON work_orders FOR UPDATE TO authenticated USING(organization_id=(SELECT organization_id FROM profiles WHERE id=auth.uid())) WITH CHECK(organization_id=(SELECT organization_id FROM profiles WHERE id=auth.uid()));
@@ -31,6 +34,7 @@ INSERT INTO contacts(id,organization_id,full_name) VALUES('${id(30)}','${id(1)}'
 INSERT INTO punchlist_access_grants(id,organization_id,contact_id,access_type,status,expiration_date) VALUES('${id(50)}','${id(1)}','${id(30)}','test_and_tune','active',CURRENT_DATE+80),('${id(51)}','${id(1)}','${id(31)}','test_and_tune','active',CURRENT_DATE-1),('${id(52)}','${id(2)}','${id(40)}','test_and_tune','active',CURRENT_DATE+80);
 `);
 await db.exec(await readFile('supabase/migrations/20261001001456_compact_punchlist_and_safe_service_requests.sql','utf8'));
+await db.exec(await readFile('tests/punchlist/production-triggers.sql','utf8'));
 await db.exec(`INSERT INTO punchlist_tasks(id,organization_id,contact_id,title,status,installer_notes) VALUES('${id(199)}','${id(1)}','${id(30)}','Earlier completed item','completed','PRIVATE LEGACY COMPLETION');`);
 await db.exec(await readFile('supabase/migrations/20261012181950_punchlist_visit_handoff_and_access.sql','utf8'));
 async function as(n,contact,org=1){await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SELECT set_config('test.jwt','${JSON.stringify(contact?{app_metadata:{is_portal_user:true,contact_id:id(contact),organization_id:id(org)}}:{})}',false);SET ROLE authenticated;`);}
@@ -60,6 +64,7 @@ const originalTimestamp=packet[0].updated_at;
 await db.query(`SELECT report_work_order_punchlist('${id(500)}','${id(100)}','completed','Adjusted the speaker','${originalTimestamp}')`);
 await owner(`INSERT INTO profiles(id,organization_id,contact_id,role) VALUES('${id(90)}','${id(1)}','${id(30)}','portal_user')`);
 await as(90,30);assert.equal((await db.query('SELECT count(*)::int n FROM work_orders')).rows[0].n,0,'A portal profile never exposes general work-order notes');
+assert.equal((await db.query('SELECT count(*)::int n FROM punchlist_task_history')).rows[0].n,0,'Production history trigger cannot expose legacy or technician notes to a portal profile');
 assert.equal((await db.query(`SELECT installer_notes FROM punchlist_tasks WHERE id='${id(100)}'`)).rows[0].installer_notes,null,'Technician completion notes never enter customer-facing records');
 assert.equal((await db.query(`SELECT installer_notes FROM punchlist_tasks WHERE id='${id(101)}'`)).rows[0].installer_notes,null);
 await as(12);const shared=(await db.query(`SELECT get_work_order_punchlist('${id(501)}') AS items`)).rows[0].items;assert.equal(shared[0].status,'completed');
@@ -68,7 +73,10 @@ await as(20);await assert.rejects(db.query(`SELECT get_work_order_punchlist('${i
 await as(90,30);await assert.rejects(db.query(`SELECT get_work_order_punchlist('${id(500)}')`),/access denied/);
 await as(11);await assert.rejects(db.query(`UPDATE work_orders SET status='completed' WHERE id='${id(500)}'`),/remaining work/);
 for(let n=101;n<106;n++){packet=(await db.query(`SELECT get_work_order_punchlist('${id(500)}') items`)).rows[0].items;const t=packet.find(t=>t.id===id(n));await db.query(`SELECT report_work_order_punchlist('${id(500)}','${id(n)}','unfinished','Return with replacement parts','${t.updated_at}')`);}
-await db.query(`UPDATE work_orders SET status='completed' WHERE id='${id(500)}'`);
+await owner(`INSERT INTO work_order_tasks(id,organization_id,work_order_id,status) VALUES('${id(700)}','${id(1)}','${id(500)}','pending')`);
+await as(11);await assert.rejects(db.query(`UPDATE work_orders SET status='completed' WHERE id='${id(500)}'`),/every assigned task/);
+await owner(`UPDATE work_order_tasks SET status='completed' WHERE id='${id(700)}'`);
+await as(11);await db.query(`UPDATE work_orders SET status='completed' WHERE id='${id(500)}'`);
 assert.equal((await owner(`SELECT status FROM punchlist_tasks WHERE id='${id(101)}'`))[0].status,'scheduled','Another technician is still on the visit');
 await as(12);for(let n=101;n<106;n++){packet=(await db.query(`SELECT get_work_order_punchlist('${id(501)}') items`)).rows[0].items;const t=packet.find(t=>t.id===id(n));await db.query(`SELECT report_work_order_punchlist('${id(501)}','${id(n)}','unfinished','Needs another visit','${t.updated_at}')`);}
 await db.query(`UPDATE work_orders SET status='completed' WHERE id='${id(501)}'`);
@@ -84,5 +92,9 @@ await as(90,30);await assert.rejects(db.query(`SELECT renew_punchlist_access('${
 await as(20);await assert.rejects(db.query(`SELECT toggle_punchlist_access_suspension('${id(50)}')`),/Access denied/);
 await as(10);await db.query(`SELECT toggle_punchlist_access_suspension('${id(50)}')`);
 await as(90,30);assert.equal((await db.query(`SELECT * FROM get_punchlist_access_info('${id(30)}')`)).rows[0].has_access,false);await assert.rejects(db.query(`SELECT request_punchlist_service(ARRAY['${id(101)}'::uuid],'${id(30)}')`),/Active VIP/);
-console.log('Six originals → one shared visit checklist; individual completion, remaining work, customer notes privacy, no-profile/expired access, tenant and stale-update guards passed.');
+await owner(`INSERT INTO punchlist_tasks(id,organization_id,contact_id,title) VALUES('${id(198)}','${id(1)}','${id(30)}','Cancel pending request')`);
+await as(10);const cancelledRequest=(await db.query(`SELECT request_punchlist_service(ARRAY['${id(198)}'::uuid],'${id(30)}') id`)).rows[0].id;
+await owner(`UPDATE service_requests SET status='cancelled' WHERE id='${cancelledRequest}'`);
+assert.equal((await owner(`SELECT status FROM punchlist_tasks WHERE id='${id(198)}'`))[0].status,'draft','Production cancellation trigger returns pending originals to the open list');
+console.log('Six originals → one shared visit checklist; production history/cancellation/Internal Task triggers, individual completion, remaining work, customer notes privacy, no-profile/expired access, tenant and stale-update guards passed.');
 await db.close();
