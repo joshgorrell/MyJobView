@@ -1,3 +1,4 @@
+import { TeamLeave, leaveLabel } from '../../lib/timeOff';
 import { CalendarMonthGrid } from '../Shared/Calendar/CalendarMonthGrid';
 import { CalendarGantt } from '../Shared/Calendar/CalendarGantt';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
@@ -615,9 +616,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         ,supabase.from('internal_time_sessions').select('id,title,session_date,start_time,end_time,predetermined_hours,status,assigned_to')
           .eq('assigned_to',user.id).in('status',['scheduled','in_progress','completed'])
           .gte('session_date',calendarDateKey(startDate)).lte('session_date',calendarDateKey(endDate)),
-        supabase.from('pto_requests').select('id,employee_id,start_date,end_date,request_type')
-          .eq('employee_id',user.id).eq('status','approved')
-          .lte('start_date',calendarDateKey(endDate)).gte('end_date',calendarDateKey(startDate)),
+        supabase.rpc('team_time_off',{p_from:calendarDateKey(startDate),p_to:calendarDateKey(endDate)}),
       ]);
 
       if (appointmentsRes.error) throw appointmentsRes.error;
@@ -751,15 +750,11 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         technician_name:'',customer_name:'Approved internal session',isReminder:true,reminderType:'internal_time' as const,
       }));
       const ptoEvents: Appointment[] = [];
-      for(const pto of ptoRes.data || []) {
-        const from = pto.start_date > calendarDateKey(startDate) ? pto.start_date : calendarDateKey(startDate);
-        const to = pto.end_date < calendarDateKey(endDate) ? pto.end_date : calendarDateKey(endDate);
-        for(let day=new Date(from+'T12:00Z'); day.toISOString().slice(0,10)<=to; day.setUTCDate(day.getUTCDate()+1)) {
-          const date=day.toISOString().slice(0,10);
-          ptoEvents.push({id:pto.id+'-'+date,title:pto.request_type==='full_day'?'Approved Time Off':'Approved Partial Time Off (see request for hours)',
-            appointment_date:date,start_time:'00:00',end_time:'23:59',all_day:true,status:'approved',technician_id:pto.employee_id,
-            technician_name:'',customer_name:'Time Off',isReminder:true,reminderType:'time_off'});
-        }
+      for(const pto of (ptoRes.data || []) as TeamLeave[]) {
+        if (calendarView === 'my' && pto.employee_id !== user.id) continue;
+        ptoEvents.push({id:pto.request_id+'-'+pto.leave_date,title:pto.employee_name+' · '+leaveLabel(pto),
+          appointment_date:pto.leave_date,start_time:pto.start_time||'00:00',end_time:pto.end_time||'23:59',all_day:pto.full_day,status:'approved',technician_id:pto.employee_id,
+          technician_name:pto.employee_name,customer_name:'Time Off',isReminder:true,reminderType:'time_off'});
       }
 
       // Combine and sort by date and time

@@ -1,3 +1,5 @@
+import { PTOManagement } from './PTOManagement';
+import { canManageTimeOff } from '../../lib/timeOff';
 import { TimeReviewPanel } from './Payroll/TimeReviewPanel';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -88,8 +90,9 @@ interface PendingTimeRequest {
   assigned_profile: { full_name: string | null } | null;
 }
 
-export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>void}) {
-  const { user } = useAuth();
+export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'timeoff';onLaborDashboard?:()=>void}) {
+  const { user, profile } = useAuth();
+  const admin = profile?.role === 'admin';
   const [autoClockOutSettings, setAutoClockOutSettings] = useState<AutoClockOutSettings>({
     auto_clock_out_enabled: true,
     forgot_clock_out_penalty_points: -15,
@@ -128,7 +131,7 @@ export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>vo
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
   const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [confirmRunAutoClockOut, setConfirmRunAutoClockOut] = useState(false);
-  const [activeTab, setActiveTab] = useState<'settings' | 'review' | 'payroll'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'review' | 'payroll' | 'timeoff'>(initialTab || (admin ? 'settings' : 'timeoff'));
   const [selectedPayPeriodId, setSelectedPayPeriodId] = useState<string | null>(null);
   const [payrollRefreshKey, setPayrollRefreshKey] = useState(0);
 
@@ -515,12 +518,12 @@ export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>vo
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-primary mb-1 flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-600" />
             Time Clock Command Center
           </h3>
-          <p className="text-sm text-gray-600">
-            Manage time clock settings, payroll periods, and jurisdiction review
+          <p className="text-sm text-muted">
+            Manage time clock settings, payroll periods, leave, and jurisdiction review
           </p>
         </div>
       </div>
@@ -528,7 +531,7 @@ export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>vo
       {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open labor dashboard</button>}
       {/* Tab Navigation */}
       <div className="flex flex-wrap gap-1 border-b border-gray-200">
-        <button
+        {admin && <button
           onClick={() => setActiveTab('settings')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'settings'
@@ -538,9 +541,9 @@ export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>vo
         >
           <Clock className="w-4 h-4 inline mr-1.5" />
           Settings & Alerts
-        </button>
-        <button onClick={()=>setActiveTab('review')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='review'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}>Requests & Travel</button>
-        <button
+        </button>}
+        {admin && <button onClick={()=>setActiveTab('review')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='review'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}>Requests & Travel</button>}
+        {admin && <button
           onClick={() => setActiveTab('payroll')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'payroll'
@@ -550,11 +553,13 @@ export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>vo
         >
           <DollarSign className="w-4 h-4 inline mr-1.5" />
           Payroll & Jurisdiction
-        </button>
+        </button>}
+        {canManageTimeOff(profile?.role) && <button onClick={()=>setActiveTab('timeoff')} className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='timeoff'?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>Time Off</button>}
       </div>
 
-      {activeTab==='review' && <TimeReviewPanel onPayroll={()=>setActiveTab('payroll')}/>}
-      {activeTab === 'settings' && (
+      {activeTab==='timeoff' && canManageTimeOff(profile?.role) && <PTOManagement/>}
+      {admin && activeTab==='review' && <TimeReviewPanel onPayroll={()=>setActiveTab('payroll')}/>}
+      {admin && activeTab === 'settings' && (
       <>
       <div className="flex items-center gap-2 justify-end">
         <button
@@ -1833,7 +1838,7 @@ export function TimeClockManagement({onLaborDashboard}:{onLaborDashboard?:()=>vo
       </>
       )}
 
-      {activeTab === 'payroll' && (
+      {admin && activeTab === 'payroll' && (
         <div className="space-y-6">
           <PayrollPeriodSummary 
             onPeriodSelect={setSelectedPayPeriodId}

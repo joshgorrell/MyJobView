@@ -1,3 +1,4 @@
+import { canManageTimeOff } from './lib/timeOff';
 import { WorkspaceTabs } from './components/Shared/WorkspaceTabs';
 import { pageFromLocation, workspacePage, workspaceUrl, isPortalProposalRoute } from './lib/workspaceRoutes';
 import { resolveLegacyPage } from './lib/permissionCatalog';
@@ -121,7 +122,6 @@ const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxIns
 const LaborDashboard = lazy(() => import('./components/Production/LaborDashboard/LaborDashboard'));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
 
-const PTOManagement = lazy(() => import('./components/Admin/PTOManagement').then(m => ({ default: m.PTOManagement })));
 const MyTimeOff = lazy(() => import('./components/Dispatch/MyTimeOff').then(m => ({ default: m.MyTimeOff })));
 const StickyNotes = lazy(() => import('./components/Sales/StickyNotes').then(m => ({ default: m.default })));
 const DesignQueue = lazy(() => import('./components/Sales/DesignQueue'));
@@ -1164,7 +1164,7 @@ function AppContent() {
 
           {activeTab === 'rewards_dashboard' && checkModuleAccess('rewards_dashboard') && <RewardsDashboard key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('labor_dashboard')} />}
+          {activeTab === 'time_clock_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('labor_dashboard')} />}
 
 
 
@@ -1172,7 +1172,7 @@ function AppContent() {
 
           {activeTab === 'my_mileage' && <MileageEntryForm key={activeTab} />}
 
-          {activeTab === 'pto_management' && profile.role === 'admin' && <PTOManagement key={activeTab} />}
+          {activeTab === 'pto_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} initialTab="timeoff" />}
 
           {activeTab === 'bug_management' && checkModuleAccess('bug_management') && <BugManagement key={activeTab} />}
 

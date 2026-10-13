@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';import {chromium} from 'playwright';import {createServer} from 'vite';
+const server=await createServer({configFile:'tests/pto/browser/vite.config.mjs'});await server.listen();
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH});
+try{for(const size of [{width:320,height:568},{width:390,height:844},{width:1280,height:800}]){
+ const page=await browser.newPage({viewport:size});const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('Browser error:',e.message);});
+ await page.goto('http://127.0.0.1:5196');await page.getByText('80.0 hrs available').waitFor();
+ await page.getByRole('button',{name:'Team Time Off',exact:true}).click();await page.getByRole('cell',{name:'Off 08:00–12:00'}).waitFor();
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Shared availability does not overflow viewport');
+ await page.getByLabel('Availability view').selectOption('upcoming');await page.getByText('Luis',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'My Requests & Balances',exact:true}).click();await page.getByRole('button',{name:'Request Time Off',exact:true}).click();
+ const dialog=page.getByRole('dialog');await dialog.getByLabel('Leave Policy').selectOption('vacation');await dialog.getByLabel('Start Date').fill('2027-01-04');await dialog.getByLabel('End Date').fill('2027-01-08');await dialog.getByText('5 workday(s) · 40.0 hours total').waitFor();await dialog.getByLabel('Reason').fill('Private medical details');if(size.width===390)await page.screenshot({path:'/tmp/pto-request-mobile.png',fullPage:true});await dialog.getByRole('button',{name:'Submit Request',exact:true}).click();await page.getByText('pending',{exact:true}).waitFor();
+ assert.equal((await page.evaluate(()=>window.__calls.find(c=>c.name==='submit_time_off'))).args.p_type,'full_day');
+ await page.getByRole('button',{name:'Team Time Off',exact:true}).click();assert.equal(await page.getByText('Private medical details',{exact:true}).count(),0,'Team tab hides private reasons');
+ await page.getByRole('button',{name:'My Requests & Balances',exact:true}).click();page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Cancel Request',exact:true}).click();await page.getByText('cancelled',{exact:true}).waitFor();
+ await page.goto('http://127.0.0.1:5196/?surface=command');await page.getByRole('button',{name:'Time Off',exact:true}).waitFor();await page.getByRole('button',{name:'Assign Leave Policy / Set Verified Balance',exact:true}).click();await page.getByLabel('Employee',{exact:true}).selectOption('me');await page.getByLabel('Policy',{exact:true}).selectOption('vacation');await page.getByLabel('Verified remaining hours').fill('80');await page.getByLabel('Adjustment reason').fill('Verified HR opening balance');await page.getByRole('button',{name:'Save',exact:true}).click();
+ assert.ok((await page.evaluate(()=>window.__calls)).some(c=>c.name==='set_time_off_balance'));
+ if(size.width===390)await page.screenshot({path:'/tmp/pto-command-mobile.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Command Center does not overflow viewport');assert.deepEqual(errors,[]);assert.deepEqual(await page.evaluate(()=>window.__errors),[]);await page.close();
+}console.log('PTO browser checks passed at 320px, 390px and desktop: requests, cancellation, private/shared tabs, calendar and Command Center balance setup.');}finally{await browser.close();await server.close();}
