@@ -55,8 +55,8 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const [threadId, setThreadId] = useState<string | null>(null);
   const canMessageCustomers = hasModuleAccess('messages');
   useEffect(() => {
-    if (conversationProps.openThreadId) { setView('messages'); setMessageFilter('customer'); setThreadId(null); }
-  }, [conversationProps.openThreadId]);
+    if (!initialTaskView && conversationProps.openThreadId) { setView('messages'); setMessageFilter('customer'); setThreadId(null); }
+  }, [conversationProps.openThreadId, initialTaskView]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(false);

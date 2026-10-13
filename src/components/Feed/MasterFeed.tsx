@@ -1,3 +1,5 @@
+import { WorkspaceTabs } from '../Shared/WorkspaceTabs';
+import { useDepartments } from '../../contexts/DepartmentContext';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import Flow from '../Flow/Flow';
 import type { CustomerConversationsProps } from '../Flow/CustomerConversations';
@@ -190,11 +192,15 @@ function LegacyDiscussionFeed({ onLeadClick, focusPostId }: MasterFeedProps & { 
 }
 
 export function MasterFeed({ onLeadClick, ...conversationProps }: MasterFeedProps) {
+  const { hasModuleAccess } = useDepartments();
   const focusPostId = new URLSearchParams(window.location.search).get('postId');
+  if (!hasModuleAccess('feed') && !hasModuleAccess('messages')) {
+    return <WorkspaceTabs title="Flow" initial="tasks" tabs={hasModuleAccess('tasks') && conversationProps.tasksContent ? [{ key: 'tasks', label: 'Tasks', content: conversationProps.tasksContent }] : []} />;
+  }
 
   // Flow is now the primary communication surface. Keep the legacy discussion
   // detail only for existing deep links so historical replies remain reachable.
-  if (focusPostId && !conversationProps.openThreadId && !conversationProps.createRequested) {
+  if (focusPostId && !conversationProps.initialTaskView && !conversationProps.openThreadId && !conversationProps.createRequested) {
     return <div className="space-y-3">
       <a href="?tab=feed" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white text-gray-700 border border-gray-200 hover:bg-gray-50">
         <FlowWaveIcon className="text-base" /> Back to Flow
