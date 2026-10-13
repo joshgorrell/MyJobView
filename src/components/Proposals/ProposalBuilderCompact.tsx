@@ -6827,7 +6827,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
           onClose={() => setShowSubmissionModal(false)}
-          onSend={(approvalWindow) => handleConfirmSubmission(true, approvalWindow)}
+          initialPortalVisibility={Boolean(proposal.is_portal_visible)}
+          onSend={(approvalWindow, visibleInPortal) => handleConfirmSubmission(visibleInPortal, approvalWindow)}
           onNavigateToSettings={(section) => {
             setShowSubmissionModal(false);
             setShowSettings(true);
