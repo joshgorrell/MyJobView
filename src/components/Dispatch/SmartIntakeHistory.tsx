@@ -118,7 +118,6 @@ export function SmartIntakeHistory() {
           <p><strong>Status:</strong> {selected.item.status} · <strong>Classification:</strong> {selected.item.classification}</p>
           <p><strong>Customer:</strong> {customer ? customer.name : selected.item.contact_id ? "Contact matched — details unavailable" : "Not confirmed — select a customer before saving media"}</p>
           {customerError && <p role="status" className="text-amber-300">{customerError}</p>}
-          {customer && <div className="rounded-lg border border-gray-700 bg-gray-800 p-3"><p className="font-medium">Possible work orders</p>{customer.suggestedWorkOrders.length === 0 ? <p className="text-gray-400">No existing work orders found for this contact.</p> : <ul className="mt-2 space-y-1">{customer.suggestedWorkOrders.map(order => <li key={order.id} className="text-gray-300">{order.label} · {order.status}</li>)}</ul>}<p className="mt-2 text-xs text-gray-400">Suggestions only. Verify the correct work order before linking attachments.</p></div>}
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
           <h4 className="font-semibold">Attachments</h4>
           {attachmentError && <p role="status" className="text-amber-300">{attachmentError}</p>}
