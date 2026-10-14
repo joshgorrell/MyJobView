@@ -37,6 +37,7 @@ Deno.serve(async (request) => {
   const recipient = recipients.length === 1 ? recipients[0].trim().toLowerCase() : "";
   const eventId = typeof event?.email_id === "string" ? event.email_id.trim() : "";
   const sender = typeof event?.from === "string" ? event.from.trim() : "";
+  const eventCreatedAt = typeof event?.created_at === "string" ? event.created_at : null;
   if (!recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
 
   const dbUrl = Deno.env.get("SUPABASE_URL");
@@ -80,7 +81,7 @@ Deno.serve(async (request) => {
       intake_id: intakeId,
       actor_type: "provider",
       event_type: "email_received",
-      detail: { destination_purpose: destination.purpose, provider: "resend" },
+      detail: { destination_purpose: destination.purpose, provider: "resend", provider_created_at: eventCreatedAt, content_pending: true },
     });
     if (eventError) console.error("Intake audit event failed", { intakeId, code: eventError.code });
   }
