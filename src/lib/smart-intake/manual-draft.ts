@@ -13,6 +13,7 @@ export type ManualIntakeDraft = {
   dueDate?: string;
   assignmentNotes?: string;
   assigneeId?: string;
+  officeId?: string;
 };
 
 export type ValidatedManualIntakeDraft = {
@@ -25,6 +26,7 @@ export type ValidatedManualIntakeDraft = {
   dueDate: string | null;
   assignmentNotes: string | null;
   assigneeId: string | null;
+  officeId: string | null;
 };
 
 export function validateManualIntakeDraft(draft: ManualIntakeDraft):
@@ -37,6 +39,7 @@ export function validateManualIntakeDraft(draft: ManualIntakeDraft):
   const description = draft.description.trim();
   const assignmentNotes = draft.assignmentNotes?.trim() || null;
   const assigneeId = draft.purpose === 'service' ? null : draft.assigneeId?.trim() || null;
+  const officeId = draft.officeId?.trim() || null;
   const dueDate = draft.purpose === 'task' ? draft.dueDate?.trim() || null : null;
   if (!['service', 'support', 'task'].includes(draft.purpose)) errors.push('Choose a valid intake purpose.');
   if (!organizationId) errors.push('Organization is required.');
@@ -49,7 +52,7 @@ export function validateManualIntakeDraft(draft: ManualIntakeDraft):
   if (errors.length) return { ok: false, errors };
   return { ok: true, value: {
     purpose: draft.purpose, organizationId, contactId, subject, description,
-    priority: draft.priority, dueDate, assignmentNotes, assigneeId,
+    priority: draft.priority, dueDate, assignmentNotes, assigneeId, officeId,
   } };
 }
 
