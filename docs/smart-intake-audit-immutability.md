@@ -1,5 +1,5 @@
-# Audit immutability implementation
+# Audit immutability status
 
-The staged migration adds database triggers rejecting updates/deletes on intake events, messages, delivery events and processing attempts, and changes inbound evidence foreign keys to restrict cascading deletion.
+Append-only database triggers are **not implemented**. The staged audit-history migration creates tables and enables RLS, but does not prevent privileged updates or deletes. Some related child tables also have cascading foreign-key deletes.
 
-Do not apply until verifying how retention, privacy redaction, and migrations interact with these restrictions. An authorized retention/archive process must be designed before production activation. This is a staging-only schema improvement, not proof of compliance or full audit immutability: the intake_items parent row remains mutable to support workflow state changes.
+Before activation, implement and test retention and authorized redaction, append-only enforcement, deletion behavior, and recovery of audit events after partial failures. No migration has been applied to production.
