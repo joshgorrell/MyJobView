@@ -8,6 +8,7 @@ import { EnrichedThread, Message } from './conversationTypes';
 import { loadCoworkerThreads, loadCoworkerMessages, markCoworkerMessagesRead, sendCoworkerReply } from './coworkerConversations';
 import { useAuth } from '../../contexts/AuthContext';
 import { insertFlowTag, useFlowTags, TagChoice } from './useFlowTags';
+import { findEmployeeMentionCandidates, MentionPerson } from '../../lib/flow/mentionCandidates';
 
 
 interface Contact {
@@ -114,7 +115,30 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'customer' | 'proposals' | 'internal'>('all');
   const [isInternal, setIsInternal] = useState(false);
-  const staffChoices = messageTag?.symbol === '@' && isInternal ? messageChoices.filter(c => c.kind === 'person') : [];
+  // Only coworker posts currently persist mention recipients for notification.
+  const canMentionStaff = selectedThread?.source === 'coworker';
+  const [mentionPeople, setMentionPeople] = useState<MentionPerson[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!canMentionStaff || !profile?.organization_id) { setMentionPeople([]); return; }
+    void supabase.from('profiles').select('id,username,full_name')
+      .eq('organization_id', profile.organization_id).eq('is_active', true).limit(500)
+      .then(({ data }) => { if (!cancelled) setMentionPeople((data || []).filter(p => p.full_name)); });
+    return () => { cancelled = true; };
+  }, [canMentionStaff, profile?.organization_id]);
+  const staffChoices = messageTag?.symbol === '@' && canMentionStaff ? messageChoices.filter(c => c.kind === 'person') : [];
+  const naturalCandidates = canMentionStaff && !messageTag
+    ? findEmployeeMentionCandidates(newMessage, mentionPeople).filter(candidate => candidate.end <= messageCursor && candidate.personIds.length > 0 && !candidate.text.startsWith('@'))
+    : [];
+  const naturalCandidate = naturalCandidates[naturalCandidates.length - 1];
+  function confirmNaturalMention(person: MentionPerson) {
+    if (!naturalCandidate || !person.username) return;
+    const replacement = '@' + person.username;
+    const next = newMessage.slice(0, naturalCandidate.start) + replacement + newMessage.slice(naturalCandidate.end);
+    const cursor = naturalCandidate.start + replacement.length;
+    setNewMessage(next); setMessageCursor(cursor);
+    requestAnimationFrame(() => { messageInput.current?.focus(); messageInput.current?.setSelectionRange(cursor, cursor); });
+  }
   function chooseMessageMention(choice: TagChoice) {
     if (!messageTag || choice.kind !== 'person') return;
     const inserted = insertFlowTag(newMessage, messageCursor, messageTag.start, choice);
@@ -1021,6 +1045,10 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     e.target.value = '';
                   }}
                 />
+                {naturalCandidate && staffChoices.length === 0 && <div className="mb-2 max-h-40 overflow-auto rounded border border-blue-200 bg-white p-2 text-sm" aria-label="Possible teammate mention">
+                  <div className="mb-1 text-gray-600">Mention a teammate? Select to notify; leave unchanged for plain text.</div>
+                  {mentionPeople.filter(p => naturalCandidate.personIds.includes(p.id) && p.username).map(p => <button key={p.id} type="button" onClick={() => confirmNaturalMention(p)} className="mr-2 mb-1 rounded bg-blue-50 px-3 py-2 text-blue-700 hover:bg-blue-100">@{p.username} · {p.full_name}</button>)}
+                </div>}
                 {staffChoices.length > 0 && <div className="mb-2 max-h-40 overflow-auto rounded border border-blue-200 bg-white" role="listbox" aria-label="Mention teammates">{staffChoices.map((choice, index) => <button key={choice.id} type="button" role="option" aria-selected={index === mentionHighlight} onClick={() => chooseMessageMention(choice)} className={`block w-full px-3 py-2 text-left text-sm ${index === mentionHighlight ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}>@{choice.kind === 'person' ? choice.username : ''} · {choice.label}</button>)}</div>}
                 <div className="flex gap-2 items-end">
                   {selectedThread.source !== 'coworker' && <button
@@ -1045,7 +1073,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         handleSendMessage();
                       }
                     }}
-                    placeholder={selectedThread.source === 'coworker' ? 'Reply… Type @ to mention a teammate' : isInternal ? 'Internal note… Type @ to mention a teammate' : 'Type your message…'}
+                    placeholder={selectedThread.source === 'coworker' ? 'Reply… Type @ to mention a teammate' : isInternal ? 'Internal note…' : 'Type your message…'}
                     rows={2}
                     className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
                   />
