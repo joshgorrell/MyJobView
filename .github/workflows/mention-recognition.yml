@@ -1,0 +1,23 @@
+name: Employee mention recognition
+on:
+  pull_request:
+    paths:
+      - 'src/lib/flow/mentionCandidates.ts'
+      - 'src/components/Flow/CustomerConversations.tsx'
+      - 'src/components/Flow/coworkerConversations.ts'
+      - 'tests/flow/mention-candidates.mjs'
+      - '.github/workflows/mention-recognition.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: node tests/flow/mention-candidates.mjs
+      - run: npm run typecheck
+      - run: npm run build
