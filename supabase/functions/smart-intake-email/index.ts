@@ -247,5 +247,14 @@ Deno.serve(async (request) => {
   if (storedContent.raw_body === null) {
     return Response.json({ error: "Email content pending retrieval", intakeId }, { status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" } });
   }
+  // Delivery is complete only after both the intake record and message timeline
+  // contain the content; retries can reconcile a partially completed write.
+  const { data: storedMessage, error: messageCheckError } = await db.from("intake_messages")
+    .select("body").eq("intake_id", intakeId).eq("provider_message_id", eventId).maybeSingle();
+  if (messageCheckError || !storedMessage || storedMessage.body === null) {
+    return Response.json({ error: "Message timeline pending", intakeId }, {
+      status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+    });
+  }
   return Response.json({ accepted: true, intakeId }, { headers: { "Cache-Control": "no-store" } });
 });
