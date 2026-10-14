@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { validateManualIntakeDraft } from '../../lib/smart-intake/manual-draft';
+import { toTaskDraft } from '../../lib/smart-intake/task-payload';
+
+const TaskForm = lazy(() => import('../Tasks/TaskForm').then(m => ({ default: m.TaskForm })));
 
 type IntakeType = 'service' | 'support' | 'task';
 type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null };
@@ -28,6 +31,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const [assignees, setAssignees] = useState<Array<{ id: string; full_name: string | null }>>([]);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [error, setError] = useState('');
+  const [taskReviewOpen, setTaskReviewOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -91,6 +95,13 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   });
 
 
+  if (taskReviewOpen && draftValidation.ok && draftValidation.value.purpose === 'task') {
+    const taskDraft = toTaskDraft(draftValidation.value);
+    return <Suspense fallback={<p className="p-4 text-gray-300">Loading task review…</p>}>
+      <TaskForm contactId={taskDraft.contact_id} aiPrefill={{ contactId: taskDraft.contact_id, title: taskDraft.title, description: taskDraft.description, priority: taskDraft.priority, dueDate: taskDraft.due_date || undefined, assigneeId: taskDraft.assigned_to || undefined }} onClose={() => setTaskReviewOpen(false)} onSuccess={onClose} />
+    </Suspense>;
+  }
+
   return (
     <section className="rounded-xl border border-gray-700 bg-gray-900 p-4 sm:p-6 space-y-4" aria-label="New manual intake">
       <div className="flex items-start justify-between gap-3">
@@ -149,6 +160,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       </label>}
       {error && <p role="alert" className="text-sm text-amber-300">{error}</p>}
       {!draftValidation.ok && <p className="text-xs text-gray-400">{draftValidation.errors[0]}</p>}
+      {type === 'task' && draftValidation.ok && <button type="button" onClick={() => setTaskReviewOpen(true)} className="min-h-11 rounded-lg bg-blue-600 px-4 font-medium text-white hover:bg-blue-500">Review in Task Form</button>}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="min-h-11 rounded-lg px-4 text-gray-300">Cancel</button>
         <button type="button" disabled title="Unified intake submission is not connected yet" className="min-h-11 rounded-lg bg-gray-700 px-4 font-medium text-gray-300 disabled:opacity-50">
