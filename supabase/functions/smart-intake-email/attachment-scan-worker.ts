@@ -16,7 +16,9 @@ type ScanDatabase = {
   from: (table: string) => {
     update: (values: Record<string, unknown>) => {
       eq: (column: string, value: string) => {
-        eq: (column: string, value: string) => Promise<{ data: unknown; error: unknown }>;
+        eq: (column: string, value: string) => {
+        select: (columns: string) => Promise<{ data: Array<{ id: string }> | null; error: unknown }>;
+      };
       };
     };
   };
@@ -46,18 +48,14 @@ export async function scanPendingAttachment(
 
   let verdict: "clean" | "blocked" | "failed" = "failed";
   try {
-    await scanWithPrivateService(bytes, config.endpoint, config.token, config.allowedHost);
-    verdict = "clean";
-  } catch (error) {
-    // A positive malware verdict is distinguishable only if the scanner
-    // explicitly reports it; scanner errors remain failed, never clean.
-    if (error instanceof Error && error.message === "Attachment is not cleared for use") {
-      verdict = "blocked";
-    }
+    verdict = await scanWithPrivateService(bytes, config.endpoint, config.token, config.allowedHost);
+  } catch {
+    // Transport, authentication and parsing failures are not malware findings.
+    verdict = "failed";
   }
-  const { error: updateError } = await db.from("intake_attachments")
+  const { data: updated, error: updateError } = await db.from("intake_attachments")
     .update({ scan_status: verdict, scan_completed_at: new Date().toISOString() })
-    .eq("id", attachment.id).eq("scan_status", "pending");
-  if (updateError) throw new Error("Unable to persist scan verdict");
+    .eq("id", attachment.id).eq("scan_status", "pending").select("id");
+  if (updateError || updated?.length !== 1) throw new Error("Scan verdict update was not confirmed");
   return verdict;
 }
