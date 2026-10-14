@@ -33,7 +33,10 @@ Deno.serve(async (request) => {
   const sender = typeof payload?.from === "string" ? payload.from.trim() : "";
   if (!recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
 
-  const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+  const dbUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!dbUrl || !serviceKey) return Response.json({ error: "Intake configuration unavailable" }, { status: 503 });
+  const db = createClient(dbUrl, serviceKey);
   const { data: destinations, error: destinationError } = await db.from("intake_destinations")
     .select("organization_id,office_id,purpose,verified_at").eq("channel", "email")
     .eq("destination_address", recipient).eq("enabled", true);
