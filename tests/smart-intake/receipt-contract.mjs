@@ -17,6 +17,8 @@ assert.match(endpoint, /payload\.data/);
 assert.match(endpoint, /email\.received/);
 assert.match(endpoint, /recipients\.length !== 1/);
 assert.match(endpoint, /raw_body: null/);
+assert.match(endpoint, /Unable to persist inbound message/);
+assert.match(endpoint, /Unable to persist message timeline/);
 assert.match(endpoint, /Email content pending retrieval/);
 assert.match(endpoint, /Retry-After/);
 assert.match(endpoint, /request\.body\?\.getReader\(\)/);
