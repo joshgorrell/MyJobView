@@ -30,9 +30,13 @@ Deno.serve(async (request) => {
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) payload = parsed as Record<string, unknown>;
   } catch { /* Invalid JSON is rejected below. */ }
   if (payload?.type !== "email.received") return Response.json({ error: "Unsupported event type" }, { status: 400 });
-  const recipient = typeof payload?.to === "string" ? payload.to.trim().toLowerCase() : "";
-  const eventId = typeof payload?.email_id === "string" ? payload.email_id.trim() : "";
-  const sender = typeof payload?.from === "string" ? payload.from.trim() : "";
+  const event = payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+    ? payload.data as Record<string, unknown> : null;
+  const recipients = Array.isArray(event?.to) ? event.to.filter((value): value is string => typeof value === "string") : [];
+  // A message addressed to several aliases is ambiguous: require exactly one.
+  const recipient = recipients.length === 1 ? recipients[0].trim().toLowerCase() : "";
+  const eventId = typeof event?.email_id === "string" ? event.email_id.trim() : "";
+  const sender = typeof event?.from === "string" ? event.from.trim() : "";
   if (!recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
 
   const dbUrl = Deno.env.get("SUPABASE_URL");
@@ -50,8 +54,8 @@ Deno.serve(async (request) => {
     organization_id: destination.organization_id, office_id: destination.office_id,
     channel: "email", provider: "resend", provider_event_id: eventId,
     source_address: sender, destination_address: recipient,
-    subject: typeof payload.subject === "string" ? payload.subject.slice(0, 1000) : null,
-    raw_body: typeof payload.text === "string" ? payload.text : null,
+    subject: typeof event?.subject === "string" ? event.subject.slice(0, 1000) : null,
+    raw_body: null, // Resend receipt webhooks contain metadata, not fetched email body.
     status: "received",
   }, { onConflict: "organization_id,channel,provider,provider_event_id", ignoreDuplicates: true })
     .select("id").maybeSingle();
