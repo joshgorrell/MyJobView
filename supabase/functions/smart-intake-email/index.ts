@@ -11,6 +11,7 @@ Deno.serve(async (request) => {
   if (Deno.env.get("SMART_INTAKE_EMAIL_ENABLED") !== "true") {
     return Response.json({ error: "Intake not enabled" }, { status: 503 });
   }
+  if (Deno.env.get("SMART_INTAKE_EMAIL_PROVIDER") !== "resend") return Response.json({ error: "Provider not configured" }, { status: 503 });
   const expected = Deno.env.get("SMART_INTAKE_EMAIL_WEBHOOK_SECRET");
   const provided = request.headers.get("x-webhook-secret");
   if (!expected || !provided || expected !== provided) {
