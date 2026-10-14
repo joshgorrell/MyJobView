@@ -16,9 +16,15 @@ Deno.serve(async req => {
       .eq('token_hash', hash).maybeSingle();
     if (linkError || !link || link.revoked_at || (link.expires_at && Date.parse(link.expires_at) <= Date.now())) return json({ error: 'Invalid or expired link' }, 404);
     const { data: proposal, error: proposalError } = await db.from('proposals')
-      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at')
+      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at')
       .eq('id', link.proposal_id).eq('organization_id', link.organization_id).maybeSingle();
     if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
+    // The share URL is stable, but its 30-day viewing window starts at the latest submission.
+    // Recalling/revising blocks access through the status check above; resubmission resets sent_at.
+    if (!proposal.sent_at || !Number.isFinite(Date.parse(proposal.sent_at)) ||
+      Date.now() >= Date.parse(proposal.sent_at) + 30 * 86400000) {
+      return json({ error: 'This proposal viewing period has expired. Please request a resubmission.' }, 410);
+    }
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
     return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at } });
   } catch (error) {
