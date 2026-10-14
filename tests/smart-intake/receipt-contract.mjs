@@ -10,6 +10,7 @@ assert.match(endpoint, /verifyResendSignature\(body, request.headers, webhookSec
 assert.match(endpoint, /crypto\.subtle\.verify/);
 assert.match(endpoint, /svix-signature/);
 assert.match(endpoint, /svix-timestamp/);
+assert.match(endpoint, /Number\.isSafeInteger\(Number\(timestamp\)\)/);
 assert.doesNotMatch(endpoint, /x-webhook-secret/);
 assert.match(endpoint, /SMART_INTAKE_EMAIL_PROVIDER/);
 assert.match(endpoint, /payload\.data/);
@@ -28,5 +29,6 @@ assert.match(endpoint, /status: "needs_review"/);
 assert.match(endpoint, /ignoreDuplicates: true/);
 assert.match(endpoint, /verified_at/);
 assert.match(foundation, /intake_item_provider_unique unique/);
+assert.match(foundation, /'unknown','service','task','sales','other'/);
 assert.match(purpose, /purpose in \('support','sales'\)/);
 console.log('Smart Intake receipt contract passed');
