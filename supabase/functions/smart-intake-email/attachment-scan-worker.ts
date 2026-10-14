@@ -41,6 +41,9 @@ export async function scanPendingAttachment(
   if (storageError || !blob || blob.size !== attachment.byte_size) {
     throw new Error("Quarantined attachment unavailable or size mismatch");
   }
+  if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[a-zA-Z0-9_-]{1,255}$/i.test(attachment.storage_key)) {
+    throw new Error("Invalid quarantine storage key");
+  }
   const bytes = new Uint8Array(await blob.arrayBuffer());
   if (await attachmentSha256(bytes) !== attachment.sha256) {
     throw new Error("Quarantined attachment checksum mismatch");
