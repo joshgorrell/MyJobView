@@ -141,7 +141,12 @@ Deno.serve(async (request) => {
       event_type: "email_received",
       detail: { destination_purpose: destination.purpose, provider: "resend", provider_created_at: eventCreatedAt, content_pending: true },
     });
-    if (eventError) console.error("Intake audit event failed", { intakeId, code: eventError.code });
+    if (eventError) {
+      console.error("Intake audit event failed", { intakeId, code: eventError.code });
+      return Response.json({ error: "Intake audit persistence failed", intakeId }, {
+        status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+      });
+    }
   }
   // Retrieve complete content only after tenant-scoped receipt persistence.
   // Keep the record in needs_review until attachment handling and verification are complete.
