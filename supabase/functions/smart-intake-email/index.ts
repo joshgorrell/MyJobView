@@ -187,6 +187,11 @@ Deno.serve(async (request) => {
             if (Array.isArray(attachments) && attachments.length > 20) {
               return Response.json({ error: "Attachment count exceeds limit", intakeId }, { status: 503 });
             }
+            if (Array.isArray(attachments) && attachments.some(item =>
+              !item || typeof item !== "object" || Array.isArray(item)
+            )) {
+              return Response.json({ error: "Malformed attachment metadata", intakeId }, { status: 503 });
+            }
             if (Array.isArray(attachments) && attachments.length > 0) {
               // Preserve the fact that attachments were detected even though
               // quarantine/scanning is not yet implemented. Never mark clean.
