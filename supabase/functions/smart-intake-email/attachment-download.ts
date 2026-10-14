@@ -10,7 +10,8 @@ export async function downloadBoundedAttachment(
 ): Promise<Uint8Array> {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" || parsed.hostname !== "api.resend.com" ||
-      parsed.port || parsed.username || parsed.password) {
+      parsed.port || parsed.username || parsed.password ||
+      !/^\/emails\/receiving\/[a-zA-Z0-9_-]{1,255}\/attachments\/[a-zA-Z0-9_-]{1,255}$/.test(parsed.pathname) || parsed.search || parsed.hash) {
     throw new Error("Untrusted attachment download URL");
   }
   if (!/^re_[a-zA-Z0-9_]+$/.test(bearerToken)) throw new Error("Invalid provider credential");
