@@ -30,18 +30,31 @@ Deno.serve(async req => {
       return json({ revoked: true });
     }
     if (!['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'Submit the proposal before sharing' }, 409);
-    const token = hex(crypto.getRandomValues(new Uint8Array(32)));
+    // Reconstruct the same secret link without ever storing its plaintext.
+    // A revoked link is rotated, so only one token can resolve per proposal.
+    const { data: existing, error: lookupError } = await admin.from('proposal_share_links')
+      .select('token_nonce,revoked_at,expires_at,portal_version')
+      .eq('proposal_id', proposal.id).maybeSingle();
+    if (lookupError) throw lookupError;
+    const expired = !!existing?.expires_at && Date.parse(existing.expires_at) <= Date.now();
+    const nonce = existing && !existing.revoked_at && !expired ? existing.token_nonce : crypto.randomUUID();
+    const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const signingKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const token = hex(new Uint8Array(await crypto.subtle.sign('HMAC', signingKey, new TextEncoder().encode(`proposal-share:v1:${proposal.id}:${nonce}`))));
     const tokenHash = await hash(token);
-    const { error } = await admin.from('proposal_share_links').insert({
+    const { error } = await admin.from('proposal_share_links').upsert({
       proposal_id: proposal.id,
       organization_id: profile.organization_id,
+      token_nonce: nonce,
       token_hash: tokenHash,
       created_by: auth.user.id,
       portal_version: proposal.current_portal_version ?? 1,
-      expires_at: new Date(Date.now() + 30 * 86400000).toISOString()
-    });
+      expires_at: null,
+      revoked_at: null
+    }, { onConflict: 'proposal_id' });
     if (error) throw error;
-    return json({ token, expiresInDays: 30 });
+    return json({ token, reused: !!existing && !existing.revoked_at && !expired });
+
   } catch (error) {
     console.error('Proposal share link operation failed', error);
     return json({ error: 'Unable to manage proposal share link' }, 500);
