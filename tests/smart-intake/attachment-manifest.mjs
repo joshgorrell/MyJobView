@@ -66,3 +66,23 @@ try {
   globalThis.fetch = originalFetch;
 }
 console.log("Smart Intake attachment helper contract tests passed");
+
+const signedSource = readFileSync(new URL("../../supabase/functions/smart-intake-email/signed-download.ts", import.meta.url), "utf8");
+const signedCompiled = await transform(signedSource, { loader: "ts", format: "esm" });
+const { downloadSignedAttachment } = await import("data:text/javascript;base64," + Buffer.from(signedCompiled.code).toString("base64"));
+await assert.rejects(downloadSignedAttachment("http://storage.example.com/file", ["storage.example.com"], 10));
+await assert.rejects(downloadSignedAttachment("https://evil.example.com/file", ["storage.example.com"], 10));
+await assert.rejects(downloadSignedAttachment("https://storage.example.com/file", [], 10));
+const priorFetch = globalThis.fetch;
+try {
+  globalThis.fetch = async () => new Response(new Uint8Array([1, 2, 3]), {
+    headers: { "content-length": "3" },
+  });
+  assert.deepEqual(await downloadSignedAttachment("https://storage.example.com/file", ["storage.example.com"], 3), new Uint8Array([1, 2, 3]));
+  await assert.rejects(downloadSignedAttachment("https://storage.example.com/file", ["storage.example.com"], 2));
+  globalThis.fetch = async () => new Response(new Uint8Array([1, 2, 3, 4]));
+  await assert.rejects(downloadSignedAttachment("https://storage.example.com/file", ["storage.example.com"], 3));
+} finally {
+  globalThis.fetch = priorFetch;
+}
+console.log("Smart Intake signed attachment download tests passed");
