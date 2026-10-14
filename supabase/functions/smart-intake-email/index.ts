@@ -184,6 +184,9 @@ Deno.serve(async (request) => {
             // Do not acknowledge emails whose attachments have not been preserved.
             // A separate ingestion stage must persist and scan each attachment.
             const attachments = email.attachments;
+            if (Array.isArray(attachments) && attachments.length > 20) {
+              return Response.json({ error: "Attachment count exceeds limit", intakeId }, { status: 503 });
+            }
             if (Array.isArray(attachments) && attachments.length > 0) {
               // Preserve the fact that attachments were detected even though
               // quarantine/scanning is not yet implemented. Never mark clean.
