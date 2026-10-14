@@ -11,7 +11,7 @@ export function LoginForm() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(new URLSearchParams(window.location.search).get('password_updated') === '1' ? 'Password saved. Sign in with your new password.' : null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { signIn, signUp, resetPassword, resendConfirmation } = useAuth();
   const [returnToDealer, setReturnToDealer] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export function LoginForm() {
     try {
       if (isForgotPassword) {
         await resetPassword(email);
-        setSuccess('Password reset email sent! Check your inbox for the reset link.');
+        setSuccess('If an account exists for this email, a password reset link is on its way. Check your inbox and spam folder, and use the newest email.');
         setIsForgotPassword(false);
       } else if (isSignUp) {
         await signUp(email, password);
@@ -57,7 +57,7 @@ export function LoginForm() {
       let errorMessage = error?.message || `Failed to ${isForgotPassword ? 'send reset email' : isSignUp ? 'sign up' : 'sign in'}. Please try again.`;
 
       if (errorMessage.includes('Invalid login credentials')) {
-        errorMessage = 'Invalid email or password. If you just signed up, please check your email for a confirmation link first.';
+        errorMessage = 'The email or password is incorrect. Use Forgot password to choose a new password.';
       } else if (errorMessage.includes('Email not confirmed')) {
         errorMessage = 'Please confirm your email address before signing in. Check your inbox for the confirmation link.';
       }
@@ -95,6 +95,7 @@ export function LoginForm() {
             </label>
             <input
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -111,6 +112,7 @@ export function LoginForm() {
               </label>
               <input
                 type="password"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

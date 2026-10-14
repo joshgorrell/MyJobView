@@ -1,3 +1,4 @@
+import { PasswordSetup } from './components/Auth/PasswordSetup';
 import { canManageTimeOff } from './lib/timeOff';
 import { WorkspaceTabs } from './components/Shared/WorkspaceTabs';
 import { pageFromLocation, workspacePage, workspaceUrl, isPortalProposalRoute } from './lib/workspaceRoutes';
@@ -181,7 +182,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 }
 
 function AppContent() {
-  const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
+  const { user, profile, loading, isPasswordRecovery, isPortalUser, signOut } = useAuth();
   const { starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
@@ -249,9 +250,6 @@ function AppContent() {
   };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
-  const [newPassword, setNewPassword] = useState('');
-  const [resetError, setResetError] = useState<string | null>(null);
-  const [resetSuccess, setResetSuccess] = useState(false);
 
   const notificationCount = useNotificationCount();
 
@@ -794,72 +792,7 @@ function AppContent() {
       window.location.replace(bridgeUrl.toString());
       return <LoadingFallback />;
     }
-    if (isPasswordRecovery) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-          <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-white mb-6">{new URLSearchParams(window.location.search).get('account_setup') === 'welcome' ? 'Welcome to MyJobView' : 'Reset Your Password'}</h2>
-
-            {resetSuccess ? (
-              <div className="text-center">
-                <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-sm mb-4">
-                  Password updated successfully!
-                </div>
-                <p className="text-gray-300 mb-4">You can now sign in with your new password.</p>
-                <button
-                  onClick={() => {
-                    window.location.href = '/';
-                  }}
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
-                >
-                  Go to Sign In
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setResetError(null);
-                try {
-                  await updatePassword(newPassword);
-                  setResetSuccess(true);
-                  window.history.replaceState(null, '', window.location.pathname);
-                } catch (error: any) {
-                  setResetError(error?.message || 'Failed to update password');
-                }
-              }}>
-                {resetError && (
-                  <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm mb-4">
-                    {resetError}
-                  </div>
-                )}
-
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter new password"
-                    minLength={6}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
-                >
-                  Update Password
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      );
-    }
+    if (isPasswordRecovery) return <PasswordSetup />;
     return <LoginForm />;
   }
 
