@@ -44,6 +44,7 @@ export function validateManualIntakeDraft(draft: ManualIntakeDraft):
   if (!subject || subject.length > 200) errors.push('Subject must be 1–200 characters.');
   if (!description || description.length > 10000) errors.push('Details must be 1–10000 characters.');
   if (assignmentNotes && assignmentNotes.length > 1000) errors.push('Assignment notes must be at most 1000 characters.');
+  if (!['low', 'normal', 'high', 'urgent'].includes(draft.priority)) errors.push('Choose a valid priority.');
   if (dueDate && !isCalendarDate(dueDate)) errors.push('Enter a valid due date.');
   if (errors.length) return { ok: false, errors };
   return { ok: true, value: {
