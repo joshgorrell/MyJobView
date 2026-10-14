@@ -103,10 +103,10 @@ export function SmartIntakeHistory() {
           {attachmentError && <p role="status" className="text-amber-300">{attachmentError}</p>}
           {!attachmentError && attachments.length === 0 && <p className="text-gray-400">No attachments available for review.</p>}
           {attachments.map(file => <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-700 bg-gray-800 p-3">
-            <div className="min-w-0"><p className="break-all font-medium">{file.original_filename || "Unnamed attachment"}</p><p className="text-xs text-gray-400">{file.byte_size === null ? "Size unknown" : `${(file.byte_size / 1024).toFixed(1)} KB`} · Scan: {file.scan_status} · Review: {file.disposition}</p></div>
+            <div className="min-w-0"><p className="break-all font-medium">{file.original_filename || "Unnamed attachment"}</p><p className="text-xs text-gray-400">{file.byte_size === null ? "Size unknown" : `${(file.byte_size / 1024).toFixed(1)} KB`} · {file.scan_status === "blocked" || file.scan_status === "failed" ? "Attachment unavailable" : file.disposition === "pending" ? "Awaiting review" : file.disposition.replaceAll("_", " ")}</p></div>
             <span className="text-xs text-gray-400">Expires {new Date(file.expires_at).toLocaleDateString()}</span>
           </div>)}
-          <p className="text-xs text-gray-400">Quarantined attachments cannot be opened or downloaded here. Review actions will become available after security validation.</p>
+          <p className="text-xs text-gray-400">Attachment actions will be available once secure review is enabled.</p>
           <h4 className="font-semibold">Processing and delivery timeline</h4>
           {[...selected.messages.map(x => ({id:x.id,at:x.created_at,label:`Message: ${x.direction}`})),...selected.events.map(x => ({id:x.id,at:x.created_at,label:`${x.actor_type}: ${x.event_type}`})),...selected.attempts.map(x => ({id:x.id,at:x.created_at,label:`Attempt ${x.attempt_number}: ${x.outcome}${x.reason_code ? ' ('+x.reason_code+')' : ''}`})),...selected.delivery.map(x => ({id:x.id,at:x.occurred_at,label:`Delivery: ${x.event_kind} ${x.delivery_status ?? ''}`}))].sort((a,b) => a.at.localeCompare(b.at)).map(x => <div key={x.id} className="border-l-2 border-blue-500 py-1 pl-3"><span className="text-xs text-gray-400">{new Date(x.at).toLocaleString()}</span><p>{x.label}</p></div>)}
         </div>}
