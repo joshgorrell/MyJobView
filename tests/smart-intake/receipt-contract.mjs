@@ -26,6 +26,8 @@ assert.match(endpoint, /bytes > 1024 \* 1024/);
 assert.match(endpoint, /Invalid UTF-8/);
 assert.match(endpoint, /Invalid provider response/);
 assert.match(endpoint, /Attachment processing pending/);
+assert.match(endpoint, /attachments\.length > 20/);
+assert.match(endpoint, /Attachment count exceeds limit/);
 assert.match(endpoint, /event_type: "attachments_pending"/);
 assert.match(endpoint, /HTML email too large/);
 assert.match(endpoint, /String.fromCodePoint/);
