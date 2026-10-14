@@ -21,7 +21,8 @@ Status: design and implementation audit; not a release authorization. Do not dep
 
 ## Work not yet verified
 
-- Locate and inspect the canonical Customer Support and Task creation components, schemas, assignments, and notification mechanisms before writing any alternative insert paths.
+- **Task form located:** `src/components/Tasks/TaskForm.tsx` provides contact selection/creation, employee or department assignment, priority levels, due dates, reminders, offline-aware creation, and AI prefill. It already inserts tasks; Smart Intake should reuse its task domain logic rather than replicate its fields and save behavior. Confirm the task's User Flow visibility and notification behavior before routing.
+- Locate and inspect the canonical Customer Support creation component, schemas, assignments, and notification mechanisms before writing any alternative insert paths.
 - Locate the actual User Flow component/query and check the destination records' eligibility and lifecycle transitions.
 - Determine whether one server-side transactional creation endpoint can create destination + intake audit together with tenant authorization and idempotency. Avoid a client-side two-step write that can leave orphaned history.
 - Reconcile the intake schema: `intake_items.channel` currently excludes manual; classification currently excludes support. Add explicit origin and destination distinctions in a reviewed migration, with tenant-scoped access controls.
@@ -30,7 +31,7 @@ Status: design and implementation audit; not a release authorization. Do not dep
 
 ## Safe implementation order
 
-1. Inventory existing Support, Task, Pipeline, and User Flow entry points and database contracts.
+1. Inventory existing Support, Pipeline, and User Flow entry points and database contracts; TaskForm is now identified but its User Flow integration remains unverified.
 2. Define a shared intake draft and conditional field rules with no duplicate persisted state.
 3. Extract existing domain creation operations; implement secure atomic routing and intake audit.
 4. Wire the single form and inbox triage to those operations; verify destination visibility in User Flow.
