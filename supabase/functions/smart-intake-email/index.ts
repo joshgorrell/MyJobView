@@ -54,5 +54,15 @@ Deno.serve(async (request) => {
     if (existing.error || !existing.data) return Response.json({ error: "Unable to resolve stored intake" }, { status: 500 });
     intakeId = existing.data.id;
   }
+  // Capture a minimal audit event on first receipt; never duplicate it on retries.
+  if (data?.id) {
+    const { error: eventError } = await db.from("intake_events").insert({
+      intake_id: intakeId,
+      actor_type: "provider",
+      event_type: "email_received",
+      detail: { destination_purpose: destination.purpose, provider: "resend" },
+    });
+    if (eventError) return Response.json({ error: "Unable to audit intake receipt" }, { status: 500 });
+  }
   return Response.json({ accepted: true, intakeId });
 });
