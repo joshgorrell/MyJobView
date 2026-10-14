@@ -21,4 +21,11 @@ assert.deepEqual(names('Hey Luis Garcia, ask Tim'), [
 assert.deepEqual(names('at Luis please'), [{ text: 'at Luis', ids: ['luis'], explicit: true }]);
 assert.deepEqual(names('@Tim Miller please'), [{ text: '@Tim Miller', ids: ['tim'], explicit: true }]);
 assert.deepEqual(names('no one mentioned'), []);
-console.log('PASS: natural, explicit, spoken, duplicate and absent mentions');
+// Guard the persisted notification path as well as the visual name recognizer.
+const coworker = await readFile('src/components/Flow/coworkerConversations.ts', 'utf8');
+const composer = await readFile('src/components/Flow/CustomerConversations.tsx', 'utf8');
+assert.match(coworker, /content\.matchAll\(\/\(\?:\^\|\[\^\\w\]\)@\(\[a-z0-9\]\+\)\/gi\)/);
+assert.match(coworker, /\.eq\('organization_id', organizationId\)\.eq\('is_active', true\)\.in\('username', usernames\)/);
+assert.match(composer, /const canMentionStaff = selectedThread\?\.source === 'coworker';/);
+assert.deepEqual(Array.from('Hello @lgarcia, @tmiller and email@external.com'.matchAll(/(?:^|[^\\w])@([a-z0-9]+)/gi), m => m[1]), ['lgarcia', 'tmiller']);
+console.log('PASS: natural, spoken, ambiguous and absent names; scoped confirmed mention notifications');
