@@ -22,6 +22,7 @@ Deno.serve(async (request) => {
   if (contentLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
   const body = await request.text().catch(() => "");
   if (new TextEncoder().encode(body).byteLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
+  if (!body.trim()) return Response.json({ error: "Empty payload" }, { status: 400 });
   let payload: Record<string, unknown> | null = null;
   try {
     const parsed: unknown = JSON.parse(body);
