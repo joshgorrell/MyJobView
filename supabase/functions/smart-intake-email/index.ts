@@ -43,8 +43,29 @@ Deno.serve(async (request) => {
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (!Number.isFinite(contentLength) || contentLength < 0) return Response.json({ error: "Invalid content length" }, { status: 400 });
   if (contentLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
-  const body = await request.text().catch(() => "");
-  if (new TextEncoder().encode(body).byteLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
+  // Bound the actual stream: Content-Length is optional and cannot be trusted.
+  const reader = request.body?.getReader();
+  if (!reader) return Response.json({ error: "Empty payload" }, { status: 400 });
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > 1024 * 1024) {
+        await reader.cancel();
+        return Response.json({ error: "Payload too large" }, { status: 413 });
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return Response.json({ error: "Unable to read payload" }, { status: 400 });
+  }
+  const combined = new Uint8Array(bytes);
+  let offset = 0;
+  for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.byteLength; }
+  const body = new TextDecoder("utf-8", { fatal: true }).decode(combined);
   if (!body.trim()) return Response.json({ error: "Empty payload" }, { status: 400 });
   if (!(await verifyResendSignature(body, request.headers, webhookSecret))) return Response.json({ error: "Unauthorized" }, { status: 401 });
   let payload: Record<string, unknown> | null = null;
