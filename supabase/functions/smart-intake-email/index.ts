@@ -202,8 +202,8 @@ Deno.serve(async (request) => {
               if (new TextEncoder().encode(html).byteLength > 1024 * 1024) {
                 return Response.json({ error: "HTML email too large", intakeId }, { status: 413 });
               }
-              const plain = html.replace(/<(script|style|head|svg|iframe)\\b[^>]*>[\\s\\S]*?<\\/\\1\\s*>/gi, " ")
-                .replace(/<br\\s*\\/?>|<\\/(?:p|div|li|tr|h[1-6])\\s*>/gi, "\\n")
+              const plain = html.replace(/<(script|style|head|svg|iframe)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+                .replace(/<br\s*\/?>|<\/(?:p|div|li|tr|h[1-6])\s*>/gi, "\n")
                 .replace(/<[^>]*>/g, " ")
                 .replace(/&(#x[0-9a-f]+|#[0-9]+|amp|lt|gt|quot|apos|nbsp);/gi, (_match, entity: string) => {
                   const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -212,7 +212,7 @@ Deno.serve(async (request) => {
                     ? Number.parseInt(entity.slice(2), 16) : Number.parseInt(entity.slice(1), 10);
                   return numeric > 0 && numeric <= 0x10ffff && !(numeric >= 0xd800 && numeric <= 0xdfff)
                     ? String.fromCodePoint(numeric) : " ";
-                }).replace(/[ \\t]+/g, " ").trim();
+                }).replace(/[ \t]+/g, " ").trim();
               email.text = plain;
             }
             const text = typeof email.text === "string" ? email.text : null;
