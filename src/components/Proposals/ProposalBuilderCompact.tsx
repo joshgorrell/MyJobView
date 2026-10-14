@@ -597,6 +597,23 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [copyingShareLink, setCopyingShareLink] = useState(false);
   const [shareLinkMessage, setShareLinkMessage] = useState('');
+  const handleRevokeProposalLinks = async () => {
+    if (!proposal || copyingShareLink) return;
+    if (!window.confirm('Revoke all previously shared customer links for this proposal? Customers will no longer be able to open those links.')) return;
+    setCopyingShareLink(true);
+    setShareLinkMessage('');
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-proposal-share-link', {
+        body: { proposalId: proposal.id, action: 'revoke' },
+      });
+      if (error || !data?.revoked) throw new Error('Could not revoke proposal links.');
+      setShareLinkMessage('All previously shared links have been revoked.');
+    } catch (error) {
+      setShareLinkMessage(error instanceof Error ? error.message : 'Unable to revoke proposal links.');
+    } finally {
+      setCopyingShareLink(false);
+    }
+  };
   const handleCopyProposalLink = async () => {
     if (!proposal || copyingShareLink) return;
     setCopyingShareLink(true);
@@ -3428,6 +3445,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25 disabled:cursor-not-allowed disabled:opacity-40"
                   title="Copy a secure, 30-day read-only proposal summary link">
                   <Copy className="h-4 w-4 shrink-0" /><span>{copyingShareLink ? 'Creating Link…' : 'Copy Link'}</span>
+                </button>
+                <button type="button" onClick={handleRevokeProposalLinks}
+                  disabled={copyingShareLink}
+                  className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-strong bg-elevated px-2.5 text-xs font-medium text-secondary hover:text-red-400 disabled:opacity-40"
+                  title="Revoke all customer share links for this proposal">
+                  <Unlink className="h-4 w-4 shrink-0" /><span className="hidden lg:inline">Revoke Links</span>
                 </button>
                 <button type="button" onClick={() => setShowPdfModal(true)}
                   className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25"
