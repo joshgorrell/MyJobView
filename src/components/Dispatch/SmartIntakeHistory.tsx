@@ -24,7 +24,7 @@ export function SmartIntakeHistory() {
   const [selected, setSelected] = useState<Timeline | null>(null);
   const [detailError, setDetailError] = useState('');
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const orgId = tenant?.organizationId ?? profile?.organization_id ?? null;
+  const orgId = tenant?.organizationId && profile?.organization_id === tenant.organizationId ? tenant.organizationId : profile?.organization_id && !tenant ? profile.organization_id : null;
   const attentionStatuses = ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','failed_retryable'];
 
   const reload = useCallback(async () => {
