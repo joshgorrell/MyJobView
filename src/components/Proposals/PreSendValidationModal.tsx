@@ -14,6 +14,7 @@ interface PreSendValidationModalProps {
   copyingLink?: boolean;
   canCopyLink?: boolean;
   allowSubmission?: boolean;
+  alreadySubmitted?: boolean;
   onNavigateToSettings: (section: ValidationSection['name']) => void;
 }
 
@@ -30,6 +31,7 @@ export function PreSendValidationModal({
   copyingLink = false,
   canCopyLink = false,
   allowSubmission = true,
+  alreadySubmitted = false,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,8 @@ export function PreSendValidationModal({
   const approvalWindow = 30; // Dealer policy is resolved by the submission handler.
   const [visibleInPortal, setVisibleInPortal] = useState(initialPortalVisibility);
   const [sending, setSending] = useState(false);
+  const [linkActivated, setLinkActivated] = useState(alreadySubmitted);
+  const [submissionError, setSubmissionError] = useState('');
   const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -84,12 +88,20 @@ export function PreSendValidationModal({
     setSending(true);
     try {
       await onSend(approvalWindow, visibleInPortal);
+      setLinkActivated(true);
+      setSubmissionError('');
     } catch (error) {
       // The parent displays the failure; leave this dialog open so the user can retry.
       console.error('Proposal submission failed:', error);
+      setSubmissionError('Could not activate the proposal. Please try again.');
     } finally {
       setSending(false);
     }
+  }
+
+  async function handleActivateLink(checked: boolean) {
+    if (!checked || linkActivated || sending || !allowSubmission || !validationData?.isReady) return;
+    await handleSend();
   }
 
   if (loading) {
@@ -137,8 +149,8 @@ export function PreSendValidationModal({
               className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
               <Mail className="h-4 w-4" /> Email
             </button>
-            <button type="button" onClick={onCopyLink} disabled={!onCopyLink || !canCopyLink || copyingLink}
-              title={canCopyLink ? 'Copy the reusable customer link' : 'Submit the proposal before copying its customer link'}
+            <button type="button" onClick={onCopyLink} disabled={!onCopyLink || !(canCopyLink || linkActivated) || copyingLink}
+              title={canCopyLink || linkActivated ? 'Copy the reusable customer link' : 'Activate the customer proposal link first'}
               className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
               <Copy className="h-4 w-4" /> {copyingLink ? 'Copying…' : 'Copy link'}
             </button>
@@ -147,7 +159,24 @@ export function PreSendValidationModal({
               <Printer className="h-4 w-4" /> Print / PDF
             </button>
           </div>
-          {!canCopyLink && <p className="text-xs text-gray-400">A reusable customer link becomes available after submission.</p>}
+          {!canCopyLink && !linkActivated && <p className="text-xs text-gray-400">Activate the customer proposal link below to enable copying.</p>}
+        </div>
+
+        <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
+          <label className={`flex items-start gap-3 rounded-xl border p-4 ${linkActivated ? 'border-green-600/40 bg-green-500/10' : 'border-blue-500/40 bg-blue-500/10'}`}>
+            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-blue-500"
+              checked={linkActivated} disabled={linkActivated || sending || !allowSubmission || !validationData?.isReady}
+              onChange={e => void handleActivateLink(e.target.checked)} />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-white">{linkActivated ? 'Customer proposal link is active' : 'Activate customer proposal link'}</span>
+              <span className="mt-1 block text-xs leading-5 text-gray-300">{linkActivated
+                ? 'This proposal has been submitted. Use Copy link, Email, or Print / PDF above to share it.'
+                : 'Checking this box submits the proposal immediately, starts the dealer-wide approval window, and enables the reusable customer link. No email is sent.'}</span>
+            </span>
+          </label>
+          {!allowSubmission && !linkActivated && <p className="mt-2 text-xs text-amber-300">This proposal cannot be submitted in its current status.</p>}
+          {!validationData?.isReady && !linkActivated && <p className="mt-2 text-xs text-amber-300">Resolve the readiness issues below to activate the link.</p>}
+          {submissionError && <p role="alert" className="mt-2 text-xs text-red-300">{submissionError}</p>}
         </div>
 
         {/* Progress bar */}
@@ -267,9 +296,9 @@ export function PreSendValidationModal({
           </button>
           <button
             onClick={handleSend}
-            disabled={!allowSubmission || !isReady || sending}
+            disabled={!allowSubmission || !isReady || sending || linkActivated}
             className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-              allowSubmission && isReady && !sending
+              allowSubmission && isReady && !sending && !linkActivated
                 ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30'
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}
@@ -282,7 +311,7 @@ export function PreSendValidationModal({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                {allowSubmission ? 'Submit proposal' : 'Already finalized'}
+                {linkActivated ? 'Submitted' : allowSubmission ? 'Submit proposal' : 'Already finalized'}
               </>
             )}
           </button>
