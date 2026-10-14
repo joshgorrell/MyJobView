@@ -6733,7 +6733,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           customerName={proposal.contacts?.company_name || proposal.contacts?.name || [proposal.contacts?.first_name, proposal.contacts?.last_name].filter(Boolean).join(' ') || ''}
           onPrint={() => { setShowReactivateModal(false); setShowPdfModal(true); }}
           onDownloadPdf={() => { setShowReactivateModal(false); setShowPdfModal(true); }}
-          onCopyLink={handleCopyProposalLink}
           onSuccess={() => loadData()}
         /></Suspense>
       )}
