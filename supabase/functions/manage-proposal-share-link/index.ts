@@ -29,7 +29,7 @@ Deno.serve(async req => {
       if (error) throw error;
       return json({ revoked: true });
     }
-    if (['draft', 'designing', 'withdrawn', 'recalled'].includes(proposal.status)) return json({ error: 'Submit the proposal before sharing' }, 409);
+    if (!['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'Submit the proposal before sharing' }, 409);
     const token = hex(crypto.getRandomValues(new Uint8Array(32)));
     const tokenHash = await hash(token);
     const { error } = await admin.from('proposal_share_links').insert({
