@@ -14,7 +14,7 @@ export async function quarantineReceivedAttachments(
   db: Parameters<typeof uploadQuarantinedAttachment>[0] & {
     storage: { from: (bucket: string) => {
       upload: (path: string, body: Uint8Array, options: { contentType: string; upsert: boolean }) => Promise<{ error: { message: string } | null }>;
-      info: (path: string) => Promise<{ data: { size?: number; metadata?: { size?: number } } | null; error: unknown }>;
+      info: (path: string) => Promise<{ data: { size?: number; metadata?: { size?: number } } | null; error: { statusCode?: string | number; status?: number; message?: string; error?: string } | null }>;
       download: (path: string) => Promise<{ data: Blob | null; error: unknown }>;
     } };
     from: (table: string) => {
@@ -79,7 +79,8 @@ export async function quarantineReceivedAttachments(
     // recording the database row. Never overwrite an unknown existing object.
     const bucket = db.storage.from("smart-intake-quarantine");
     const { data: orphan, error: orphanError } = await bucket.info(storageKey);
-    if (orphanError && !/not found/i.test(String(orphanError))) {
+    const notFound = orphanError && (orphanError.statusCode === "404" || orphanError.statusCode === 404 || orphanError.status === 404);
+    if (orphanError && !notFound) {
       throw new Error("Unable to inspect quarantine object");
     }
     if (orphan) {
