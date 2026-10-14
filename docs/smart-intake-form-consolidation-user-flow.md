@@ -38,3 +38,10 @@ Status: design and implementation audit; not a release authorization. Do not dep
 5. Add tests and complete feature-flagged rollout gates.
 
 **Explicitly deferred:** enabling the prototype's Create button, inserting directly into guessed tables, deploying migrations, and altering production routing.
+
+## Verified destination behavior (follow-up)
+
+- **Tasks:** `TaskForm.handleSubmit` uses `offlineSupabaseInsert('tasks', ...)` with `assigned_to`, `assigned_department_id`, `contact_id`, `due_date`, `reminder_date`, `user_id`, and task points. It also writes `feed_events` for task creation/updates and may create a Google Calendar reminder. Reimplementing task creation as a bare insert would silently lose these behaviors. The existing form redirects to `#tasks` after creation; this is **not** proof of User Flow integration.
+- **Service requests:** `ServiceRequestQueue` subscribes to `service_requests` changes and loads non-closed/non-cancelled requests, optionally filtered by priority and source type. Any Smart Intake-created service request must use the same valid schema/status and appear here; queue visibility under source filters requires an explicit check.
+- **Atomicity risk:** task creation and `feed_events` creation are separate offline-aware writes today. An intake routing endpoint should not claim atomic audit history unless the database transaction actually includes destination creation and the intake event. Do not bypass existing offline behavior without a migration plan.
+- **Tenant isolation check:** `TaskForm.loadContacts/loadUsers/loadDepartments` queries shown in the inspected component lack explicit `organization_id` predicates. Verify enforced RLS and correct tenant context before reusing them in Smart Intake. This is an audit concern, not a confirmed data leak.
