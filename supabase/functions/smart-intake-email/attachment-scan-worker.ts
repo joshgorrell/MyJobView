@@ -17,8 +17,8 @@ type ScanDatabase = {
     update: (values: Record<string, unknown>) => {
       eq: (column: string, value: string) => {
         eq: (column: string, value: string) => {
-        select: (columns: string) => Promise<{ data: Array<{ id: string }> | null; error: unknown }>;
-      };
+          select: (columns: string) => Promise<{ data: Array<{ id: string }> | null; error: unknown }>;
+        };
       };
     };
   };
