@@ -21,7 +21,10 @@ Deno.serve(async (request) => {
   }
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !key) return Response.json({ error: "Missing service configuration" }, { status: 503 });
+  if (!url || !key || !Deno.env.get("SMART_INTAKE_SCANNER_ENDPOINT") ||
+      !Deno.env.get("SMART_INTAKE_SCANNER_HOST") || !Deno.env.get("SMART_INTAKE_SCANNER_TOKEN")) {
+    return Response.json({ error: "Missing service configuration" }, { status: 503 });
+  }
   const db = createClient(url, key, { auth: { persistSession: false } });
   const { data, error } = await db.from("intake_attachments")
     .select("id,storage_key,sha256,byte_size,scan_status,intake_messages!inner(intake_id,intake_items!inner(organization_id))")
