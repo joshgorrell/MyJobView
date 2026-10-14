@@ -31,6 +31,7 @@ import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
 import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
+const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposalPage'));
 const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
@@ -459,6 +460,10 @@ function AppContent() {
     setShowTaskForm(false);
     setShowJobMediaUpload(false);
   }, [activeTab]);
+
+  if (currentPath === '/shared/proposal') {
+    return <Suspense fallback={<LoadingFallback />}><SharedProposalPage /></Suspense>;
+  }
 
   if (loading) {
     return <BrandedLoading message="Loading your workspace..." />;
