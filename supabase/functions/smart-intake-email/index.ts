@@ -12,7 +12,7 @@ async function verifyResendSignature(body: string, headers: Headers, secret: str
   const id = headers.get("svix-id");
   const timestamp = headers.get("svix-timestamp");
   const signature = headers.get("svix-signature");
-  if (!id || !timestamp || !signature || !Number.isSafeInteger(Number(timestamp))) return false;
+  if (!id || !timestamp || !signature || !/^[0-9]+$/.test(timestamp)) return false;
   const seconds = Number(timestamp);
   if (!Number.isSafeInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > 300) return false;
   try {
@@ -34,7 +34,7 @@ async function verifyResendSignature(body: string, headers: Headers, secret: str
 function mailbox(value: string): string | null {
   if (/[\r\n]/.test(value)) return null;
   const trimmed = value.trim();
-  const match = trimmed.match(/^(?:[^<>]*<)?([^<>\s@]+@[^<>\s@]+)(?:>)?$/);
+  const match = trimmed.match(/^([^<>\s@]+@[^<>\s@]+)$/) ?? trimmed.match(/^[^<>]*<([^<>\s@]+@[^<>\s@]+)>$/);
   if (!match) return null;
   const address = match[1].toLowerCase();
   return address.length <= 320 && /^[^@]+@[^@]+\.[^@]+$/.test(address) ? address : null;
