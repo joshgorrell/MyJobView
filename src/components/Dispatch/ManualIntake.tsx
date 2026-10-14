@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { ServiceRequestForm } from '../Service/ServiceRequestForm';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,7 +20,6 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const [priority, setPriority] = useState('normal');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState('');
-  const [serviceFormOpen, setServiceFormOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -41,13 +39,6 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     [customer.company_name, customer.contact_name, customer.email].some(value =>
       value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
   const canContinue = !!organizationId && !!contactId && !!subject.trim() && !!description.trim();
-
-  if (serviceFormOpen) {
-    return <ServiceRequestForm onClose={() => setServiceFormOpen(false)} onSuccess={onClose}
-      prefilledContactId={contactId}
-      aiPrefill={{ contactId, jobDescription: [subject.trim(), description.trim()].filter(Boolean).join(' — '),
-        priority: priority === 'urgent' || priority === 'high' ? 'urgent' : 'normal' }} />;
-  }
 
   return (
     <section className="rounded-xl border border-gray-700 bg-gray-900 p-4 sm:p-6 space-y-4" aria-label="New manual intake">
@@ -90,11 +81,11 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       {error && <p role="alert" className="text-sm text-amber-300">{error}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="min-h-11 rounded-lg px-4 text-gray-300">Cancel</button>
-        <button type="button" disabled={!canContinue || type !== "service"} onClick={() => setServiceFormOpen(true)} title={type === "service" ? "Continue in the existing Service Request form" : "Creation for this type is not yet connected"} className="min-h-11 rounded-lg bg-gray-700 px-4 font-medium text-gray-300 disabled:opacity-50">
-          {type === 'service' ? 'Continue to' : 'Create'} {type === 'service' ? 'Service Request' : type === 'support' ? 'Support Issue' : type === 'task' ? 'Task' : type === 'sales' ? 'Sales Lead' : 'Intake'} {type === 'service' ? '' : '(coming soon)'}
+        <button type="button" disabled title="Unified intake submission is not connected yet" className="min-h-11 rounded-lg bg-gray-700 px-4 font-medium text-gray-300 disabled:opacity-50">
+          Create {type === 'service' ? 'Service Request' : type === 'support' ? 'Support Issue' : type === 'task' ? 'Task' : type === 'sales' ? 'Sales Lead' : 'Intake'} (coming soon)
         </button>
       </div>
-      <p className="text-xs text-gray-400">Service Requests continue through MJV's existing creation form. Other intake types remain disabled until their established creation flows are connected.</p>
+      <p className="text-xs text-gray-400">One form will capture, classify, and route the request. Submission is disabled until the unified creation and audit flow is implemented.</p>
     </section>
   );
 }
