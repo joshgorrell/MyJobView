@@ -15,6 +15,7 @@ export async function quarantineReceivedAttachments(
     storage: { from: (bucket: string) => {
       upload: (path: string, body: Uint8Array, options: { contentType: string; upsert: boolean }) => Promise<{ error: { message: string } | null }>;
       info: (path: string) => Promise<{ data: { size?: number; metadata?: { size?: number } } | null; error: unknown }>;
+      download: (path: string) => Promise<{ data: Blob | null; error: unknown }>;
     } };
     from: (table: string) => {
       select: (columns: string) => {
@@ -55,9 +56,17 @@ export async function quarantineReceivedAttachments(
       if (!Number.isSafeInteger(objectSize) || objectSize < 0) {
         throw new Error("Quarantine object size unavailable");
       }
-      if (objectSize !== existing.data.byte_size) {
+      if (objectSize !== existing.data.byte_size || objectSize > 15 * 1024 * 1024) {
         throw new Error("Quarantine object size does not match database record");
       }
+      // A matching byte count is insufficient: verify the stored binary itself.
+      const { data: stored, error: downloadError } = await db.storage.from("smart-intake-quarantine")
+        .download(storageKey);
+      if (downloadError || !stored || stored.size !== objectSize) {
+        throw new Error("Unable to verify quarantined content");
+      }
+      const storedDigest = await attachmentSha256(new Uint8Array(await stored.arrayBuffer()));
+      if (storedDigest !== existing.data.sha256) throw new Error("Quarantine checksum mismatch");
       continue;
     }
 
