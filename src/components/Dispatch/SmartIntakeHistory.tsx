@@ -25,19 +25,20 @@ export function SmartIntakeHistory() {
   const [detailError, setDetailError] = useState('');
   const [loadingDetail, setLoadingDetail] = useState(false);
   const orgId = tenant?.organizationId ?? profile?.organization_id ?? null;
+  const attentionStatuses = ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','failed_retryable'];
 
   const reload = useCallback(async () => {
     if (!orgId || authLoading || !profile) return;
     setBusy(true);
     setError('');
     try {
-      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, status: status === 'all' ? undefined : status, from: dateFrom || undefined, to: dateTo || undefined, limit: 100 });
+      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, status: status === 'all' ? undefined : status, statuses: view === 'attention' && status === 'all' ? attentionStatuses : undefined, from: dateFrom || undefined, to: dateTo || undefined, limit: 100 });
       setRows(result);
     } catch (e) {
       setRows([]);
       setError(e instanceof Error ? e.message : 'Unable to load intake history');
     } finally { setBusy(false); }
-  }, [orgId, authLoading, profile, search, channel, status, dateFrom, dateTo]);
+  }, [orgId, authLoading, profile, search, channel, status, dateFrom, dateTo, view]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -51,8 +52,7 @@ export function SmartIntakeHistory() {
     finally { setLoadingDetail(false); }
   }
 
-  const attention = new Set(['received','analyzing','awaiting_customer','awaiting_employee','needs_review','failed_retryable']);
-  const visible = view === 'all' ? rows : rows.filter(row => attention.has(row.status));
+  const visible = rows;
   return (
     <section className="min-w-0 space-y-4" aria-label="Smart Intake history">
       <div className="flex flex-wrap items-center justify-between gap-3">
