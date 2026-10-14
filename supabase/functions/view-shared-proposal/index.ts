@@ -21,7 +21,7 @@ Deno.serve(async req => {
     if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
     // Approval and link viewing use the same stored submission expiration. Resubmission resets expires_at.
     if (!proposal.sent_at || !Number.isFinite(Date.parse(proposal.sent_at)) ||
-      (proposal.expires_at && Date.now() >= Date.parse(proposal.expires_at))) {
+      (!proposal.expires_at || !Number.isFinite(Date.parse(proposal.expires_at)) || Date.now() >= Date.parse(proposal.expires_at))) {
       return json({ error: 'This proposal viewing period has expired. Please request a resubmission.' }, 410);
     }
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
