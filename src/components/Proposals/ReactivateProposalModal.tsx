@@ -11,14 +11,13 @@ interface ReactivateProposalModalProps {
   totalAmount: number;
   onClose: () => void;
   onSuccess: () => void | Promise<void>;
-  onCopyLink?: () => void | Promise<void>;
   onPrint?: () => void;
   onDownloadPdf?: () => void;
 }
 
 export function ReactivateProposalModal({
   proposalId, proposalNumber, proposalTitle, customerName, onClose, onSuccess,
-  onCopyLink, onPrint, onDownloadPdf,
+  onPrint, onDownloadPdf,
 }: ReactivateProposalModalProps) {
   const [portalVisible, setPortalVisible] = useState(false);
   const [days, setDays] = useState<number | null>(null);
@@ -69,11 +68,19 @@ export function ReactivateProposalModal({
       }
       setPortalVisible(makeVisible);
       await onSuccess();
-      if (copyAfter && onCopyLink) await onCopyLink();
+      if (copyAfter) {
+        const { data, error: linkError } = await supabase.functions.invoke('manage-proposal-share-link', {
+          body: { proposalId, action: 'create' },
+        });
+        if (linkError || !data?.token) throw linkError || new Error('Could not create the customer link');
+        const url = new URL('/shared/proposal', window.location.origin);
+        url.searchParams.set('token', data.token);
+        await navigator.clipboard.writeText(url.toString());
+      }
       setMessage(copyAfter ? 'Customer link copied.' : 'Proposal is active.');
     } catch (error) {
       console.error('Proposal activation failed', error);
-      setMessage('Unable to activate the proposal. Please try again.');
+      setMessage(active ? 'Unable to complete that action. Please try again.' : 'Unable to complete the action. If the proposal was activated, you can retry copying its link.');
     } finally {
       setSubmitting(false);
     }
@@ -97,10 +104,10 @@ export function ReactivateProposalModal({
           <p className="mb-3 text-sm font-semibold text-slate-200">Choose any delivery options</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button type="button" onClick={onPrint} className={actionClass}><Printer size={19} className="text-blue-300" />Print</button>
-            <button type="button" onClick={onDownloadPdf} className={actionClass}><Download size={23} className="text-blue-300" />PDF</button>
-            <button type="button" onClick={() => void activate(portalVisible, true)} disabled={submitting || days === null || !onCopyLink} className={actionClass}><Copy size={23} className="text-blue-300" />Copy link</button>
+            <button type="button" onClick={onDownloadPdf} className={actionClass}><Download size={19} className="text-blue-300" />PDF</button>
+            <button type="button" onClick={() => void activate(portalVisible, true)} disabled={submitting || days === null} className={actionClass}><Copy size={19} className="text-blue-300" />Copy link</button>
             <button type="button" onClick={() => void activate(!portalVisible)} disabled={submitting || days === null} className={actionClass}>
-              {portalVisible ? <Check size={19} className="text-green-400" /> : <Globe size={23} className="text-blue-300" />}
+              {portalVisible ? <Check size={19} className="text-green-400" /> : <Globe size={19} className="text-blue-300" />}
               {portalVisible ? 'Portal on' : 'Portal'}
             </button>
           </div>
