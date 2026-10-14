@@ -76,6 +76,34 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
   const [areaTemplates, setAreaTemplates] = useState<AreaTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dealerApprovalDays, setDealerApprovalDays] = useState(30);
+  const [savingDealerApprovalDays, setSavingDealerApprovalDays] = useState(false);
+  const [dealerApprovalMessage, setDealerApprovalMessage] = useState('');
+  const isDealerAdmin = profile?.role === 'admin';
+  useEffect(() => {
+    if (!profile?.organization_id) return;
+    supabase.from('organizations').select('proposal_approval_days')
+      .eq('id', profile.organization_id).single()
+      .then(({ data, error }) => {
+        if (error) setDealerApprovalMessage('Could not load the dealer approval policy.');
+        else if (data) setDealerApprovalDays(data.proposal_approval_days ?? 30);
+      });
+  }, [profile?.organization_id]);
+  const saveDealerApprovalPolicy = async () => {
+    if (!isDealerAdmin || !profile?.organization_id || savingDealerApprovalDays) return;
+    if (!Number.isInteger(dealerApprovalDays) || dealerApprovalDays < 1 || dealerApprovalDays > 365) {
+      setDealerApprovalMessage('Choose a whole number from 1 to 365 days.');
+      return;
+    }
+    setSavingDealerApprovalDays(true);
+    setDealerApprovalMessage('');
+    const { data, error } = await supabase.from('organizations')
+      .update({ proposal_approval_days: dealerApprovalDays })
+      .eq('id', profile.organization_id).select('proposal_approval_days').single();
+    setDealerApprovalMessage(error || !data ? 'Unable to save. Dealer administrator access is required.' : 'Dealer approval window saved for future submissions.');
+    setSavingDealerApprovalDays(false);
+  };
+
   const [newArea, setNewArea] = useState('');
   const [generatingScope, setGeneratingScope] = useState(false);
   const [aiCooldown, setAiCooldown] = useState(0);
@@ -1944,6 +1972,27 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
             )}
 
             {/* COLUMNS/VISIBILITY TAB */}
+            {activeTab === 'visibility' && (
+              <section className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+                <h2 className="text-lg font-semibold text-gray-900">Proposal Approval &amp; Viewing Window</h2>
+                <p className="mt-1 text-sm text-gray-600">One dealer-wide deadline controls both customer approval and access to the proposal's single shared link. The window restarts each time a proposal is submitted again. Existing submitted proposals keep their current deadline.</p>
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="text-sm font-medium text-gray-700">Window (days)
+                    <input type="number" min={1} max={365} step={1} disabled={!isDealerAdmin}
+                      value={dealerApprovalDays}
+                      onChange={e => setDealerApprovalDays(Number(e.target.value))}
+                      className="mt-1 block w-28 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 disabled:bg-gray-100" />
+                  </label>
+                  {isDealerAdmin && <button type="button" disabled={savingDealerApprovalDays}
+                    onClick={saveDealerApprovalPolicy}
+                    className="min-h-[40px] rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                    {savingDealerApprovalDays ? 'Saving…' : 'Save Dealer Setting'}
+                  </button>}
+                </div>
+                {!isDealerAdmin && <p className="mt-2 text-xs text-gray-600">Only a dealer administrator can change this setting.</p>}
+                {dealerApprovalMessage && <p role="status" className="mt-2 text-sm text-gray-700">{dealerApprovalMessage}</p>}
+              </section>
+            )}
             {activeTab === 'visibility' && (
               <div className="space-y-8">
                 {/* Class Visibility Settings */}
