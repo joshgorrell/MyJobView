@@ -46,7 +46,8 @@ export async function quarantineReceivedAttachments(
     }
 
     const metadata = await getReceivedAttachmentDownload(input.providerEmailId, attachment.id, input.apiKey);
-    const bytes = await downloadSignedAttachment(metadata.downloadUrl, input.allowedDownloadHosts, 15 * 1024 * 1024);
+    if (metadata.size > 15 * 1024 * 1024) throw new Error("Attachment too large");
+    const bytes = await downloadSignedAttachment(metadata.downloadUrl, input.allowedDownloadHosts, Math.max(1, metadata.size));
     if (bytes.byteLength !== metadata.size) throw new Error("Attachment size mismatch");
     const sha256 = await attachmentSha256(bytes);
     try {
