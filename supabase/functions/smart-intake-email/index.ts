@@ -62,7 +62,7 @@ Deno.serve(async (request) => {
       event_type: "email_received",
       detail: { destination_purpose: destination.purpose, provider: "resend" },
     });
-    if (eventError) return Response.json({ error: "Unable to audit intake receipt" }, { status: 500 });
+    if (eventError) console.error("Intake audit event failed", { intakeId, code: eventError.code });
   }
   return Response.json({ accepted: true, intakeId });
 });
