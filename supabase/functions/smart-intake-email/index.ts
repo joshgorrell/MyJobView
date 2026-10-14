@@ -57,7 +57,7 @@ Deno.serve(async (request) => {
     source_address: sender, destination_address: recipient,
     subject: typeof event?.subject === "string" ? event.subject.slice(0, 1000) : null,
     raw_body: null, // Resend receipt webhooks contain metadata, not fetched email body.
-    status: "received",
+    // Metadata-only receipts must not be treated as complete messages.\n    status: "needs_review",
   }, { onConflict: "organization_id,channel,provider,provider_event_id", ignoreDuplicates: true })
     .select("id").maybeSingle();
   if (error) return Response.json({ error: "Unable to store intake" }, { status: 500 });
