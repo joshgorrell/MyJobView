@@ -1,13 +1,15 @@
 import { useState, Suspense, lazy } from 'react';
-import { ListTodo, BarChart3 } from 'lucide-react';
+import { ListTodo, BarChart3, Inbox } from 'lucide-react';
 
 const ServiceRequestQueue = lazy(() => import('./ServiceRequestQueue').then(m => ({ default: m.ServiceRequestQueue })));
+const SmartIntakeHistory = lazy(() => import('./SmartIntakeHistory').then(m => ({ default: m.SmartIntakeHistory })));
 const ServiceRequestAnalytics = lazy(() => import('./ServiceRequestAnalytics').then(m => ({ default: m.ServiceRequestAnalytics })));
 
-type TabKey = 'queue' | 'analytics';
+type TabKey = 'queue' | 'analytics' | 'intake';
 
 const TABS = [
   { key: 'queue' as TabKey, label: 'Queue', icon: ListTodo },
+  { key: 'intake' as TabKey, label: 'Smart Intake', icon: Inbox },
   { key: 'analytics' as TabKey, label: 'Analytics', icon: BarChart3 },
 ];
 
@@ -52,6 +54,7 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
       <Suspense fallback={<TabFallback />}>
         {activeTab === 'queue' && <ServiceRequestQueue />}
         {activeTab === 'analytics' && <ServiceRequestAnalytics />}
+        {activeTab === 'intake' && <SmartIntakeHistory />}
       </Suspense>
     </div>
   );
