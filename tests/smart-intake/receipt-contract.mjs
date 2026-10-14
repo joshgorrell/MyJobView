@@ -51,6 +51,7 @@ assert.match(endpoint, /mailbox\(retrievedTo\[0\]\) === recipient/);
 assert.match(foundation, /intake_item_provider_unique unique/);
 assert.match(foundation, /intake_attachment_work_order_links/);
 assert.match(foundation, /intake_attachments_expiring/);
+assert.match(foundation, /intake_attachment_resolution_check/);
 assert.match(foundation, /scan_status text not null default 'pending'/);
 assert.match(foundation, /disposition text not null default 'pending'/);
 assert.match(foundation, /'unknown','service','task','sales','other'/);
