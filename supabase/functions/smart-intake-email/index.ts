@@ -158,14 +158,6 @@ Deno.serve(async (request) => {
       console.error("Received email retrieval failed", { intakeId });
     }
   }
-  // Retryable retrieval must never be silently acknowledged as completed.
-  // Provider retries can safely re-enter because intake_items is idempotent.
-  const { data: storedContent, error: storedContentError } = await db.from("intake_items")
-    .select("raw_body").eq("id", intakeId).eq("organization_id", destination.organization_id).single();
-  if (storedContentError) return Response.json({ error: "Unable to verify intake content" }, { status: 503 });
-  if (storedContent.raw_body === null) {
-    return Response.json({ error: "Email content pending retrieval", intakeId }, { status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" } });
-  }
   // Capture a minimal audit event on first receipt; never duplicate it on retries.
   if (data?.id) {
     const { error: eventError } = await db.from("intake_events").insert({
@@ -175,6 +167,14 @@ Deno.serve(async (request) => {
       detail: { destination_purpose: destination.purpose, provider: "resend", provider_created_at: eventCreatedAt, content_pending: true },
     });
     if (eventError) console.error("Intake audit event failed", { intakeId, code: eventError.code });
+  }
+  // Retryable retrieval must never be silently acknowledged as completed.
+  // Provider retries can safely re-enter because intake_items is idempotent.
+  const { data: storedContent, error: storedContentError } = await db.from("intake_items")
+    .select("raw_body").eq("id", intakeId).eq("organization_id", destination.organization_id).single();
+  if (storedContentError) return Response.json({ error: "Unable to verify intake content" }, { status: 503 });
+  if (storedContent.raw_body === null) {
+    return Response.json({ error: "Email content pending retrieval", intakeId }, { status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" } });
   }
   return Response.json({ accepted: true, intakeId }, { headers: { "Cache-Control": "no-store" } });
 });
