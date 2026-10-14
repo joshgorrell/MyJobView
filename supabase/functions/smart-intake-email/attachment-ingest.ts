@@ -14,7 +14,7 @@ export async function quarantineReceivedAttachments(
   db: Parameters<typeof uploadQuarantinedAttachment>[0] & {
     storage: { from: (bucket: string) => {
       upload: (path: string, body: Uint8Array, options: { contentType: string; upsert: boolean }) => Promise<{ error: { message: string } | null }>;
-      info: (path: string) => Promise<{ data: unknown; error: unknown }>;
+      info: (path: string) => Promise<{ data: { size?: number; metadata?: { size?: number } } | null; error: unknown }>;
     } };
     from: (table: string) => {
       select: (columns: string) => {
@@ -51,6 +51,10 @@ export async function quarantineReceivedAttachments(
       const { data: object, error: objectError } = await db.storage.from("smart-intake-quarantine")
         .info(storageKey);
       if (objectError || !object) throw new Error("Quarantined object missing");
+      const objectSize = object.metadata?.size ?? object.size;
+      if (!Number.isSafeInteger(objectSize) || objectSize < 0) {
+        throw new Error("Quarantine object size unavailable");
+      }
       continue;
     }
 
