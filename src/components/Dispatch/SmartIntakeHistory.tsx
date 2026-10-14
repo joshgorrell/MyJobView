@@ -9,6 +9,8 @@ import { loadIntakeTimeline } from '../../lib/smart-intake/history-timeline';
 type Row = Awaited<ReturnType<typeof listIntakeHistory>>[number];
 type Timeline = Awaited<ReturnType<typeof loadIntakeTimeline>>;
 
+const ATTENTION_STATUSES = ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','failed_retryable'];
+
 export function SmartIntakeHistory() {
   const { tenant } = useTenant();
   const { profile, loading: authLoading } = useAuth();
@@ -25,14 +27,13 @@ export function SmartIntakeHistory() {
   const [detailError, setDetailError] = useState('');
   const [loadingDetail, setLoadingDetail] = useState(false);
   const orgId = tenant?.organizationId && profile?.organization_id === tenant.organizationId ? tenant.organizationId : profile?.organization_id && !tenant ? profile.organization_id : null;
-  const attentionStatuses = ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','failed_retryable'];
 
   const reload = useCallback(async () => {
     if (!orgId || authLoading || !profile) return;
     setBusy(true);
     setError('');
     try {
-      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, status: status === 'all' ? undefined : status, statuses: view === 'attention' && status === 'all' ? attentionStatuses : undefined, from: dateFrom || undefined, to: dateTo || undefined, limit: 100 });
+      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, status: status === 'all' ? undefined : status, statuses: view === 'attention' && status === 'all' ? ATTENTION_STATUSES : undefined, from: dateFrom || undefined, to: dateTo || undefined, limit: 100 });
       setRows(result);
     } catch (e) {
       setRows([]);
@@ -67,7 +68,7 @@ export function SmartIntakeHistory() {
         <label className="flex items-center gap-2 text-sm text-gray-300">Channel <select value={channel} onChange={e => setChannel(e.target.value as typeof channel)} className="min-h-11 rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All</option><option value="email">Email</option><option value="sms">SMS</option><option value="mms">MMS</option></select></label>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <label className="text-sm text-gray-300">Status<select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All statuses</option>{(view === 'attention' ? attentionStatuses : ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','ready','processed','duplicate_linked','dismissed','failed_retryable']).map(value => <option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></label>
+        <label className="text-sm text-gray-300">Status<select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All statuses</option>{(view === 'attention' ? ATTENTION_STATUSES : ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','ready','processed','duplicate_linked','dismissed','failed_retryable']).map(value => <option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></label>
         <label className="text-sm text-gray-300">From<input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white" /></label>
         <label className="text-sm text-gray-300">Through<input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white" /></label>
       </div>
