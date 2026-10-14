@@ -79,6 +79,10 @@ create table if not exists public.intake_attachments (
   )
 );
 
+-- Tenant scope is derived from the parent intake message, not caller input.
+create index if not exists intake_attachments_message
+  on public.intake_attachments(intake_message_id);
+
 create index if not exists intake_attachments_expiring
   on public.intake_attachments(expires_at)
   where disposition = 'pending' and deleted_at is null;
