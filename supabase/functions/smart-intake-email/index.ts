@@ -133,6 +133,9 @@ Deno.serve(async (request) => {
         signal: AbortSignal.timeout(10000),
       });
       if (response.ok) {
+        if (!response.headers.get("content-type")?.toLowerCase().includes("application/json")) {
+          return Response.json({ error: "Invalid provider response", intakeId }, { status: 503 });
+        }
         const received: unknown = await response.json();
         if (received && typeof received === "object" && !Array.isArray(received)) {
           const email = received as Record<string, unknown>;
