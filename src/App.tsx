@@ -1,3 +1,4 @@
+import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
 import { PasswordSetup } from './components/Auth/PasswordSetup';
 import { canManageTimeOff } from './lib/timeOff';
 import { WorkspaceTabs } from './components/Shared/WorkspaceTabs';
@@ -812,6 +813,7 @@ function AppContent() {
   return (
     <div className="theme-workspace workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
+      <EmployeeWelcomeOnboarding />
       {!isStandalone && (
         <>
           <Header
