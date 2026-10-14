@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-type IntakeType = 'service' | 'support' | 'task' | 'sales' | 'other';
+type IntakeType = 'service' | 'support' | 'task' | 'other';
 type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null };
 
 export function ManualIntake({ onClose }: { onClose: () => void }) {
@@ -51,7 +51,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
         <label className="space-y-1 text-sm text-gray-300">Type
           <select value={type} onChange={e => setType(e.target.value as IntakeType)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
             <option value="service">Service Request</option><option value="support">Customer Support</option>
-            <option value="task">Task</option><option value="sales">Sales Lead</option><option value="other">Other / Needs Review</option>
+            <option value="task">Task</option><option value="other">Other / Needs Review</option>
           </select>
         </label>
         <label className="space-y-1 text-sm text-gray-300">Priority
@@ -82,7 +82,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="min-h-11 rounded-lg px-4 text-gray-300">Cancel</button>
         <button type="button" disabled title="Unified intake submission is not connected yet" className="min-h-11 rounded-lg bg-gray-700 px-4 font-medium text-gray-300 disabled:opacity-50">
-          Create {type === 'service' ? 'Service Request' : type === 'support' ? 'Support Issue' : type === 'task' ? 'Task' : type === 'sales' ? 'Sales Lead' : 'Intake'} (coming soon)
+          Create {type === 'service' ? 'Service Request' : type === 'support' ? 'Support Issue' : type === 'task' ? 'Task' : 'Intake'} (coming soon)
         </button>
       </div>
       <p className="text-xs text-gray-400">One form will capture, classify, and route the request. Submission is disabled until the unified creation and audit flow is implemented.</p>
