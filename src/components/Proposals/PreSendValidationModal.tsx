@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Send, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck } from 'lucide-react';
 import { checkProposalReadiness, markAllSectionsReviewed, type ValidationSection } from '../../lib/proposalValidation';
 
 interface PreSendValidationModalProps {
@@ -281,48 +281,15 @@ export function PreSendValidationModal({
 
         <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
           <label className="flex items-center justify-between gap-3 text-sm text-white cursor-pointer min-h-[44px]">
-            <span><span className="block font-medium">Visible in Customer Portal</span><span className="block text-xs text-gray-400 mt-1">Controls the customer's portal listing. Submitting does not send an email.</span></span>
-            <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-500" checked={visibleInPortal} onChange={event => setVisibleInPortal(event.target.checked)} />
+            <span><span className="block font-medium">Visible in Customer Portal</span><span className="block text-xs text-gray-400 mt-1">Choose whether to show this proposal in the customer portal when activated. No email is sent.</span></span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-500" checked={visibleInPortal} disabled={linkActivated || sending || !allowSubmission} onChange={event => setVisibleInPortal(event.target.checked)} />
           </label>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 text-gray-300 hover:text-white hover:bg-gray-700 rounded-xl font-medium transition-colors text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!allowSubmission || !isReady || sending || linkActivated}
-            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-              allowSubmission && isReady && !sending && !linkActivated
-                ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30'
-                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {sending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                {linkActivated ? 'Submitted' : allowSubmission ? 'Submit proposal' : 'Already finalized'}
-              </>
-            )}
-          </button>
+        <div className="sticky bottom-0 border-t border-gray-700 bg-gray-900 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-400">{linkActivated ? 'Submitted — choose a delivery method above.' : 'No email is sent automatically.'}</p>
+          <button type="button" onClick={onClose} className="min-h-11 rounded-xl bg-gray-700 px-5 text-sm font-semibold text-white hover:bg-gray-600">Done</button>
         </div>
-
-        {isReady && allowSubmission && (
-          <p className="text-center text-xs text-green-400 pb-3 -mt-2 flex items-center justify-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
-            Ready to submit
-          </p>
-        )}
       </div>
     </div>
   );
