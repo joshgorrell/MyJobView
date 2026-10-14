@@ -9,8 +9,8 @@ type TabKey = 'queue' | 'analytics' | 'intake';
 
 const TABS = [
   { key: 'queue' as TabKey, label: 'Queue', icon: ListTodo },
-  { key: 'intake' as TabKey, label: 'Smart Intake', icon: Inbox },
   { key: 'analytics' as TabKey, label: 'Analytics', icon: BarChart3 },
+  ...(import.meta.env.VITE_SMART_INTAKE_UI_ENABLED === 'true' ? [{ key: 'intake' as TabKey, label: 'Smart Intake', icon: Inbox }] : []),
 ];
 
 function TabFallback() {
