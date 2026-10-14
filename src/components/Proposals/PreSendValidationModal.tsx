@@ -13,6 +13,7 @@ interface PreSendValidationModalProps {
   onCopyLink?: () => void;
   copyingLink?: boolean;
   canCopyLink?: boolean;
+  allowSubmission?: boolean;
   onNavigateToSettings: (section: ValidationSection['name']) => void;
 }
 
@@ -28,6 +29,7 @@ export function PreSendValidationModal({
   onCopyLink,
   copyingLink = false,
   canCopyLink = false,
+  allowSubmission = true,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
   const [loading, setLoading] = useState(true);
@@ -78,7 +80,7 @@ export function PreSendValidationModal({
   }
 
   async function handleSend() {
-    if (!validationData?.isReady || sending) return;
+    if (!allowSubmission || !validationData?.isReady || sending) return;
     setSending(true);
     try {
       await onSend(approvalWindow, visibleInPortal);
@@ -265,9 +267,9 @@ export function PreSendValidationModal({
           </button>
           <button
             onClick={handleSend}
-            disabled={!isReady || sending}
+            disabled={!allowSubmission || !isReady || sending}
             className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-              isReady && !sending
+              allowSubmission && isReady && !sending
                 ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30'
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}
@@ -280,13 +282,13 @@ export function PreSendValidationModal({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Submit proposal
+                {allowSubmission ? 'Submit proposal' : 'Already finalized'}
               </>
             )}
           </button>
         </div>
 
-        {isReady && (
+        {isReady && allowSubmission && (
           <p className="text-center text-xs text-green-400 pb-3 -mt-2 flex items-center justify-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
             Ready to submit
