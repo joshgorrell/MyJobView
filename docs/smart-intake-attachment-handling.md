@@ -17,3 +17,7 @@ Default temporary retention is 30 days; warn seven days before expiry. Dealer ad
 - [ ] Cross-tenant, duplicate, scan, storage failure and expiration tests
 
 Do not enable production forwarding until these gates pass.
+
+## Work-order link integrity
+
+The foundation schema includes `intake_attachment_work_order_links` with a composite primary key, so repeat linking is idempotent. Before exposing any linking operation, the server must check that the intake, work order, customer media and acting employee belong to the same organization. The attachment must be marked clean; pending, blocked or failed scans cannot be linked. Discarding a file must be rejected while any active work-order reference exists, unless the user explicitly removes the references first. Work-order deletion removes its link but does not automatically delete shared media.
