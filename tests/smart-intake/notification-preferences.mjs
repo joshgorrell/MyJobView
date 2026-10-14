@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+const source = fs.readFileSync('src/lib/smart-intake/notification-preferences.ts','utf8');
+vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+assert.equal(exports.shouldNotifyForIntake(null,'new_service_request'),false);
+assert.equal(exports.shouldNotifyForIntake({new_service_request:false,urgent_service_request:true,needs_review:false},'urgent_service_request'),true);
+assert.equal(exports.normalizeNotificationPreferences({new_service_request:true}).needs_review,false);
+console.log('Per-user notification opt-in checks passed');
