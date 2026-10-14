@@ -25,6 +25,9 @@ export async function listIntakeHistory(db: SupabaseClient, filters: IntakeHisto
   if (filters.channel) query = query.eq('channel', filters.channel);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.before) query = query.lt('created_at', filters.before);
+  if (filters.from && !/^\d{4}-\d{2}-\d{2}$/.test(filters.from)) throw new Error('Invalid start date');
+  if (filters.to && !/^\d{4}-\d{2}-\d{2}$/.test(filters.to)) throw new Error('Invalid end date');
+  if (filters.from && filters.to && filters.from > filters.to) throw new Error('Invalid date range');
   if (filters.from) query = query.gte('created_at', filters.from + 'T00:00:00.000Z');
   if (filters.to) query = query.lt('created_at', new Date(Date.parse(filters.to + 'T00:00:00.000Z') + 86400000).toISOString());
   if (filters.search?.trim()) {
