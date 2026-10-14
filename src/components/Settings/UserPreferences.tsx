@@ -1,3 +1,4 @@
+import { NotificationPreferenceFields } from './NotificationPreferenceFields';
 import { useState, useEffect } from 'react';
 import { Bell, Save, Calendar, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -646,109 +647,7 @@ export function UserPreferences() {
           <p className="text-secondary">Choose which notifications you want to receive</p>
         </div>
 
-        <div className="space-y-4">
-        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.notify_on_mention}
-              onChange={(e) => setPreferences({ ...preferences, notify_on_mention: e.target.checked })}
-              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <div className="font-semibold text-primary">Mention Notifications</div>
-              <div className="text-sm text-secondary mt-1">
-                Receive notifications when someone mentions you with @ in discussions
-              </div>
-            </div>
-          </label>
-        </div>
-
-        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.notify_on_lead_assigned}
-              onChange={(e) => setPreferences({ ...preferences, notify_on_lead_assigned: e.target.checked })}
-              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <div className="font-semibold text-primary">Lead Assignment Notifications</div>
-              <div className="text-sm text-secondary mt-1">
-                Receive notifications when leads are assigned to you
-              </div>
-            </div>
-          </label>
-        </div>
-
-        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.notify_on_fishbowl}
-              onChange={(e) => setPreferences({ ...preferences, notify_on_fishbowl: e.target.checked })}
-              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <div className="font-semibold text-primary">Fishbowl Lead Notifications</div>
-              <div className="text-sm text-secondary mt-1">
-                Receive notifications when new leads are added to the fishbowl
-              </div>
-            </div>
-          </label>
-        </div>
-
-        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.notify_on_escalated}
-              onChange={(e) => setPreferences({ ...preferences, notify_on_escalated: e.target.checked })}
-              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <div className="font-semibold text-primary">Lead Escalation Notifications</div>
-              <div className="text-sm text-secondary mt-1">
-                Receive notifications when leads are escalated
-              </div>
-            </div>
-          </label>
-        </div>
-
-        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.notify_on_lead_status}
-              onChange={(e) => setPreferences({ ...preferences, notify_on_lead_status: e.target.checked })}
-              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <div className="font-semibold text-primary">Priority Lead Status Updates</div>
-              <div className="text-sm text-secondary mt-1">
-                Receive notifications when your High or Urgent priority leads are claimed or status changes
-              </div>
-            </div>
-          </label>
-        </div>
-
-        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.notify_on_product_requests}
-              onChange={(e) => setPreferences({ ...preferences, notify_on_product_requests: e.target.checked })}
-              className="mt-1 w-5 h-5 shrink-0 text-brand rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <div className="font-semibold text-primary">Product Request Notifications</div>
-              <div className="text-sm text-secondary mt-1">
-                Receive email notifications when new product/parts requests are submitted for purchasing
-              </div>
-            </div>
-          </label>
-        </div>
-        </div>
+        <NotificationPreferenceFields value={preferences} onChange={setPreferences} disabled={saving} />
 
         <div className="mt-6 flex justify-end">
           <button

@@ -15,6 +15,12 @@ export interface Profile {
   is_active: boolean;
   avatar_url: string | null;
   email_leads: boolean;
+  notify_on_mention?: boolean;
+  notify_on_lead_assigned?: boolean;
+  notify_on_fishbowl?: boolean;
+  notify_on_escalated?: boolean;
+  notify_on_lead_status?: boolean;
+  notify_on_product_requests?: boolean;
   organization_id?: string | null;
   primary_office_id?: string | null;
   default_office_id?: string | null;
