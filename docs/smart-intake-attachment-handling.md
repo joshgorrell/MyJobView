@@ -21,3 +21,7 @@ Do not enable production forwarding until these gates pass.
 ## Work-order link integrity
 
 The foundation schema includes `intake_attachment_work_order_links` with a composite primary key, so repeat linking is idempotent. Before exposing any linking operation, the server must check that the intake, work order, customer media and acting employee belong to the same organization. The attachment must be marked clean; pending, blocked or failed scans cannot be linked. Discarding a file must be rejected while any active work-order reference exists, unless the user explicitly removes the references first. Work-order deletion removes its link but does not automatically delete shared media.
+
+## Required state transitions
+
+Pending + scan pending: quarantine only, never preview or link. Scan clean: eligible for employee review. Scan blocked/failed: no access, flag for staff and retry or discard under policy. Review decisions must atomically record disposition, resolving employee and timestamp. Discard requires checking that no durable customer-media or work-order reference exists. Expiry cleanup must delete the storage object first and mark deleted_at only after confirmation. If deletion fails, retain a retryable record. Customer media promotion must complete before temporary expiry is disabled. A repeated request must be idempotent.
