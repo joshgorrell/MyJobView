@@ -38,7 +38,7 @@ Deno.serve(async (request) => {
   const eventId = typeof event?.email_id === "string" ? event.email_id.trim() : "";
   const sender = typeof event?.from === "string" ? event.from.trim() : "";
   const eventCreatedAt = typeof event?.created_at === "string" ? event.created_at : null;
-  if (!recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
+  if (!event || recipients.length !== 1 || !recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
 
   const dbUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
