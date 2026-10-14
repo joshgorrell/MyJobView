@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RotateCcw, AlertTriangle, Calendar, Globe, FileText, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -22,24 +22,25 @@ export function ReactivateProposalModal({
   onReview
 }: ReactivateProposalModalProps) {
   const [makePortalVisible, setMakePortalVisible] = useState(true);
-  const [expirationDays, setExpirationDays] = useState(30);
-  const [customDate, setCustomDate] = useState('');
-  const [useCustomDate, setUseCustomDate] = useState(false);
+  const [expirationDays, setExpirationDays] = useState<number | null>(null);
+  const [policyError, setPolicyError] = useState('');
+  useEffect(() => {
+    let active = true;
+    supabase.from('proposals').select('organization_id').eq('id', proposalId).single()
+      .then(async ({ data, error }) => {
+        if (error || !data?.organization_id) throw error || new Error('Organization not found');
+        const policy = await supabase.from('organizations').select('proposal_approval_days').eq('id', data.organization_id).single();
+        if (policy.error) throw policy.error;
+        if (active) setExpirationDays(policy.data?.proposal_approval_days ?? 30);
+      })
+      .catch(() => { if (active) setPolicyError('Could not load dealer approval policy. Please try again.'); });
+    return () => { active = false; };
+  }, [proposalId]);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const presetOptions = [
-    { days: 7, label: '7 Days' },
-    { days: 14, label: '14 Days' },
-    { days: 30, label: '30 Days' },
-    { days: 60, label: '60 Days' },
-    { days: 90, label: '90 Days' },
-  ];
-
   function calculateExpirationDate() {
-    if (useCustomDate && customDate) {
-      return customDate;
-    }
+    if (expirationDays === null) throw new Error('Dealer approval policy is not loaded');
     const date = new Date();
     date.setDate(date.getDate() + expirationDays);
     return date.toISOString();
@@ -78,6 +79,7 @@ export function ReactivateProposalModal({
   async function handleReactivate() {
     setSubmitting(true);
     try {
+      if (expirationDays === null || policyError) return;
       const expiresAt = calculateExpirationDate();
 
       const { error } = await supabase
@@ -187,66 +189,12 @@ export function ReactivateProposalModal({
             </label>
           </div>
 
-          {/* New Expiration Date */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Calendar size={20} />
-              Set New Approval Window
-            </h3>
-
-            {/* Preset Options */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {presetOptions.map((option) => (
-                <button
-                  key={option.days}
-                  onClick={() => {
-                    setExpirationDays(option.days);
-                    setUseCustomDate(false);
-                  }}
-                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-all ${
-                    expirationDays === option.days && !useCustomDate
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-              <button
-                onClick={() => setUseCustomDate(true)}
-                className={`px-4 py-2 rounded-lg border-2 font-medium transition-all ${
-                  useCustomDate
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Custom
-              </button>
-            </div>
-
-            {/* Custom Date Picker */}
-            {useCustomDate && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Custom Expiration Date
-                </label>
-                <input
-                  type="date"
-                  value={customDate ? customDate.split('T')[0] : ''}
-                  onChange={(e) => setCustomDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            )}
-
-            {/* Expiration Preview */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-blue-700">New expiration date:</div>
-                <div className="text-sm font-semibold text-blue-900">{getFormattedExpirationDate()}</div>
-              </div>
-            </div>
+          {/* Dealer-wide approval and viewing policy — not a per-proposal override. */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <h3 className="font-semibold text-blue-950 flex items-center gap-2"><Calendar size={18} />Approval &amp; viewing window</h3>
+            {policyError ? <p className="mt-2 text-sm text-red-700">{policyError}</p> : expirationDays === null
+              ? <p className="mt-2 text-sm text-blue-800">Loading dealer policy…</p>
+              : <p className="mt-2 text-sm text-blue-900">Your dealer policy allows {expirationDays} days for viewing and approval. Resubmission restarts this window, expiring {getFormattedExpirationDate()}.</p>}
           </div>
 
           {/* Optional Notes */}
@@ -282,7 +230,7 @@ export function ReactivateProposalModal({
             </button>
             <button
               onClick={handleReactivate}
-              disabled={submitting}
+              disabled={submitting || expirationDays === null || Boolean(policyError)}
               className="px-6 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 disabled:opacity-50 font-medium transition-all flex items-center gap-2"
             >
               <RotateCcw size={18} />
