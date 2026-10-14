@@ -72,7 +72,11 @@ create table if not exists public.intake_attachments (
   resolved_by uuid references public.profiles(id),
   deleted_at timestamptz,
   sha256 text,
-  scan_completed_at timestamptz
+  scan_completed_at timestamptz,
+  constraint intake_attachment_resolution_check check (
+    (disposition = 'pending' and resolved_at is null)
+    or (disposition <> 'pending' and resolved_at is not null)
+  )
 );
 
 create index if not exists intake_attachments_expiring
