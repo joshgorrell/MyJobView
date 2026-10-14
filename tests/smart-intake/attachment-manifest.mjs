@@ -37,3 +37,10 @@ await assert.rejects(requireCleanScan(sample));
 await assert.rejects(requireCleanScan(sample, async () => "blocked"));
 await assert.rejects(requireCleanScan(sample, async () => "failed"));
 await requireCleanScan(sample, async () => "clean");
+
+const downloadSource = readFileSync(new URL("../../supabase/functions/smart-intake-email/attachment-download.ts", import.meta.url), "utf8");
+const downloadCompiled = await transform(downloadSource, { loader: "ts", format: "esm" });
+const { downloadBoundedAttachment } = await import("data:text/javascript;base64," + Buffer.from(downloadCompiled.code).toString("base64"));
+await assert.rejects(downloadBoundedAttachment("https://example.com/emails/receiving/a/attachments/b", "re_valid"));
+await assert.rejects(downloadBoundedAttachment("https://api.resend.com/other/path", "re_valid"));
+await assert.rejects(downloadBoundedAttachment("https://api.resend.com/emails/receiving/a/attachments/b?redirect=1", "re_valid"));
