@@ -205,7 +205,13 @@ Deno.serve(async (request) => {
               const { error: contentError } = await db.from("intake_items").update({ raw_body: text })
                 .eq("id", intakeId).eq("organization_id", destination.organization_id)
                 .is("raw_body", null);
-              if (contentError) console.error("Intake content persistence failed", { intakeId, code: contentError.code });
+              if (contentError) {
+                console.error("Intake content persistence failed", { intakeId, code: contentError.code });
+                return Response.json({ error: "Unable to persist email content", intakeId }, { status: 503 });
+              }
+              const { error: messageBodyError } = await db.from("intake_messages")
+                .update({ body: text }).eq("intake_id", intakeId).eq("provider_message_id", eventId).is("body", null);
+              if (messageBodyError) return Response.json({ error: "Unable to persist message timeline", intakeId }, { status: 503 });
             }
           } else {
             console.error("Received email identity mismatch", { intakeId });
