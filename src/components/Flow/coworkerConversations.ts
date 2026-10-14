@@ -120,7 +120,7 @@ export async function markCoworkerMessagesRead(organizationId: string, userId: s
 export async function sendCoworkerReply(organizationId: string, userId: string, rootId: string, content: string) {
   // The database inherits the parent's audience and destination. Mentions notify
   // participants; they never add a new recipient to a private conversation.
-  const usernames = [...new Set(Array.from(content.matchAll(/(?:^|[^\\w])@([a-z0-9]+)/gi), match => match[1].toLowerCase()))];
+  const usernames = [...new Set(Array.from(content.matchAll(/(?:^|[^\w])@([a-z0-9]+)/gi), match => match[1].toLowerCase()))];
   let mentions: string[] = [];
   if (usernames.length) {
     const { data, error: lookupError } = await supabase.from('profiles')
