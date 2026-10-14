@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Check, Copy, Download, Globe, Printer, X } from 'lucide-react';
+import { CalendarDays, Check, Copy, Download, Globe, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface ReactivateProposalModalProps {
@@ -11,13 +11,12 @@ interface ReactivateProposalModalProps {
   totalAmount: number;
   onClose: () => void;
   onSuccess: () => void | Promise<void>;
-  onPrint?: () => void;
   onDownloadPdf?: () => void;
 }
 
 export function ReactivateProposalModal({
   proposalId, proposalNumber, proposalTitle, customerName, onClose, onSuccess,
-  onPrint, onDownloadPdf,
+  onDownloadPdf,
 }: ReactivateProposalModalProps) {
   const [portalVisible, setPortalVisible] = useState(false);
   const [days, setDays] = useState<number | null>(null);
@@ -102,8 +101,7 @@ export function ReactivateProposalModal({
 
         <div className="overflow-y-auto px-5 py-6 sm:px-7">
           <p className="mb-3 text-sm font-semibold text-slate-200">Choose any delivery options</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <button type="button" onClick={onPrint} className={actionClass}><Printer size={19} className="text-blue-300" />Print</button>
+          <div className="grid grid-cols-3 gap-2">
             <button type="button" onClick={onDownloadPdf} className={actionClass}><Download size={19} className="text-blue-300" />PDF</button>
             <button type="button" onClick={() => void activate(portalVisible, true)} disabled={submitting || days === null} className={actionClass}><Copy size={19} className="text-blue-300" />Copy link</button>
             <button type="button" onClick={() => void activate(!portalVisible)} disabled={submitting || days === null} className={actionClass}>
@@ -116,7 +114,7 @@ export function ReactivateProposalModal({
             <span>{policyError || (expiration ? `New expiration: ${expiration}` : 'Loading expiration…')}</span>
           </div>
           {message && <p role="status" className="mt-3 text-sm text-blue-200">{message}</p>}
-          <p className="mt-3 text-xs text-slate-400">Copy link or send to portal activates the proposal. Printing and PDF do not change its status.</p>
+          <p className="mt-3 text-xs text-slate-400">Copy link or send to portal activates the proposal. PDF does not change its status.</p>
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-slate-700 px-5 py-4 sm:px-7">
