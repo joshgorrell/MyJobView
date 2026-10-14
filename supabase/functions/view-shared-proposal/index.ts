@@ -18,8 +18,7 @@ Deno.serve(async req => {
     const { data: proposal, error: proposalError } = await db.from('proposals')
       .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at')
       .eq('id', link.proposal_id).eq('organization_id', link.organization_id).maybeSingle();
-    if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status) ||
-      (proposal.current_portal_version ?? 1) !== link.portal_version) return json({ error: 'This proposal link is no longer valid' }, 410);
+    if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
     return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at } });
   } catch (error) {
