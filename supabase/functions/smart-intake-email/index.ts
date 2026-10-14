@@ -77,6 +77,41 @@ Deno.serve(async (request) => {
     if (existing.error || !existing.data) return Response.json({ error: "Unable to resolve stored intake" }, { status: 500 });
     intakeId = existing.data.id;
   }
+  // Retrieve complete content only after tenant-scoped receipt persistence.
+  // Keep the record in needs_review until attachment handling and verification are complete.
+  const resendKey = Deno.env.get("RESEND_API_KEY");
+  if (resendKey && /^[a-zA-Z0-9_-]{1,255}$/.test(eventId)) {
+    try {
+      const response = await fetch("https://api.resend.com/emails/receiving/" + encodeURIComponent(eventId), {
+        headers: { Authorization: "Bearer " + resendKey },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (response.ok) {
+        const received: unknown = await response.json();
+        if (received && typeof received === "object" && !Array.isArray(received)) {
+          const email = received as Record<string, unknown>;
+          const retrievedTo = Array.isArray(email.to) ? email.to : [];
+          if (email.id === eventId && typeof email.from === "string" &&
+              email.from.trim() === sender && retrievedTo.length === 1 &&
+              typeof retrievedTo[0] === "string" && retrievedTo[0].trim().toLowerCase() === recipient) {
+            const text = typeof email.text === "string" ? email.text : null;
+            if (text !== null && new TextEncoder().encode(text).byteLength <= 1024 * 1024) {
+              const { error: contentError } = await db.from("intake_items").update({ raw_body: text })
+                .eq("id", intakeId).eq("organization_id", destination.organization_id)
+                .is("raw_body", null);
+              if (contentError) console.error("Intake content persistence failed", { intakeId, code: contentError.code });
+            }
+          } else {
+            console.error("Received email identity mismatch", { intakeId });
+          }
+        }
+      } else {
+        console.error("Received email retrieval unavailable", { intakeId, status: response.status });
+      }
+    } catch {
+      console.error("Received email retrieval failed", { intakeId });
+    }
+  }
   // Capture a minimal audit event on first receipt; never duplicate it on retries.
   if (data?.id) {
     const { error: eventError } = await db.from("intake_events").insert({
