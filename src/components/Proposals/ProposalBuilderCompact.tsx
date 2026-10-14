@@ -1856,7 +1856,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     setShowSubmissionModal(true);
   }
 
-  async function handleConfirmSubmission(sendToPortal: boolean, approvalWindowDays: number) {
+  async function handleConfirmSubmission(sendToPortal: boolean, _approvalWindowDays: number) {
     if (sending) return;
     setSending(true);
 
