@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { validateManualIntakeDraft } from '../../lib/smart-intake/manual-draft';
 
 type IntakeType = 'service' | 'support' | 'task';
 type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null };
@@ -52,7 +53,9 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     support: 'A customer question or issue that may be resolved without dispatching a technician.',
     task: 'Internal follow-up or action for an employee. Assign an owner and optional due date.',
   };
-  const canContinue = !!organizationId && !!contactId && !!subject.trim() && !!description.trim();
+  const draftValidation = validateManualIntakeDraft({
+    purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes,
+  });
   const selectedCustomer = customers.find(customer => customer.id === contactId);
 
   return (
@@ -100,6 +103,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
         <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
       </label>}
       {error && <p role="alert" className="text-sm text-amber-300">{error}</p>}
+      {!draftValidation.ok && <p className="text-xs text-gray-400">{draftValidation.errors[0]}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="min-h-11 rounded-lg px-4 text-gray-300">Cancel</button>
         <button type="button" disabled title="Unified intake submission is not connected yet" className="min-h-11 rounded-lg bg-gray-700 px-4 font-medium text-gray-300 disabled:opacity-50">
