@@ -15,8 +15,6 @@ interface QuickActionModalProps {
 }
 
 export function QuickActionModal({
-  stableHeight = false,
-  scrollBody = true,
   title,
   subtitle,
   icon,
@@ -111,6 +109,12 @@ export function QuickActionModal({
             animation: qamFadeIn 0.22s ease-out both;
           }
         }
+        /* Forms grow naturally; only the overlay scrolls on short viewports. */
+        .qam-body > form,
+        .qam-body > form > .qam-scroll {
+          flex: none;
+          overflow: visible;
+        }
         .qam-scroll {
           -webkit-overflow-scrolling: touch;
           overscroll-behavior: contain;
@@ -148,19 +152,18 @@ export function QuickActionModal({
       {/* Sheet / Dialog */}
       <div
         className={`
-          fixed bottom-0 left-0 right-0 z-[61]
-          flex items-end
-          sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4
+          fixed inset-0 z-[61] overflow-y-auto overscroll-contain
+          flex flex-col items-center p-2 sm:p-4
         `}
         style={viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
       >
         <div
           className={`
-            qam-sheet min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-2xl
+            qam-sheet min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-3xl shrink-0 my-auto
             rounded-t-2xl sm:rounded-xl
             shadow-2xl border-t sm:border border-subtle
             flex flex-col
-            ${stableHeight ? 'h-[92svh] sm:h-[90svh]' : 'max-h-[92svh] sm:max-h-[90svh]'}
+            
             relative
           `}
           ref={dialogRef}
@@ -169,7 +172,7 @@ export function QuickActionModal({
           aria-labelledby={titleId}
           aria-describedby={subtitle ? subtitleId : undefined}
           tabIndex={-1}
-          style={{ maxHeight: 'min(var(--qam-max-height), 100%)' }}
+          
           onKeyDown={event => {
             if (event.defaultPrevented) return;
             if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
@@ -248,7 +251,7 @@ export function QuickActionModal({
           {/* Scrollable body — ref for future touch drag if needed */}
           <div
             ref={scrollRef}
-            className={`qam-body qam-safe-bottom flex flex-col flex-1 min-h-0 min-w-0 ${scrollBody ? 'qam-scroll overflow-y-auto' : 'overflow-hidden'}`}
+            className={`qam-body qam-safe-bottom flex flex-col flex-1 min-h-0 min-w-0 overflow-visible`}
           >
             {children}
           </div>
