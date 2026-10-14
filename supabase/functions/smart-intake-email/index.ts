@@ -86,5 +86,5 @@ Deno.serve(async (request) => {
     });
     if (eventError) console.error("Intake audit event failed", { intakeId, code: eventError.code });
   }
-  return Response.json({ accepted: true, intakeId });
+  return Response.json({ accepted: true, intakeId }, { headers: { "Cache-Control": "no-store" } });
 });
