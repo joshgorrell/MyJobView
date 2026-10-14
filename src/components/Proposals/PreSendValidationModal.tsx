@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Send, Loader2, Wrench } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Send, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck } from 'lucide-react';
 import { checkProposalReadiness, markAllSectionsReviewed, type ValidationSection } from '../../lib/proposalValidation';
 
 interface PreSendValidationModalProps {
@@ -10,6 +10,9 @@ interface PreSendValidationModalProps {
   initialPortalVisibility?: boolean;
   onEmailProposal?: () => void;
   onPrintProposal?: () => void;
+  onCopyLink?: () => void;
+  copyingLink?: boolean;
+  canCopyLink?: boolean;
   onNavigateToSettings: (section: ValidationSection['name']) => void;
 }
 
@@ -22,6 +25,9 @@ export function PreSendValidationModal({
   initialPortalVisibility = false,
   onEmailProposal,
   onPrintProposal,
+  onCopyLink,
+  copyingLink = false,
+  canCopyLink = false,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
   const [loading, setLoading] = useState(true);
@@ -105,7 +111,7 @@ export function PreSendValidationModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/60">
           <div>
-            <h2 className="text-lg font-semibold text-white">Submit Proposal</h2>
+            <h2 className="text-lg font-semibold text-white">Proposal delivery</h2>
             <p className="text-gray-400 text-xs mt-0.5">#{proposalNumber}</p>
           </div>
           <button
@@ -223,19 +229,30 @@ export function PreSendValidationModal({
           </label>
         </div>
 
-        <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Proposal Actions</p>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-700/60 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-blue-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">Optional delivery actions</p>
+              <p className="text-xs text-gray-400">Submit without sending anything, or choose how to share the proposal.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button type="button" onClick={onEmailProposal} disabled={!onEmailProposal}
-              className="min-h-[44px] rounded-lg border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              Email Proposal
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Mail className="h-4 w-4" /> Email
+            </button>
+            <button type="button" onClick={onCopyLink} disabled={!onCopyLink || !canCopyLink || copyingLink}
+              title={canCopyLink ? 'Copy the reusable customer link' : 'Submit the proposal before copying its customer link'}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Copy className="h-4 w-4" /> {copyingLink ? 'Copying…' : 'Copy link'}
             </button>
             <button type="button" onClick={onPrintProposal} disabled={!onPrintProposal}
-              className="min-h-[44px] rounded-lg border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              Print
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Printer className="h-4 w-4" /> Print / PDF
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-400">Email and Print are independent of submission and remain available later.</p>
+          {!canCopyLink && <p className="text-xs text-gray-400">A reusable customer link becomes available after submission.</p>}
         </div>
 
         {/* Footer */}
@@ -263,7 +280,7 @@ export function PreSendValidationModal({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Submit Proposal
+                Submit proposal
               </>
             )}
           </button>
