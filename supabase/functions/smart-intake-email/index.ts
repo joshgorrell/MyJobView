@@ -133,6 +133,16 @@ Deno.serve(async (request) => {
     if (existing.error || !existing.data) return Response.json({ error: "Unable to resolve stored intake" }, { status: 500 });
     intakeId = existing.data.id;
   }
+  // Capture a minimal audit event on first receipt; never duplicate it on retries.
+  if (data?.id) {
+    const { error: eventError } = await db.from("intake_events").insert({
+      intake_id: intakeId,
+      actor_type: "provider",
+      event_type: "email_received",
+      detail: { destination_purpose: destination.purpose, provider: "resend", provider_created_at: eventCreatedAt, content_pending: true },
+    });
+    if (eventError) console.error("Intake audit event failed", { intakeId, code: eventError.code });
+  }
   // Retrieve complete content only after tenant-scoped receipt persistence.
   // Keep the record in needs_review until attachment handling and verification are complete.
   const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -182,16 +192,6 @@ Deno.serve(async (request) => {
     } catch {
       console.error("Received email retrieval failed", { intakeId });
     }
-  }
-  // Capture a minimal audit event on first receipt; never duplicate it on retries.
-  if (data?.id) {
-    const { error: eventError } = await db.from("intake_events").insert({
-      intake_id: intakeId,
-      actor_type: "provider",
-      event_type: "email_received",
-      detail: { destination_purpose: destination.purpose, provider: "resend", provider_created_at: eventCreatedAt, content_pending: true },
-    });
-    if (eventError) console.error("Intake audit event failed", { intakeId, code: eventError.code });
   }
   // Retryable retrieval must never be silently acknowledged as completed.
   // Provider retries can safely re-enter because intake_items is idempotent.
