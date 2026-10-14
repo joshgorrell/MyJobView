@@ -21,6 +21,8 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const [priority, setPriority] = useState('normal');
   const [dueDate, setDueDate] = useState('');
   const [assigneeNotes, setAssigneeNotes] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [assignees, setAssignees] = useState<Array<{ id: string; full_name: string | null }>>([]);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,6 +48,20 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     }, 300);
     return () => { active = false; clearTimeout(timer); };
   }, [organizationId, customerSearch]);
+
+  useEffect(() => {
+    let active = true;
+    setAssignees([]);
+    setAssigneeId('');
+    if (!organizationId) return () => { active = false; };
+    void supabase.from('profiles').select('id,full_name')
+      .eq('organization_id', organizationId).order('full_name').then(({ data, error: lookupError }) => {
+        if (!active) return;
+        if (lookupError) setError('Employee lookup is unavailable.');
+        else setAssignees(data ?? []);
+      });
+    return () => { active = false; };
+  }, [organizationId]);
 
   const filtered = customers.filter(customer => customer.id === contactId || [customer.company_name, customer.contact_name, customer.email].some(value => value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
   const purposeGuidance: Record<IntakeType, string> = {
@@ -96,6 +112,12 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       <label className="block space-y-1 text-sm text-gray-300">Details
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} maxLength={10000} className="w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-white" />
       </label>
+      {(type === 'task' || type === 'support') && <label className="block space-y-1 text-sm text-gray-300">Assign to employee
+        <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
+          <option value="">Unassigned</option>
+          {assignees.map(person => <option key={person.id} value={person.id}>{person.full_name || 'Unnamed employee'}</option>)}
+        </select>
+      </label>}
       {(type === 'task' || type === 'support') && <label className="block space-y-1 text-sm text-gray-300">Assignment / follow-up notes
         <textarea value={assigneeNotes} onChange={e => setAssigneeNotes(e.target.value)} rows={2} maxLength={1000} placeholder="Who should handle this, and what needs to happen?" className="w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-white" />
       </label>}
