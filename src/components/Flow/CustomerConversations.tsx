@@ -127,7 +127,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   }, [canMentionStaff, profile?.organization_id]);
   const staffChoices = messageTag?.symbol === '@' && canMentionStaff ? messageChoices.filter(c => c.kind === 'person') : [];
   const naturalCandidates = canMentionStaff && !messageTag
-    ? findEmployeeMentionCandidates(newMessage, mentionPeople).filter(candidate => candidate.end <= messageCursor && candidate.personIds.length > 0)
+    ? findEmployeeMentionCandidates(newMessage, mentionPeople).filter(candidate => candidate.end <= messageCursor && candidate.personIds.length > 0 && !candidate.text.startsWith('@'))
     : [];
   const naturalCandidate = naturalCandidates.at(-1);
   function confirmNaturalMention(person: MentionPerson) {
