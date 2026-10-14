@@ -1861,9 +1861,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     setSending(true);
 
     try {
-      // Calculate expiration date
+      // Dealer-wide approval window controls both acceptance and link viewing.
+      const { data: orgPolicy, error: policyError } = await supabase
+        .from('organizations')
+        .select('proposal_approval_days')
+        .eq('id', proposal.organization_id)
+        .single();
+      if (policyError) throw policyError;
+      const configuredDays = orgPolicy?.proposal_approval_days ?? 30;
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + approvalWindowDays);
+      expiresAt.setDate(expiresAt.getDate() + configuredDays);
 
       // Update proposal status, expiration
       const { error: updateError } = await supabase
