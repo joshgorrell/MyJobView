@@ -26,7 +26,7 @@ interface ServiceRequestConsoleProps {
 }
 
 export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab || 'queue');
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab && TABS.some(tab => tab.key === initialTab) ? initialTab : 'queue');
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-2 sm:space-y-4">
