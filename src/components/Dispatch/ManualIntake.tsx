@@ -26,7 +26,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     let active = true;
     const query = customerSearch.trim();
-    setCustomers([]);
+    setCustomers(previous => previous.filter(customer => customer.id === contactId));
     setError('');
     if (!organizationId || query.length < 2) return () => { active = false; };
     setCustomerLoading(true);
@@ -46,13 +46,14 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     return () => { active = false; clearTimeout(timer); };
   }, [organizationId, customerSearch]);
 
-  const filtered = customers;
+  const filtered = customers.filter(customer => customer.id === contactId || [customer.company_name, customer.contact_name, customer.email].some(value => value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
   const purposeGuidance: Record<IntakeType, string> = {
     service: 'Equipment, installation, repair, or on-site service. Creates a service request for the dispatch queue.',
     support: 'A customer question or issue that may be resolved without dispatching a technician.',
     task: 'Internal follow-up or action for an employee. Assign an owner and optional due date.',
   };
   const canContinue = !!organizationId && !!contactId && !!subject.trim() && !!description.trim();
+  const selectedCustomer = customers.find(customer => customer.id === contactId);
 
   return (
     <section className="rounded-xl border border-gray-700 bg-gray-900 p-4 sm:p-6 space-y-4" aria-label="New manual intake">
@@ -85,6 +86,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
           {filtered.map(customer => <option key={customer.id} value={customer.id}>{customer.company_name || customer.contact_name || customer.email || 'Unnamed contact'}</option>)}
         </select>
       </label>
+      {contactId && <p className="text-xs text-gray-400">Selected customer: {selectedCustomer?.company_name || selectedCustomer?.contact_name || selectedCustomer?.email || 'Previously selected contact'}</p>}
       <label className="block space-y-1 text-sm text-gray-300">Subject
         <input value={subject} onChange={e => setSubject(e.target.value)} maxLength={200} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
       </label>
@@ -101,7 +103,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="min-h-11 rounded-lg px-4 text-gray-300">Cancel</button>
         <button type="button" disabled title="Unified intake submission is not connected yet" className="min-h-11 rounded-lg bg-gray-700 px-4 font-medium text-gray-300 disabled:opacity-50">
-          Create {type === 'service' ? 'Service Request' : type === 'support' ? 'Support Issue' : type === 'task' ? 'Task'} (coming soon)
+          Create {type === 'service' ? 'Service Request' : type === 'support' ? 'Support Issue' : 'Task'} (coming soon)
         </button>
       </div>
       <p className="text-xs text-gray-400">One form will capture, classify, and route the request. Submission is disabled until the unified creation and audit flow is implemented.</p>
