@@ -5,6 +5,7 @@ export type IntakeHistoryFilters = {
   search?: string;
   channel?: 'email' | 'sms' | 'mms';
   status?: string;
+  statuses?: string[];
   before?: string;
   from?: string;
   to?: string;
@@ -24,6 +25,7 @@ export async function listIntakeHistory(db: SupabaseClient, filters: IntakeHisto
     .limit(limit);
   if (filters.channel) query = query.eq('channel', filters.channel);
   if (filters.status) query = query.eq('status', filters.status);
+  else if (filters.statuses?.length) query = query.in('status', filters.statuses);
   if (filters.before) {
     if (!Number.isFinite(Date.parse(filters.before))) throw new Error('Invalid pagination timestamp');
     query = query.lt('created_at', filters.before);
