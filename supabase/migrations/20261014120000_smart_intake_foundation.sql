@@ -84,3 +84,9 @@ alter table public.intake_items enable row level security;
 alter table public.intake_messages enable row level security;
 alter table public.intake_attachments enable row level security;
 alter table public.intake_events enable row level security;
+
+-- Prevent concurrent webhook retries from creating duplicate receipt evidence.
+-- Other event types intentionally remain repeatable for a full audit timeline.
+create unique index if not exists intake_events_one_email_received
+  on public.intake_events (intake_id)
+  where event_type = 'email_received';
