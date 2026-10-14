@@ -79,6 +79,17 @@ create index if not exists intake_attachments_expiring
   on public.intake_attachments(expires_at)
   where disposition = 'pending' and deleted_at is null;
 
+-- One physical media object may be referenced by multiple work orders.
+-- Linking is service-role-only until tenant-scoped mutation RPCs are reviewed.
+create table if not exists public.intake_attachment_work_order_links (
+  attachment_id uuid not null references public.intake_attachments(id) on delete restrict,
+  work_order_id uuid not null references public.work_orders(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  created_by uuid references public.profiles(id),
+  primary key (attachment_id, work_order_id)
+);
+alter table public.intake_attachment_work_order_links enable row level security;
+
 create table if not exists public.intake_events (
   id uuid primary key default gen_random_uuid(),
   intake_id uuid not null references public.intake_items(id) on delete cascade,
