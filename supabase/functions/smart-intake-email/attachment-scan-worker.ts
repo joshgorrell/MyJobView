@@ -8,6 +8,7 @@ type AttachmentRow = {
   byte_size: number | null;
   scan_status: "pending" | "clean" | "blocked" | "failed";
   organization_id: string;
+  intake_id: string;
 };
 
 type ScanDatabase = {
@@ -40,7 +41,9 @@ export async function scanPendingAttachment(
   if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[a-zA-Z0-9_-]{1,255}$/i.test(attachment.storage_key)) {
     throw new Error("Invalid quarantine storage key");
   }
-  if (attachment.storage_key.split("/")[0].toLowerCase() !== attachment.organization_id.toLowerCase()) {
+  const segments = attachment.storage_key.split("/");
+  if (segments[0].toLowerCase() !== attachment.organization_id.toLowerCase() ||
+      segments[1].toLowerCase() !== attachment.intake_id.toLowerCase()) {
     throw new Error("Attachment organization does not match quarantine path");
   }
   const { data: blob, error: storageError } = await db.storage.from("smart-intake-quarantine")
