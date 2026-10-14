@@ -1857,7 +1857,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
 
   async function handleConfirmSubmission(sendToPortal: boolean, _approvalWindowDays: number) {
-    if (sending) return;
+    if (sending || !proposal || ['approved', 'accepted', 'approved_pending_action', 'declined'].includes(proposal.status)) {
+      throw new Error('This proposal cannot be resubmitted in its current status.');
+    }
     setSending(true);
 
     try {
@@ -3454,7 +3456,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 title={presentation.expired ? 'Reopen the proposal for customer submission' : 'Review submission and delivery options'}
               >
                 <Send className="h-4 w-4" />
-                <span>{presentation.expired ? 'Resubmit' : ['sent', 'portal', 'approved', 'accepted', 'approved_pending_action'].includes(proposal.status) ? 'Share / Delivery' : 'Submit'}</span>
+                <span>{presentation.expired ? 'Resubmit' : ['sent', 'portal', 'approved', 'accepted', 'approved_pending_action', 'declined'].includes(proposal.status) ? 'Share / Delivery' : 'Submit'}</span>
               </button>
             )}
             {shareLinkMessage && <span role="status" className="max-w-[180px] truncate text-xs text-secondary">{shareLinkMessage}</span>}
@@ -3616,7 +3618,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     <button type="button" onClick={() => { setShowSubmissionModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><Send className="w-4 h-4" />Submission options</button>
                     <button type="button" onClick={() => { setShowPdfModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><FileText className="w-4 h-4" />Print / PDF</button>
                     <button type="button" onClick={() => { setShowTasksPanel(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><ListChecks className="w-4 h-4" />Proposal tasks</button>
-                    <button type="button" onClick={() => { setShowMoreOptionsMenu(false); if (window.confirm('Revoke customer access to this proposal link? The old link will stop working.')) void handleRevokeProposalLinks(); }} disabled={copyingShareLink} className="w-full px-3 py-2 text-left text-red-400 hover:bg-elevated flex items-center gap-2 text-sm disabled:opacity-40"><Unlink className="w-4 h-4" />Revoke customer link</button>
+                    <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleRevokeProposalLinks(); }} disabled={copyingShareLink} className="w-full px-3 py-2 text-left text-red-400 hover:bg-elevated flex items-center gap-2 text-sm disabled:opacity-40"><Unlink className="w-4 h-4" />Revoke customer link</button>
                     <div className="border-t border-subtle my-1" />
 
                     {/* Proposal Actions */}
@@ -6783,6 +6785,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           onCopyLink={handleCopyProposalLink}
           copyingLink={copyingShareLink}
           canCopyLink={['sent', 'portal', 'approved', 'accepted', 'approved_pending_action'].includes(proposal.status)}
+          allowSubmission={!['approved', 'accepted', 'approved_pending_action', 'declined'].includes(proposal.status)}
           onSend={(approvalWindow, visibleInPortal) => handleConfirmSubmission(visibleInPortal, approvalWindow)}
           onNavigateToSettings={(section) => {
             setShowSubmissionModal(false);
