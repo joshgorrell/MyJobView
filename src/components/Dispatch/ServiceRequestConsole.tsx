@@ -1,14 +1,16 @@
 import { useState, Suspense, lazy } from 'react';
-import { ListTodo, BarChart3 } from 'lucide-react';
+import { ListTodo, BarChart3, Inbox } from 'lucide-react';
 
 const ServiceRequestQueue = lazy(() => import('./ServiceRequestQueue').then(m => ({ default: m.ServiceRequestQueue })));
+const SmartIntakeHistory = lazy(() => import('./SmartIntakeHistory').then(m => ({ default: m.SmartIntakeHistory })));
 const ServiceRequestAnalytics = lazy(() => import('./ServiceRequestAnalytics').then(m => ({ default: m.ServiceRequestAnalytics })));
 
-type TabKey = 'queue' | 'analytics';
+type TabKey = 'queue' | 'analytics' | 'intake';
 
 const TABS = [
   { key: 'queue' as TabKey, label: 'Queue', icon: ListTodo },
   { key: 'analytics' as TabKey, label: 'Analytics', icon: BarChart3 },
+  ...(import.meta.env.VITE_SMART_INTAKE_UI_ENABLED === 'true' ? [{ key: 'intake' as TabKey, label: 'Smart Intake', icon: Inbox }] : []),
 ];
 
 function TabFallback() {
@@ -24,7 +26,7 @@ interface ServiceRequestConsoleProps {
 }
 
 export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab || 'queue');
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab && TABS.some(tab => tab.key === initialTab) ? initialTab : 'queue');
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-2 sm:space-y-4">
@@ -52,6 +54,7 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
       <Suspense fallback={<TabFallback />}>
         {activeTab === 'queue' && <ServiceRequestQueue />}
         {activeTab === 'analytics' && <ServiceRequestAnalytics />}
+        {activeTab === 'intake' && <SmartIntakeHistory />}
       </Suspense>
     </div>
   );

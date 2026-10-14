@@ -57,7 +57,8 @@
     "test:sessions": "node tests/sessions/runtime.mjs && node tests/sessions/database.mjs",
     "test:pto": "node tests/pto/database.mjs && node tests/pto/browser.mjs",
     "test:labor-dashboard": "node tests/labor-dashboard/database.mjs && node tests/labor-dashboard/reporting.mjs && node tests/labor-dashboard/edge.mjs && node tests/labor-dashboard/runtime.mjs",
-    "test:proposal-sharing": "node tests/proposals/share-link-contract.mjs"
+    "test:proposal-sharing": "node tests/proposals/share-link-contract.mjs",
+    "test:smart-intake": "node tests/smart-intake/receipt-contract.mjs && node tests/smart-intake/attachment-manifest.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

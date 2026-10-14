@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const source = fs.readFileSync('src/lib/smart-intake/history-status.ts', 'utf8');
+const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const exports = {};
+vm.runInNewContext(js, { exports });
+assert.match(exports.describeIntakeHistory('not_found'), /does not prove/);
+assert.match(exports.describeIntakeHistory('processing_failed'), /processing failed/);
+assert.match(exports.describeIntakeHistory('request_created'), /service request/);
+console.log('Intake history status checks passed');
