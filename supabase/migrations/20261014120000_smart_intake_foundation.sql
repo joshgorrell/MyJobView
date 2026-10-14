@@ -127,3 +127,8 @@ create unique index if not exists intake_events_one_email_received
 create unique index if not exists intake_events_one_attachments_pending
   on public.intake_events (intake_id)
   where event_type = 'attachments_pending';
+
+-- One attachment object key per inbound message; retries must not create
+-- duplicate rows for the same quarantined provider attachment.
+create unique index if not exists intake_attachments_message_storage_unique
+  on public.intake_attachments (intake_message_id, storage_key);
