@@ -12,6 +12,10 @@ import type { AttachmentManifest } from "./attachment-manifest.ts";
  */
 export async function quarantineReceivedAttachments(
   db: Parameters<typeof uploadQuarantinedAttachment>[0] & {
+    storage: { from: (bucket: string) => {
+      upload: (path: string, body: Uint8Array, options: { contentType: string; upsert: boolean }) => Promise<{ error: { message: string } | null }>;
+      info: (path: string) => Promise<{ data: unknown; error: unknown }>;
+    } };
     from: (table: string) => {
       select: (columns: string) => {
         eq: (column: string, value: string) => {
@@ -42,6 +46,11 @@ export async function quarantineReceivedAttachments(
     if (existing.error) throw new Error("Unable to check quarantined attachment");
     if (existing.data) {
       if (!existing.data.sha256) throw new Error("Incomplete quarantine record");
+      // A database row alone does not prove the object survived a failed upload
+      // or an out-of-band deletion. Verify its presence before skipping retries.
+      const { data: object, error: objectError } = await db.storage.from("smart-intake-quarantine")
+        .info(storageKey);
+      if (objectError || !object) throw new Error("Quarantined object missing");
       continue;
     }
 
