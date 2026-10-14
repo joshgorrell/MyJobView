@@ -135,6 +135,24 @@ Deno.serve(async (request) => {
     if (existing.error || !existing.data) return Response.json({ error: "Unable to resolve stored intake" }, { status: 500 });
     intakeId = existing.data.id;
   }
+  // Resolve an existing customer contact only when the sender has one exact,
+  // organization-scoped email match. Ambiguity is left for staff review.
+  // Never create a customer or overwrite a manually selected contact.
+  if (!/[%_\\]/.test(senderMailbox)) {
+    const { data: candidates, error: contactError } = await db.from("contacts")
+      .select("id,email").eq("organization_id", destination.organization_id)
+      .ilike("email", senderMailbox).limit(2);
+    if (contactError) {
+      console.error("Smart Intake contact lookup failed", { intakeId, code: contactError.code });
+    } else if (candidates?.length === 1 &&
+        candidates[0].email?.trim().toLowerCase() === senderMailbox) {
+      const { error: matchError } = await db.from("intake_items")
+        .update({ contact_id: candidates[0].id })
+        .eq("id", intakeId).eq("organization_id", destination.organization_id)
+        .is("contact_id", null);
+      if (matchError) console.error("Smart Intake contact match failed", { intakeId, code: matchError.code });
+    }
+  }
   // Persist an inbound message record once, independently of provider retries.
   const { error: messageError } = await db.from("intake_messages").upsert({
     intake_id: intakeId,
