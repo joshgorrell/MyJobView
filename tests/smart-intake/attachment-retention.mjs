@@ -12,7 +12,9 @@ const item = {
   expires_at: "2026-10-13T12:00:00Z", deleted_at: null,
 };
 assert.equal(canPurgeQuarantine(item, now, 0), true);
-assert.equal(canPurgeQuarantine({ ...item, disposition: "pending" }, now, 0), false);
+assert.equal(canPurgeQuarantine({ ...item, disposition: "pending" }, now, 0), true);
+assert.equal(canPurgeQuarantine({ ...item, disposition: "pending", scan_status: "pending" }, now, 0), false);
+assert.equal(canPurgeQuarantine({ ...item, disposition: "pending" }, now, 1), false);
 assert.equal(canPurgeQuarantine({ ...item, disposition: "customer_media" }, now, 0), false);
 assert.equal(canPurgeQuarantine({ ...item, disposition: "work_order" }, now, 0), false);
 assert.equal(canPurgeQuarantine({ ...item, disposition: "both" }, now, 0), false);
