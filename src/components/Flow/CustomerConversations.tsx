@@ -115,7 +115,8 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'customer' | 'proposals' | 'internal'>('all');
   const [isInternal, setIsInternal] = useState(false);
-  const canMentionStaff = selectedThread?.source === 'coworker' || selectedThread?.visibility === 'internal' || isInternal;
+  // Only coworker posts currently persist mention recipients for notification.
+  const canMentionStaff = selectedThread?.source === 'coworker';
   const [mentionPeople, setMentionPeople] = useState<MentionPerson[]>([]);
   useEffect(() => {
     let cancelled = false;
@@ -1072,7 +1073,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         handleSendMessage();
                       }
                     }}
-                    placeholder={selectedThread.source === 'coworker' ? 'Reply… Type @ to mention a teammate' : isInternal ? 'Internal note… Type @ to mention a teammate' : 'Type your message…'}
+                    placeholder={selectedThread.source === 'coworker' ? 'Reply… Type @ to mention a teammate' : isInternal ? 'Internal note…' : 'Type your message…'}
                     rows={2}
                     className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
                   />
