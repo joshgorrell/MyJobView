@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Check, Copy, Download, FileText, Globe, Loader2, Printer, RotateCcw, X } from 'lucide-react';
+import { CalendarDays, Check, Copy, Download, Globe, Printer, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface ReactivateProposalModalProps {
