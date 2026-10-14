@@ -347,7 +347,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-          <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 space-y-4">
+          <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {error && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
                 {error}
@@ -412,7 +412,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             </div>
 
             {/* Description - always visible */}
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Description
               </label>
@@ -426,7 +426,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             </div>
 
             {/* Contact - always visible */}
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Contact <span className="text-muted font-normal">(optional)</span>
               </label>
@@ -455,7 +455,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             </div>
 
             {showNewContactForm && (
-              <div className="p-4 bg-surface border border-subtle rounded-lg space-y-3">
+              <div className="sm:col-span-2 p-4 bg-surface border border-subtle rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                     <UserPlus className="w-4 h-4" />
@@ -517,14 +517,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             <button
               type="button"
               onClick={() => setShowDetails(!showDetails)}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
+              className="sm:col-span-2 w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
             >
               <span>{showDetails ? 'Hide details' : '+ Details'}</span>
               <span className="text-xs text-muted">priority, due date, reminder</span>
             </button>
 
             {showDetails && (
-              <div className="space-y-4">
+              <div className="sm:col-span-2 space-y-4">
             {/* Priority + Due Date side by side */}
             <div className="grid grid-cols-2 gap-3">
               <div>
