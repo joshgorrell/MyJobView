@@ -121,3 +121,9 @@ alter table public.intake_events enable row level security;
 create unique index if not exists intake_events_one_email_received
   on public.intake_events (intake_id)
   where event_type = 'email_received';
+
+-- Only one unresolved attachment quarantine warning per intake. A later
+-- attachment event may be recorded after resolution using a distinct type.
+create unique index if not exists intake_events_one_attachments_pending
+  on public.intake_events (intake_id)
+  where event_type = 'attachments_pending';
