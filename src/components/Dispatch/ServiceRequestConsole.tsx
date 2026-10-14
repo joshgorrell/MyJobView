@@ -1,7 +1,8 @@
 import { useState, Suspense, lazy } from 'react';
-import { ListTodo, BarChart3, Inbox } from 'lucide-react';
+import { ListTodo, BarChart3, Inbox, Plus } from 'lucide-react';
 
 const ServiceRequestQueue = lazy(() => import('./ServiceRequestQueue').then(m => ({ default: m.ServiceRequestQueue })));
+const ManualIntake = lazy(() => import('./ManualIntake').then(m => ({ default: m.ManualIntake })));
 const SmartIntakeHistory = lazy(() => import('./SmartIntakeHistory').then(m => ({ default: m.SmartIntakeHistory })));
 const ServiceRequestAnalytics = lazy(() => import('./ServiceRequestAnalytics').then(m => ({ default: m.ServiceRequestAnalytics })));
 
@@ -26,6 +27,7 @@ interface ServiceRequestConsoleProps {
 }
 
 export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps) {
+  const [manualOpen, setManualOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab && TABS.some(tab => tab.key === initialTab) ? initialTab : 'queue');
 
   return (
@@ -51,7 +53,9 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
         })}
       </div>
 
+      {activeTab === 'intake' && <button type="button" onClick={() => setManualOpen(value => !value)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"><Plus className="h-4 w-4" /> New Intake</button>}
       <Suspense fallback={<TabFallback />}>
+        {activeTab === 'intake' && manualOpen && <ManualIntake onClose={() => setManualOpen(false)} />}
         {activeTab === 'queue' && <ServiceRequestQueue />}
         {activeTab === 'analytics' && <ServiceRequestAnalytics />}
         {activeTab === 'intake' && <SmartIntakeHistory />}
