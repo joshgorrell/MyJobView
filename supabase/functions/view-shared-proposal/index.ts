@@ -19,10 +19,9 @@ Deno.serve(async req => {
       .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at')
       .eq('id', link.proposal_id).eq('organization_id', link.organization_id).maybeSingle();
     if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
-    // The share URL is stable, but its 30-day viewing window starts at the latest submission.
-    // Recalling/revising blocks access through the status check above; resubmission resets sent_at.
+    // Approval and link viewing use the same stored submission expiration. Resubmission resets expires_at.
     if (!proposal.sent_at || !Number.isFinite(Date.parse(proposal.sent_at)) ||
-      Date.now() >= Date.parse(proposal.sent_at) + 30 * 86400000) {
+      (proposal.expires_at && Date.now() >= Date.parse(proposal.expires_at))) {
       return json({ error: 'This proposal viewing period has expired. Please request a resubmission.' }, 410);
     }
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
