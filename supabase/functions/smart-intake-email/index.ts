@@ -42,7 +42,7 @@ Deno.serve(async (request) => {
     organization_id: destination.organization_id, office_id: destination.office_id,
     channel: "email", provider: "resend", provider_event_id: eventId,
     source_address: sender, destination_address: recipient,
-    subject: typeof payload.subject === "string" ? payload.subject : null,
+    subject: typeof payload.subject === "string" ? payload.subject.slice(0, 1000) : null,
     raw_body: typeof payload.text === "string" ? payload.text : null,
     status: "received",
   }, { onConflict: "organization_id,channel,provider,provider_event_id", ignoreDuplicates: true })
