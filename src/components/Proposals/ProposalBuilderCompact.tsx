@@ -3439,166 +3439,25 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               </>
             )}
 
-            {/* Persistent proposal actions: available even after approval or prior delivery. */}
+            {/* One primary submission/delivery workflow. Secondary actions live in the modal or More menu. */}
             {proposal && (
-              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                <button type="button" onClick={() => setShowEmailProposalModal(true)}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25"
-                  title="Email or resend this proposal">
-                  <Mail className="h-4 w-4 shrink-0" /><span>Email Proposal</span>
-                </button>
-                <button type="button" onClick={handleCopyProposalLink}
-                  disabled={copyingShareLink || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Copy the single reusable, read-only proposal summary link">
-                  <Copy className="h-4 w-4 shrink-0" /><span>{copyingShareLink ? 'Creating Link…' : 'Copy Link'}</span>
-                </button>
-                <button type="button" onClick={handleRevokeProposalLinks}
-                  disabled={copyingShareLink}
-                  className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-strong bg-elevated px-2.5 text-xs font-medium text-secondary hover:text-red-400 disabled:opacity-40"
-                  title="Revoke all customer share links for this proposal">
-                  <Unlink className="h-4 w-4 shrink-0" /><span className="hidden lg:inline">Revoke Links</span>
-                </button>
-                <button type="button" onClick={() => setShowPdfModal(true)}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25"
-                  title="Print this proposal">
-                  <FileText className="h-4 w-4 shrink-0" /><span>Print</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (presentation.expired) {
+                    setShowReactivateModal(true);
+                  } else {
+                    setShowSubmissionModal(true);
+                  }
+                }}
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors"
+                title={presentation.expired ? 'Reopen the proposal for customer submission' : 'Review submission and delivery options'}
+              >
+                <Send className="h-4 w-4" />
+                <span>{presentation.expired ? 'Resubmit' : ['sent', 'portal', 'approved', 'accepted', 'approved_pending_action'].includes(proposal.status) ? 'Share / Delivery' : 'Submit'}</span>
+              </button>
             )}
-
-            {shareLinkMessage && <span role="status" className="max-w-[220px] text-xs text-secondary">{shareLinkMessage}</span>}
-
-            {/* Deliver Dropdown */}
-            {proposal?.status !== 'approved' && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowDeliverDropdown(!showDeliverDropdown)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs ${
-                    (proposal?.status === 'sent' || proposal?.status === 'portal')
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                      : proposalReadiness?.isReady
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                        : 'bg-elevated text-secondary hover:bg-strong/25 border border-strong'
-                  }`}
-                  title="Deliver proposal to customer"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span className="hidden sm:inline">Deliver</span>
-                  {selectedTemplateId && pdfTemplates.find(t => t.id === selectedTemplateId) && (
-                    <span className="hidden lg:inline text-xs text-secondary ml-1 pl-2 border-l border-gray-500/40 max-w-[120px] truncate">
-                      {pdfTemplates.find(t => t.id === selectedTemplateId)?.name}
-                    </span>
-                  )}
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-
-                {showDeliverDropdown && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowDeliverDropdown(false)} />
-                    <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
-                      {/* Submit to Portal */}
-                      <button
-                        onClick={() => {
-                          setShowDeliverDropdown(false);
-                          handleSendToPortal();
-                        }}
-                        disabled={sending}
-                        className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm disabled:opacity-50 ${
-                          proposalReadiness?.isReady
-                            ? 'text-brand hover:bg-infoSoft'
-                            : 'text-muted hover:bg-surface'
-                        }`}
-                        title={proposalReadiness?.isReady ? "Submit to customer portal" : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
-                      >
-                        <Globe className="w-4 h-4" />
-                        <span className="flex-1">Send to Customer</span>
-                        {!proposalReadiness?.isReady && (
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                        )}
-                      </button>
-
-                      {/* Email */}
-                      <button
-                        onClick={() => {
-                          setShowEmailProposalModal(true);
-                          setShowDeliverDropdown(false);
-                        }}
-                        className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm ${
-                          proposalReadiness?.isReady
-                            ? 'text-gray-700 hover:bg-gray-100'
-                            : 'text-muted hover:bg-surface'
-                        }`}
-                        title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete`}
-                      >
-                        <Mail className="w-4 h-4" />
-                        <span className="flex-1">Email Proposal</span>
-                        {!proposalReadiness?.isReady && (
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                        )}
-                      </button>
-
-                      {/* Tasks */}
-                      <button
-                        onClick={() => setShowTasksPanel(true)}
-                        className="px-3 py-1.5 bg-elevated hover:bg-strong/25 text-gray-200 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
-                        title="View and edit proposal tasks"
-                      >
-                        <ListChecks className="w-4 h-4" />
-                        Tasks
-                      </button>
-
-                      {/* Download PDF */}
-                      <button
-                        onClick={() => {
-                          loadPdfTemplates();
-                          setShowPdfModal(true);
-                          setShowDeliverDropdown(false);
-                        }}
-                        className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Download PDF</span>
-                      </button>
-
-                      <div className="border-t border-subtle my-1" />
-
-                      {/* Present Live */}
-                      <button
-                        onClick={() => {
-                          openPortalPreview();
-                          setShowDeliverDropdown(false);
-                        }}
-                        className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                      >
-                        <Monitor className="w-4 h-4" />
-                        <span>Present to Customer</span>
-                      </button>
-
-                      {/* Portal management for already-sent proposals */}
-                      {(proposal?.status === 'sent' || proposal?.status === 'portal') && (
-                        <>
-                          <div className="border-t border-subtle my-1" />
-                          {!presentation.expired && (
-                            <button
-                              onClick={() => {
-                                handleRecallProposal();
-                                setShowDeliverDropdown(false);
-                              }}
-                              disabled={recalling}
-                              className="w-full px-3 py-2 text-left text-amber-600 hover:bg-amber-50 flex items-center gap-2 text-sm disabled:opacity-50"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                              {recalling ? 'Recalling...' : 'Recall from Portal'}
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            {shareLinkMessage && <span role="status" className="max-w-[180px] truncate text-xs text-secondary">{shareLinkMessage}</span>}
 
             {/* Status Actions Dropdown */}
             {proposal?.status !== 'approved' && (
@@ -3751,6 +3610,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         <div className="border-t border-subtle my-1" />
                       </>
                     )}
+
+                    {/* Secondary proposal actions — deliberately not in the main header. */}
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Delivery &amp; access</div>
+                    <button type="button" onClick={() => { setShowSubmissionModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><Send className="w-4 h-4" />Submission options</button>
+                    <button type="button" onClick={() => { setShowPdfModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><FileText className="w-4 h-4" />Print / PDF</button>
+                    <button type="button" onClick={() => { setShowTasksPanel(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><ListChecks className="w-4 h-4" />Proposal tasks</button>
+                    <button type="button" onClick={() => { setShowMoreOptionsMenu(false); if (window.confirm('Revoke customer access to this proposal link? The old link will stop working.')) void handleRevokeProposalLinks(); }} disabled={copyingShareLink} className="w-full px-3 py-2 text-left text-red-400 hover:bg-elevated flex items-center gap-2 text-sm disabled:opacity-40"><Unlink className="w-4 h-4" />Revoke customer link</button>
+                    <div className="border-t border-subtle my-1" />
 
                     {/* Proposal Actions */}
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Proposal</div>
@@ -6913,6 +6780,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             setShowSubmissionModal(false);
             setShowPdfModal(true);
           }}
+          onCopyLink={handleCopyProposalLink}
+          copyingLink={copyingShareLink}
+          canCopyLink={['sent', 'portal', 'approved', 'accepted', 'approved_pending_action'].includes(proposal.status)}
           onSend={(approvalWindow, visibleInPortal) => handleConfirmSubmission(visibleInPortal, approvalWindow)}
           onNavigateToSettings={(section) => {
             setShowSubmissionModal(false);
