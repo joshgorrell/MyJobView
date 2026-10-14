@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { parseAttachmentManifest } from "./attachment-manifest.ts";
 
 /**
  * Staged endpoint: do not configure a live webhook until provider-specific
@@ -183,16 +184,11 @@ Deno.serve(async (request) => {
               typeof retrievedTo[0] === "string" && mailbox(retrievedTo[0]) === recipient) {
             // Do not acknowledge emails whose attachments have not been preserved.
             // A separate ingestion stage must persist and scan each attachment.
-            const attachments = email.attachments;
-            if (Array.isArray(attachments) && attachments.length > 20) {
-              return Response.json({ error: "Attachment count exceeds limit", intakeId }, { status: 503 });
+            const attachments = parseAttachmentManifest(email.attachments);
+            if (attachments === null) {
+              return Response.json({ error: "Invalid attachment metadata", intakeId }, { status: 503 });
             }
-            if (Array.isArray(attachments) && attachments.some(item =>
-              !item || typeof item !== "object" || Array.isArray(item)
-            )) {
-              return Response.json({ error: "Malformed attachment metadata", intakeId }, { status: 503 });
-            }
-            if (Array.isArray(attachments) && attachments.length > 0) {
+            if (attachments.length > 0) {
               // Preserve the fact that attachments were detected even though
               // quarantine/scanning is not yet implemented. Never mark clean.
               const { error: attachmentAuditError } = await db.from("intake_events").insert({
@@ -206,9 +202,6 @@ Deno.serve(async (request) => {
               return Response.json({ error: "Attachment processing pending", intakeId }, {
                 status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
               });
-            }
-            if (attachments !== undefined && !Array.isArray(attachments)) {
-              return Response.json({ error: "Invalid attachment metadata", intakeId }, { status: 503 });
             }
             // HTML-only mail is not safely representable as plain text here.
             // Keep it pending rather than silently storing an empty body.
