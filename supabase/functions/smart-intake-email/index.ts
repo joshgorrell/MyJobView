@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { parseAttachmentManifest } from "./attachment-manifest.ts";
+import { quarantineReceivedAttachments } from "./attachment-ingest.ts";
 
 /**
  * Staged endpoint: do not configure a live webhook until provider-specific
@@ -207,6 +208,37 @@ Deno.serve(async (request) => {
                   return Response.json({ error: "Unable to persist attachment audit", intakeId }, { status: 503 });
                 }
               }
+              // Feature gate is independent of email receipt and defaults off.
+              if (Deno.env.get("SMART_INTAKE_ATTACHMENT_QUARANTINE_ENABLED") !== "true") {
+                return Response.json({ error: "Attachment quarantine disabled", intakeId }, {
+                  status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+                });
+              }
+              const allowedHosts = (Deno.env.get("SMART_INTAKE_ATTACHMENT_DOWNLOAD_HOSTS") ?? "")
+                .split(",").map(host => host.trim().toLowerCase()).filter(Boolean);
+              const { data: messageRecord, error: messageLookupError } = await db.from("intake_messages")
+                .select("id").eq("intake_id", intakeId).eq("provider_message_id", eventId).maybeSingle();
+              if (messageLookupError || !messageRecord) {
+                return Response.json({ error: "Attachment message lookup failed", intakeId }, { status: 503 });
+              }
+              try {
+                await quarantineReceivedAttachments(db as never, {
+                  organizationId: destination.organization_id,
+                  intakeId,
+                  messageId: messageRecord.id,
+                  providerEmailId: eventId,
+                  apiKey: resendKey,
+                  attachments,
+                  allowedDownloadHosts: allowedHosts,
+                });
+              } catch (cause) {
+                console.error("Attachment quarantine failed", { intakeId, reason: cause instanceof Error ? cause.message : "unknown" });
+                return Response.json({ error: "Attachment quarantine pending", intakeId }, {
+                  status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+                });
+              }
+              // Quarantined objects are not scanned and must remain inaccessible.
+              // Acknowledge only once scan and disposition workflow is implemented.
               console.error("Intake attachments require secure persistence", { intakeId, count: attachments.length });
               return Response.json({ error: "Attachment processing pending", intakeId }, {
                 status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
