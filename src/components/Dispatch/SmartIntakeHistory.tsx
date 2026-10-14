@@ -105,6 +105,7 @@ export function SmartIntakeHistory() {
           <p><strong>From:</strong> {selected.item.source_address}</p><p><strong>To:</strong> {selected.item.destination_address}</p><p><strong>Subject:</strong> {selected.item.subject || '(No subject)'}</p>
           <div className="whitespace-pre-wrap break-words rounded-lg bg-gray-800 p-3">{selected.item.raw_body?.trim() ? selected.item.raw_body : '(Blank message body)'}</div>
           <p><strong>Status:</strong> {selected.item.status} · <strong>Classification:</strong> {selected.item.classification}</p>
+          <p><strong>Customer contact:</strong> {selected.item.contact_id ? "Matched to an existing contact" : "Not confirmed — select a customer before saving media"}</p>
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
           <h4 className="font-semibold">Attachments</h4>
           {attachmentError && <p role="status" className="text-amber-300">{attachmentError}</p>}
