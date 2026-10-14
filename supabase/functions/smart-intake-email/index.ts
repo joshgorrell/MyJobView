@@ -40,7 +40,7 @@ Deno.serve(async (request) => {
   if (!dbUrl || !serviceKey) return Response.json({ error: "Intake configuration unavailable" }, { status: 503 });
   const db = createClient(dbUrl, serviceKey);
   const { data: destinations, error: destinationError } = await db.from("intake_destinations")
-    .select("organization_id,office_id,purpose,verified_at").eq("channel", "email")
+    .select("organization_id,office_id,purpose,verified_at").eq("provider", "resend").eq("channel", "email")
     .eq("destination_address", recipient).eq("enabled", true);
   if (destinationError) return Response.json({ error: "Destination lookup failed" }, { status: 500 });
   if (!destinations || destinations.length !== 1) return Response.json({ error: "Unrecognized recipient" }, { status: 404 });
