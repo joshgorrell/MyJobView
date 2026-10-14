@@ -25,6 +25,8 @@ assert.match(endpoint, /Invalid UTF-8/);
 assert.match(endpoint, /Invalid provider response/);
 assert.match(endpoint, /Attachment processing pending/);
 assert.match(endpoint, /Intake audit persistence failed/);
+assert.match(endpoint, /eventError\.code !== "23505"/);
+assert.match(foundation, /intake_events_one_email_received/);
 assert.match(endpoint, /Unable to verify receipt audit/);
 assert.match(endpoint, /receiptEvents\?\.length/);
 assert.match(endpoint, /Invalid attachment metadata/);
