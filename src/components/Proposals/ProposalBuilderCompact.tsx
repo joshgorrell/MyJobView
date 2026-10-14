@@ -3461,95 +3461,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             )}
             {shareLinkMessage && <span role="status" className="max-w-[180px] truncate text-xs text-secondary">{shareLinkMessage}</span>}
 
-            {/* Status Actions Dropdown */}
-            {proposal?.status !== 'approved' && (
-            <div className="relative">
-                  <button
-                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs ${
-                      proposalReadiness?.isReady
-                        ? 'bg-elevated text-primary hover:bg-strong/25'
-                        : 'bg-surface/60 text-muted hover:bg-elevated/60 border border-strong/40'
-                    }`}
-                    title="Proposal status — open available actions"
-                    aria-label={`${proposalStatusLabel(proposal?.status || 'designing')} — proposal actions`}
-                    aria-expanded={showStatusDropdown}
-                  >
-                    {presentation.expired ? <Clock className="w-4 h-4 text-orange-400" /> : <FileText className="w-4 h-4" />}
-                    <span>{proposalStatusLabel(proposal?.status || 'designing')}</span>
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-
-                  {showStatusDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowStatusDropdown(false)} />
-                      <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[180px]">
-                        <button
-                          onClick={() => {
-                            setShowManualApprovalModal(true);
-                            setShowStatusDropdown(false);
-                          }}
-                          disabled={updatingStatus}
-                          className={`w-full px-3 py-2 text-left flex items-center gap-2 text-sm disabled:opacity-50 ${
-                            proposalReadiness?.isReady
-                              ? 'text-success hover:bg-successSoft'
-                              : 'text-muted hover:bg-surface'
-                          }`}
-                          title={proposalReadiness?.isReady ? undefined : `Proposal is ${proposalReadiness?.overallProgress ?? 0}% complete — review settings before approving`}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span className="flex-1">Approve</span>
-                          {!proposalReadiness?.isReady && (
-                            <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                          )}
-                        </button>
-                        {proposal?.status !== 'declined' && (
-                          <button
-                            onClick={handleDeclineProposal}
-                            disabled={updatingStatus}
-                            className="w-full px-3 py-2 text-left text-danger hover:bg-dangerSoft flex items-center gap-2 text-sm disabled:opacity-50"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Decline
-                          </button>
-                        )}
-
-                        {proposal?.status === 'designing' && (
-                          <>
-                            <div className="border-t border-subtle my-1" />
-                            <button
-                              onClick={() => handleUpdateStatus('ready_to_submit')}
-                              disabled={updatingStatus}
-                              className="w-full px-3 py-2 text-left text-warning hover:bg-warningSoft flex items-center gap-2 text-sm disabled:opacity-50"
-                            >
-                              <ThumbsUp className="w-4 h-4" />
-                              Mark Ready to Send
-                            </button>
-                          </>
-                        )}
-
-                        {proposal?.status !== 'designing' && (
-                          <>
-                            <div className="border-t border-subtle my-1" />
-                            <button
-                              onClick={() => handleUpdateStatus('designing')}
-                              disabled={updatingStatus}
-                              className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm disabled:opacity-50"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                              Return to Designing
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
+            {/* Status is informational; status transitions live in More options. */}
+            {proposal && (
+              <span className="inline-flex items-center rounded-lg border border-subtle bg-elevated px-3 py-2 text-xs font-medium text-secondary" title="Current proposal status">
+                {presentation.expired ? 'Expired' : proposalStatusLabel(proposal.status)}
+              </span>
             )}
-
-            {proposal?.status === 'approved' && getStatusBadge(proposal.status)}
-            <ProposalReviewControls expired={presentation.expired}
-              onReactivate={() => setShowReactivateModal(true)} onPreview={openPortalPreview} />
 
             {/* Add Item Button */}
             <button
@@ -3621,6 +3538,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleRevokeProposalLinks(); }} disabled={copyingShareLink} className="w-full px-3 py-2 text-left text-red-400 hover:bg-elevated flex items-center gap-2 text-sm disabled:opacity-40"><Unlink className="w-4 h-4" />Revoke customer link</button>
                     <div className="border-t border-subtle my-1" />
 
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Status management</div>
+                    {proposal?.status !== 'approved' && (
+                      <>
+                        <button type="button" onClick={() => { setShowManualApprovalModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><CheckCircle2 className="w-4 h-4" />Mark approved</button>
+                        {proposal?.status !== 'declined' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleDeclineProposal(); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><XCircle className="w-4 h-4" />Mark declined</button>}
+                        {proposal?.status === 'designing' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('ready_to_submit'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><ThumbsUp className="w-4 h-4" />Mark ready</button>}
+                        {proposal?.status !== 'designing' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('designing'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><Edit2 className="w-4 h-4" />Return to designing</button>}
+                      </>
+                    )}
+                    <div className="border-t border-subtle my-1" />
                     {/* Proposal Actions */}
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Proposal</div>
                     <button
