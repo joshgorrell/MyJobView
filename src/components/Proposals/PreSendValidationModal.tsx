@@ -13,7 +13,6 @@ interface PreSendValidationModalProps {
   onNavigateToSettings: (section: ValidationSection['name']) => void;
 }
 
-const APPROVAL_WINDOWS = [7, 14, 30, 45, 60, 90];
 
 export function PreSendValidationModal({
   proposalId,
@@ -27,7 +26,7 @@ export function PreSendValidationModal({
 }: PreSendValidationModalProps) {
   const [loading, setLoading] = useState(true);
   const [validationData, setValidationData] = useState<any>(null);
-  const [approvalWindow, setApprovalWindow] = useState(30);
+  const approvalWindow = 30; // Dealer policy is resolved by the submission handler.
   const [visibleInPortal, setVisibleInPortal] = useState(initialPortalVisibility);
   const [sending, setSending] = useState(false);
   const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
@@ -212,25 +211,9 @@ export function PreSendValidationModal({
           </div>
         )}
 
-        {/* Approval window */}
         <div className="px-6 pb-4 border-b border-gray-700/60">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Approval Window</p>
-          <div className="flex items-center gap-2">
-            {APPROVAL_WINDOWS.map(days => (
-              <button
-                key={days}
-                onClick={() => setApprovalWindow(days)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                  approvalWindow === days
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500 hover:text-white'
-                }`}
-              >
-                {days}d
-              </button>
-            ))}
-            <span className="text-xs text-gray-500 ml-1">from submission</span>
-          </div>
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Approval &amp; Viewing Window</p>
+          <p className="mt-1 text-sm text-gray-300">Uses the dealer-wide proposal setting. The deadline restarts when this proposal is resubmitted.</p>
         </div>
 
         <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
