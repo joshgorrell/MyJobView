@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { parseHashtags, resolveMentions } from '../../lib/username';
+import { parseHashtags } from '../../lib/username';
 import { FlowScope } from '../../lib/flow/types';
 import { EnrichedThread, Message } from './conversationTypes';
 
@@ -120,7 +120,14 @@ export async function markCoworkerMessagesRead(organizationId: string, userId: s
 export async function sendCoworkerReply(organizationId: string, userId: string, rootId: string, content: string) {
   // The database inherits the parent's audience and destination. Mentions notify
   // participants; they never add a new recipient to a private conversation.
-  const { userMentions, leadMentions } = await resolveMentions(content, supabase);
-  const { error } = await supabase.from('discussion_posts').insert({ organization_id: organizationId, user_id: userId, parent_id: rootId, content, post_type: 'general', mentions: [...userMentions, ...leadMentions], hashtags: parseHashtags(content) });
+  const usernames = [...new Set(Array.from(content.matchAll(/(?:^|[^\\w])@([a-z0-9]+)/gi), match => match[1].toLowerCase()))];
+  let mentions: string[] = [];
+  if (usernames.length) {
+    const { data, error: lookupError } = await supabase.from('profiles')
+      .select('id,username').eq('organization_id', organizationId).eq('is_active', true).in('username', usernames);
+    if (lookupError) throw lookupError;
+    mentions = [...new Set((data || []).map(person => person.id))];
+  }
+  const { error } = await supabase.from('discussion_posts').insert({ organization_id: organizationId, user_id: userId, parent_id: rootId, content, post_type: 'general', mentions, hashtags: parseHashtags(content) });
   if (error) throw error;
 }
