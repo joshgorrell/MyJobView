@@ -6729,10 +6729,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           lastModified={proposal.updated_at || proposal.created_at}
           totalAmount={pricing.total}
           onClose={() => setShowReactivateModal(false)}
-          onSuccess={() => {
-            setShowReactivateModal(false);
-            loadData();
-          }}
+          proposalTitle={proposal.title || proposal.proposal_name || ''}
+          customerName={proposal.contacts?.company_name || proposal.contacts?.name || [proposal.contacts?.first_name, proposal.contacts?.last_name].filter(Boolean).join(' ') || ''}
+          onPrint={() => { setShowReactivateModal(false); setShowPdfModal(true); }}
+          onDownloadPdf={() => { setShowReactivateModal(false); setShowPdfModal(true); }}
+          onCopyLink={handleCopyProposalLink}
+          onSuccess={() => loadData()}
         /></Suspense>
       )}
 
