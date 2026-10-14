@@ -30,6 +30,16 @@ async function verifyResendSignature(body: string, headers: Headers, secret: str
   return false;
 }
 
+// Preserve display names as evidence, but compare only canonical mailbox addresses.
+function mailbox(value: string): string | null {
+  if (/[\r\n]/.test(value)) return null;
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(?:[^<>]*<)?([^<>\s@]+@[^<>\s@]+)(?:>)?$/);
+  if (!match) return null;
+  const address = match[1].toLowerCase();
+  return address.length <= 320 && /^[^@]+@[^@]+\.[^@]+$/.test(address) ? address : null;
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return Response.json({ error: "Method not allowed" }, { status: 405 });
   // Deliberate feature gate: default off even if deployed accidentally.
@@ -80,12 +90,12 @@ Deno.serve(async (request) => {
     ? payload.data as Record<string, unknown> : null;
   const recipients = Array.isArray(event?.to) ? event.to.filter((value): value is string => typeof value === "string") : [];
   // A message addressed to several aliases is ambiguous: require exactly one.
-  const recipient = recipients.length === 1 ? recipients[0].trim().toLowerCase() : "";
+  const recipient = recipients.length === 1 ? mailbox(recipients[0]) ?? "" : "";
   const eventId = typeof event?.email_id === "string" ? event.email_id.trim() : "";
   const sender = typeof event?.from === "string" ? event.from.trim() : "";
+  const senderMailbox = mailbox(sender);
   const eventCreatedAt = typeof event?.created_at === "string" ? event.created_at : null;
-  const validAddress = (address: string) => address.includes("@") && !address.includes(" ") && !address.includes("<") && !address.includes(">");
-  if (!event || recipients.length !== 1 || !validAddress(recipient) || !validAddress(sender) || !recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
+  if (!event || recipients.length !== 1 || !recipient || !senderMailbox || !recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
 
   const dbUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -141,8 +151,8 @@ Deno.serve(async (request) => {
           const email = received as Record<string, unknown>;
           const retrievedTo = Array.isArray(email.to) ? email.to : [];
           if (email.id === eventId && typeof email.from === "string" &&
-              email.from.trim() === sender && retrievedTo.length === 1 &&
-              typeof retrievedTo[0] === "string" && retrievedTo[0].trim().toLowerCase() === recipient) {
+              mailbox(email.from) === senderMailbox && retrievedTo.length === 1 &&
+              typeof retrievedTo[0] === "string" && mailbox(retrievedTo[0]) === recipient) {
             const text = typeof email.text === "string" ? email.text : null;
             if (text !== null && new TextEncoder().encode(text).byteLength <= 1024 * 1024) {
               const { error: contentError } = await db.from("intake_items").update({ raw_body: text })
