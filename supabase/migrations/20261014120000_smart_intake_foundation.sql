@@ -30,7 +30,7 @@ create table if not exists public.intake_items (
   status text not null default 'received' check (status in
     ('received','analyzing','awaiting_customer','awaiting_employee',
      'needs_review','ready','processed','duplicate_linked','dismissed','failed_retryable')),
-  classification text not null default 'unknown' check (classification in ('unknown','service','sales','other')),
+  classification text not null default 'unknown' check (classification in ('unknown','service','task','sales','other')),
   priority text not null default 'normal',
   contact_id uuid references public.contacts(id),
   lead_id uuid references public.leads(id),
