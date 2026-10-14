@@ -129,7 +129,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   const naturalCandidates = canMentionStaff && !messageTag
     ? findEmployeeMentionCandidates(newMessage, mentionPeople).filter(candidate => candidate.end <= messageCursor && candidate.personIds.length > 0 && !candidate.text.startsWith('@'))
     : [];
-  const naturalCandidate = naturalCandidates.at(-1);
+  const naturalCandidate = naturalCandidates[naturalCandidates.length - 1];
   function confirmNaturalMention(person: MentionPerson) {
     if (!naturalCandidate || !person.username) return;
     const replacement = '@' + person.username;
