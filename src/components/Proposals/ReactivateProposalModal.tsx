@@ -9,7 +9,6 @@ interface ReactivateProposalModalProps {
   totalAmount: number;
   onClose: () => void;
   onSuccess: () => void;
-  onReview: () => void;
 }
 
 export function ReactivateProposalModal({
@@ -18,8 +17,7 @@ export function ReactivateProposalModal({
   lastModified,
   totalAmount,
   onClose,
-  onSuccess,
-  onReview
+  onSuccess
 }: ReactivateProposalModalProps) {
   const [makePortalVisible, setMakePortalVisible] = useState(true);
   const [expirationDays, setExpirationDays] = useState<number | null>(null);
@@ -213,14 +211,7 @@ export function ReactivateProposalModal({
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-xl flex justify-between gap-3">
-          <button
-            onClick={onReview}
-            className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition-colors flex items-center gap-2"
-          >
-            <FileText size={18} />
-            Review First
-          </button>
+        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-xl flex justify-end gap-3">
           <div className="flex gap-3">
             <button
               onClick={onClose}
