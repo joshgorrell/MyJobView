@@ -40,13 +40,13 @@ export async function quarantineReceivedAttachments(
     const existing = await db.from("intake_attachments").select("id,sha256")
       .eq("intake_message_id", input.messageId).eq("storage_key", storageKey).maybeSingle();
     if (existing.error) throw new Error("Unable to check quarantined attachment");
-    if (existing.data) continue;
+    if (existing.data) {\n      if (!existing.data.sha256) throw new Error("Incomplete quarantine record");\n      continue;\n    }
 
     const metadata = await getReceivedAttachmentDownload(input.providerEmailId, attachment.id, input.apiKey);
     const bytes = await downloadSignedAttachment(metadata.downloadUrl, input.allowedDownloadHosts, 15 * 1024 * 1024);
     if (bytes.byteLength !== metadata.size) throw new Error("Attachment size mismatch");
     const sha256 = await attachmentSha256(bytes);
-    await uploadQuarantinedAttachment(db, storageKey, bytes, attachment.contentType);
+    try {\n      await uploadQuarantinedAttachment(db, storageKey, bytes, attachment.contentType);\n    } catch {\n      // Storage may already contain an orphan from a prior interrupted attempt.\n      // Do not overwrite it or assume its contents match the provider.\n      throw new Error("Quarantine upload requires reconciliation");\n    }
     const { error } = await db.from("intake_attachments").insert({
       intake_message_id: input.messageId,
       storage_key: storageKey,
