@@ -16,11 +16,13 @@ Deno.serve(async (request) => {
   if (!expected || !provided || expected !== provided) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
   const payload = await request.json().catch(() => null);
   const recipient = typeof payload?.to === "string" ? payload.to.trim().toLowerCase() : "";
   const eventId = typeof payload?.email_id === "string" ? payload.email_id.trim() : "";
   const sender = typeof payload?.from === "string" ? payload.from.trim() : "";
-  if (!recipient || !eventId || !sender) return Response.json({ error: "Invalid event" }, { status: 400 });
+  if (!recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320) return Response.json({ error: "Invalid event" }, { status: 400 });
 
   const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
   const { data: destinations, error: destinationError } = await db.from("intake_destinations")
