@@ -19,8 +19,8 @@ Deno.serve(async req => {
     const { proposalId, action } = await req.json();
     if (typeof proposalId !== 'string' || !/^[0-9a-f-]{36}$/i.test(proposalId)) return json({ error: 'Invalid proposal ID' }, 400);
     if (action !== 'create' && action !== 'revoke') return json({ error: 'Invalid action' }, 400);
-    const { data: profile } = await client.from('profiles').select('organization_id').eq('id', auth.user.id).single();
-    if (!profile?.organization_id) return json({ error: 'Organization access required' }, 403);
+    const { data: profile } = await client.from('profiles').select('organization_id,role').eq('id', auth.user.id).single();
+    if (!profile?.organization_id || !['admin', 'manager', 'sales', 'service_manager'].includes(profile.role)) return json({ error: 'Staff sharing permission required' }, 403);
     const { data: proposal } = await client.from('proposals').select('id,organization_id,current_portal_version,status').eq('id', proposalId).eq('organization_id', profile.organization_id).maybeSingle();
     if (!proposal) return json({ error: 'Proposal not found or access denied' }, 404);
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
