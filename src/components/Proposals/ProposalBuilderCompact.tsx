@@ -1854,7 +1854,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     setShowSubmissionModal(true);
   }
 
-  async function handleConfirmSubmission(sendToPortal: boolean, _approvalWindowDays: number) {
+  async function handleConfirmSubmission(sendToPortal: boolean, _approvalWindowDays: number, keepDeliveryOpen = false) {
     if (sending || !proposal || ['approved', 'accepted', 'approved_pending_action', 'declined'].includes(proposal.status)) {
       throw new Error('This proposal cannot be resubmitted in its current status.');
     }
@@ -1887,12 +1887,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       // Submission and delivery are separate customer-facing actions.
       // Email is sent only when the user explicitly chooses Email Proposal.
-      alert(sendToPortal
-        ? 'Proposal submitted and visible in the customer portal. No email was sent.'
-        : 'Proposal submitted. No email was sent.');
-
+      if (!keepDeliveryOpen) {
+        alert(sendToPortal
+          ? 'Proposal submitted and visible in the customer portal. No email was sent.'
+          : 'Proposal submitted. No email was sent.');
+      }
       await loadData();
-      setShowSubmissionModal(false);
+      if (!keepDeliveryOpen) setShowSubmissionModal(false);
     } catch (error: any) {
       console.error('Error submitting proposal:', error);
       alert('Failed to submit proposal: ' + (error.message || 'Unknown error'));
@@ -6710,8 +6711,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           onCopyLink={handleCopyProposalLink}
           copyingLink={copyingShareLink}
           canCopyLink={['sent', 'portal', 'approved', 'accepted', 'approved_pending_action'].includes(proposal.status)}
-          allowSubmission={!['approved', 'accepted', 'approved_pending_action', 'declined'].includes(proposal.status)}
-          onSend={(approvalWindow, visibleInPortal) => handleConfirmSubmission(visibleInPortal, approvalWindow)}
+          alreadySubmitted={['sent', 'portal', 'approved', 'accepted', 'approved_pending_action'].includes(proposal.status)}
+          allowSubmission={!['sent', 'portal', 'approved', 'accepted', 'approved_pending_action', 'declined'].includes(proposal.status) && !presentation.expired}
+          onSend={(approvalWindow, visibleInPortal) => handleConfirmSubmission(visibleInPortal, approvalWindow, true)}
           onNavigateToSettings={(section) => {
             setShowSubmissionModal(false);
             setShowSettings(true);
