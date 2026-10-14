@@ -3450,7 +3450,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     setShowSubmissionModal(true);
                   }
                 }}
-                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors"
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors"
                 title={presentation.expired ? 'Reopen the proposal for customer submission' : 'Review submission and delivery options'}
               >
                 <Send className="h-4 w-4" />
@@ -3461,7 +3461,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
             {/* Status is informational; status transitions live in More options. */}
             {proposal && (
-              <span className="inline-flex items-center rounded-lg border border-subtle bg-elevated px-3 py-2 text-xs font-medium text-secondary" title="Current proposal status">
+              <span className="inline-flex h-10 shrink-0 items-center rounded-lg border border-subtle bg-elevated px-3 text-xs font-medium text-secondary" title="Current proposal status">
                 {presentation.expired ? 'Expired' : proposalStatusLabel(proposal.status)}
               </span>
             )}
@@ -3471,7 +3471,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               onClick={() => {
                 setShowAddItemToAreasModal(true);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white hover:bg-cyan-700 rounded-lg transition-colors font-medium text-xs"
+              className="flex h-10 shrink-0 items-center gap-1.5 px-3 bg-cyan-600 text-white hover:bg-cyan-700 rounded-lg transition-colors font-medium text-sm"
               title="Add Item"
             >
               <Plus className="w-4 h-4" />
@@ -3482,7 +3482,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             <div className="relative">
               <button
                 onClick={() => setShowMoreOptionsMenu(!showMoreOptionsMenu)}
-                className="p-2 text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
+                className="flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
                 title="More Options"
               >
                 <MoreVertical className="w-4 h-4" />
