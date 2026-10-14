@@ -19,25 +19,40 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('normal');
   const [dueDate, setDueDate] = useState('');
+  const [assigneeNotes, setAssigneeNotes] = useState('');
+  const [customerLoading, setCustomerLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    if (!organizationId) return;
-    // Only a bounded, tenant-scoped customer list. Do not query across organizations.
-    void supabase.from('contacts').select('id,company_name,contact_name,email')
-      .eq('organization_id', organizationId).order('company_name').limit(200)
-      .then(({ data, error: lookupError }) => {
-        if (!active) return;
-        if (lookupError) setError('Customer lookup is unavailable.');
-        else setCustomers(data ?? []);
-      });
-    return () => { active = false; };
-  }, [organizationId]);
+    const query = customerSearch.trim();
+    setCustomers([]);
+    setError('');
+    if (!organizationId || query.length < 2) return () => { active = false; };
+    setCustomerLoading(true);
+    const timer = setTimeout(async () => {
+      const safe = query.replace(/[%_,()\\]/g, '').slice(0, 80);
+      if (!safe) { if (active) setCustomerLoading(false); return; }
+      const { data, error: lookupError } = await supabase.from('contacts')
+        .select('id,company_name,contact_name,email')
+        .eq('organization_id', organizationId)
+        .or(['company_name.ilike.%' + safe + '%', 'contact_name.ilike.%' + safe + '%', 'email.ilike.%' + safe + '%'].join(','))
+        .order('company_name').limit(25);
+      if (!active) return;
+      setCustomerLoading(false);
+      if (lookupError) setError('Customer lookup is unavailable.');
+      else setCustomers(data ?? []);
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [organizationId, customerSearch]);
 
-  const filtered = customers.filter(customer =>
-    [customer.company_name, customer.contact_name, customer.email].some(value =>
-      value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
+  const filtered = customers;
+  const purposeGuidance: Record<IntakeType, string> = {
+    service: 'Equipment, installation, repair, or on-site service. Creates a service request for the dispatch queue.',
+    support: 'A customer question or issue that may be resolved without dispatching a technician.',
+    task: 'Internal follow-up or action for an employee. Assign an owner and optional due date.',
+    other: 'Not sure where it belongs? Send it to Needs Review for triage.',
+  };
   const canContinue = !!organizationId && !!contactId && !!subject.trim() && !!description.trim();
 
   return (
@@ -61,8 +76,10 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
         </label>
       </div>
       <label className="block space-y-1 text-sm text-gray-300">Find customer
-        <input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Search company, name, or email" className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
+        <input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Enter at least 2 characters to search customers" className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
       </label>
+      {customerLoading && <p role="status" className="text-xs text-gray-400">Searching customers…</p>}
+      <p className="text-sm text-blue-300">{purposeGuidance[type]}</p>
       <label className="block space-y-1 text-sm text-gray-300">Customer
         <select value={contactId} onChange={e => setContactId(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
           <option value="">Select an existing customer</option>
@@ -75,6 +92,9 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       <label className="block space-y-1 text-sm text-gray-300">Details
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} maxLength={10000} className="w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-white" />
       </label>
+      {(type === 'task' || type === 'support') && <label className="block space-y-1 text-sm text-gray-300">Assignment / follow-up notes
+        <textarea value={assigneeNotes} onChange={e => setAssigneeNotes(e.target.value)} rows={2} maxLength={1000} placeholder="Who should handle this, and what needs to happen?" className="w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-white" />
+      </label>}
       {type === 'task' && <label className="block space-y-1 text-sm text-gray-300">Due date (optional)
         <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
       </label>}
