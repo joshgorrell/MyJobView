@@ -83,6 +83,7 @@ export async function quarantineReceivedAttachments(
     if (orphanError && !notFound) {
       throw new Error("Unable to inspect quarantine object");
     }
+    if (!orphan && !notFound) throw new Error("Quarantine object lookup returned no result");
     if (orphan) {
       const { data: stored, error: readError } = await bucket.download(storageKey);
       if (readError || !stored || stored.size !== bytes.byteLength) {
