@@ -196,9 +196,24 @@ Deno.serve(async (request) => {
             // HTML-only mail is not safely representable as plain text here.
             // Keep it pending rather than silently storing an empty body.
             if (typeof email.text !== "string" && typeof email.html === "string") {
-              return Response.json({ error: "HTML-only email processing pending", intakeId }, {
-                status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
-              });
+              // Convert simple HTML to readable plain text; never render untrusted HTML.
+              // Entity decoding covers the common named and numeric forms.
+              const html = email.html;
+              if (new TextEncoder().encode(html).byteLength > 1024 * 1024) {
+                return Response.json({ error: "HTML email too large", intakeId }, { status: 413 });
+              }
+              const plain = html.replace(/<(script|style|head|svg|iframe)\\b[^>]*>[\\s\\S]*?<\\/\\1\\s*>/gi, " ")
+                .replace(/<br\\s*\\/?>|<\\/(?:p|div|li|tr|h[1-6])\\s*>/gi, "\\n")
+                .replace(/<[^>]*>/g, " ")
+                .replace(/&(#x[0-9a-f]+|#[0-9]+|amp|lt|gt|quot|apos|nbsp);/gi, (_match, entity: string) => {
+                  const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+                  if (entity[0] !== "#") return named[entity.toLowerCase()] ?? " ";
+                  const numeric = entity[1]?.toLowerCase() === "x"
+                    ? Number.parseInt(entity.slice(2), 16) : Number.parseInt(entity.slice(1), 10);
+                  return numeric > 0 && numeric <= 0x10ffff && !(numeric >= 0xd800 && numeric <= 0xdfff)
+                    ? String.fromCodePoint(numeric) : " ";
+                }).replace(/[ \\t]+/g, " ").trim();
+              email.text = plain;
             }
             const text = typeof email.text === "string" ? email.text : null;
             if (text !== null && new TextEncoder().encode(text).byteLength <= 1024 * 1024) {
