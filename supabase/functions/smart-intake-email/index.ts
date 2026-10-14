@@ -153,6 +153,18 @@ Deno.serve(async (request) => {
           if (email.id === eventId && typeof email.from === "string" &&
               mailbox(email.from) === senderMailbox && retrievedTo.length === 1 &&
               typeof retrievedTo[0] === "string" && mailbox(retrievedTo[0]) === recipient) {
+            // Do not acknowledge emails whose attachments have not been preserved.
+            // A separate ingestion stage must persist and scan each attachment.
+            const attachments = email.attachments;
+            if (Array.isArray(attachments) && attachments.length > 0) {
+              console.error("Intake attachments require secure persistence", { intakeId, count: attachments.length });
+              return Response.json({ error: "Attachment processing pending", intakeId }, {
+                status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+              });
+            }
+            if (attachments !== undefined && !Array.isArray(attachments)) {
+              return Response.json({ error: "Invalid attachment metadata", intakeId }, { status: 503 });
+            }
             const text = typeof email.text === "string" ? email.text : null;
             if (text !== null && new TextEncoder().encode(text).byteLength <= 1024 * 1024) {
               const { error: contentError } = await db.from("intake_items").update({ raw_body: text })
