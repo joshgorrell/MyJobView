@@ -23,6 +23,8 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const [dueDate, setDueDate] = useState('');
   const [assigneeNotes, setAssigneeNotes] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const [officeId, setOfficeId] = useState('');
+  const [offices, setOffices] = useState<Array<{ id: string; office_name: string }>>([]);
   const [assignees, setAssignees] = useState<Array<{ id: string; full_name: string | null }>>([]);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [error, setError] = useState('');
@@ -64,6 +66,20 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     return () => { active = false; };
   }, [organizationId]);
 
+  useEffect(() => {
+    let active = true;
+    setOffices([]);
+    setOfficeId('');
+    if (!organizationId) return () => { active = false; };
+    void supabase.from('company_offices').select('id,office_name')
+      .eq('organization_id', organizationId).order('office_name').then(({ data, error: lookupError }) => {
+        if (!active) return;
+        if (lookupError) setError('Office lookup is unavailable.');
+        else setOffices(data ?? []);
+      });
+    return () => { active = false; };
+  }, [organizationId]);
+
   const filtered = [ ...(selectedCustomer && !customers.some(customer => customer.id === selectedCustomer.id) ? [selectedCustomer] : []), ...customers ].filter(customer => customer.id === contactId || [customer.company_name, customer.contact_name, customer.email].some(value => value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
   const purposeGuidance: Record<IntakeType, string> = {
     service: 'Equipment, installation, repair, or on-site service. Creates a service request for the dispatch queue.',
@@ -71,7 +87,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     task: 'Internal follow-up or action for an employee. Assign an owner and optional due date.',
   };
   const draftValidation = validateManualIntakeDraft({
-    purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes, assigneeId,
+    purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes, assigneeId, officeId,
   });
 
 
@@ -95,6 +111,12 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
           </select>
         </label>
       </div>
+      <label className="block space-y-1 text-sm text-gray-300">Office
+        <select value={officeId} onChange={e => setOfficeId(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
+          <option value="">No office selected</option>
+          {offices.map(office => <option key={office.id} value={office.id}>{office.office_name}</option>)}
+        </select>
+      </label>
       <label className="block space-y-1 text-sm text-gray-300">Find customer
         <input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Enter at least 2 characters to search customers" className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
       </label>
