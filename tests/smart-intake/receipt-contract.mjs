@@ -6,6 +6,11 @@ const foundation = readFileSync(new URL('../../supabase/migrations/2026101412000
 const purpose = readFileSync(new URL('../../supabase/migrations/20261014150000_smart_intake_destination_purpose.sql', import.meta.url), 'utf8');
 
 assert.match(endpoint, /SMART_INTAKE_EMAIL_ENABLED/);
+assert.match(endpoint, /verifyResendSignature\(body, request.headers, webhookSecret\)/);
+assert.match(endpoint, /crypto\.subtle\.verify/);
+assert.match(endpoint, /svix-signature/);
+assert.match(endpoint, /svix-timestamp/);
+assert.doesNotMatch(endpoint, /x-webhook-secret/);
 assert.match(endpoint, /SMART_INTAKE_EMAIL_PROVIDER/);
 assert.match(endpoint, /payload\.data/);
 assert.match(endpoint, /email\.received/);
