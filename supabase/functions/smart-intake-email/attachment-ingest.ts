@@ -20,7 +20,7 @@ export async function quarantineReceivedAttachments(
       select: (columns: string) => {
         eq: (column: string, value: string) => {
           eq: (column: string, value: string) => {
-            maybeSingle: () => Promise<{ data: { id: string; sha256: string | null } | null; error: { code?: string } | null }>;
+            maybeSingle: () => Promise<{ data: { id: string; sha256: string | null; byte_size: number | null } | null; error: { code?: string } | null }>;
           };
         };
       };
@@ -41,7 +41,7 @@ export async function quarantineReceivedAttachments(
   if (input.attachments.length > 20) throw new Error("Too many attachments");
   for (const attachment of input.attachments) {
     const storageKey = quarantineObjectKey(input.organizationId, input.intakeId, attachment.id);
-    const existing = await db.from("intake_attachments").select("id,sha256")
+    const existing = await db.from("intake_attachments").select("id,sha256,byte_size")
       .eq("intake_message_id", input.messageId).eq("storage_key", storageKey).maybeSingle();
     if (existing.error) throw new Error("Unable to check quarantined attachment");
     if (existing.data) {
@@ -54,6 +54,9 @@ export async function quarantineReceivedAttachments(
       const objectSize = object.metadata?.size ?? object.size;
       if (!Number.isSafeInteger(objectSize) || objectSize < 0) {
         throw new Error("Quarantine object size unavailable");
+      }
+      if (objectSize !== existing.data.byte_size) {
+        throw new Error("Quarantine object size does not match database record");
       }
       continue;
     }
