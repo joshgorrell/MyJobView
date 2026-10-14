@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Inbox, Mail, MessageSquare, RefreshCw, Search, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
@@ -29,6 +29,7 @@ export function SmartIntakeHistory() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [attachments, setAttachments] = useState<IntakeAttachmentReview[]>([]);
   const [attachmentError, setAttachmentError] = useState('');
+  const inspectionVersion = useRef(0);
   const orgId = tenant?.organizationId && profile?.organization_id === tenant.organizationId ? tenant.organizationId : profile?.organization_id && !tenant ? profile.organization_id : null;
 
   const reload = useCallback(async () => {
@@ -48,6 +49,7 @@ export function SmartIntakeHistory() {
 
   async function inspect(id: string) {
     if (!orgId) return;
+    const version = ++inspectionVersion.current;
     setSelected(null);
     setAttachments([]);
     setAttachmentError('');
@@ -55,12 +57,17 @@ export function SmartIntakeHistory() {
     setLoadingDetail(true);
     try {
       const timeline = await loadIntakeTimeline(supabase, orgId, id);
+      if (version !== inspectionVersion.current) return;
       setSelected(timeline);
-      try { setAttachments(await listIntakeAttachmentReviews(supabase, orgId, id)); }
-      catch { setAttachmentError('Attachment metadata is not available. Access may not be enabled yet.'); }
+      try {
+        const files = await listIntakeAttachmentReviews(supabase, orgId, id);
+        if (version === inspectionVersion.current) setAttachments(files);
+      } catch {
+        if (version === inspectionVersion.current) setAttachmentError('Attachment information is not available yet.');
+      }
     }
-    catch (e) { setDetailError(e instanceof Error ? e.message : 'Unable to load message history'); }
-    finally { setLoadingDetail(false); }
+    catch (e) { if (version === inspectionVersion.current) setDetailError(e instanceof Error ? e.message : 'Unable to load message history'); }
+    finally { if (version === inspectionVersion.current) setLoadingDetail(false); }
   }
 
   const visible = rows;
@@ -71,7 +78,7 @@ export function SmartIntakeHistory() {
         <button type="button" onClick={() => void reload()} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-700 px-3 text-gray-200 hover:bg-gray-800"><RefreshCw className="h-4 w-4" /> Refresh</button>
       </div>
       <div className="flex flex-wrap gap-2">
-        {(['attention','all'] as const).map(tab => <button key={tab} type="button" onClick={() => { setView(tab); setStatus('all'); setSelected(null); }} aria-pressed={view === tab} className={`min-h-11 rounded-lg px-4 text-sm font-medium ${view === tab ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}>{tab === 'attention' ? 'Needs Attention' : 'All Activity'}</button>)}
+        {(['attention','all'] as const).map(tab => <button key={tab} type="button" onClick={() => { setView(tab); setStatus('all'); inspectionVersion.current++; setSelected(null); setAttachments([]); }} aria-pressed={view === tab} className={`min-h-11 rounded-lg px-4 text-sm font-medium ${view === tab ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}>{tab === 'attention' ? 'Needs Attention' : 'All Activity'}</button>)}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
         <label className="relative"><Search className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" /><span className="sr-only">Search intake history</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search sender, recipient or subject" className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-900 pl-10 pr-3 text-white" /></label>
@@ -91,7 +98,7 @@ export function SmartIntakeHistory() {
         <span className="min-w-0 flex-1"><span className="block truncate font-medium text-white">{row.subject || '(No subject)'}</span><span className="block truncate text-sm text-gray-400">{row.source_address}</span><span className="mt-1 block text-xs text-gray-500">{new Date(row.created_at).toLocaleString()} · {row.channel.toUpperCase()} · {row.status.replaceAll('_',' ')}</span></span><ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
       </button>)}</div>
       {(loadingDetail || detailError || selected) && <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 sm:p-6" aria-label="Intake investigation">
-        <div className="mb-3 flex items-center justify-between"><h3 className="font-semibold text-white">Message investigation</h3><button type="button" className="min-h-11 px-3 text-sm text-gray-300" onClick={() => {setSelected(null);setDetailError('');}}>Close</button></div>
+        <div className="mb-3 flex items-center justify-between"><h3 className="font-semibold text-white">Message investigation</h3><button type="button" className="min-h-11 px-3 text-sm text-gray-300" onClick={() => {inspectionVersion.current++;setSelected(null);setAttachments([]);setDetailError('');}}>Close</button></div>
         {loadingDetail && <p className="text-gray-400">Loading timeline…</p>}
         {detailError && <p role="alert" className="text-red-300">{detailError}</p>}
         {selected && <div className="space-y-3 text-sm text-gray-200">
