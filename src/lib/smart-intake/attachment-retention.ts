@@ -14,7 +14,9 @@ export function canPurgeQuarantine(
   if (attachment.deleted_at || linkedWorkOrders !== 0 || !Number.isSafeInteger(linkedWorkOrders)) return false;
   if (!attachment.expires_at || !Number.isFinite(Date.parse(attachment.expires_at))) return false;
   if (Date.parse(attachment.expires_at) > now.getTime()) return false;
-  // Never purge while an attachment is pending review, pending scanning, or
-  // retained as customer media / on a work order. Only explicit discards are eligible.
-  return attachment.disposition === "discarded" && attachment.scan_status !== "pending";
+  // Expired unreviewed quarantine objects are eligible for cleanup, as are
+  // explicit discards. Retained media and work-order references are protected.
+  // A scan still in progress must never race with storage deletion.
+  return (attachment.disposition === "pending" || attachment.disposition === "discarded") &&
+    attachment.scan_status !== "pending";
 }
