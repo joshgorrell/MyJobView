@@ -40,5 +40,19 @@ Deno.serve(async (request) => {
   }, { onConflict: "organization_id,channel,provider,provider_event_id", ignoreDuplicates: true })
     .select("id").maybeSingle();
   if (error) return Response.json({ error: "Unable to store intake" }, { status: 500 });
-  return Response.json({ accepted: true, intakeId: data?.id ?? null });
+  // A provider retry may return no row from an ignoreDuplicates upsert.
+  // Resolve the existing row without modifying its original evidence.
+  let intakeId = data?.id ?? null;
+  if (!intakeId) {
+    const existing = await db.from("intake_items")
+      .select("id")
+      .eq("organization_id", destination.organization_id)
+      .eq("channel", "email")
+      .eq("provider", "resend")
+      .eq("provider_event_id", eventId)
+      .maybeSingle();
+    if (existing.error || !existing.data) return Response.json({ error: "Unable to resolve stored intake" }, { status: 500 });
+    intakeId = existing.data.id;
+  }
+  return Response.json({ accepted: true, intakeId });
 });
