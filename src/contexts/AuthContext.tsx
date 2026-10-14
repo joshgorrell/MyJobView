@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, passwordRecoveryLink } from '../lib/supabase';
+import { verifyPasswordRecovery } from '../lib/passwordRecovery';
 import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
 import { browserInstallationId } from '../lib/sessionDevices';
@@ -35,7 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(passwordRecoveryLink.active);
+  const recoveryVerifiedRef = useRef(false);
   const [isPortalUser, setIsPortalUser] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
@@ -50,8 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   loadingProfileRef.current = loadingProfile;
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const recoveryLink = new URLSearchParams(hash.replace(/^#/, '')).get('type') === 'recovery';
+    const recoveryLink = passwordRecoveryLink.active;
     if (recoveryLink) setIsPasswordRecovery(true);
 
     // Wrap getSession in a timeout so a hanging session fetch doesn't
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         setCompanySettings(null);
         setCurrentSessionId(null);
-        setIsPasswordRecovery(false);
+        setIsPasswordRecovery(recoveryLink);
         setIsPortalUser(false);
         setLoading(false);
         setLoadingProfile(false);
@@ -241,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
     if (error) throw error;
 
@@ -300,8 +301,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+    const redirect = new URL('/', window.location.origin);
+    redirect.searchParams.set('account_setup', 'reset');
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirect.toString(),
     });
 
     if (error) {
@@ -326,6 +329,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function updatePassword(newPassword: string) {
+    if (passwordRecoveryLink.active && !recoveryVerifiedRef.current) {
+      const verifiedUser = await verifyPasswordRecovery(supabase, passwordRecoveryLink);
+      recoveryVerifiedRef.current = true;
+      setUser(verifiedUser);
+      // Remove credentials from the address bar after verification succeeds.
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.hash = '';
+      cleanUrl.searchParams.delete('code');
+      window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
+    }
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
     });

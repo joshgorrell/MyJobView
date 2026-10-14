@@ -52,8 +52,16 @@ export async function handleAuthEmail(req: Request) {
         body = `<p>Your verification code is <strong>${escape(recipient.token)}</strong>.</p>`;
       } else {
         if (!recipient.hash) throw new Error('Auth email token is missing');
-        const link = new URL('/auth/v1/verify', Deno.env.get('SUPABASE_URL'));
-        link.search = new URLSearchParams({ token: recipient.hash, type: action, redirect_to: data.redirect_to || data.site_url }).toString();
+        const link = action === 'recovery'
+          ? new URL('/', data.redirect_to || data.site_url)
+          : new URL('/auth/v1/verify', Deno.env.get('SUPABASE_URL'));
+        if (action === 'recovery') {
+          if (link.protocol !== 'https:' || link.username || link.password) throw new Error('Invalid recovery URL');
+          link.searchParams.set('account_setup', 'reset');
+          link.hash = new URLSearchParams({ account_token_hash: recipient.hash }).toString();
+        } else {
+          link.search = new URLSearchParams({ token: recipient.hash, type: action, redirect_to: data.redirect_to || data.site_url }).toString();
+        }
         text = `${title}: ${link.toString()}\nThis one-time link expires. If you did not request it, ignore this email.`;
         body = `<p><a href="${escape(link.toString())}">${escape(title)}</a></p><p>This one-time link expires. If you did not request it, ignore this email.</p>`;
       }
