@@ -27,6 +27,8 @@ assert.match(endpoint, /Attachment processing pending/);
 assert.match(endpoint, /Invalid attachment metadata/);
 assert.ok(endpoint.indexOf('Attachment processing pending') < endpoint.indexOf('const text = typeof email.text'), 'Attachment gate must precede content persistence');
 assert.ok(endpoint.indexOf('event_type: "email_received"') < endpoint.indexOf('Email content pending retrieval'), 'Audit event must precede retry response');
+assert.ok(endpoint.indexOf('event_type: "email_received"') < endpoint.indexOf('Attachment processing pending'), 'Audit event must precede attachment failure');
+assert.ok(endpoint.indexOf('event_type: "email_received"') < endpoint.indexOf('const resendKey'), 'Audit event must precede provider retrieval');
 assert.match(endpoint, /storedContent\.raw_body === null/);
 assert.match(endpoint, /status: "needs_review"/);
 assert.match(endpoint, /ignoreDuplicates: true/);
