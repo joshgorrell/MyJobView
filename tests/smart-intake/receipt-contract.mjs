@@ -39,6 +39,8 @@ assert.ok(endpoint.indexOf('event_type: "email_received"') < endpoint.indexOf('E
 assert.ok(endpoint.indexOf('event_type: "email_received"') < endpoint.indexOf('Attachment processing pending'), 'Audit event must precede attachment failure');
 assert.ok(endpoint.indexOf('event_type: "email_received"') < endpoint.indexOf('const resendKey'), 'Audit event must precede provider retrieval');
 assert.match(endpoint, /storedContent\.raw_body === null/);
+assert.match(endpoint, /Message timeline pending/);
+assert.match(endpoint, /storedMessage\.body === null/);
 assert.match(endpoint, /status: "needs_review"/);
 assert.match(endpoint, /ignoreDuplicates: true/);
 assert.match(endpoint, /verified_at/);
