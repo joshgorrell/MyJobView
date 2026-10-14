@@ -6,6 +6,8 @@ export type IntakeHistoryFilters = {
   channel?: 'email' | 'sms' | 'mms';
   status?: string;
   before?: string;
+  from?: string;
+  to?: string;
   limit?: number;
 };
 
@@ -23,6 +25,8 @@ export async function listIntakeHistory(db: SupabaseClient, filters: IntakeHisto
   if (filters.channel) query = query.eq('channel', filters.channel);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.before) query = query.lt('created_at', filters.before);
+  if (filters.from) query = query.gte('created_at', filters.from + 'T00:00:00.000Z');
+  if (filters.to) query = query.lt('created_at', new Date(Date.parse(filters.to + 'T00:00:00.000Z') + 86400000).toISOString());
   if (filters.search?.trim()) {
     const value = filters.search.trim().replace(/[%_,()]/g, '');
     if (value) query = query.or(['source_address.ilike.%' + value + '%','destination_address.ilike.%' + value + '%','subject.ilike.%' + value + '%'].join(','));
