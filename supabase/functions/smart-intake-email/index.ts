@@ -24,11 +24,12 @@ Deno.serve(async (request) => {
 
   const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
   const { data: destinations, error: destinationError } = await db.from("intake_destinations")
-    .select("organization_id,office_id").eq("channel", "email")
+    .select("organization_id,office_id,purpose,verified_at").eq("channel", "email")
     .eq("destination_address", recipient).eq("enabled", true);
   if (destinationError) return Response.json({ error: "Destination lookup failed" }, { status: 500 });
   if (!destinations || destinations.length !== 1) return Response.json({ error: "Unrecognized recipient" }, { status: 404 });
   const destination = destinations[0];
+  if (!destination.verified_at || !["support", "sales"].includes(destination.purpose)) return Response.json({ error: "Destination not verified" }, { status: 403 });
   const { data, error } = await db.from("intake_items").upsert({
     organization_id: destination.organization_id, office_id: destination.office_id,
     channel: "email", provider: "resend", provider_event_id: eventId,
