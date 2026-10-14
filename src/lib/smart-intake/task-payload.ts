@@ -6,6 +6,7 @@ import type { ValidatedManualIntakeDraft } from './manual-draft';
  */
 export function toTaskDraft(draft: ValidatedManualIntakeDraft) {
   if (draft.purpose !== 'task') throw new Error('Only task intake can become a task draft.');
+  if (!draft.organizationId || !draft.contactId) throw new Error('Task intake requires organization and customer context.');
   const description = [draft.description, draft.assignmentNotes].filter(Boolean).join('\n\n');
   return {
     title: draft.subject,
