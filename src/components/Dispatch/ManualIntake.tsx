@@ -70,7 +70,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     task: 'Internal follow-up or action for an employee. Assign an owner and optional due date.',
   };
   const draftValidation = validateManualIntakeDraft({
-    purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes,
+    purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes, assigneeId,
   });
   const selectedCustomer = customers.find(customer => customer.id === contactId);
 
