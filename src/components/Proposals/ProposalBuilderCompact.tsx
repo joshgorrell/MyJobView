@@ -626,7 +626,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const link = new URL('/shared/proposal', window.location.origin);
       link.searchParams.set('token', data.token);
       await navigator.clipboard.writeText(link.toString());
-      setShareLinkMessage('Secure proposal link copied. It expires in 30 days.');
+      setShareLinkMessage('Proposal link copied. This is the only active link for this proposal.');
     } catch (error) {
       setShareLinkMessage(error instanceof Error ? error.message : 'Unable to copy proposal link.');
     } finally {
@@ -3443,7 +3443,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 <button type="button" onClick={handleCopyProposalLink}
                   disabled={copyingShareLink || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)}
                   className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Copy a secure, 30-day read-only proposal summary link">
+                  title="Copy the single reusable, read-only proposal summary link">
                   <Copy className="h-4 w-4 shrink-0" /><span>{copyingShareLink ? 'Creating Link…' : 'Copy Link'}</span>
                 </button>
                 <button type="button" onClick={handleRevokeProposalLinks}
