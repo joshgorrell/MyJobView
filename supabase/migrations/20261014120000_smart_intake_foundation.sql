@@ -64,8 +64,20 @@ create table if not exists public.intake_attachments (
   mime_type text,
   byte_size bigint check (byte_size >= 0),
   scan_status text not null default 'pending' check (scan_status in ('pending','clean','blocked','failed')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  disposition text not null default 'pending'
+    check (disposition in ('pending','discarded','customer_media','work_order','both')),
+  expires_at timestamptz not null default (now() + interval '30 days'),
+  resolved_at timestamptz,
+  resolved_by uuid references public.profiles(id),
+  deleted_at timestamptz,
+  sha256 text,
+  scan_completed_at timestamptz
 );
+
+create index if not exists intake_attachments_expiring
+  on public.intake_attachments(expires_at)
+  where disposition = 'pending' and deleted_at is null;
 
 create table if not exists public.intake_events (
   id uuid primary key default gen_random_uuid(),
