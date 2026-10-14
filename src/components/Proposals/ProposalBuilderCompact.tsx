@@ -6731,7 +6731,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           onClose={() => setShowReactivateModal(false)}
           proposalTitle={proposal.title || proposal.proposal_name || ''}
           customerName={proposal.contacts?.company_name || proposal.contacts?.name || [proposal.contacts?.first_name, proposal.contacts?.last_name].filter(Boolean).join(' ') || ''}
-          onPrint={() => { setShowReactivateModal(false); setShowPdfModal(true); }}
           onDownloadPdf={() => { setShowReactivateModal(false); setShowPdfModal(true); }}
           onSuccess={() => loadData()}
         /></Suspense>
