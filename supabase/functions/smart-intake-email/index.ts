@@ -29,6 +29,7 @@ Deno.serve(async (request) => {
     const parsed: unknown = JSON.parse(body);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) payload = parsed as Record<string, unknown>;
   } catch { /* Invalid JSON is rejected below. */ }
+  if (payload?.type !== "email.received") return Response.json({ error: "Unsupported event type" }, { status: 400 });
   const recipient = typeof payload?.to === "string" ? payload.to.trim().toLowerCase() : "";
   const eventId = typeof payload?.email_id === "string" ? payload.email_id.trim() : "";
   const sender = typeof payload?.from === "string" ? payload.from.trim() : "";
