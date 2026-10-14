@@ -10,7 +10,7 @@ assert.match(endpoint, /verifyResendSignature\(body, request.headers, webhookSec
 assert.match(endpoint, /crypto\.subtle\.verify/);
 assert.match(endpoint, /svix-signature/);
 assert.match(endpoint, /svix-timestamp/);
-assert.match(endpoint, /Number\.isSafeInteger\(Number\(timestamp\)\)/);
+assert.match(endpoint, /Number\.isSafeInteger\(seconds\)/);
 assert.doesNotMatch(endpoint, /x-webhook-secret/);
 assert.match(endpoint, /SMART_INTAKE_EMAIL_PROVIDER/);
 assert.match(endpoint, /payload\.data/);
