@@ -19,6 +19,7 @@ const intake = "123e4567-e89b-42d3-a456-426614174001";
 const attachment = {
   id: "123e4567-e89b-42d3-a456-426614174002",
   organization_id: org,
+  intake_id: intake,
   storage_key: org + "/" + intake + "/file_1",
   sha256,
   byte_size: 3,
@@ -53,8 +54,9 @@ try {
   assert.equal(updates.at(-1).scan_status, "failed");
   const before = downloads;
   await assert.rejects(scanPendingAttachment(db, { ...attachment, organization_id: "223e4567-e89b-42d3-a456-426614174000" }, config));
+  await assert.rejects(scanPendingAttachment(db, { ...attachment, intake_id: "223e4567-e89b-42d3-a456-426614174001" }, config));
   await assert.rejects(scanPendingAttachment(db, { ...attachment, sha256: "0".repeat(64) }, config));
-  assert.equal(downloads, before + 1, "Tenant mismatch must fail before storage read");
+  assert.equal(downloads, before + 1, "Tenant and intake mismatches must fail before storage read");
   assert.equal(updates.length, 3, "Invalid attachments must not be updated");
 } finally {
   globalThis.fetch = originalFetch;
