@@ -16,6 +16,7 @@ Deno.serve(async (request) => {
   if (!expected || !provided || expected !== provided) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return Response.json({ error: "JSON required" }, { status: 415 });
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (!Number.isFinite(contentLength) || contentLength < 0) return Response.json({ error: "Invalid content length" }, { status: 400 });
   if (contentLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
