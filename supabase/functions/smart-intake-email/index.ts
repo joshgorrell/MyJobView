@@ -65,7 +65,9 @@ Deno.serve(async (request) => {
   const combined = new Uint8Array(bytes);
   let offset = 0;
   for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.byteLength; }
-  const body = new TextDecoder("utf-8", { fatal: true }).decode(combined);
+  let body: string;
+  try { body = new TextDecoder("utf-8", { fatal: true }).decode(combined); }
+  catch { return Response.json({ error: "Invalid UTF-8" }, { status: 400 }); }
   if (!body.trim()) return Response.json({ error: "Empty payload" }, { status: 400 });
   if (!(await verifyResendSignature(body, request.headers, webhookSecret))) return Response.json({ error: "Unauthorized" }, { status: 401 });
   let payload: Record<string, unknown> | null = null;
