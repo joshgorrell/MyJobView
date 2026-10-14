@@ -14,6 +14,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     ? tenant.organizationId : !tenant ? profile?.organization_id : null;
   const [type, setType] = useState<IntakeType>('service');
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [contactId, setContactId] = useState('');
   const [subject, setSubject] = useState('');
@@ -29,7 +30,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     let active = true;
     const query = customerSearch.trim();
-    setCustomers(previous => previous.filter(customer => customer.id === contactId));
+    setCustomers([]);
     setError('');
     if (!organizationId || query.length < 2) return () => { active = false; };
     setCustomerLoading(true);
@@ -63,7 +64,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     return () => { active = false; };
   }, [organizationId]);
 
-  const filtered = customers.filter(customer => customer.id === contactId || [customer.company_name, customer.contact_name, customer.email].some(value => value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
+  const filtered = [ ...(selectedCustomer && !customers.some(customer => customer.id === selectedCustomer.id) ? [selectedCustomer] : []), ...customers ].filter(customer => customer.id === contactId || [customer.company_name, customer.contact_name, customer.email].some(value => value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
   const purposeGuidance: Record<IntakeType, string> = {
     service: 'Equipment, installation, repair, or on-site service. Creates a service request for the dispatch queue.',
     support: 'A customer question or issue that may be resolved without dispatching a technician.',
@@ -72,7 +73,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const draftValidation = validateManualIntakeDraft({
     purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes, assigneeId,
   });
-  const selectedCustomer = customers.find(customer => customer.id === contactId);
+
 
   return (
     <section className="rounded-xl border border-gray-700 bg-gray-900 p-4 sm:p-6 space-y-4" aria-label="New manual intake">
@@ -100,7 +101,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       {customerLoading && <p role="status" className="text-xs text-gray-400">Searching customers…</p>}
       <p className="text-sm text-blue-300">{purposeGuidance[type]}</p>
       <label className="block space-y-1 text-sm text-gray-300">Customer
-        <select value={contactId} onChange={e => setContactId(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
+        <select value={contactId} onChange={e => { const id = e.target.value; setContactId(id); setSelectedCustomer(filtered.find(customer => customer.id === id) ?? null); }} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
           <option value="">Select an existing customer</option>
           {filtered.map(customer => <option key={customer.id} value={customer.id}>{customer.company_name || customer.contact_name || customer.email || 'Unnamed contact'}</option>)}
         </select>
