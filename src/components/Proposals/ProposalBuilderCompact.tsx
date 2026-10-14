@@ -642,11 +642,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [sending, setSending] = useState(false);
   const [recalling, setRecalling] = useState(false);
   const [showPortalDropdown, setShowPortalDropdown] = useState(false);
-  const [showDeliverDropdown, setShowDeliverDropdown] = useState(false);
   const [previewHideCosts, setPreviewHideCosts] = useState(false);
   const [showPortalPreview, setShowPortalPreview] = useState(false);
   const [showMoreOptionsMenu, setShowMoreOptionsMenu] = useState(false);
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [showUnlockWarningModal, setShowUnlockWarningModal] = useState(false);
   const [showPortalVersionHistory, setShowPortalVersionHistory] = useState(false);
