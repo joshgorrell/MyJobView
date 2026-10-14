@@ -185,6 +185,15 @@ Deno.serve(async (request) => {
             // A separate ingestion stage must persist and scan each attachment.
             const attachments = email.attachments;
             if (Array.isArray(attachments) && attachments.length > 0) {
+              // Preserve the fact that attachments were detected even though
+              // quarantine/scanning is not yet implemented. Never mark clean.
+              const { error: attachmentAuditError } = await db.from("intake_events").insert({
+                intake_id: intakeId, actor_type: "system", event_type: "attachments_pending",
+                detail: { count: attachments.length, action: "quarantine_required" },
+              });
+              if (attachmentAuditError) {
+                console.error("Attachment audit failed", { intakeId, code: attachmentAuditError.code });
+              }
               console.error("Intake attachments require secure persistence", { intakeId, count: attachments.length });
               return Response.json({ error: "Attachment processing pending", intakeId }, {
                 status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
