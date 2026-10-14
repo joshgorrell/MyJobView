@@ -26,6 +26,8 @@ assert.match(endpoint, /bytes > 1024 \* 1024/);
 assert.match(endpoint, /Invalid UTF-8/);
 assert.match(endpoint, /Invalid provider response/);
 assert.match(endpoint, /Attachment processing pending/);
+assert.match(endpoint, /parseAttachmentManifest\(email\.attachments\)/);
+assert.match(endpoint, /attachments\.length > 0/);
 assert.match(endpoint, /attachments\.length > 20/);
 assert.match(endpoint, /Attachment count exceeds limit/);
 assert.match(endpoint, /Malformed attachment metadata/);
