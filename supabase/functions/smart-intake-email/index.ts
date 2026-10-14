@@ -29,7 +29,7 @@ Deno.serve(async (request) => {
   const recipient = typeof payload?.to === "string" ? payload.to.trim().toLowerCase() : "";
   const eventId = typeof payload?.email_id === "string" ? payload.email_id.trim() : "";
   const sender = typeof payload?.from === "string" ? payload.from.trim() : "";
-  if (!recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320) return Response.json({ error: "Invalid event" }, { status: 400 });
+  if (!recipient || !eventId || !sender || eventId.length > 255 || recipient.length > 320 || sender.length > 320 || /[\r\n]/.test(recipient) || /[\r\n]/.test(sender) || /[\r\n]/.test(eventId)) return Response.json({ error: "Invalid event" }, { status: 400 });
 
   const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
   const { data: destinations, error: destinationError } = await db.from("intake_destinations")
