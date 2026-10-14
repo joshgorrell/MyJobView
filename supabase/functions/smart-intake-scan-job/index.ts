@@ -24,15 +24,15 @@ Deno.serve(async (request) => {
   if (!url || !key) return Response.json({ error: "Missing service configuration" }, { status: 503 });
   const db = createClient(url, key, { auth: { persistSession: false } });
   const { data, error } = await db.from("intake_attachments")
-    .select("id,storage_key,sha256,byte_size,scan_status,intake_messages!inner(intake_items!inner(organization_id))")
+    .select("id,storage_key,sha256,byte_size,scan_status,intake_messages!inner(intake_id,intake_items!inner(organization_id))")
     .eq("scan_status", "pending").is("deleted_at", null).order("created_at", { ascending: true }).limit(10);
   if (error) return Response.json({ error: "Unable to retrieve pending attachments" }, { status: 503 });
   let scanned = 0;
   let failed = 0;
   for (const item of data ?? []) {
-    const message = item.intake_messages as unknown as { intake_items?: { organization_id?: string } };
+    const message = item.intake_messages as unknown as { intake_id?: string; intake_items?: { organization_id?: string } };
     const organizationId = message?.intake_items?.organization_id;
-    if (!organizationId) { failed++; continue; }
+    if (!organizationId || !message?.intake_id) { failed++; continue; }
     try {
       await scanPendingAttachment(db as never, {
         id: item.id,
@@ -41,6 +41,7 @@ Deno.serve(async (request) => {
         byte_size: item.byte_size,
         scan_status: "pending",
         organization_id: organizationId,
+        intake_id: message.intake_id,
       }, {
         endpoint: Deno.env.get("SMART_INTAKE_SCANNER_ENDPOINT"),
         token: Deno.env.get("SMART_INTAKE_SCANNER_TOKEN"),
