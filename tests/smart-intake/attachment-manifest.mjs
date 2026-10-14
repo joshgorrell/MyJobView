@@ -19,3 +19,12 @@ assert.equal(parseAttachmentManifest([{ ...valid, filename: "bad\nname.jpg" }]),
 assert.equal(parseAttachmentManifest([{ ...valid, content_type: "invalid" }]), null);
 assert.equal(parseAttachmentManifest([{ ...valid, id: "../bad" }]), null);
 console.log("Smart Intake attachment manifest tests passed");
+
+const keySource = readFileSync(new URL("../../supabase/functions/smart-intake-email/quarantine-key.ts", import.meta.url), "utf8");
+const keyCompiled = await transform(keySource, { loader: "ts", format: "esm" });
+const { quarantineObjectKey } = await import("data:text/javascript;base64," + Buffer.from(keyCompiled.code).toString("base64"));
+const org = "123e4567-e89b-42d3-a456-426614174000";
+const intake = "123e4567-e89b-42d3-a456-426614174001";
+assert.equal(quarantineObjectKey(org, intake, "attachment_123"), org + "/" + intake + "/attachment_123");
+assert.throws(() => quarantineObjectKey("../outside", intake, "attachment_123"));
+assert.throws(() => quarantineObjectKey(org, intake, "../escape"));
