@@ -41,6 +41,28 @@ await requireCleanScan(sample, async () => "clean");
 // The Resend attachment endpoint returns JSON metadata, not binary bytes.
 // Guard the current contract so a removed helper cannot silently break CI.
 const downloadSource = readFileSync(new URL("../../supabase/functions/smart-intake-email/attachment-download.ts", import.meta.url), "utf8");
-assert.match(downloadSource, /export async function getReceivedAttachmentDownload\\(/);
-assert.doesNotMatch(downloadSource, /export async function downloadBoundedAttachment\\(/);
+const downloadCompiled = await transform(downloadSource, { loader: "ts", format: "esm" });
+const { getReceivedAttachmentDownload } = await import("data:text/javascript;base64," + Buffer.from(downloadCompiled.code).toString("base64"));
+await assert.rejects(getReceivedAttachmentDownload("../bad", "attachment_123", "re_valid"));
+await assert.rejects(getReceivedAttachmentDownload("email_123", "../bad", "re_valid"));
+await assert.rejects(getReceivedAttachmentDownload("email_123", "attachment_123", "invalid"));
+const originalFetch = globalThis.fetch;
+try {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    id: "attachment_123",
+    download_url: "https://storage.example.com/file?signature=abc",
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+    size: 3,
+  }), { headers: { "content-type": "application/json" } });
+  const metadata = await getReceivedAttachmentDownload("email_123", "attachment_123", "re_valid");
+  assert.equal(metadata.size, 3);
+  assert.equal(metadata.id, "attachment_123");
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    id: "different", download_url: "https://storage.example.com/file",
+    expires_at: new Date(Date.now() + 60_000).toISOString(), size: 3,
+  }), { headers: { "content-type": "application/json" } });
+  await assert.rejects(getReceivedAttachmentDownload("email_123", "attachment_123", "re_valid"));
+} finally {
+  globalThis.fetch = originalFetch;
+}
 console.log("Smart Intake attachment helper contract tests passed");
