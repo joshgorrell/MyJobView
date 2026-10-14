@@ -191,12 +191,21 @@ Deno.serve(async (request) => {
             if (attachments.length > 0) {
               // Preserve the fact that attachments were detected even though
               // quarantine/scanning is not yet implemented. Never mark clean.
-              const { error: attachmentAuditError } = await db.from("intake_events").insert({
-                intake_id: intakeId, actor_type: "system", event_type: "attachments_pending",
-                detail: { count: attachments.length, action: "quarantine_required" },
-              });
-              if (attachmentAuditError) {
-                console.error("Attachment audit failed", { intakeId, code: attachmentAuditError.code });
+              const { data: priorAttachmentEvents, error: priorAttachmentLookupError } = await db
+                .from("intake_events").select("id").eq("intake_id", intakeId)
+                .eq("event_type", "attachments_pending").limit(1);
+              if (priorAttachmentLookupError) {
+                return Response.json({ error: "Unable to verify attachment audit", intakeId }, { status: 503 });
+              }
+              if (!priorAttachmentEvents?.length) {
+                const { error: attachmentAuditError } = await db.from("intake_events").insert({
+                  intake_id: intakeId, actor_type: "system", event_type: "attachments_pending",
+                  detail: { count: attachments.length, action: "quarantine_required" },
+                });
+                if (attachmentAuditError && attachmentAuditError.code !== "23505") {
+                  console.error("Attachment audit failed", { intakeId, code: attachmentAuditError.code });
+                  return Response.json({ error: "Unable to persist attachment audit", intakeId }, { status: 503 });
+                }
               }
               console.error("Intake attachments require secure persistence", { intakeId, count: attachments.length });
               return Response.json({ error: "Attachment processing pending", intakeId }, {
