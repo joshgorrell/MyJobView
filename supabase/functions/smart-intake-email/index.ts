@@ -12,7 +12,7 @@ async function verifyResendSignature(body: string, headers: Headers, secret: str
   const id = headers.get("svix-id");
   const timestamp = headers.get("svix-timestamp");
   const signature = headers.get("svix-signature");
-  if (!id || !timestamp || !signature || !/^\\d+$/.test(timestamp)) return false;
+  if (!id || !timestamp || !signature || !Number.isSafeInteger(Number(timestamp))) return false;
   const seconds = Number(timestamp);
   if (!Number.isSafeInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > 300) return false;
   try {
