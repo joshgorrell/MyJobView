@@ -823,8 +823,8 @@ function AppContent() {
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
             onCreateServiceRequest={() => setShowServiceRequestForm(true)}
             onCreateTask={() => {
-              setShowTaskForm(true);
-              setActiveTab('tasks');
+              setAiTaskPrefill(null);
+              setShowAiTaskForm(true);
             }}
             onCreateJobMedia={() => setShowJobMediaUpload(true)}
             onCreateProjectTime={['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role) ? () => setShowAddProjectTime(true) : undefined}
