@@ -75,12 +75,28 @@ export async function quarantineReceivedAttachments(
     const bytes = await downloadSignedAttachment(metadata.downloadUrl, input.allowedDownloadHosts, Math.max(1, metadata.size));
     if (bytes.byteLength !== metadata.size) throw new Error("Attachment size mismatch");
     const sha256 = await attachmentSha256(bytes);
-    try {
-      await uploadQuarantinedAttachment(db, storageKey, bytes, attachment.contentType);
-    } catch {
-      // Storage may already contain an orphan from a prior interrupted attempt.
-      // Do not overwrite it or assume its contents match the provider.
-      throw new Error("Quarantine upload requires reconciliation");
+    // Recover from a previous attempt that uploaded bytes but failed before
+    // recording the database row. Never overwrite an unknown existing object.
+    const bucket = db.storage.from("smart-intake-quarantine");
+    const { data: orphan, error: orphanError } = await bucket.info(storageKey);
+    if (orphanError && !/not found/i.test(String(orphanError))) {
+      throw new Error("Unable to inspect quarantine object");
+    }
+    if (orphan) {
+      const { data: stored, error: readError } = await bucket.download(storageKey);
+      if (readError || !stored || stored.size !== bytes.byteLength) {
+        throw new Error("Orphan quarantine object mismatch");
+      }
+      const digest = await attachmentSha256(new Uint8Array(await stored.arrayBuffer()));
+      if (digest !== sha256) throw new Error("Orphan quarantine checksum mismatch");
+    } else {
+      try {
+        await uploadQuarantinedAttachment(db, storageKey, bytes, attachment.contentType);
+      } catch {
+        // Another concurrent delivery may have uploaded the object. A retry
+        // will inspect its checksum; never overwrite or claim success here.
+        throw new Error("Quarantine upload requires reconciliation");
+      }
     }
     const { error } = await db.from("intake_attachments").insert({
       intake_message_id: input.messageId,
