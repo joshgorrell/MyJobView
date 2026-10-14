@@ -14,6 +14,9 @@ export function SmartIntakeHistory() {
   const { profile, loading: authLoading } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [channel, setChannel] = useState<'all'|'email'|'sms'|'mms'>('all');
   const [view, setView] = useState<'attention'|'all'>('attention');
   const [busy, setBusy] = useState(false);
@@ -28,13 +31,13 @@ export function SmartIntakeHistory() {
     setBusy(true);
     setError('');
     try {
-      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, limit: 100 });
+      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, status: status === 'all' ? undefined : status, from: dateFrom || undefined, to: dateTo || undefined, limit: 100 });
       setRows(result);
     } catch (e) {
       setRows([]);
       setError(e instanceof Error ? e.message : 'Unable to load intake history');
     } finally { setBusy(false); }
-  }, [orgId, authLoading, profile, search, channel]);
+  }, [orgId, authLoading, profile, search, channel, status, dateFrom, dateTo]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -62,6 +65,11 @@ export function SmartIntakeHistory() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
         <label className="relative"><Search className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" /><span className="sr-only">Search intake history</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search sender, recipient or subject" className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-900 pl-10 pr-3 text-white" /></label>
         <label className="flex items-center gap-2 text-sm text-gray-300">Channel <select value={channel} onChange={e => setChannel(e.target.value as typeof channel)} className="min-h-11 rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All</option><option value="email">Email</option><option value="sms">SMS</option><option value="mms">MMS</option></select></label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <label className="text-sm text-gray-300">Status<select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All statuses</option>{['received','analyzing','awaiting_customer','awaiting_employee','needs_review','ready','processed','duplicate_linked','dismissed','failed_retryable'].map(value => <option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></label>
+        <label className="text-sm text-gray-300">From<input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white" /></label>
+        <label className="text-sm text-gray-300">Through<input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white" /></label>
       </div>
       {!orgId && <p className="rounded-lg border border-amber-700 p-3 text-amber-200">Dealer identity is not available. History cannot be loaded.</p>}
       {error && <p role="alert" className="rounded-lg border border-red-700 p-3 text-red-200"><AlertTriangle className="mr-2 inline h-4 w-4" />{error}</p>}
