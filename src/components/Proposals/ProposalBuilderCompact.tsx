@@ -595,6 +595,27 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [showNotificationHistory, setShowNotificationHistory] = useState(false);
   const [showApprovalActionModal, setShowApprovalActionModal] = useState(false);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [copyingShareLink, setCopyingShareLink] = useState(false);
+  const [shareLinkMessage, setShareLinkMessage] = useState('');
+  const handleCopyProposalLink = async () => {
+    if (!proposal || copyingShareLink) return;
+    setCopyingShareLink(true);
+    setShareLinkMessage('');
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-proposal-share-link', {
+        body: { proposalId: proposal.id, action: 'create' },
+      });
+      if (error || !data?.token) throw new Error('Could not create a secure proposal link.');
+      const link = new URL('/shared/proposal', window.location.origin);
+      link.searchParams.set('token', data.token);
+      await navigator.clipboard.writeText(link.toString());
+      setShareLinkMessage('Secure proposal link copied. It expires in 30 days.');
+    } catch (error) {
+      setShareLinkMessage(error instanceof Error ? error.message : 'Unable to copy proposal link.');
+    } finally {
+      setCopyingShareLink(false);
+    }
+  };
   const [showReactivateModal, setShowReactivateModal] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<ValidationSection['name']>('details');
   const [newTemplateName, setNewTemplateName] = useState('');
@@ -3402,6 +3423,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   title="Email or resend this proposal">
                   <Mail className="h-4 w-4 shrink-0" /><span>Email Proposal</span>
                 </button>
+                <button type="button" onClick={handleCopyProposalLink}
+                  disabled={copyingShareLink || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="Copy a secure, 30-day read-only proposal summary link">
+                  <Copy className="h-4 w-4 shrink-0" /><span>{copyingShareLink ? 'Creating Link…' : 'Copy Link'}</span>
+                </button>
                 <button type="button" onClick={() => setShowPdfModal(true)}
                   className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-strong bg-elevated px-2.5 sm:px-3 text-xs font-medium text-primary hover:bg-strong/25"
                   title="Print this proposal">
@@ -3409,6 +3436,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </button>
               </div>
             )}
+
+            {shareLinkMessage && <span role="status" className="max-w-[220px] text-xs text-secondary">{shareLinkMessage}</span>}
 
             {/* Deliver Dropdown */}
             {proposal?.status !== 'approved' && (
