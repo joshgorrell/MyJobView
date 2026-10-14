@@ -18,7 +18,13 @@ Deno.serve(async (request) => {
   }
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (contentLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
-  const payload = await request.json().catch(() => null);
+  const body = await request.text().catch(() => "");
+  if (new TextEncoder().encode(body).byteLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
+  let payload: Record<string, unknown> | null = null;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) payload = parsed as Record<string, unknown>;
+  } catch { /* Invalid JSON is rejected below. */ }
   const recipient = typeof payload?.to === "string" ? payload.to.trim().toLowerCase() : "";
   const eventId = typeof payload?.email_id === "string" ? payload.email_id.trim() : "";
   const sender = typeof payload?.from === "string" ? payload.from.trim() : "";
