@@ -79,7 +79,7 @@ export function ReactivateProposalModal({
     }
   }
 
-  const actionClass = 'flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-4 text-sm font-medium text-white transition-colors hover:border-blue-400 hover:bg-slate-700 disabled:opacity-50';
+  const actionClass = 'flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/70 px-2 py-3 text-xs sm:text-sm font-medium text-white transition-colors hover:border-blue-400 hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6">
@@ -95,13 +95,13 @@ export function ReactivateProposalModal({
 
         <div className="overflow-y-auto px-5 py-6 sm:px-7">
           <p className="mb-3 text-sm font-semibold text-slate-200">Choose any delivery options</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button type="button" onClick={onPrint} className={actionClass}><Printer size={23} className="text-blue-300" />Print</button>
-            <button type="button" onClick={onDownloadPdf} className={actionClass}><Download size={23} className="text-blue-300" />Download PDF</button>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" onClick={onPrint} className={actionClass}><Printer size={19} className="text-blue-300" />Print</button>
+            <button type="button" onClick={onDownloadPdf} className={actionClass}><Download size={23} className="text-blue-300" />PDF</button>
             <button type="button" onClick={() => void activate(portalVisible, true)} disabled={submitting || days === null || !onCopyLink} className={actionClass}><Copy size={23} className="text-blue-300" />Copy link</button>
             <button type="button" onClick={() => void activate(!portalVisible)} disabled={submitting || days === null} className={actionClass}>
-              {portalVisible ? <Check size={23} className="text-green-400" /> : <Globe size={23} className="text-blue-300" />}
-              {portalVisible ? 'In customer portal' : 'Send to customer portal'}
+              {portalVisible ? <Check size={19} className="text-green-400" /> : <Globe size={23} className="text-blue-300" />}
+              {portalVisible ? 'Portal on' : 'Portal'}
             </button>
           </div>
           <div className="mt-5 flex items-center gap-2 rounded-xl bg-slate-800/70 px-4 py-3 text-sm text-slate-200">
