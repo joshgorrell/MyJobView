@@ -6733,9 +6733,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             setShowReactivateModal(false);
             loadData();
           }}
-          onReview={() => {
-            setShowReactivateModal(false);
-          }}
         /></Suspense>
       )}
 
