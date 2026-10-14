@@ -183,6 +183,13 @@ Deno.serve(async (request) => {
             if (attachments !== undefined && !Array.isArray(attachments)) {
               return Response.json({ error: "Invalid attachment metadata", intakeId }, { status: 503 });
             }
+            // HTML-only mail is not safely representable as plain text here.
+            // Keep it pending rather than silently storing an empty body.
+            if (typeof email.text !== "string" && typeof email.html === "string") {
+              return Response.json({ error: "HTML-only email processing pending", intakeId }, {
+                status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+              });
+            }
             const text = typeof email.text === "string" ? email.text : null;
             if (text !== null && new TextEncoder().encode(text).byteLength <= 1024 * 1024) {
               const { error: contentError } = await db.from("intake_items").update({ raw_body: text })
