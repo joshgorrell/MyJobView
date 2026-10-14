@@ -124,6 +124,32 @@ export function PreSendValidationModal({
           </button>
         </div>
 
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-700/60 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-blue-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">Optional delivery actions</p>
+              <p className="text-xs text-gray-400">Submit without sending anything, or choose how to share the proposal.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button type="button" onClick={onEmailProposal} disabled={!onEmailProposal}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Mail className="h-4 w-4" /> Email
+            </button>
+            <button type="button" onClick={onCopyLink} disabled={!onCopyLink || !canCopyLink || copyingLink}
+              title={canCopyLink ? 'Copy the reusable customer link' : 'Submit the proposal before copying its customer link'}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Copy className="h-4 w-4" /> {copyingLink ? 'Copying…' : 'Copy link'}
+            </button>
+            <button type="button" onClick={onPrintProposal} disabled={!onPrintProposal}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Printer className="h-4 w-4" /> Print / PDF
+            </button>
+          </div>
+          {!canCopyLink && <p className="text-xs text-gray-400">A reusable customer link becomes available after submission.</p>}
+        </div>
+
         {/* Progress bar */}
         <div className="px-6 pt-4 pb-3">
           <div className="flex items-center justify-between mb-1.5">
@@ -229,32 +255,6 @@ export function PreSendValidationModal({
             <span><span className="block font-medium">Visible in Customer Portal</span><span className="block text-xs text-gray-400 mt-1">Controls the customer's portal listing. Submitting does not send an email.</span></span>
             <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-500" checked={visibleInPortal} onChange={event => setVisibleInPortal(event.target.checked)} />
           </label>
-        </div>
-
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-700/60 space-y-3">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-blue-400" />
-            <div>
-              <p className="text-sm font-semibold text-white">Optional delivery actions</p>
-              <p className="text-xs text-gray-400">Submit without sending anything, or choose how to share the proposal.</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <button type="button" onClick={onEmailProposal} disabled={!onEmailProposal}
-              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              <Mail className="h-4 w-4" /> Email
-            </button>
-            <button type="button" onClick={onCopyLink} disabled={!onCopyLink || !canCopyLink || copyingLink}
-              title={canCopyLink ? 'Copy the reusable customer link' : 'Submit the proposal before copying its customer link'}
-              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              <Copy className="h-4 w-4" /> {copyingLink ? 'Copying…' : 'Copy link'}
-            </button>
-            <button type="button" onClick={onPrintProposal} disabled={!onPrintProposal}
-              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              <Printer className="h-4 w-4" /> Print / PDF
-            </button>
-          </div>
-          {!canCopyLink && <p className="text-xs text-gray-400">A reusable customer link becomes available after submission.</p>}
         </div>
 
         {/* Footer */}
