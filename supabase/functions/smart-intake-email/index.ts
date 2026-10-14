@@ -5,6 +5,31 @@ import { createClient } from "npm:@supabase/supabase-js@2";
  * Staged endpoint: do not configure a live webhook until provider-specific
  * signature verification and recipient mapping are fully validated.
  */
+
+// Resend webhook signatures use the Svix/Standard Webhooks signed payload:
+// svix-id.svix-timestamp.raw-body, HMAC-SHA256, base64 v1 signature.
+async function verifyResendSignature(body: string, headers: Headers, secret: string): Promise<boolean> {
+  const id = headers.get("svix-id");
+  const timestamp = headers.get("svix-timestamp");
+  const signature = headers.get("svix-signature");
+  if (!id || !timestamp || !signature || !/^\\d+$/.test(timestamp)) return false;
+  const seconds = Number(timestamp);
+  if (!Number.isSafeInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > 300) return false;
+  try {
+    const encoded = secret.startsWith("whsec_") ? secret.slice(6) : secret;
+    const keyBytes = Uint8Array.from(atob(encoded.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+    if (keyBytes.length < 16) return false;
+    const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const message = new TextEncoder().encode(id + "." + timestamp + "." + body);
+    for (const token of signature.split(" ")) {
+      if (!token.startsWith("v1,")) continue;
+      const signatureBytes = Uint8Array.from(atob(token.slice(3)), c => c.charCodeAt(0));
+      if (await crypto.subtle.verify("HMAC", key, signatureBytes, message)) return true;
+    }
+  } catch { /* Fail closed on invalid encoding, key, or signature. */ }
+  return false;
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return Response.json({ error: "Method not allowed" }, { status: 405 });
   // Deliberate feature gate: default off even if deployed accidentally.
@@ -12,11 +37,8 @@ Deno.serve(async (request) => {
     return Response.json({ error: "Intake not enabled" }, { status: 503 });
   }
   if (Deno.env.get("SMART_INTAKE_EMAIL_PROVIDER") !== "resend") return Response.json({ error: "Provider not configured" }, { status: 503 });
-  const expected = Deno.env.get("SMART_INTAKE_EMAIL_WEBHOOK_SECRET");
-  const provided = request.headers.get("x-webhook-secret");
-  if (!expected || !provided || expected !== provided) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const webhookSecret = Deno.env.get("SMART_INTAKE_EMAIL_WEBHOOK_SECRET");
+  if (!webhookSecret) return Response.json({ error: "Webhook not configured" }, { status: 503 });
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return Response.json({ error: "JSON required" }, { status: 415 });
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (!Number.isFinite(contentLength) || contentLength < 0) return Response.json({ error: "Invalid content length" }, { status: 400 });
@@ -24,6 +46,7 @@ Deno.serve(async (request) => {
   const body = await request.text().catch(() => "");
   if (new TextEncoder().encode(body).byteLength > 1024 * 1024) return Response.json({ error: "Payload too large" }, { status: 413 });
   if (!body.trim()) return Response.json({ error: "Empty payload" }, { status: 400 });
+  if (!(await verifyResendSignature(body, request.headers, webhookSecret))) return Response.json({ error: "Unauthorized" }, { status: 401 });
   let payload: Record<string, unknown> | null = null;
   try {
     const parsed: unknown = JSON.parse(body);
