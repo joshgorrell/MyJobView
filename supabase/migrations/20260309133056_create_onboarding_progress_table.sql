@@ -1,0 +1,13 @@
+/*\n  # Create onboarding_progress table\n\n  ## Purpose\n  Stores in-progress wizard state for security contract onboarding so customers\n  can resume if they navigate away.\n\n  ## New Tables\n  - `onboarding_progress`\n    - `id` (uuid, primary key)\n    - `contract_id` (uuid, FK to security_contracts, unique)\n    - `current_step` (int)\n    - `form_data` (jsonb)\n    - `last_activity_at` (timestamptz)\n    - `created_at` (timestamptz)\n\n  ## Security\n  - RLS enabled\n  - Anonymous users can insert/update/select their own row via valid magic link token\n*/\n\nCREATE TABLE IF NOT EXISTS onboarding_progress (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  contract_id uuid REFERENCES security_contracts(id) ON DELETE CASCADE,\n  current_step integer NOT NULL DEFAULT 1,\n  form_data jsonb DEFAULT '{}',\n  last_activity_at timestamptz DEFAULT now(),\n  created_at timestamptz DEFAULT now(),\n  CONSTRAINT onboarding_progress_contract_id_key UNIQUE (contract_id)\n)
+
+\n\nALTER TABLE onboarding_progress ENABLE ROW LEVEL SECURITY
+
+\n\nCREATE POLICY "Anon can insert onboarding progress via magic link"\n  ON onboarding_progress\n  FOR INSERT\n  TO anon\n  WITH CHECK (\n    EXISTS (\n      SELECT 1 FROM security_contracts sc\n      WHERE sc.id = onboarding_progress.contract_id\n        AND sc.magic_link_token IS NOT NULL\n        AND sc.magic_link_expires_at > now()\n    )\n  )
+
+\n\nCREATE POLICY "Anon can update onboarding progress via magic link"\n  ON onboarding_progress\n  FOR UPDATE\n  TO anon\n  USING (\n    EXISTS (\n      SELECT 1 FROM security_contracts sc\n      WHERE sc.id = onboarding_progress.contract_id\n        AND sc.magic_link_token IS NOT NULL\n        AND sc.magic_link_expires_at > now()\n    )\n  )\n  WITH CHECK (\n    EXISTS (\n      SELECT 1 FROM security_contracts sc\n      WHERE sc.id = onboarding_progress.contract_id\n        AND sc.magic_link_token IS NOT NULL\n        AND sc.magic_link_expires_at > now()\n    )\n  )
+
+\n\nCREATE POLICY "Anon can select onboarding progress via magic link"\n  ON onboarding_progress\n  FOR SELECT\n  TO anon\n  USING (\n    EXISTS (\n      SELECT 1 FROM security_contracts sc\n      WHERE sc.id = onboarding_progress.contract_id\n        AND sc.magic_link_token IS NOT NULL\n        AND sc.magic_link_expires_at > now()\n    )\n  )
+
+\n\nCREATE POLICY "Authenticated users can manage onboarding progress same org"\n  ON onboarding_progress\n  FOR SELECT\n  TO authenticated\n  USING (\n    EXISTS (\n      SELECT 1 FROM security_contracts sc\n      WHERE sc.id = onboarding_progress.contract_id\n        AND sc.organization_id = get_user_org_id()\n    )\n  )
+
+\n
