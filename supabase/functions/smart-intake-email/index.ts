@@ -133,6 +133,16 @@ Deno.serve(async (request) => {
     if (existing.error || !existing.data) return Response.json({ error: "Unable to resolve stored intake" }, { status: 500 });
     intakeId = existing.data.id;
   }
+  // Persist an inbound message record once, independently of provider retries.
+  const { error: messageError } = await db.from("intake_messages").upsert({
+    intake_id: intakeId,
+    provider_message_id: eventId,
+    direction: "inbound",
+    sender_address: sender,
+  }, { onConflict: "intake_id,provider_message_id", ignoreDuplicates: true });
+  if (messageError) return Response.json({ error: "Unable to persist inbound message", intakeId }, {
+    status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+  });
   // Reconcile missing receipt audit evidence on retries after transient DB failures.
   const { data: receiptEvents, error: receiptLookupError } = await db.from("intake_events")
     .select("id").eq("intake_id", intakeId).eq("event_type", "email_received").limit(1);
