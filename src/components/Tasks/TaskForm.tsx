@@ -54,7 +54,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
-  const autoSaveKey = task ? `task_edit_${task.id}` : 'task_new';
+  const autoSaveKey = task ? `task_edit_${task.id}` : supportMode ? 'task_new_support' : 'task_new';
   const { restoreSavedData, clearSavedData } = useAutoSave({
     key: autoSaveKey,
     data: formData,
@@ -91,7 +91,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       } else {
         const savedData = restoreSavedData();
         if (savedData) {
-          setFormData(savedData);
+          setFormData(prev => ({ ...prev, ...savedData, title: supportMode && !String(savedData.title || '').trim() ? 'Support: ' : savedData.title }));
         }
       }
     }
