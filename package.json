@@ -58,7 +58,7 @@
     "test:pto": "node tests/pto/database.mjs && node tests/pto/browser.mjs",
     "test:labor-dashboard": "node tests/labor-dashboard/database.mjs && node tests/labor-dashboard/reporting.mjs && node tests/labor-dashboard/edge.mjs && node tests/labor-dashboard/runtime.mjs",
     "test:proposal-sharing": "node tests/proposals/share-link-contract.mjs",
-    "test:smart-intake": "node tests/smart-intake/receipt-contract.mjs && node tests/smart-intake/attachment-manifest.mjs && node tests/smart-intake/private-malware-scanner.mjs && node tests/smart-intake/scan-worker.mjs && node tests/smart-intake/attachment-retention.mjs && node tests/smart-intake/attachment-metadata-permissions.mjs && node tests/smart-intake/customer-matching-contract.mjs && node tests/smart-intake/manual-draft-contract.mjs && node tests/smart-intake/routing-readiness-contract.mjs && node tests/smart-intake/service-routing-contract.mjs && node tests/smart-intake/service-routing-worker.mjs"
+    "test:smart-intake": "node tests/smart-intake/receipt-contract.mjs && node tests/smart-intake/attachment-manifest.mjs && node tests/smart-intake/private-malware-scanner.mjs && node tests/smart-intake/scan-worker.mjs && node tests/smart-intake/attachment-retention.mjs && node tests/smart-intake/attachment-metadata-permissions.mjs && node tests/smart-intake/customer-matching-contract.mjs && node tests/smart-intake/manual-draft-contract.mjs && node tests/smart-intake/manual-service-transaction.mjs && node tests/smart-intake/routing-readiness-contract.mjs && node tests/smart-intake/service-routing-contract.mjs && node tests/smart-intake/service-routing-worker.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
