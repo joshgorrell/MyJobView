@@ -31,7 +31,7 @@ assert.match(endpoint, /parseAttachmentManifest\(email\.attachments\)/);
 assert.match(endpoint, /attachments\.length > 0/);
 assert.match(manifest, /value\.length > 20/);
 assert.match(manifest, /value\.length > 20/);
-assert.match(endpoint, /Malformed attachment metadata/);
+assert.match(endpoint, /Invalid attachment metadata/);
 assert.match(endpoint, /event_type: "attachments_pending"/);
 assert.match(endpoint, /HTML email too large/);
 assert.match(endpoint, /String.fromCodePoint/);
