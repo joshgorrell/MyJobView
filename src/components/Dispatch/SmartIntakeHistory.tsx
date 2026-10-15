@@ -36,6 +36,7 @@ export function SmartIntakeHistory() {
   const [customerMatches, setCustomerMatches] = useState<IntakeCustomerContext[]>([]);
   const [customerSearchBusy, setCustomerSearchBusy] = useState(false);
   const [customerSearchError, setCustomerSearchError] = useState('');
+  const [confirmingCustomer, setConfirmingCustomer] = useState(false);
   const inspectionVersion = useRef(0);
   const orgId = tenant?.organizationId && profile?.organization_id === tenant.organizationId ? tenant.organizationId : profile?.organization_id && !tenant ? profile.organization_id : null;
 
@@ -86,6 +87,25 @@ export function SmartIntakeHistory() {
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [orgId, selected, customerSearch]);
+
+  async function confirmCustomer(contact: IntakeCustomerContext) {
+    if (!selected || !orgId || selected.item.contact_id || confirmingCustomer) return;
+    setConfirmingCustomer(true);
+    setCustomerSearchError('');
+    try {
+      const { error: confirmationError } = await supabase.rpc('smart_intake_confirm_customer', {
+        target_intake: selected.item.id,
+        target_contact: contact.id,
+      });
+      if (confirmationError) throw confirmationError;
+      await inspect(selected.item.id);
+      await reload();
+    } catch {
+      setCustomerSearchError('Unable to confirm customer. Refresh and verify this message is still unmatched.');
+    } finally {
+      setConfirmingCustomer(false);
+    }
+  }
 
   async function inspect(id: string) {
     if (!orgId) return;
@@ -167,7 +187,7 @@ export function SmartIntakeHistory() {
             </label>
             {customerSearchBusy && <p role="status">Searching…</p>}
             {customerSearchError && <p role="alert" className="text-amber-300">{customerSearchError}</p>}
-            {customerMatches.map(match => <p key={match.id} className="rounded border border-gray-700 p-2">{match.name}{match.email ? ' · ' + match.email : ''} <span className="text-xs text-gray-400">— match candidate (not linked)</span></p>)}
+            {customerMatches.map(match => <p key={match.id} className="rounded border border-gray-700 p-2">{match.name}{match.email ? ' · ' + match.email : ''} <span className="text-xs text-gray-400">— match candidate (not linked)</span><button type="button" disabled={confirmingCustomer} onClick={() => void confirmCustomer(match)} className="ml-2 rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">Confirm customer</button></p>)}
             <p className="text-xs text-gray-400">New customer creation and confirmation will be available here after authorization and audit logging are implemented.</p>
           </div>}
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
