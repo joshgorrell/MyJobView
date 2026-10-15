@@ -417,6 +417,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       successMessage="Lead Created!"
     >
         <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4 min-w-0">
+          <AIFormFill kind="lead" onFill={prefill => setFormData(previous => ({ ...previous, contact_name: prefill.contactName ?? previous.contact_name, company_name: prefill.company ?? previous.company_name, email: prefill.email ?? previous.email, phone: prefill.phone ?? previous.phone, opportunity_description: prefill.description ?? previous.opportunity_description, priority: ['low', 'medium', 'high', 'urgent'].includes(prefill.priority ?? '') ? prefill.priority! : previous.priority }))} />
           {/* Contact Mode Toggle */}
           <div>
             <label className="block text-sm font-medium text-secondary mb-2">
