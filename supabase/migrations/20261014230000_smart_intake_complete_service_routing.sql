@@ -68,7 +68,7 @@ begin
     left(concat_ws(E'\n\n', nullif(item.subject,''), description_text), 10000),
     details.billable_type, details.billable_by,
     case when item.priority = 'urgent' then 'urgent' else 'normal' end,
-    'open', 'smart_intake', 'service', 'dispatch', details.verified_by
+    'open', 'other', 'service', 'dispatch', details.verified_by
   ) returning id into request_id;
   update public.intake_items
     set service_request_id = request_id, status = 'processed',
