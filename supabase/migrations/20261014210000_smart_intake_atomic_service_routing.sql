@@ -11,7 +11,7 @@ declare
   contact public.contacts%rowtype;
   new_request uuid;
   body_text text;
-  verified_details public.intake_service_details%rowtype;
+  verified_details record;
 begin
   if (select auth.role()) <> 'service_role' then
     raise exception 'Trusted processor required';
