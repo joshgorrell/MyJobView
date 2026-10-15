@@ -11,7 +11,7 @@ type TabKey = 'queue' | 'analytics' | 'intake';
 const TABS = [
   { key: 'queue' as TabKey, label: 'Queue', icon: ListTodo },
   { key: 'analytics' as TabKey, label: 'Analytics', icon: BarChart3 },
-  ...(import.meta.env.VITE_SMART_INTAKE_UI_ENABLED === 'true' ? [{ key: 'intake' as TabKey, label: 'Smart Intake', icon: Inbox }] : []),
+  ...(import.meta.env.VITE_SMART_INTAKE_UI_ENABLED === 'true' || import.meta.env.VITE_SMART_INTAKE_MANUAL_TEST_ENABLED === 'true' ? [{ key: 'intake' as TabKey, label: 'Smart Intake', icon: Inbox }] : []),
 ];
 
 function TabFallback() {
@@ -28,6 +28,7 @@ interface ServiceRequestConsoleProps {
 
 export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps) {
   const [manualOpen, setManualOpen] = useState(false);
+  const manualTestOnly = import.meta.env.VITE_SMART_INTAKE_UI_ENABLED !== 'true';
   const [queueRevision, setQueueRevision] = useState(0);
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab && TABS.some(tab => tab.key === initialTab) ? initialTab : 'queue');
 
@@ -59,7 +60,8 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
         {activeTab === 'intake' && manualOpen && <ManualIntake onClose={() => setManualOpen(false)} onCreated={() => { setManualOpen(false); setQueueRevision(value => value + 1); setActiveTab('queue'); }} />}
         {activeTab === 'queue' && <ServiceRequestQueue key={queueRevision} />}
         {activeTab === 'analytics' && <ServiceRequestAnalytics />}
-        {activeTab === 'intake' && <SmartIntakeHistory />}
+        {activeTab === 'intake' && !manualTestOnly && <SmartIntakeHistory />}
+        {activeTab === 'intake' && manualTestOnly && <p className="text-sm text-gray-400">Manual Service Request testing is enabled. Automated email and SMS intake are not active.</p>}
       </Suspense>
     </div>
   );
