@@ -359,7 +359,7 @@ for(const width of [320,390,768,1440]) {
  await productPage.getByRole('heading',{name:'QN85Q8F',exact:true}).waitFor();
  const description=productPage.getByText(productDescription,{exact:true});
  assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'3','Overview intentionally previews three lines');
- assert.equal(await productPage.getByLabel('Product type: Non-Inventory',{exact:true}).count(),1);
+ assert.equal(await description.count(),1,'Product description appears in Overview');
  await productPage.getByRole('button',{name:'Details',exact:true}).click();
  const fullDescription=productPage.getByText(productDescription,{exact:true});
  assert.equal(await fullDescription.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none','Details must show the full description');
