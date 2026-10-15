@@ -358,7 +358,10 @@ for(const width of [320,390,768,1440]) {
  await productPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?product');
  await productPage.getByRole('heading',{name:'QN85Q8F',exact:true}).waitFor();
  const description=productPage.getByText(productDescription,{exact:true});
- assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none');
+ assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'3','Overview intentionally previews three lines');
+ await productPage.getByRole('button',{name:'Details',exact:true}).click();
+ const fullDescription=productPage.getByText(productDescription,{exact:true});
+ assert.equal(await fullDescription.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none','Details must show the full description');
  assert.ok(await productPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Product modal fits '+width);
  assert.equal(await productPage.getByText('Non-Inventory',{exact:true}).count(),0);
  assert.equal(await productPage.getByLabel('Product type: Non-Inventory',{exact:true}).count(),1);
