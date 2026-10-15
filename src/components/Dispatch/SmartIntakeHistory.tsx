@@ -154,8 +154,8 @@ export function SmartIntakeHistory() {
         billing_by: serviceBillingBy,
       });
       if (saveError) throw saveError;
-      setServiceMessage('Service details verified. Routing remains pending.');
       await inspect(selected.item.id);
+      setServiceMessage('Service details verified. Routing remains pending.');
     } catch (e) {
       setServiceMessage(e instanceof Error ? e.message : 'Unable to verify service details.');
     } finally {
