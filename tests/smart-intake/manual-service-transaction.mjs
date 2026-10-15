@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const sql = readFileSync('supabase/migrations/20261015100000_smart_intake_manual_service.sql', 'utf8');
+const manualChannel = readFileSync('supabase/migrations/20261015110000_smart_intake_manual_channel.sql', 'utf8');
+const channelRpc = readFileSync('supabase/migrations/20261015120000_smart_intake_manual_channel_rpc.sql', 'utf8');
+assert.match(manualChannel, /'email','sms','mms','manual'/);
+assert.match(channelRpc, /target_org,target_office,'manual','manual'/);
 const form = readFileSync('src/components/Dispatch/ManualIntake.tsx', 'utf8');
 const consoleView = readFileSync('src/components/Dispatch/ServiceRequestConsole.tsx', 'utf8');
 
