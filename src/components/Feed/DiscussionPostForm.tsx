@@ -281,7 +281,9 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         </div>
       )}
 
+      <label htmlFor="flow-message-content" className="block text-sm font-semibold text-slate-800">Message *</label>
       <textarea
+        id="flow-message-content"
         ref={textareaRef}
         value={content}
         onChange={(e) => { setContent(e.target.value); setCursorPosition(e.target.selectionStart); if (routeToken && !e.target.value.includes(routeToken)) { setRoute(null); setRouteToken(''); } setHighlight(0); }}
