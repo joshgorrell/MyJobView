@@ -1238,8 +1238,9 @@ function AppContent() {
         <Suspense fallback={null}>
           <TaskForm
             supportMode
-            onClose={() => setShowSupportTaskForm(false)}
-            onSuccess={() => setShowSupportTaskForm(false)}
+            aiPrefill={aiTaskPrefill}
+            onClose={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
+            onSuccess={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
           />
         </Suspense>
       )}
@@ -1304,7 +1305,7 @@ function AppContent() {
           onRegisterOpen={(fn) => { openAIAssistantRef.current = fn; }}
           onAction={(action) => {
             const actionModule: Record<string, string> = {
-              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks',
+              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks', CREATE_SUPPORT_REQUEST: 'tasks',
               CREATE_SERVICE_REQUEST: 'service_requests', CREATE_MESSAGE: 'messages',
               CREATE_PROPOSAL: 'proposals', CREATE_SECURITY_CONTRACT: 'security_onboarding',
               OPEN_PROPOSAL: 'proposals',
@@ -1322,6 +1323,9 @@ function AppContent() {
             } else if (action.type === 'CREATE_TASK') {
               if (action.prefill) setAiTaskPrefill(action.prefill as { title?: string; description?: string; priority?: string; dueDate?: string });
               setShowAiTaskForm(true);
+            } else if (action.type === 'CREATE_SUPPORT_REQUEST') {
+              setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
+              setShowSupportTaskForm(true);
             } else if (action.type === 'CREATE_SERVICE_REQUEST') {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);
