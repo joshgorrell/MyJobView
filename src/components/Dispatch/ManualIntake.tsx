@@ -10,7 +10,7 @@ const TaskForm = lazy(() => import('../Tasks/TaskForm').then(m => ({ default: m.
 type IntakeType = 'service' | 'support' | 'task';
 type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null; office_id: string | null };
 
-export function ManualIntake({ onClose }: { onClose: () => void }) {
+export function ManualIntake({ onClose, onCreated }: { onClose: () => void; onCreated?: () => void }) {
   const { tenant } = useTenant();
   const { profile } = useAuth();
   const organizationId = tenant?.organizationId && profile?.organization_id === tenant.organizationId
@@ -121,7 +121,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
         billing_type: draft.billableType, billing_by: draft.billableBy,
       });
       if (submitError) throw submitError;
-      onClose();
+      (onCreated ?? onClose)();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Could not create the Service Request.');
     } finally {
