@@ -60,16 +60,20 @@ as $$
 declare
   item_org uuid;
   existing_contact uuid;
+  item_status text;
 begin
   if (select auth.uid()) is null then
     raise exception 'Authentication required';
   end if;
-  select organization_id, contact_id into item_org, existing_contact
+  select organization_id, contact_id, status into item_org, existing_contact, item_status
   from public.intake_items
   where id = target_intake and channel in ('email','sms','mms')
   for update;
   if item_org is null or not public.smart_intake_staff_can_read(item_org) then
     raise exception 'Not authorized to resolve this intake';
+  end if;
+  if item_status not in ('received','analyzing','awaiting_customer','awaiting_employee','needs_review','failed_retryable') then
+    raise exception 'Intake is no longer awaiting customer resolution';
   end if;
   if existing_contact is not null then
     raise exception 'Customer has already been confirmed';
