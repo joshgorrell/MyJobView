@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { supabase } from '../../lib/supabase';
@@ -514,7 +515,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
       setEditingRoomId(null);
     } catch (err) {
       console.error('Error saving room scope:', err);
-      alert('Failed to save scope');
+      notify('Failed to save scope', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingRoomScope(false);
     }
@@ -553,7 +554,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
       setEditingTaskItemId(null);
     } catch (err) {
       console.error('Error saving task notes:', err);
-      alert('Failed to save install task');
+      notify('Failed to save install task', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingTask(false);
     }

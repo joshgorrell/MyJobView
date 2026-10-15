@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useOfflineStorage } from '../../hooks/useOfflineStorage';
@@ -126,7 +127,7 @@ export default function PackagesList({
       onRefresh();
     } catch (error) {
       console.error('Error deleting package:', error);
-      alert('Failed to delete package');
+      notify('Failed to delete package', { theme: 'amber', tone: 'error' });
     }
   }
 

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Save, Clock, Wrench, Package, AlertCircle, Search, CheckCircle, DollarSign, FileText, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -305,7 +306,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
       setWorkOrders(sorted);
     } catch (error) {
       console.error('Error loading work orders:', error);
-      alert('Failed to load work orders');
+      notify('Failed to load work orders', { theme: 'emerald', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -348,7 +349,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
 
   async function loadWorkOrderData() {
     if (selectedWorkOrderIds.length === 0) {
-      alert('Please select at least one work order');
+      notify('Please select at least one work order', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -447,7 +448,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
       setStep('review');
     } catch (error) {
       console.error('Error loading work order data:', error);
-      alert(error instanceof Error ? error.message : 'Failed to load work order details');
+      notify(error instanceof Error ? error.message : 'Failed to load work order details', { theme: 'emerald', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -506,7 +507,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
 
   async function refreshCatalogParts(replace=false) {
     const {data,error} = await supabase.from('service_parts_used').select('*').in('work_order_id',selectedWorkOrderIds);
-    if(error) {alert(error.message);return;}
+    if(error) {notify(error.message, { theme: 'emerald', tone: 'error' });return;}
     setPartsUsed(data || []);
     setLineItems(previous => {const prev=replace?previous.filter(li=>!li.source_part_id && li.source!=='parts'):previous;return [...prev,...(data || []).filter(p => !p.is_warranty && !p.warranty_item && !prev.some(li => li.source_part_id===p.id || li.id===p.id)).map(p=>({id:p.id,description:p.part_name,quantity:Number(p.quantity),unit_price:Number(p.unit_price),amount:Math.round(Number(p.quantity)*Number(p.unit_price)*100)/100,item_type:'material' as const,source:'parts' as const,source_part_id:p.id,product_id:p.product_id,sku:p.part_sku,cost:Number(p.unit_cost),notes:p.notes || '',notes_visible_on_invoice:false}))];});
   }
@@ -551,22 +552,22 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
     e.preventDefault();
 
     if (selectedWorkOrderIds.length === 0) {
-      alert('Please select at least one work order');
+      notify('Please select at least one work order', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     if (lineItems.some(item => !item.description.trim())) {
-      alert('Please fill in all line item descriptions');
+      notify('Please fill in all line item descriptions', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     const selectedWorkOrder = workOrders.find(wo => wo.id === selectedWorkOrderIds[0]);
     if (!selectedWorkOrder) {
-      alert('Selected work order not found');
+      notify('Selected work order not found', { theme: 'emerald', tone: 'error' });
       return;
     }
 
-    if (publish && (openClocks || reviewOrders.some(w=>w.status!=='completed'))) { alert('Clock out all technicians before billing.'); return; }
+    if (publish && (openClocks || reviewOrders.some(w=>w.status!=='completed'))) { notify('Clock out all technicians before billing.', { theme: 'emerald', tone: 'info' }); return; }
     setSubmitting(true);
     try {
       const taxResult = computeInvoiceTax({
@@ -590,11 +591,12 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
         p_lines:lineItems.map(item => ({description:item.description,quantity:item.quantity,unit_price:item.unit_price,item_type:item.item_type || 'material',is_taxable:true,source_part_id:item.source_part_id || null,product_id:item.product_id || null,sku:item.sku || null,cost:item.cost ?? null,notes:item.notes || null,notes_visible_on_invoice:item.notes_visible_on_invoice || false})),
       });
       if(error) throw error;
+      notify('Invoice created!', { theme: 'emerald', tone: 'success' });
       onSuccess(invoiceId);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.');
+      notify(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

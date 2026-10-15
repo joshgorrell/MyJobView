@@ -1,3 +1,4 @@
+import { notify } from '../../../lib/feedback';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { MapPin, AlertTriangle, CheckCircle, Edit3, X } from 'lucide-react';
@@ -112,7 +113,7 @@ export default function JurisdictionReviewPanel({ payPeriodId }: { payPeriodId: 
       await loadSegments();
     } catch (err: any) {
       console.error('Error saving override:', err);
-      alert(err.message || 'Failed to save override');
+      notify(err.message || 'Failed to save override', { theme: 'blue', tone: 'error' });
     }
   };
 

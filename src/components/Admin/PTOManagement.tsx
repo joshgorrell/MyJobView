@@ -1,3 +1,4 @@
+import { requestConfirmation, requestText } from '../../lib/feedback';
 import { TeamTimeOffPanel } from "../Shared/TeamTimeOffPanel";
 import { displayDate, LeaveDay } from "../../lib/timeOff";
 import React, { useState, useEffect } from "react";
@@ -134,9 +135,7 @@ export function PTOManagement() {
   }
   async function cancelRequest(id: string) {
     if (
-      !window.confirm(
-        "Cancel this approved time off and restore the leave balance?",
-      )
+      !(await requestConfirmation("Cancel this approved time off and restore the leave balance?", { theme: 'blue' }))
     )
       return;
     setBusyRequest(id);
@@ -684,10 +683,8 @@ export function PTOManagement() {
                             {request.policy.pto_type === "vacation" && (
                               <button
                                 disabled={busyRequest === request.id}
-                                onClick={() => {
-                                  const reason = window.prompt(
-                                    "Enter override reason for approving short-notice vacation:",
-                                  );
+                                onClick={async () => {
+                                  const reason = (await requestText("Enter override reason for approving short-notice vacation:", '', { theme: 'blue' }));
                                   if (reason)
                                     handleRequestAction(
                                       request.id,

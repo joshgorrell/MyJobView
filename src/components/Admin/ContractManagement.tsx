@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FileText, Plus, Edit2, Trash2, Check, X } from 'lucide-react';
@@ -62,7 +63,7 @@ export default function ContractManagement() {
       setContracts(contracts.filter(c => c.id !== id));
     } catch (error) {
       console.error('Error deleting contract:', error);
-      alert('Failed to delete contract');
+      notify('Failed to delete contract', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -77,7 +78,7 @@ export default function ContractManagement() {
       await loadContracts();
     } catch (error) {
       console.error('Error setting default contract:', error);
-      alert('Failed to set default contract');
+      notify('Failed to set default contract', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -329,7 +330,7 @@ function ContractModal({
       onSave();
     } catch (error) {
       console.error('Error saving contract:', error);
-      alert('Failed to save contract');
+      notify('Failed to save contract', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

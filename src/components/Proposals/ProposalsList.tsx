@@ -1,3 +1,4 @@
+import { requestConfirmation, notify } from '../../lib/feedback';
 import { proposalStatusLabel } from '../../lib/proposalPresentation';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -371,7 +372,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       ? `This proposal has been sent to the customer. Deleting it will remove it from their portal as well.\n\nAre you sure you want to delete "${proposal.title}"?`
       : `Are you sure you want to delete "${proposal.title}"?`;
 
-    if (!confirm(confirmMessage)) {
+    if (!(await requestConfirmation(confirmMessage, { theme: 'violet' }))) {
       return;
     }
 
@@ -387,7 +388,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       setOpenMenuId(null);
     } catch (error) {
       console.error('Error deleting proposal:', error);
-      alert('Failed to delete proposal. Please try again.');
+      notify('Failed to delete proposal. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -397,7 +398,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       ? 'This proposal is approved. Recalling it will remove the approval and return it to Designing status. Are you sure?'
       : 'Recall this proposal from the customer portal? It will be returned to Designing status.';
 
-    if (!confirm(message)) {
+    if (!(await requestConfirmation(message, { theme: 'violet' }))) {
       return;
     }
 
@@ -426,10 +427,10 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       await loadProposals();
       setOpenMenuId(null);
-      alert('Proposal recalled successfully!');
+      notify('Proposal recalled successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error recalling proposal:', error);
-      alert('Failed to recall proposal. Please try again.');
+      notify('Failed to recall proposal. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -450,7 +451,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   async function handleArchiveProposal(proposal: Proposal) {
     const confirmMessage = `Archive proposal "${proposal.title}"? It will be hidden from the list but can be unarchived later.`;
 
-    if (!confirm(confirmMessage)) {
+    if (!(await requestConfirmation(confirmMessage, { theme: 'violet' }))) {
       return;
     }
 
@@ -471,7 +472,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       setOpenMenuId(null);
     } catch (error) {
       console.error('Error archiving proposal:', error);
-      alert('Failed to archive proposal. Please try again.');
+      notify('Failed to archive proposal. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -515,7 +516,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       }
     } catch (error) {
       console.error('Error fetching activity data:', error);
-      alert('Failed to load activity history');
+      notify('Failed to load activity history', { theme: 'violet', tone: 'error' });
     }
   }
 

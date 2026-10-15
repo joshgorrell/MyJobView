@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, Send, Percent, ArrowRight, ClipboardCheck, Mail, CreditCard as Edit2, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -209,7 +210,7 @@ export function ManualApprovalModal({
 
   async function handleApprove() {
     if (acceptanceMethod === 'purchase_order' && !purchaseOrderNumber.trim()) {
-      alert('Please enter a purchase order number');
+      notify('Please enter a purchase order number', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -327,7 +328,7 @@ export function ManualApprovalModal({
       console.error('Error approving proposal:', error);
       setShowSuccessAnimation(false);
       setSuccessPhase('magic');
-      alert(error.message || 'Error approving proposal. Please try again.');
+      notify(error.message || 'Error approving proposal. Please try again.', { theme: 'violet', tone: 'error' });
       setSubmitting(false);
     }
   }

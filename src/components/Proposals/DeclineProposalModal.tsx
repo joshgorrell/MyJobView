@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState } from 'react';
 import { X, XCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -88,6 +89,7 @@ export function DeclineProposalModal({
         // Non-fatal if activity log fails
       });
 
+      notify('Proposal marked declined.', { theme: 'violet', tone: 'info' });
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to update proposal. Please try again.');

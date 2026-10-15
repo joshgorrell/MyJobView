@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Plus, Search, Package, DollarSign, Hash } from 'lucide-react';
@@ -136,13 +137,13 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
     e.preventDefault();
 
     if (parts.length === 0) {
-      alert('Please add at least one part');
+      notify('Please add at least one part', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     const invalidParts = parts.filter(p => !p.part_name || p.quantity <= 0);
     if (invalidParts.length > 0) {
-      alert('Please fill in all required fields for each part');
+      notify('Please fill in all required fields for each part', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -167,11 +168,12 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
 
       if (error) throw error;
 
+      notify('Parts added!', { theme: 'blue', tone: 'success' });
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Error adding parts:', error);
-      alert(`Failed to add parts: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add parts: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

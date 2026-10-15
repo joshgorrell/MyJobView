@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -192,7 +193,7 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
 
     } catch (error) {
       console.error('Error loading billing data:', error);
-      alert('Failed to load billing data');
+      notify('Failed to load billing data', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -200,7 +201,7 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
 
   async function handleAddPart() {
     if (!newPart.part_name.trim() || newPart.quantity <= 0) {
-      alert('Please enter part name and quantity');
+      notify('Please enter part name and quantity', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -246,13 +247,13 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
       });
     } catch (error) {
       console.error('Error adding part:', error);
-      alert('Failed to add part');
+      notify('Failed to add part', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function handleAddCharge() {
     if (!newCharge.description.trim() || newCharge.amount === 0) {
-      alert('Please enter description and amount');
+      notify('Please enter description and amount', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -289,7 +290,7 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
       });
     } catch (error) {
       console.error('Error adding charge:', error);
-      alert('Failed to add charge');
+      notify('Failed to add charge', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -343,12 +344,12 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
       // TODO: Integrate with QBO to create actual invoice
       // This would call the quickbooks-create-invoice edge function
 
-      alert('Invoice generated successfully!');
+      notify('Invoice generated successfully!', { theme: 'blue', tone: 'success' });
       if (onSuccess) onSuccess();
       onClose();
     } catch (error) {
       console.error('Error generating invoice:', error);
-      alert('Failed to generate invoice');
+      notify('Failed to generate invoice', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

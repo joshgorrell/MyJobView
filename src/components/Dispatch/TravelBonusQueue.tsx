@@ -1,3 +1,4 @@
+import { notify, requestText } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DollarSign, MapPin, Check, X, CreditCard as Edit2, Navigation, User, Calendar, Building2, ArrowRight } from 'lucide-react';
@@ -100,12 +101,12 @@ export function TravelBonusQueue() {
       loadRequests();
     } catch (error) {
       console.error('Error approving request:', error);
-      alert('Failed to approve request');
+      notify('Failed to approve request', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function handleDeny(requestId: string) {
-    const notes = prompt('Reason for denial:');
+    const notes = (await requestText('Reason for denial:', '', { theme: 'blue' }));
     if (!notes) return;
 
     if (!profile) return;
@@ -125,7 +126,7 @@ export function TravelBonusQueue() {
       loadRequests();
     } catch (error) {
       console.error('Error denying request:', error);
-      alert('Failed to deny request');
+      notify('Failed to deny request', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -140,12 +141,12 @@ export function TravelBonusQueue() {
 
     const amount = parseFloat(editAmount);
     if (isNaN(amount) || amount < 0) {
-      alert('Please enter a valid amount');
+      notify('Please enter a valid amount', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!editNotes.trim()) {
-      alert('Please provide a reason for the adjustment');
+      notify('Please provide a reason for the adjustment', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -169,7 +170,7 @@ export function TravelBonusQueue() {
       loadRequests();
     } catch (error) {
       console.error('Error saving adjustment:', error);
-      alert('Failed to save adjustment');
+      notify('Failed to save adjustment', { theme: 'blue', tone: 'error' });
     }
   }
 

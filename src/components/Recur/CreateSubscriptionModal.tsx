@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Search } from 'lucide-react';
@@ -75,7 +76,7 @@ export default function CreateSubscriptionModal({ subscription, onClose, onSaved
 
   async function handleSave() {
     if (!selectedContactId || !selectedPlanId || !startDate || !nextBillingDate) {
-      alert('Please fill in all required fields');
+      notify('Please fill in all required fields', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -88,7 +89,7 @@ export default function CreateSubscriptionModal({ subscription, onClose, onSaved
         .maybeSingle();
 
       if (!companySettings) {
-        alert('Company settings not found');
+        notify('Company settings not found', { theme: 'blue', tone: 'error' });
         return;
       }
 
@@ -121,10 +122,11 @@ export default function CreateSubscriptionModal({ subscription, onClose, onSaved
         if (error) throw error;
       }
 
+      notify('Subscription saved!', { theme: 'emerald', tone: 'success' });
       onSaved();
     } catch (error) {
       console.error('Error saving subscription:', error);
-      alert('Failed to save subscription');
+      notify('Failed to save subscription', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

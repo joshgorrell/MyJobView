@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Calendar, CheckCircle, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -63,7 +64,7 @@ export function GoogleCalendarSettings() {
       window.location.href = authUrl;
     } catch (error) {
       console.error('Error initiating OAuth:', error);
-      alert('Failed to connect to Google Calendar');
+      notify('Failed to connect to Google Calendar', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -87,7 +88,7 @@ export function GoogleCalendarSettings() {
       });
     } catch (error) {
       console.error('Error disconnecting:', error);
-      alert('Failed to disconnect Google Calendar');
+      notify('Failed to disconnect Google Calendar', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -117,7 +118,7 @@ export function GoogleCalendarSettings() {
         .is('google_calendar_event_id', null);
 
       if (!appointments || appointments.length === 0) {
-        alert('No new appointments to sync');
+        notify('No new appointments to sync', { theme: 'blue', tone: 'warning' });
         return;
       }
 
@@ -157,11 +158,11 @@ export function GoogleCalendarSettings() {
         }
       }
 
-      alert(`Synced ${appointments.length} appointment(s) to Google Calendar`);
+      notify(`Synced ${appointments.length} appointment(s) to Google Calendar`, { theme: 'blue', tone: 'success' });
       await loadConnectionStatus();
     } catch (error) {
       console.error('Error syncing:', error);
-      alert('Failed to sync appointments');
+      notify('Failed to sync appointments', { theme: 'blue', tone: 'error' });
     } finally {
       setSyncing(false);
     }

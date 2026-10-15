@@ -1,3 +1,4 @@
+import { requestText } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Star, Calendar, CheckCircle, Clock, AlertCircle, User, Phone } from 'lucide-react';
@@ -149,7 +150,7 @@ export function VIPProgramView() {
   }
 
   async function addNotes(vipId: string, visit: '30' | '60' | '90') {
-    const notes = prompt(`Add notes for ${visit}-day visit:`);
+    const notes = (await requestText(`Add notes for ${visit}-day visit:`, '', { theme: 'blue' }));
     if (!notes) return;
 
     try {
@@ -418,8 +419,8 @@ export function VIPProgramView() {
                           <>
                             {!visit.scheduled ? (
                               <button
-                                onClick={() => {
-                                  const date = prompt('Schedule date (YYYY-MM-DD):');
+                                onClick={async () => {
+                                  const date = (await requestText('Schedule date (YYYY-MM-DD):', '', { theme: 'blue', inputType: 'date' }));
                                   if (date) updateVisit(record.id, visit.day as any, 'scheduled', date);
                                 }}
                                 className="w-full px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"

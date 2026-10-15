@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -45,6 +46,7 @@ export function ManualJobTimeRequestModal({ onClose, onSubmitted }: { onClose: (
         entry_date: date, clock_in: clockIn, clock_out: clockOut, reason: reason.trim(), status: 'pending',
       });
       if (error) throw error;
+      notify('Time request submitted for review!', { theme: 'blue', tone: 'success' });
       onSubmitted(); onClose();
     } catch (error: any) { setError(error.message || 'Unable to submit request.'); }
     finally { setSaving(false); }

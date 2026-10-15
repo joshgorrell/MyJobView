@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -94,12 +95,12 @@ export function RequestReviewModal({ entryId, onClose, onReviewed }: Props) {
 
       if (requestError) throw requestError;
 
-      alert('Time adjustment request approved successfully');
+      notify('Time adjustment request approved successfully', { theme: 'blue', tone: 'success' });
       onReviewed();
       onClose();
     } catch (error: any) {
       console.error('Error approving request:', error);
-      alert(error.message || 'Failed to approve request');
+      notify(error.message || 'Failed to approve request', { theme: 'blue', tone: 'error' });
     } finally {
       setProcessing(false);
     }
@@ -109,7 +110,7 @@ export function RequestReviewModal({ entryId, onClose, onReviewed }: Props) {
     if (!request) return;
 
     if (!adminNotes.trim()) {
-      alert('Please provide a reason for denial');
+      notify('Please provide a reason for denial', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -127,12 +128,12 @@ export function RequestReviewModal({ entryId, onClose, onReviewed }: Props) {
 
       if (error) throw error;
 
-      alert('Time adjustment request denied');
+      notify('Time adjustment request denied', { theme: 'blue', tone: 'info' });
       onReviewed();
       onClose();
     } catch (error: any) {
       console.error('Error denying request:', error);
-      alert(error.message || 'Failed to deny request');
+      notify(error.message || 'Failed to deny request', { theme: 'blue', tone: 'error' });
     } finally {
       setProcessing(false);
     }

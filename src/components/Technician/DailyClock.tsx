@@ -1,3 +1,4 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import React, { useState, useEffect, useRef } from 'react';
@@ -237,7 +238,7 @@ export function DailyClock() {
 
   async function submitLeaveRequest() {
     if (!profile?.id || !selectedLeavePolicy) {
-      alert('Please select a leave type');
+      notify('Please select a leave type', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -248,9 +249,7 @@ export function DailyClock() {
     const isSameDay = true;
 
     if (isSameDay && !['bereavement', 'jury_duty', 'unpaid'].includes(policy.policy.pto_type)) {
-      const confirmed = window.confirm(
-        `You are calling in for today. This will submit a ${policy.policy.pto_type} request for manager approval.\n\nIf submitted after the cutoff time, points may be deducted from your rewards balance.\n\nDo you want to proceed?`
-      );
+      const confirmed = (await requestConfirmation(`You are calling in for today. This will submit a ${policy.policy.pto_type} request for manager approval.\n\nIf submitted after the cutoff time, points may be deducted from your rewards balance.\n\nDo you want to proceed?`, { theme: 'blue' }));
       if (!confirmed) return;
     }
 
@@ -264,14 +263,14 @@ export function DailyClock() {
 
       if (error) throw error;
 
-      alert('Leave request submitted. Your manager will review and approve it.');
+      notify('Leave request submitted. Your manager will review and approve it.', { theme: 'blue', tone: 'success' });
       setShowLeaveModal(false);
       setSelectedLeavePolicy('');
       setLeaveReason('');
       loadLeaveBalances();
     } catch (error: any) {
       console.error('Error submitting leave request:', error);
-      alert(error.message || 'Failed to submit leave request');
+      notify(error.message || 'Failed to submit leave request', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmittingLeave(false);
     }
@@ -304,7 +303,7 @@ export function DailyClock() {
 
       // If there's already an active clock-in, prevent creating a duplicate
       if (activeEntries && activeEntries.length > 0) {
-        alert('You are already clocked in. Please clock out before clocking in again.');
+        notify('You are already clocked in. Please clock out before clocking in again.', { theme: 'blue', tone: 'warning' });
         await loadTodaysClock(); // Refresh to show the current entry
         return null;
       }
@@ -335,16 +334,16 @@ export function DailyClock() {
 
       // Show offline notification
       if (!navigator.onLine) {
-        alert('You are offline. Clock-in saved locally and will sync when you\'re back online.');
+        notify('You are offline. Clock-in saved locally and will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
 
       return entryId;
     } catch (error: any) {
       console.error('Error clocking in:', error);
       if (error.code === '23505') {
-        alert('You have already clocked in today');
+        notify('You have already clocked in today', { theme: 'blue', tone: 'error' });
       } else {
-        alert('Failed to clock in: ' + error.message);
+        notify('Failed to clock in: ' + error.message, { theme: 'blue', tone: 'error' });
       }
       return null;
     }
@@ -354,7 +353,7 @@ export function DailyClock() {
     if (!todayEntry || !profile) return;
 
     if (activeBreak) {
-      alert('Please end your break before clocking out');
+      notify('Please end your break before clocking out', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -385,11 +384,11 @@ export function DailyClock() {
       setShowBreakMenu(false);
 
       if (!navigator.onLine) {
-        alert('Break started offline. Will sync when you\'re back online.');
+        notify('Break started offline. Will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
     } catch (error) {
       console.error('Error starting break:', error);
-      alert('Failed to start break');
+      notify('Failed to start break', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -409,11 +408,11 @@ export function DailyClock() {
       await loadBreaks(todayEntry!.id);
 
       if (!navigator.onLine) {
-        alert('Break ended offline. Will sync when you\'re back online.');
+        notify('Break ended offline. Will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
     } catch (error) {
       console.error('Error ending break:', error);
-      alert('Failed to end break');
+      notify('Failed to end break', { theme: 'blue', tone: 'error' });
     }
   }
 

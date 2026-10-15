@@ -1,3 +1,6 @@
+import { CompletionDialog } from '../Shared/CompletionDialog';
+import { useCompletion } from '../../hooks/useCompletion';
+import { notify } from '../../lib/feedback';
 import { schedulingError, timeKey } from '../../lib/workOrderScheduling';
 import { useState, useEffect } from 'react';
 import { X, Save, Calendar, User, Lock, Unlock, Clock, Wrench, BookOpen } from 'lucide-react';
@@ -52,6 +55,8 @@ export function CreateAppointmentModal({
   onSuccess
 }: CreateAppointmentModalProps) {
   const { user, profile } = useAuth();
+  const completion = useCompletion(() => { onSuccess(); onClose(); });
+  const [completionMessage, setCompletionMessage] = useState('Appointment scheduled!');
 
   // Default to personal for My Calendar, customer_meeting for Technician Calendar
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(
@@ -149,7 +154,7 @@ export function CreateAppointmentModal({
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Failed to load data');
+      notify('Failed to load data', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -176,28 +181,28 @@ export function CreateAppointmentModal({
 
     // Validate customer for customer meetings (only in Technician Calendar mode)
     if (calendarContext === 'technicians' && appointmentType === 'customer_meeting' && !selectedContactId) {
-      alert('Please select a customer for customer meetings');
+      notify('Please select a customer for customer meetings', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Validate date
     if (!appointmentDate) {
-      alert('Please select an appointment date');
+      notify('Please select an appointment date', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Validate times for non-all-day events
     if (!allDay && (!startTime || !endTime)) {
-      alert('Please fill in start and end times, or mark as all-day event');
+      notify('Please fill in start and end times, or mark as all-day event', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     const timeError = !allDay && schedulingError({ date: appointmentDate, start: startTime, end: endTime });
-    if (timeError) { alert(timeError); return; }
+    if (timeError) { notify(timeError, { theme: 'blue', tone: 'error' }); return; }
 
     // Validate technician for non-personal appointments (only in Technician Calendar mode)
     if (calendarContext === 'technicians' && appointmentType !== 'personal' && !technicianId) {
-      alert('Please select a technician');
+      notify('Please select a technician', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -239,20 +244,21 @@ export function CreateAppointmentModal({
             parent_appointment_id: created[0].id,
           });
         const instanceCount = typeof countResult === 'number' ? countResult : 0;
-        alert(`Appointment scheduled! ${instanceCount} recurring instance${instanceCount !== 1 ? 's' : ''} created.`);
+        setCompletionMessage(`Scheduled with ${instanceCount} recurring appointment${instanceCount !== 1 ? 's' : ''}!`);
       } else {
-        alert('Appointment created successfully!');
+        setCompletionMessage('Appointment scheduled!');
       }
 
-      onSuccess();
-      onClose();
+      completion.complete();
     } catch (error) {
       console.error('Error creating appointment:', error);
-      alert('Failed to create appointment. Please try again.');
+      notify('Failed to create appointment. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
   }
+
+  if (completion.completed) return <CompletionDialog title={completionMessage} theme="blue" kind="calendar" onContinue={completion.finish} />;
 
   if (loading) {
     return (

@@ -1,3 +1,4 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -190,7 +191,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      notify('Failed to upload image', { theme: 'violet', tone: 'error' });
       return null;
     } finally {
       setUploadingImage(false);
@@ -249,21 +250,21 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       setAccessoryProducts([]);
     } catch (error) {
       console.error('Error adding accessory:', error);
-      alert('Failed to add accessory');
+      notify('Failed to add accessory', { theme: 'violet', tone: 'error' });
     } finally {
       setAddingAccessory(false);
     }
   }
 
   async function removeAccessory(accessoryId: string) {
-    if (!confirm('Remove this accessory from the line item?')) return;
+    if (!(await requestConfirmation('Remove this accessory from the line item?', { theme: 'violet' }))) return;
     try {
       const { error } = await supabase.from('proposal_line_items').delete().eq('id', accessoryId);
       if (error) throw error;
       setAccessories(prev => prev.filter(a => a.id !== accessoryId));
     } catch (error) {
       console.error('Error removing accessory:', error);
-      alert('Failed to remove accessory');
+      notify('Failed to remove accessory', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -279,7 +280,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
     const changes = pendingChanges();
     if (!Object.keys(changes).length && !newImage) { onSaved(); return; }
     if ('room_id' in changes && !rooms.some(room => room.id === roomId)) {
-      alert('Select a valid proposal room before saving');
+      notify('Select a valid proposal room before saving', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -299,7 +300,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       await handleSave([lineItem]);
     } catch (error) {
       console.error('Error checking matching items:', error);
-      alert('Unable to check matching items. Please try saving again.');
+      notify('Unable to check matching items. Please try saving again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -333,7 +334,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       onSaved();
     } catch (error) {
       console.error('Error saving line item:', error);
-      alert('Failed to save all changes. Please retry.');
+      notify('Failed to save all changes. Please retry.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import {useAuth} from '../../contexts/AuthContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -357,6 +358,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
         }
       }
 
+      notify('Purchase order saved!', { theme: 'amber', tone: 'success' });
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to create purchase order');

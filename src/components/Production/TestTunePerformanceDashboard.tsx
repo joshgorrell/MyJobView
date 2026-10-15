@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Award, TrendingUp, TrendingDown, Clock, Target, AlertTriangle, CheckCircle2, Calendar, Filter, Download, Eye, BarChart3, DollarSign, Archive, HelpCircle, CreditCard as Edit3, Activity, Repeat, ChevronDown, ChevronUp, Trophy, LineChart } from 'lucide-react';
@@ -132,7 +133,7 @@ export function TestTunePerformanceDashboard() {
   }
 
   function exportToCSV() {
-    if (projects.length === 0) { alert('No data to export'); return; }
+    if (projects.length === 0) { notify('No data to export', { theme: 'blue', tone: 'info' }); return; }
 
     const baseColumns = [
       { key: 'contact_name', label: 'Customer Name' },

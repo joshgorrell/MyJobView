@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { RotateCcw, X, MessageSquare, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -22,7 +23,7 @@ export function ProposalReactivationRequest({
     e.preventDefault();
 
     if (!message.trim()) {
-      alert('Please enter a message explaining why you need this proposal reactivated.');
+      notify('Please enter a message explaining why you need this proposal reactivated.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -102,10 +103,10 @@ export function ProposalReactivationRequest({
       onSuccess?.();
       onClose();
 
-      alert('Your reactivation request has been sent to your sales representative. They will review and respond shortly.');
+      notify('Your reactivation request has been sent to your sales representative. They will review and respond shortly.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error sending reactivation request:', error);
-      alert('Failed to send reactivation request. Please try again.');
+      notify('Failed to send reactivation request. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSending(false);
     }

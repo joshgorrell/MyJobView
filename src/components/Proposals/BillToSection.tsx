@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -196,7 +197,7 @@ export default function BillToSection({
       }
     } catch (err) {
       console.error('Error creating contact:', err);
-      alert('Failed to create contact. Please try again.');
+      notify('Failed to create contact. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingQuickAdd(false);
     }

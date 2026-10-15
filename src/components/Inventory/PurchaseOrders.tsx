@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -213,7 +214,7 @@ function PurchaseOrderRow({ po, canCreate, onReceive, onUpdate, onView }: { po: 
   const statusClass = statusClasses[po.status] || statusClasses.draft;
 
   async function submitPO() {
-    if (!confirm(`Submit ${po.po_number}? It will be ready to send to the vendor.`)) return;
+    if (!(await requestConfirmation(`Submit ${po.po_number}? It will be ready to send to the vendor.`, { theme: 'amber' }))) return;
     setBusy(true); setMessage('');
     const { error } = await supabase.from('purchase_orders').update({ status: 'submitted', submitted_at: new Date().toISOString() }).eq('id', po.id).eq('status', 'draft');
     if (error) setMessage('Could not submit this PO.'); else onUpdate();
@@ -222,7 +223,7 @@ function PurchaseOrderRow({ po, canCreate, onReceive, onUpdate, onView }: { po: 
 
   async function emailPO() {
     if (!po.vendor_email) { setMessage('This vendor does not have an email address on file.'); return; }
-    if (!confirm(`Email ${po.po_number} to ${po.vendor_name}?`)) return;
+    if (!(await requestConfirmation(`Email ${po.po_number} to ${po.vendor_name}?`, { theme: 'amber' }))) return;
     setBusy(true); setMessage('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -235,7 +236,7 @@ function PurchaseOrderRow({ po, canCreate, onReceive, onUpdate, onView }: { po: 
   }
 
   async function deletePO() {
-    if (!confirm(`Delete ${po.po_number}? This cannot be undone.`)) return;
+    if (!(await requestConfirmation(`Delete ${po.po_number}? This cannot be undone.`, { theme: 'amber' }))) return;
     setBusy(true); setMessage('');
     const { error } = await supabase.from('purchase_orders').delete().eq('id', po.id);
     if (error) setMessage('Could not delete this PO.'); else onUpdate();

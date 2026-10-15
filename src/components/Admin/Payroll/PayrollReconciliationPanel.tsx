@@ -1,3 +1,4 @@
+import { notify } from '../../../lib/feedback';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Scale, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
@@ -89,7 +90,7 @@ export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodI
       await loadFlags();
     } catch (err: any) {
       console.error('Error resolving flag:', err);
-      alert(err.message || 'Failed to resolve flag');
+      notify(err.message || 'Failed to resolve flag', { theme: 'blue', tone: 'error' });
     } finally {
       setResolving(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -90,7 +91,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
     } catch (err) {
       console.error('Report error:', err);
       if (w) { w.document.open(); w.document.write(errorPageHtml(String(err))); w.document.close(); }
-      else { alert('Failed to generate report. Please try again.'); }
+      else { notify('Failed to generate report. Please try again.', { theme: 'violet', tone: 'error' }); }
     } finally {
       setGeneratingReport(null);
     }
@@ -589,7 +590,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
   }
 
   async function generateSalesTaxReport() {
-    if (!order.proposal_id) { alert('No proposal linked to this sales order.'); return; }
+    if (!order.proposal_id) { notify('No proposal linked to this sales order.', { theme: 'violet', tone: 'info' }); return; }
     const w = window.open('', '_blank');
     if (w) { w.document.write(loadingPageHtml('Building Sales Tax Report...')); w.document.close(); }
     setGeneratingReport('sales_tax');

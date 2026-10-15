@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -94,7 +95,7 @@ export default function QuickAddProductModal({
       setSearchQuery('');
     } catch (error) {
       console.error('Error adding product:', error);
-      alert('Failed to add product');
+      notify('Failed to add product', { theme: 'violet', tone: 'error' });
     } finally {
       setAdding(false);
     }

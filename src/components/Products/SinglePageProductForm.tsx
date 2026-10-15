@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import ProductAccessories from './ProductAccessories';
 import { normalizeBrandName } from './catalogGrouping';
 import React, { useState, useEffect, useRef } from 'react';
@@ -770,7 +771,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding manufacturer:', error);
-      alert(`Failed to add manufacturer: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add manufacturer: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -799,7 +800,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding vendor:', error);
-      alert(`Failed to add vendor: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add vendor: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -827,13 +828,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding color:', error);
-      alert(`Failed to add color: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add color: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
   function handleImageSearch() {
     if (!formData.manufacturer_id || !formData.manufacturer_model_number) {
-      alert('Please select a manufacturer and enter a model number first');
+      notify('Please select a manufacturer and enter a model number first', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -866,7 +867,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       setFormData(prev => ({ ...prev, image_url: publicUrl }));
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      notify('Failed to upload image', { theme: 'amber', tone: 'error' });
     } finally {
       setUploadingImage(false);
     }
@@ -1111,7 +1112,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     } catch (error: any) {
       console.error('Error saving product:', error);
       const errorMessage = error?.message || error?.error_description || 'Unknown error';
-      alert(`Failed to save product: ${errorMessage}`);
+      notify(`Failed to save product: ${errorMessage}`, { theme: 'amber', tone: 'error' });
     } finally {
       setSaving(false);
     }

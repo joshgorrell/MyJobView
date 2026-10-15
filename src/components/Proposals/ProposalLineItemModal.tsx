@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { X, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, RefreshCw, Plus, Copy, Replace, ChevronDown, ChevronUp, CreditCard as Edit3 } from 'lucide-react';
@@ -284,7 +285,7 @@ export default function ProposalLineItemModal({
   async function copyToSelectedAreas() {
     if (selectedAreasForCopy.size === 0) return;
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before copying.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before copying.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setCopyingToAreas(true);
@@ -318,7 +319,7 @@ export default function ProposalLineItemModal({
       setSelectedAreasForCopy(new Set());
       onClose();
     } catch (err: any) {
-      alert('Failed to copy: ' + err.message);
+      notify('Failed to copy: ' + err.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCopyingToAreas(false);
     }
@@ -346,7 +347,7 @@ export default function ProposalLineItemModal({
 
   function handleSubmit(saveToMaster: boolean) {
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before saving.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);

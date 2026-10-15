@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, AtSign, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, Clock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -229,7 +230,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message');
+      notify('Failed to send message', { theme: 'blue', tone: 'error' });
     } finally {
       setSending(false);
     }
@@ -370,7 +371,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       loadLead();
     } catch (error) {
       console.error('Error updating lead:', error);
-      alert('Failed to update lead');
+      notify('Failed to update lead', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -432,7 +433,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       loadLead();
     } catch (error) {
       console.error('Error claiming lead:', error);
-      alert('Failed to claim lead');
+      notify('Failed to claim lead', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -501,7 +502,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       loadLead();
     } catch (error) {
       console.error('Error assigning lead:', error);
-      alert('Failed to assign lead');
+      notify('Failed to assign lead', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -539,7 +540,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       onClose();
     } catch (error) {
       console.error('Error deleting lead:', error);
-      alert('Failed to delete lead');
+      notify('Failed to delete lead', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -596,7 +597,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       loadLead();
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Failed to update status');
+      notify('Failed to update status', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -612,7 +613,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
         .single();
 
       if (!calendarProfile?.google_calendar_connected) {
-        alert('Please connect your Google Calendar in My Settings to use reminders.');
+        notify('Please connect your Google Calendar in My Settings to use reminders.', { theme: 'blue', tone: 'warning' });
         setSavingReminder(false);
         return;
       }
@@ -678,10 +679,10 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
       }
 
       loadLead();
-      alert('Reminder saved and calendar event created!');
+      notify('Reminder saved and calendar event created!', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error saving reminder:', error);
-      alert('Failed to save reminder');
+      notify('Failed to save reminder', { theme: 'blue', tone: 'error' });
     } finally {
       setSavingReminder(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, AtSign, Users, Search, UserCheck, ChevronDown } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -197,7 +198,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
           .maybeSingle();
 
         if (existingLead) {
-          alert(`Username "@${username}" is already taken. Please choose a different username or leave it blank to auto-generate.`);
+          notify(`Username "@${username}" is already taken. Please choose a different username or leave it blank to auto-generate.`, { theme: 'blue', tone: 'warning' });
           setLoading(false);
           return;
         }
@@ -392,7 +393,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       }
     } catch (error) {
       console.error('Error creating lead:', error);
-      alert('Failed to create lead. Please try again.');
+      notify('Failed to create lead. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

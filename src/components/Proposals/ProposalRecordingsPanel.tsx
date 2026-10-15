@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -665,7 +666,7 @@ export default function ProposalRecordingsPanel({
 
       setSavingToLibrary(null);
     } catch (err: any) {
-      alert(`Failed to save: ${err.message}`);
+      notify(`Failed to save: ${err.message}`, { theme: 'violet', tone: 'error' });
     } finally {
       setSavingLib(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -525,26 +526,26 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     e.preventDefault();
 
     if (!formData.customer_name.trim()) {
-      alert('Please enter customer name');
+      notify('Please enter customer name', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (formData.earliest_date && formData.requested_date && formData.earliest_date > formData.requested_date) {
-      alert('Earliest date must be on or before Need By.');
+      notify('Earliest date must be on or before Need By.', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (showNewCustomer && !formData.customer_phone.trim()) {
-      alert('Please enter a phone number for the new customer.');
+      notify('Please enter a phone number for the new customer.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!formData.job_description.trim()) {
-      alert('Please enter job description');
+      notify('Please enter job description', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (requestType === 'project' && !selectedProjectId) {
-      alert('Please select a project');
+      notify('Please select a project', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -566,7 +567,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
     try {
       if (!profile?.id) {
-        alert('You must be logged in to submit a work order request.');
+        notify('You must be logged in to submit a work order request.', { theme: 'blue', tone: 'warning' });
         setLoading(false);
         return;
       }
@@ -649,7 +650,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       }
 
       if (!finalContactId) {
-        alert('Please select an existing customer or use "Create New Customer" option.');
+        notify('Please select an existing customer or use "Create New Customer" option.', { theme: 'blue', tone: 'warning' });
         setLoading(false);
         return;
       }
@@ -724,7 +725,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     } catch (error: any) {
       console.error('Error submitting work order request:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
-      alert(`Failed to submit work order request: ${errorMessage}`);
+      notify(`Failed to submit work order request: ${errorMessage}`, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

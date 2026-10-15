@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { ProposalWithDetails } from '../../lib/types';
 import { Save, Send, Eye, DollarSign, Users, RefreshCw, Clock, Mail, MessageSquare, RotateCcw, ChevronDown, ExternalLink, Activity, X, Check, Download, Globe, EyeOff, CreditCard as Edit2, Calendar, Ban, AlertTriangle, Monitor } from 'lucide-react';
@@ -277,21 +278,21 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
 
         if (emailError) {
           console.error('Error sending email:', emailError);
-          alert(`Proposal submitted but email failed:\n\n${emailError.message || 'Unknown error'}`);
+          notify(`Proposal submitted but email failed:\n\n${emailError.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
         } else if (data?.error) {
           console.error('Email API error:', data);
-          alert(`Proposal submitted but email configuration error:\n\n${data.error}\n\n${data.details || ''}`);
+          notify(`Proposal submitted but email configuration error:\n\n${data.error}\n\n${data.details || ''}`, { theme: 'violet', tone: 'error' });
         } else {
-          alert(notifyCustomer
+          notify(notifyCustomer
             ? 'Proposal submitted to customer portal and email notification sent!'
-            : 'Proposal submitted to customer portal without sending an email notification.');
+            : 'Proposal submitted to customer portal without sending an email notification.', { theme: 'violet', tone: 'success' });
         }
       } catch (error: any) {
         console.error('Error sending email:', error);
-        alert(`Proposal submitted but email notification failed:\n\n${error.message || 'Unknown error'}`);
+        notify(`Proposal submitted but email notification failed:\n\n${error.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
       }
     } else {
-      alert('Proposal status updated to Sent (not visible on portal).');
+      notify('Proposal status updated to Sent (not visible on portal).', { theme: 'violet', tone: 'success' });
     }
   }
 
@@ -320,7 +321,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
 
       if (emailError) {
         console.error('Error sending email:', emailError);
-        alert(`Failed to send proposal: ${emailError.message || 'Unknown error'}`);
+        notify(`Failed to send proposal: ${emailError.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
         setSending(false);
         return;
       }
@@ -328,7 +329,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       // Check if the response contains an error (even with 200 status)
       if (data?.error) {
         console.error('Email API error:', data);
-        alert(`Email Configuration Error:\n\n${data.error}\n\n${data.details || ''}`);
+        notify(`Email Configuration Error:\n\n${data.error}\n\n${data.details || ''}`, { theme: 'violet', tone: 'error' });
         setSending(false);
         return;
       }
@@ -350,9 +351,9 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       setStatusOverride(true);
       statusOverrides.set(proposal.id, 'sent');
 
-      alert(notifyCustomer
+      notify(notifyCustomer
         ? 'Proposal submitted to customer portal and email notification sent!'
-        : 'Proposal submitted to customer portal without sending an email notification.');
+        : 'Proposal submitted to customer portal without sending an email notification.', { theme: 'violet', tone: 'success' });
 
       // Trigger parent refresh to update the proposal list
       if (onSave) {
@@ -360,7 +361,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       }
     } catch (error) {
       console.error('Error sending proposal:', error);
-      alert('Failed to submit proposal. Please try again.');
+      notify('Failed to submit proposal. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSending(false);
     }
@@ -376,11 +377,11 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
 
       if (error) throw error;
 
-      alert('Proposal renewed for 30 more days!');
+      notify('Proposal renewed for 30 more days!', { theme: 'violet', tone: 'success' });
       if (onSave) onSave();
     } catch (error) {
       console.error('Error renewing proposal:', error);
-      alert('Failed to renew proposal. Please try again.');
+      notify('Failed to renew proposal. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setRenewing(false);
     }
@@ -408,18 +409,18 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
 
       if (emailError) {
         console.error('Error sending email:', emailError);
-        alert(`Proposal re-submitted but email failed:\n\n${emailError.message || 'Unknown error'}`);
+        notify(`Proposal re-submitted but email failed:\n\n${emailError.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
       } else if (data?.error) {
         console.error('Email API error:', data);
-        alert(`Proposal re-submitted but email configuration error:\n\n${data.error}\n\n${data.details || ''}`);
+        notify(`Proposal re-submitted but email configuration error:\n\n${data.error}\n\n${data.details || ''}`, { theme: 'violet', tone: 'error' });
       } else {
-        alert('Proposal re-submitted successfully! Customer notified via email.');
+        notify('Proposal re-submitted successfully! Customer notified via email.', { theme: 'violet', tone: 'success' });
       }
 
       if (onSave) onSave();
     } catch (error) {
       console.error('Error resubmitting proposal:', error);
-      alert('Failed to resubmit proposal. Please try again.');
+      notify('Failed to resubmit proposal. Please try again.', { theme: 'violet', tone: 'error' });
       throw error;
     } finally {
       setRenewing(false);
@@ -437,20 +438,20 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
 
       if (emailError) {
         console.error('Error sending email:', emailError);
-        alert(`Failed to send email: ${emailError.message || 'Unknown error'}`);
+        notify(`Failed to send email: ${emailError.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
         return;
       }
 
       if (data?.error) {
         console.error('Email API error:', data);
-        alert(`Email Configuration Error:\n\n${data.error}\n\n${data.details || ''}`);
+        notify(`Email Configuration Error:\n\n${data.error}\n\n${data.details || ''}`, { theme: 'violet', tone: 'error' });
         return;
       }
 
-      alert('Proposal email sent successfully!');
+      notify('Proposal email sent successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error sending proposal email:', error);
-      alert('Failed to send email. Please try again.');
+      notify('Failed to send email. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSendingEmail(false);
     }
@@ -485,13 +486,13 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       setCurrentStatus('designing');
       setStatusOverride(true);
       statusOverrides.set(proposal.id, 'designing');
-      alert('Proposal recalled successfully! It has been returned to Designing status.');
+      notify('Proposal recalled successfully! It has been returned to Designing status.', { theme: 'violet', tone: 'success' });
       setShowPortalDropdown(false);
 
       // Don't trigger parent refresh - let the UI stay in this state
     } catch (error) {
       console.error('Error recalling proposal:', error);
-      alert('Failed to recall proposal. Please try again.');
+      notify('Failed to recall proposal. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setRecalling(false);
     }
@@ -527,7 +528,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       }
     } catch (error) {
       console.error('Error fetching activity data:', error);
-      alert('Failed to load activity history');
+      notify('Failed to load activity history', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -541,13 +542,12 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
     const newVisibility = !proposal.is_portal_visible;
     try {
       await updateProposal({ is_portal_visible: newVisibility });
-      alert(newVisibility
+      notify(newVisibility
         ? 'Proposal is now visible on customer portal'
-        : 'Proposal is now hidden from customer portal'
-      );
+        : 'Proposal is now hidden from customer portal', { theme: 'violet', tone: 'info' });
     } catch (error) {
       console.error('Error toggling portal visibility:', error);
-      alert('Failed to update portal visibility');
+      notify('Failed to update portal visibility', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -555,17 +555,17 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
     try {
       await updateProposal({ expires_at: expiresAt });
       setShowExpirationEditor(false);
-      alert('Expiration date updated successfully');
+      notify('Expiration date updated successfully', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error updating expiration:', error);
-      alert('Failed to update expiration date');
+      notify('Failed to update expiration date', { theme: 'violet', tone: 'error' });
     }
   }
 
   function handleReactivateSuccess() {
     setShowReactivateModal(false);
     if (onSave) onSave();
-    alert('Proposal reactivated successfully!');
+    notify('Proposal reactivated successfully!', { theme: 'violet', tone: 'success' });
   }
 
   const profit = proposal.subtotal - (proposal.rooms?.reduce((sum, room) =>

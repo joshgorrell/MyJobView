@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import Flow from '../Flow/Flow';
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Mail, Phone, Building2, Tag, Calendar, User, TrendingUp, CreditCard as Edit2, Save, X, Trash2, AlertCircle, Camera, Image as ImageIcon, MapPin, CheckCircle2, MessageSquare, Hash, Users, Send, Shield, Eye, DollarSign, Clock, FileText, Wrench, ListTodo, Plus, Video, Receipt, Target, Sparkles, UserCheck, RefreshCw, Flame, Thermometer, ExternalLink, Navigation, Zap } from 'lucide-react';
@@ -458,11 +459,11 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
       // Show success feedback
       const tempLabel = temperatureLabels[newTemperature] || newTemperature;
-      alert(`Temperature updated to ${tempLabel}`);
+      notify(`Temperature updated to ${tempLabel}`, { theme: 'blue', tone: 'success' });
 
     } catch (error) {
       console.error('Error updating temperature:', error);
-      alert('Failed to update temperature. Please try again.');
+      notify('Failed to update temperature. Please try again.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -503,12 +504,12 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
       const result = await offlineSupabaseUpdate('contacts', updateData, contact.id);
       if (result.error) throw result.error;
 
-      alert(`Contact successfully converted to ${target}!`);
+      notify(`Contact successfully converted to ${target}!`, { theme: 'blue', tone: 'success' });
       setShowConversionModal(false);
       onConverted();
     } catch (error) {
       console.error('Error converting contact:', error);
-      alert('Failed to convert contact');
+      notify('Failed to convert contact', { theme: 'blue', tone: 'error' });
     } finally {
       setConvertingContact(false);
     }
@@ -558,11 +559,11 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
   async function handleUpdate() {
     if (!editData.office_id) {
-      alert('Office Location is required. Please select an office.');
+      notify('Office Location is required. Please select an office.', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (!editData.is_tax_exempt && (!editData.tax_jurisdiction_id || editData.tax_jurisdiction_id === '')) {
-      alert('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically, or check the Tax Exempt box if this contact is exempt.');
+      notify('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically, or check the Tax Exempt box if this contact is exempt.', { theme: 'blue', tone: 'warning' });
       return;
     }
     try {
@@ -675,18 +676,18 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         }
       }
 
-      alert('Contact updated successfully!');
+      notify('Contact updated successfully!', { theme: 'blue', tone: 'success' });
       setEditing(false);
       onBack();
     } catch (error) {
       console.error('Error updating contact:', error);
-      alert('Failed to update contact');
+      notify('Failed to update contact', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function handleTogglePortalAccess() {
     if (!contact.email) {
-      alert('Contact must have an email address to enable portal access');
+      notify('Contact must have an email address to enable portal access', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -700,21 +701,21 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
       if (error) throw error;
 
       setPortalAccessEnabled(newValue);
-      alert(newValue ? 'Portal access enabled' : 'Portal access disabled');
+      notify(newValue ? 'Portal access enabled' : 'Portal access disabled', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error toggling portal access:', error);
-      alert('Failed to update portal access');
+      notify('Failed to update portal access', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function handleSendPortalInvite() {
     if (!contact.email) {
-      alert('Contact must have an email address to send portal invite');
+      notify('Contact must have an email address to send portal invite', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!portalAccessEnabled && !punchlistAccess?.has_access) {
-      alert('Please enable portal access or grant trial access first');
+      notify('Please enable portal access or grant trial access first', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -737,10 +738,10 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         throw new Error(data.error || 'Failed to send portal invite');
       }
 
-      alert('Portal login link sent successfully!');
+      notify('Portal login link sent successfully!', { theme: 'blue', tone: 'success' });
     } catch (error: any) {
       console.error('Error sending portal invite:', error);
-      alert(error.message || 'Failed to send portal invite');
+      notify(error.message || 'Failed to send portal invite', { theme: 'blue', tone: 'error' });
     } finally {
       setSendingPortalInvite(false);
     }
@@ -748,7 +749,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
   function handleViewAsCustomer() {
     if (!portalAccessEnabled && !punchlistAccess?.has_access) {
-      alert('Portal access must be enabled or trial access granted for this contact first');
+      notify('Portal access must be enabled or trial access granted for this contact first', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -787,16 +788,16 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
       const result = data[0];
 
       if (result.is_renewal) {
-        alert('Punchlist access renewed for 90 days!');
+        notify('Punchlist access renewed for 90 days!', { theme: 'blue', tone: 'success' });
       } else {
-        alert('Punchlist access granted for 90 days!');
+        notify('Punchlist access granted for 90 days!', { theme: 'blue', tone: 'success' });
       }
 
       // Reload access info
       await loadPunchlistAccess();
     } catch (error: any) {
       console.error('Error granting punchlist access:', error);
-      alert(error.message || 'Failed to grant punchlist access');
+      notify(error.message || 'Failed to grant punchlist access', { theme: 'blue', tone: 'error' });
     } finally {
       setGrantingPunchlistAccess(false);
     }
@@ -854,13 +855,13 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
             onBack();
           } catch (error) {
             console.error('Error deleting contact:', error);
-            alert('Failed to delete contact. Please try again or contact support if the issue persists.');
+            notify('Failed to delete contact. Please try again or contact support if the issue persists.', { theme: 'blue', tone: 'error' });
           }
         }
       });
     } catch (error) {
       console.error('Error deleting contact:', error);
-      alert('Failed to delete contact. Please try again or contact support if the issue persists.');
+      notify('Failed to delete contact. Please try again or contact support if the issue persists.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -954,11 +955,11 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         }
       }
 
-      alert('Contact converted to lead successfully!');
+      notify('Contact converted to lead successfully!', { theme: 'blue', tone: 'success' });
       onConverted();
     } catch (error) {
       console.error('Error converting to lead:', error);
-      alert('Failed to convert contact to lead');
+      notify('Failed to convert contact to lead', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -1607,7 +1608,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                                         await loadCompetitorRelationships();
                                       } catch (error) {
                                         console.error('Error removing competitor:', error);
-                                        alert('Failed to remove competitor');
+                                        notify('Failed to remove competitor', { theme: 'blue', tone: 'error' });
                                       }
                                     }
                                   })}

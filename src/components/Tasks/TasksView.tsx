@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus, Filter, MessageSquare, ChevronDown, ChevronUp, HelpCircle, X, Search } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -318,7 +319,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);
-      alert('Failed to update task status');
+      notify('Failed to update task status', { theme: 'cyan', tone: 'error' });
     }
   }
 

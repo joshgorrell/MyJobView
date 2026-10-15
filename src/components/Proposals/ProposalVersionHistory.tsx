@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { History, Eye, RotateCcw, X, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -89,14 +90,14 @@ export function ProposalVersionHistory({ proposalId, onClose, onRestore }: Propo
 
       if (error) throw error;
 
-      alert('Version restored successfully');
+      notify('Version restored successfully', { theme: 'violet', tone: 'success' });
       if (onRestore) {
         onRestore(version.id);
       }
       onClose();
     } catch (error) {
       console.error('Error restoring version:', error);
-      alert('Failed to restore version');
+      notify('Failed to restore version', { theme: 'violet', tone: 'error' });
     }
   }
 

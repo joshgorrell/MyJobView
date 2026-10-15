@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X } from 'lucide-react';
@@ -31,7 +32,7 @@ export default function CreatePlanModal({ plan, planType, onClose, onSaved }: Cr
 
   async function handleSave() {
     if (!planName || !amount) {
-      alert('Please fill in all required fields');
+      notify('Please fill in all required fields', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -44,7 +45,7 @@ export default function CreatePlanModal({ plan, planType, onClose, onSaved }: Cr
         .maybeSingle();
 
       if (!companySettings) {
-        alert('Company settings not found');
+        notify('Company settings not found', { theme: 'blue', tone: 'error' });
         return;
       }
 
@@ -74,10 +75,11 @@ export default function CreatePlanModal({ plan, planType, onClose, onSaved }: Cr
         if (error) throw error;
       }
 
+      notify('Recurring plan saved!', { theme: 'emerald', tone: 'success' });
       onSaved();
     } catch (error) {
       console.error('Error saving plan:', error);
-      alert('Failed to save plan');
+      notify('Failed to save plan', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

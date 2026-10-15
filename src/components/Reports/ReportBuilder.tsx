@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Download, Calendar, TrendingUp, DollarSign, Users, FileText, Filter } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -132,7 +133,7 @@ export function ReportBuilder() {
       setReportData(processed);
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Failed to generate report');
+      notify('Failed to generate report', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,4 @@
+import { requestConfirmation, notify } from '../../lib/feedback';
 import { proposalPresentation, proposalStatusLabel } from '../../lib/proposalPresentation';
 import { ProposalReviewControls } from './ProposalReviewControls';
 import { ProposalActivityDialog } from './ProposalActivityDialog';
@@ -601,7 +602,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [shareLinkMessage, setShareLinkMessage] = useState('');
   const handleRevokeProposalLinks = async () => {
     if (!proposal || copyingShareLink) return;
-    if (!window.confirm('Revoke all previously shared customer links for this proposal? Customers will no longer be able to open those links.')) return;
+    if (!(await requestConfirmation('Revoke all previously shared customer links for this proposal? Customers will no longer be able to open those links.', { theme: 'violet' }))) return;
     setCopyingShareLink(true);
     setShareLinkMessage('');
     try {
@@ -965,7 +966,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       }
     } catch (error: any) {
       console.error('Error loading PDF templates:', error);
-      alert('Failed to load PDF templates: ' + (error.message || 'Unknown error'));
+      notify('Failed to load PDF templates: ' + (error.message || 'Unknown error'), { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1017,7 +1018,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       }
     } catch (error) {
       console.error('Error fetching activity data:', error);
-      alert('Failed to load activity history');
+      notify('Failed to load activity history', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1129,7 +1130,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           .eq('id', selectedTemplateId);
 
         if (error) throw error;
-        alert('Template updated successfully!');
+        notify('Template updated successfully!', { theme: 'violet', tone: 'success' });
       } else {
         // Insert new template
         const { error } = await supabase
@@ -1137,7 +1138,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           .insert(templateData);
 
         if (error) throw error;
-        alert('Template saved successfully!');
+        notify('Template saved successfully!', { theme: 'violet', tone: 'success' });
       }
 
       setShowSaveTemplateModal(false);
@@ -1147,7 +1148,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       loadPdfTemplates();
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      notify('Failed to save template', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingTemplate(false);
     }
@@ -1168,7 +1169,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
           if (error) throw error;
 
-          alert('Template deleted successfully!');
+          notify('Template deleted successfully!', { theme: 'violet', tone: 'success' });
 
           if (selectedTemplateId === templateId) {
             setSelectedTemplateId(null);
@@ -1177,7 +1178,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           loadPdfTemplates();
         } catch (error) {
           console.error('Error deleting template:', error);
-          alert('Failed to delete template');
+          notify('Failed to delete template', { theme: 'violet', tone: 'error' });
         }
       },
     });
@@ -1185,7 +1186,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   async function handleGeneratePdf() {
     if (!selectedTemplateId) {
-      alert('Please select a template');
+      notify('Please select a template', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -1351,7 +1352,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (propError) {
         console.error('Error loading proposal:', propError);
-        alert('Failed to load proposal: ' + propError.message);
+        notify('Failed to load proposal: ' + propError.message, { theme: 'violet', tone: 'error' });
         return [];
       }
 
@@ -1379,7 +1380,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (roomsError) {
         console.error('Error loading rooms:', roomsError);
-        alert('Failed to load areas: ' + roomsError.message);
+        notify('Failed to load areas: ' + roomsError.message, { theme: 'violet', tone: 'error' });
         return [];
       }
 
@@ -1406,7 +1407,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (itemsError) {
         console.error('Error loading items:', itemsError);
-        alert('Failed to load line items: ' + itemsError.message);
+        notify('Failed to load line items: ' + itemsError.message, { theme: 'violet', tone: 'error' });
         return [];
       }
 
@@ -1445,7 +1446,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       return roomsWithItems;
     } catch (error: any) {
       console.error('Error in loadData:', error);
-      alert('Failed to load data: ' + error.message);
+      notify('Failed to load data: ' + error.message, { theme: 'violet', tone: 'error' });
       return [];
     } finally {
       setLoading(false);
@@ -1468,14 +1469,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setShowStatusDropdown(false);
     } catch (error) {
       console.error('Error updating proposal status:', error);
-      alert('Failed to update proposal status');
+      notify('Failed to update proposal status', { theme: 'violet', tone: 'error' });
     } finally {
       setUpdatingStatus(false);
     }
   }
 
   async function handleDeclineProposal() {
-    if (!confirm('Are you sure you want to decline this proposal?')) return;
+    if (!(await requestConfirmation('Are you sure you want to decline this proposal?', { theme: 'violet' }))) return;
     await handleUpdateStatus('declined');
   }
 
@@ -1570,11 +1571,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         await loadData();
         setShowUnlockWarningModal(false);
       } else {
-        alert(data?.error || 'Failed to unlock proposal');
+        notify(data?.error || 'Failed to unlock proposal', { theme: 'violet', tone: 'error' });
       }
     } catch (error: any) {
       console.error('Error unlocking proposal:', error);
-      alert('Failed to unlock proposal: ' + error.message);
+      notify('Failed to unlock proposal: ' + error.message, { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1671,7 +1672,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       }
     } catch (error: any) {
       console.error('Error creating revision:', error);
-      alert('Failed to create revision: ' + error.message);
+      notify('Failed to create revision: ' + error.message, { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1690,11 +1691,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         await loadData(); // Reload to get updated status
         setShowPromoteRevisionModal(false);
       } else {
-        alert(data?.error || 'Failed to promote revision');
+        notify(data?.error || 'Failed to promote revision', { theme: 'violet', tone: 'error' });
       }
     } catch (error: any) {
       console.error('Error promoting revision:', error);
-      alert('Failed to promote revision: ' + error.message);
+      notify('Failed to promote revision: ' + error.message, { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1774,7 +1775,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     } catch (error) {
       console.error('Failed to reorder proposal items', error);
       await loadData();
-      alert('Could not reorder items. Please try again.');
+      notify('Could not reorder items. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -1818,15 +1819,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       // Submission and delivery are separate customer-facing actions.
       // Email is sent only when the user explicitly chooses Email Proposal.
       if (!keepDeliveryOpen) {
-        alert(sendToPortal
+        notify(sendToPortal
           ? 'Proposal submitted and visible in the customer portal. No email was sent.'
-          : 'Proposal submitted. No email was sent.');
+          : 'Proposal submitted. No email was sent.', { theme: 'violet', tone: 'success' });
       }
       await loadData();
       if (!keepDeliveryOpen) setShowSubmissionModal(false);
     } catch (error: any) {
       console.error('Error submitting proposal:', error);
-      alert('Failed to submit proposal: ' + (error.message || 'Unknown error'));
+      notify('Failed to submit proposal: ' + (error.message || 'Unknown error'), { theme: 'violet', tone: 'error' });
       throw error;
     } finally {
       setSending(false);
@@ -1834,7 +1835,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
 
   async function handleRecallProposal() {
-    if (!confirm('This will return the proposal to designing status and remove it from the customer portal. Continue?')) {
+    if (!(await requestConfirmation('This will return the proposal to designing status and remove it from the customer portal. Continue?', { theme: 'violet' }))) {
       return;
     }
 
@@ -1873,7 +1874,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setShowPortalDropdown(false);
     } catch (error) {
       console.error('Error recalling proposal:', error);
-      alert('Failed to recall proposal. Please try again.');
+      notify('Failed to recall proposal. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setRecalling(false);
     }
@@ -1904,7 +1905,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error adding area:', error);
-      alert('Failed to add area');
+      notify('Failed to add area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -1927,7 +1928,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error updating area:', error);
-      alert('Failed to update area');
+      notify('Failed to update area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -1935,7 +1936,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   async function handleDeleteArea(areaId: string) {
     if (isCoMode) {
-      alert('Areas cannot be deleted while editing a Change Order. Remove individual items instead.');
+      notify('Areas cannot be deleted while editing a Change Order. Remove individual items instead.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -1943,7 +1944,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     if (!area) return;
 
     if (area.line_items.length > 0) {
-      if (!confirm(`This area contains ${area.line_items.length} items. Are you sure you want to delete it and all its items?`)) {
+      if (!(await requestConfirmation(`This area contains ${area.line_items.length} items. Are you sure you want to delete it and all its items?`, { theme: 'violet' }))) {
         return;
       }
     }
@@ -1963,7 +1964,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error deleting area:', error);
-      alert('Failed to delete area');
+      notify('Failed to delete area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -1987,8 +1988,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const existingCORecord = coLineItems.find(c => c.proposal_line_item_id === itemId);
 
       if (existingCORecord?.action_type === 'add') {
-        if(await itemHasLabor(item)){setAddedLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setAddedLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){alert(result.error.message);return;}}else {const co=await supabase.from('change_order_line_items').delete().eq('id',existingCORecord.id);if(co.error){alert(co.error.message);return;}const li=await supabase.from('proposal_line_items').delete().eq('id',itemId);if(li.error){alert(li.error.message);return;}}await updateCOTotals(changeOrderId,onCORefresh);await refreshCOLineItems();await loadData();});return;}
-        if (!confirm('Remove this newly-added item from the change order?')) return;
+        if(await itemHasLabor(item)){setAddedLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setAddedLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){notify(result.error.message, { theme: 'violet', tone: 'error' });return;}}else {const co=await supabase.from('change_order_line_items').delete().eq('id',existingCORecord.id);if(co.error){notify(co.error.message, { theme: 'violet', tone: 'error' });return;}const li=await supabase.from('proposal_line_items').delete().eq('id',itemId);if(li.error){notify(li.error.message, { theme: 'violet', tone: 'error' });return;}}await updateCOTotals(changeOrderId,onCORefresh);await refreshCOLineItems();await loadData();});return;}
+        if (!(await requestConfirmation('Remove this newly-added item from the change order?', { theme: 'violet' }))) return;
         setSaving(true);
         try {
           await supabase.from('change_order_line_items').delete().eq('id', existingCORecord.id);
@@ -2002,7 +2003,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
         } catch (error: any) {
           console.error('Error removing added CO item:', error);
-          alert('Failed to remove item');
+          notify('Failed to remove item', { theme: 'violet', tone: 'error' });
         } finally {
           setSaving(false);
         }
@@ -2022,7 +2023,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         setMatchingAction({ action: 'delete', itemId, items: targets });
         return;
       }
-      if (!confirmedItems && !confirm('Delete this line item?')) return;
+      if (!confirmedItems && !(await requestConfirmation('Delete this line item?', { theme: 'violet' }))) return;
       const { error } = await supabase
         .from('proposal_line_items')
         .delete()
@@ -2034,7 +2035,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error deleting item:', error);
-      alert('Failed to delete item');
+      notify('Failed to delete item', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2072,7 +2073,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
     } catch (error: any) {
       console.error('Error marking CO item as removed:', error);
-      alert('Failed to remove item');
+      notify('Failed to remove item', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2093,7 +2094,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
     } catch (error: any) {
       console.error('Error restoring line item:', error);
-      alert('Failed to restore item');
+      notify('Failed to restore item', { theme: 'violet', tone: 'error' });
     } finally {
       setRestoringItemId(null);
     }
@@ -2128,7 +2129,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       return;
     }
 
-    if (!confirm(`Delete ${selectedItems.size} selected item${selectedItems.size > 1 ? 's' : ''}?`)) return;
+    if (!(await requestConfirmation(`Delete ${selectedItems.size} selected item${selectedItems.size > 1 ? 's' : ''}?`, { theme: 'violet' }))) return;
 
     setSaving(true);
     try {
@@ -2142,7 +2143,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error deleting items:', error);
-      alert('Failed to delete items');
+      notify('Failed to delete items', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2193,7 +2194,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setBulkCORemovalScopes({});
     } catch (error: any) {
       console.error('Error executing bulk CO removal:', error);
-      alert('Failed to remove items from change order');
+      notify('Failed to remove items from change order', { theme: 'violet', tone: 'error' });
     } finally {
       setExecutingBulkRemoval(false);
     }
@@ -2258,7 +2259,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error copying items:', error);
-      alert('Failed to copy items to areas');
+      notify('Failed to copy items to areas', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2275,7 +2276,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     );
 
     if (hasChildItems) {
-      alert('Cannot nest items that already have nested accessories.');
+      notify('Cannot nest items that already have nested accessories.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -2289,7 +2290,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     // Check if all selected items are in the same room
     const uniqueRooms = new Set(selectedItemsData.map(item => item.room_id));
     if (uniqueRooms.size > 1) {
-      alert('All selected items must be in the same area to nest/unnest them.');
+      notify('All selected items must be in the same area to nest/unnest them.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -2380,7 +2381,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setSelectedItems(new Set());
     } catch (error: any) {
       console.error('Error nesting/unnesting items:', error);
-      alert('Failed to nest/unnest items');
+      notify('Failed to nest/unnest items', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2409,7 +2410,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error adding area:', error);
-      alert('Failed to add new area');
+      notify('Failed to add new area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2482,7 +2483,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error substituting item:', error);
-      alert('Failed to substitute item: ' + error.message);
+      notify('Failed to substitute item: ' + error.message, { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2538,7 +2539,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setEditingItemNotes(null);
     } catch (error: any) {
       console.error('Error toggling scope visibility:', error);
-      alert('Failed to update scope visibility');
+      notify('Failed to update scope visibility', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2626,7 +2627,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setBulkUpdateProjectInfo(null);
     } catch (error: any) {
       console.error('Error updating project info:', error);
-      alert('Failed to update project information');
+      notify('Failed to update project information', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2652,7 +2653,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setBulkUpdateProjectInfo(null);
     } catch (error: any) {
       console.error('Error updating all project info:', error);
-      alert('Failed to update project information');
+      notify('Failed to update project information', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2809,7 +2810,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await applyLineItemUpdate(itemId, updates);
     } catch (error: any) {
       console.error('Error updating line item:', error);
-      alert('Failed to update item');
+      notify('Failed to update item', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -2821,7 +2822,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setPendingBulkUpdate(null);
     } catch (error: any) {
       console.error('Error updating single item:', error);
-      alert('Failed to update item');
+      notify('Failed to update item', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }
@@ -2889,7 +2890,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setPendingBulkUpdate(null);
     } catch (error: any) {
       console.error('Error updating all instances:', error);
-      alert('Failed to update all instances');
+      notify('Failed to update all instances', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }
@@ -5269,7 +5270,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               }
             } catch (error) {
               console.error('Error updating modifiers:', error);
-              alert('Failed to update modifiers');
+              notify('Failed to update modifiers', { theme: 'violet', tone: 'error' });
             }
           }}
         />
@@ -6463,8 +6464,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 .map(product => (
                   <div
                     key={product.id}
-                    onClick={() => {
-                      if (confirm(`Replace current item with "${product.name || product.description}"?`)) {
+                    onClick={async () => {
+                      if ((await requestConfirmation(`Replace current item with "${product.name || product.description}"?`, { theme: 'violet' }))) {
                         substituteItem(product.id);
                       }
                     }}

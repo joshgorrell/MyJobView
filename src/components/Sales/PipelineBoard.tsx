@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -277,7 +278,7 @@ export function PipelineBoard() {
       setShowWidgetSettings(false);
     } catch (error) {
       console.error('Error saving widget preferences:', error);
-      alert('Failed to save widget preferences');
+      notify('Failed to save widget preferences', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -535,7 +536,7 @@ export function PipelineBoard() {
       loadPipelineData();
     } catch (error) {
       console.error('Error claiming lead:', error);
-      alert('Failed to claim lead. Please try again.');
+      notify('Failed to claim lead. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -637,7 +638,7 @@ export function PipelineBoard() {
 
       if (!data) {
         console.error('Contact not found');
-        alert('Contact not found');
+        notify('Contact not found', { theme: 'violet', tone: 'error' });
         return;
       }
 
@@ -645,7 +646,7 @@ export function PipelineBoard() {
       setSelectedContact(data);
     } catch (error: any) {
       console.error('Error loading contact:', error);
-      alert(`Failed to load contact: ${error.message || 'Unknown error'}`);
+      notify(`Failed to load contact: ${error.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
     }
   }
 

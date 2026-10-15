@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -22,7 +23,7 @@ export default function ConvertToRecurringModal({ invoice, onClose, onConverted 
 
   async function handleConvert() {
     if (!amount || parseFloat(amount) <= 0) {
-      alert('Please enter a valid amount');
+      notify('Please enter a valid amount', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -35,7 +36,7 @@ export default function ConvertToRecurringModal({ invoice, onClose, onConverted 
         .maybeSingle();
 
       if (!companySettings) {
-        alert('Company settings not found');
+        notify('Company settings not found', { theme: 'emerald', tone: 'error' });
         return;
       }
 
@@ -78,11 +79,11 @@ export default function ConvertToRecurringModal({ invoice, onClose, onConverted 
 
       if (subscriptionError) throw subscriptionError;
 
-      alert('Successfully converted to recurring subscription!');
+      notify('Successfully converted to recurring subscription!', { theme: 'emerald', tone: 'success' });
       onConverted();
     } catch (error) {
       console.error('Error converting to recurring:', error);
-      alert('Failed to convert to recurring subscription');
+      notify('Failed to convert to recurring subscription', { theme: 'emerald', tone: 'error' });
     } finally {
       setConverting(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Clock, AlertCircle, CheckCircle, AlertTriangle, Check, CreditCard as Edit2, Briefcase, Trash2, Bell, Send, MapPin, Upload, HelpCircle, X, FileText, Download, User, LayoutList, BarChart3, Wrench } from 'lucide-react';
@@ -416,7 +417,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
 
   async function approveAlertClockIn(clockAlert: ClockAlert) {
     if (!clockAlert.actual_clock_in_time) {
-      window.alert('No clock-in time recorded. Please use Edit to set a time.');
+      notify('No clock-in time recorded. Please use Edit to set a time.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -759,7 +760,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       Promise.all([loadEntries(), loadAlerts(), checkPendingAutoClockOuts()]);
     } catch (error) {
       console.error('Error auto-clocking out entry:', error);
-      alert('Failed to auto clock-out entry');
+      notify('Failed to auto clock-out entry', { theme: 'blue', tone: 'error' });
     } finally {
       setProcessingClockOut(null);
     }
@@ -796,7 +797,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       Promise.all([loadEntries()]);
     } catch (error) {
       console.error('Error approving offline entry:', error);
-      alert('Failed to approve offline entry');
+      notify('Failed to approve offline entry', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -813,7 +814,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       setEntries(prev => prev.filter(e => e.id !== entry.id));
     } catch (error) {
       console.error('Error deleting entry:', error);
-      alert('Failed to delete entry. You may not have permission to delete time entries.');
+      notify('Failed to delete entry. You may not have permission to delete time entries.', { theme: 'blue', tone: 'error' });
     } finally {
       setDeletingClockId(null);
     }

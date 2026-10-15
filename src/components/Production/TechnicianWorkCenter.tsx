@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -288,11 +289,11 @@ export function TechnicianWorkCenter() {
         throw new Error(result.error || 'Failed to send notification');
       }
 
-      alert('Customer notified! ' + (result.smsDelivered ? 'SMS sent successfully.' : 'Notification logged.'));
+      notify('Customer notified! ' + (result.smsDelivered ? 'SMS sent successfully.' : 'Notification logged.'), { theme: 'blue', tone: 'success' });
       loadData();
     } catch (error: any) {
       console.error('Error sending notification:', error);
-      alert(error.message || 'Failed to send notification');
+      notify(error.message || 'Failed to send notification', { theme: 'blue', tone: 'error' });
     } finally {
       setSendingNotification(null);
     }

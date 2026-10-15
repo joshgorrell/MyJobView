@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -945,10 +946,10 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       // Reload validation after save
       await loadValidation();
 
-      alert('Settings saved successfully!');
+      notify('Settings saved successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      notify('Failed to save settings', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -976,7 +977,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
 
   async function handleGenerateScopeWithAI() {
     if (aiCooldown > 0) {
-      alert(`Please wait ${aiCooldown} seconds before generating again to avoid rate limits.`);
+      notify(`Please wait ${aiCooldown} seconds before generating again to avoid rate limits.`, { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -1063,9 +1064,9 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
 
       // Handle rate limit errors specifically
       if (error.message?.includes('rate limit') || error.message?.includes('10 seconds')) {
-        alert(error.message);
+        notify(error.message, { theme: 'violet', tone: 'error' });
       } else {
-        alert(error.message || 'Failed to generate scope of work. Please try again.');
+        notify(error.message || 'Failed to generate scope of work. Please try again.', { theme: 'violet', tone: 'error' });
       }
     } finally {
       setGeneratingScope(false);
@@ -1103,7 +1104,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       setNewArea('');
     } catch (error) {
       console.error('Error adding area:', error);
-      alert('Failed to add area template');
+      notify('Failed to add area template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1129,7 +1130,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       setAreaTemplates(areaTemplates.filter(a => a.id !== id));
     } catch (error) {
       console.error('Error deleting area:', error);
-      alert('Failed to delete area template');
+      notify('Failed to delete area template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1151,7 +1152,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       setEditingAreaName('');
     } catch (error) {
       console.error('Error updating area:', error);
-      alert('Failed to update area template');
+      notify('Failed to update area template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1210,7 +1211,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       const areasToAdd = settings.selected_areas.filter(name => !existingNames.has(name));
 
       if (areasToAdd.length === 0) {
-        alert('All selected areas already exist in the proposal');
+        notify('All selected areas already exist in the proposal', { theme: 'violet', tone: 'warning' });
         return;
       }
 
@@ -1225,10 +1226,10 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
         .insert(roomsToInsert);
 
       if (error) throw error;
-      alert(`Added ${areasToAdd.length} area(s) to proposal`);
+      notify(`Added ${areasToAdd.length} area(s) to proposal`, { theme: 'violet', tone: 'info' });
     } catch (error) {
       console.error('Error applying areas:', error);
-      alert('Failed to apply areas to proposal');
+      notify('Failed to apply areas to proposal', { theme: 'violet', tone: 'error' });
     }
   }
 

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import {useJobDraft} from '../../lib/useJobDraft';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -115,7 +116,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
       setDraft(null);setEditing(false);
     } catch (err) {
       console.error('Error saving primary scope:', err);
-      alert('Failed to save scope');
+      notify('Failed to save scope', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -137,7 +138,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
       setAIGeneratedScope('');
     } catch (err) {
       console.error('Error applying AI scope:', err);
-      alert('Failed to apply scope');
+      notify('Failed to apply scope', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

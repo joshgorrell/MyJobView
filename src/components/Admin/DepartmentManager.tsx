@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Layers, Plus, Edit2, Save, X, GripVertical, ChevronDown, ChevronRight, Eye, EyeOff, Package } from 'lucide-react';
@@ -204,7 +205,7 @@ export function DepartmentManager() {
       setIsCreating(false);
     } catch (error) {
       console.error('Error saving module:', error);
-      alert('Failed to save module');
+      notify('Failed to save module', { theme: 'blue', tone: 'error' });
     }
   };
 

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -258,10 +259,11 @@ export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSucce
         }
       }
 
+      notify('Invoice created!', { theme: 'violet', tone: 'success' });
       onSuccess(invoiceData.id);
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert('Failed to create invoice. Please try again.');
+      notify('Failed to create invoice. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

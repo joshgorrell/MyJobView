@@ -1,3 +1,4 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { supabase } from '../../lib/supabase';
@@ -157,14 +158,14 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
       setActiveRoomId(data.id);
     } catch (error) {
       console.error('Error adding room:', error);
-      alert('Failed to add room');
+      notify('Failed to add room', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDeleteRoom(roomId: string) {
-    if (!confirm('Delete this room and all its items?')) return;
+    if (!(await requestConfirmation('Delete this room and all its items?', { theme: 'violet' }))) return;
 
     try {
       const { error } = await supabase
@@ -180,7 +181,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
       }
     } catch (error) {
       console.error('Error deleting room:', error);
-      alert('Failed to delete room');
+      notify('Failed to delete room', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -200,7 +201,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
       setEditingRoomName('');
     } catch (error) {
       console.error('Error updating room name:', error);
-      alert('Failed to update room name');
+      notify('Failed to update room name', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -231,7 +232,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
       }
     } catch (error) {
       console.error('Error reordering rooms:', error);
-      alert('Failed to reorder rooms');
+      notify('Failed to reorder rooms', { theme: 'violet', tone: 'error' });
       loadData(); // Reload to get correct order
     }
   }
@@ -344,14 +345,14 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
       setShowStatusDropdown(false);
     } catch (error) {
       console.error('Error updating proposal status:', error);
-      alert('Failed to update proposal status');
+      notify('Failed to update proposal status', { theme: 'violet', tone: 'error' });
     } finally {
       setUpdatingStatus(false);
     }
   }
 
   async function handleDeclineProposal() {
-    if (!confirm('Are you sure you want to decline this proposal?')) return;
+    if (!(await requestConfirmation('Are you sure you want to decline this proposal?', { theme: 'violet' }))) return;
     await handleUpdateStatus('declined');
   }
 

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -273,7 +274,7 @@ export function BonusApprovalDashboard() {
       loadCalculations();
     } catch (error) {
       console.error('Error processing approval:', error);
-      alert('Failed to process approval. Please try again.');
+      notify('Failed to process approval. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setProcessing(false);
     }
@@ -294,7 +295,7 @@ export function BonusApprovalDashboard() {
     if (!assignmentModal.calculationId) return;
 
     if (!assignmentModal.leadTechId || !assignmentModal.projectManagerId) {
-      alert('Both Lead Technician and Project Manager must be assigned.');
+      notify('Both Lead Technician and Project Manager must be assigned.', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -334,7 +335,7 @@ export function BonusApprovalDashboard() {
       loadCalculations();
     } catch (error) {
       console.error('Error saving assignments:', error);
-      alert('Failed to save assignments. Please try again.');
+      notify('Failed to save assignments. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setProcessing(false);
     }

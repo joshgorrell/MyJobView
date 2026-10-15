@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -202,7 +203,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       setShowAccessorySelector(false);
     } catch (error) {
       console.error('Error adding accessory:', error);
-      alert('Failed to add accessory');
+      notify('Failed to add accessory', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -228,7 +229,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       setAccessories(accessories.filter(a => a.id !== accessoryId));
     } catch (error) {
       console.error('Error removing accessory:', error);
-      alert('Failed to remove accessory');
+      notify('Failed to remove accessory', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -433,13 +434,13 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       setNewClassColor('#3B82F6');
     } catch (error) {
       console.error('Error creating class:', error);
-      alert('Failed to create class');
+      notify('Failed to create class', { theme: 'violet', tone: 'error' });
     }
   }
 
   function handleSubmit(saveToMaster: boolean) {
     if (!formData.is_customer_supplied && (!formData.cost || formData.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before saving.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -508,7 +509,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
 
   async function copyToSelectedAreas() {
     if (selectedAreasForCopy.size === 0) {
-      alert('Please select at least one area');
+      notify('Please select at least one area', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -553,12 +554,12 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
 
       if (error) throw error;
 
-      alert(`Item copied to ${selectedAreasForCopy.size} area(s) successfully`);
+      notify(`Item copied to ${selectedAreasForCopy.size} area(s) successfully`, { theme: 'violet', tone: 'success' });
       setSelectedAreasForCopy(new Set());
       onClose();
     } catch (error: any) {
       console.error('Error copying to areas:', error);
-      alert('Failed to copy item: ' + error.message);
+      notify('Failed to copy item: ' + error.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCopyingToAreas(false);
     }

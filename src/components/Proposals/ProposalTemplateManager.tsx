@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -258,7 +259,7 @@ export default function ProposalTemplateManager() {
       }
     } catch (error) {
       console.error('Error loading templates:', error);
-      alert('Failed to load templates');
+      notify('Failed to load templates', { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -293,10 +294,10 @@ export default function ProposalTemplateManager() {
         .eq('id', profile.id);
 
       if (error) throw error;
-      alert('Default proposal template saved!');
+      notify('Default proposal template saved!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error saving template preference:', error);
-      alert('Failed to save template preference');
+      notify('Failed to save template preference', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingDefaultTemplate(false);
     }
@@ -322,10 +323,10 @@ export default function ProposalTemplateManager() {
 
       await loadTemplates();
       setIsEditing(false);
-      alert('Template saved successfully!');
+      notify('Template saved successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      notify('Failed to save template', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -336,7 +337,7 @@ export default function ProposalTemplateManager() {
 
     // Validate: only admins/sales managers can create company-wide templates
     if (!newTemplate.is_personal && !canManage) {
-      alert('Only admins and sales managers can create company-wide templates');
+      notify('Only admins and sales managers can create company-wide templates', { theme: 'violet', tone: 'info' });
       return;
     }
 
@@ -357,10 +358,10 @@ export default function ProposalTemplateManager() {
       await loadTemplates();
       setSelectedTemplate(data);
       setIsCreating(false);
-      alert('Template created successfully!');
+      notify('Template created successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error creating template:', error);
-      alert('Failed to create template');
+      notify('Failed to create template', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -402,10 +403,10 @@ export default function ProposalTemplateManager() {
 
       setSelectedTemplate(null);
       await loadTemplates();
-      alert('Template deleted successfully!');
+      notify('Template deleted successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error deleting template:', error);
-      alert('Failed to delete template');
+      notify('Failed to delete template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -428,10 +429,10 @@ export default function ProposalTemplateManager() {
       if (error) throw error;
 
       await loadTemplates();
-      alert('Default template updated!');
+      notify('Default template updated!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error setting default:', error);
-      alert('Failed to set default template');
+      notify('Failed to set default template', { theme: 'violet', tone: 'error' });
     }
   }
 

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { accessoryPricing } from '../../lib/accessoryPricing';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -592,7 +593,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
   async function handleSave(submit: boolean) {
     if (!selectedSalesOrder || !title || lineItems.length === 0) {
-      alert('Please fill in all required fields and add at least one line item');
+      notify('Please fill in all required fields and add at least one line item', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -810,7 +811,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       handleClose();
     } catch (error: any) {
       console.error('Error creating change order:', error);
-      alert('Failed to create change order: ' + (error?.message || String(error)));
+      notify('Failed to create change order: ' + (error?.message || String(error)), { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -841,7 +842,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
   async function handleCreateDraft() {
     if (!selectedSalesOrder || !title) {
-      alert('Please enter a title for the change order');
+      notify('Please enter a title for the change order', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -910,7 +911,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       handleClose();
     } catch (error: any) {
       console.error('Error creating change order:', error);
-      alert('Failed to create change order: ' + (error?.message || String(error)));
+      notify('Failed to create change order: ' + (error?.message || String(error)), { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

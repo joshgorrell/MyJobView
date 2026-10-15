@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -88,7 +89,7 @@ export default function ProductSelector({ onSelect, onClose, showCreateActions =
 
   function handleCustomSubmit() {
     if (!customItem.description) {
-      alert('Please enter a description');
+      notify('Please enter a description', { theme: 'violet', tone: 'warning' });
       return;
     }
 

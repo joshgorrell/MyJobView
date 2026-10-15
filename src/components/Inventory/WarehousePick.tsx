@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Package, Scan, Check, X, MapPin, FileText, AlertCircle } from 'lucide-react';
@@ -163,7 +164,7 @@ export function WarehousePick() {
       updatePickQty(item.product_id, item.quantity_picked + 1);
       setShowScanner(false);
     } else {
-      alert('Product not found in this pick list');
+      notify('Product not found in this pick list', { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -182,7 +183,7 @@ export function WarehousePick() {
 
     const itemsToPick = pickItems.filter(item => item.quantity_picked > 0);
     if (itemsToPick.length === 0) {
-      alert('No items picked. Please enter quantities.');
+      notify('No items picked. Please enter quantities.', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -245,13 +246,13 @@ export function WarehousePick() {
         }
       }
 
-      alert('Pick completed successfully!');
+      notify('Pick completed successfully!', { theme: 'amber', tone: 'success' });
       setSelectedList(null);
       setPickItems([]);
       loadPickLists();
     } catch (error) {
       console.error('Error completing pick:', error);
-      alert('Error completing pick. Please try again.');
+      notify('Error completing pick. Please try again.', { theme: 'amber', tone: 'error' });
     } finally {
       setPicking(false);
     }

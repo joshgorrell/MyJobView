@@ -1,3 +1,4 @@
+import { notify, requestText } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import {CreateInvoiceFromWorkOrderModal} from './CreateInvoiceFromWorkOrderModal';
 import {customerSecurityInvoiceLines} from '../../../supabase/functions/_shared/security-customer-invoice';
@@ -251,12 +252,10 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
           if (qboVoidError) {
             // MJV void succeeded but QBO void failed - warn user, do NOT restore
             console.error('QBO void failed:', qboVoidError);
-            alert(
-              `Invoice ${invoice.invoice_number} has been voided in MJV. ` +
+            notify(`Invoice ${invoice.invoice_number} has been voided in MJV. ` +
               `However, voiding the invoice in QuickBooks failed. ` +
               `The scheduled QBO sync will retry the void automatically. ` +
-              `The MJV void is authoritative and will not be reversed.`
-            );
+              `The MJV void is authoritative and will not be reversed.`, { theme: 'emerald', tone: 'error' });
             onVoided?.();
             onClose();
             return;
@@ -268,12 +267,10 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
             .eq('id', invoice.id);
         } catch (qboErr) {
           console.error('QBO void exception:', qboErr);
-          alert(
-            `Invoice ${invoice.invoice_number} has been voided in MJV. ` +
+          notify(`Invoice ${invoice.invoice_number} has been voided in MJV. ` +
             `However, voiding the invoice in QuickBooks failed. ` +
             `The scheduled QBO sync will retry the void automatically. ` +
-            `The MJV void is authoritative and will not be reversed.`
-          );
+            `The MJV void is authoritative and will not be reversed.`, { theme: 'emerald', tone: 'error' });
           onVoided?.();
           onClose();
           return;
@@ -284,7 +281,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
       onClose();
     } catch (err) {
       console.error('Error voiding invoice:', err);
-      alert(err instanceof Error ? err.message : 'Failed to void invoice.');
+      notify(err instanceof Error ? err.message : 'Failed to void invoice.', { theme: 'emerald', tone: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -293,7 +290,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   async function handleDeleteInvoice() {
     if (!invoice) return;
     if (invoice.status !== 'draft') {
-      alert('Only draft invoices can be deleted. Void the invoice instead.');
+      notify('Only draft invoices can be deleted. Void the invoice instead.', { theme: 'emerald', tone: 'info' });
       return;
     }
     setActionLoading(true);
@@ -305,7 +302,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
       onClose();
     } catch (err) {
       console.error('Error deleting invoice:', err);
-      alert('Failed to delete invoice. Only draft invoices can be deleted.');
+      notify('Failed to delete invoice. Only draft invoices can be deleted.', { theme: 'emerald', tone: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -451,7 +448,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   async function handleSendEmail() {
     if (!invoice) return;
     const taxBlock = checkTaxFinalizationGuard(invoice.tax_calculation_status);
-    if (taxBlock) { alert(taxBlock); return; }
+    if (taxBlock) { notify(taxBlock, { theme: 'emerald', tone: 'info' }); return; }
     setSendingEmail(true);
     setConfirmEmail(false);
     try {
@@ -751,12 +748,12 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
             {!readonly && !customerView && canManageBilling && invoice.status==='draft' && <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm" onClick={async()=>{
               const {data:links}=await supabase.from('work_order_invoice_links').select('work_order_id').eq('invoice_id',invoice.id).limit(1);
               if(links?.[0]) setEditWorkOrderId(links[0].work_order_id);
-              else {const {data,error}=await supabase.rpc('submit_invoice',{p_invoice_id:invoice.id});if(error || !data?.success)alert(error?.message || data?.errors?.join(', ') || 'Submission failed');else loadInvoice();}
+              else {const {data,error}=await supabase.rpc('submit_invoice',{p_invoice_id:invoice.id});if(error || !data?.success)notify(error?.message || data?.errors?.join(', ') || 'Submission failed', { theme: 'emerald', tone: 'error' });else loadInvoice();}
             }}> {invoice.source_type ? 'Submit Invoice' : 'Review & Submit'} </button>}
             {!readonly && !customerView && canManageBilling && ['submitted','overdue'].includes(invoice.status) && invoice.amount_paid===0 && !invoice.security_billing_cycle_id && <button className="px-4 py-2 rounded-lg border text-sm" onClick={async()=>{
-              const reason=window.prompt('Unlock this invoice for changes? It will be hidden from the portal until resubmitted. Previously delivered copies and QuickBooks links remain issued. Enter the reason:');
+              const reason=(await requestText('Unlock this invoice for changes? It will be hidden from the portal until resubmitted. Previously delivered copies and QuickBooks links remain issued. Enter the reason:', '', { theme: 'emerald' }));
               if(!reason?.trim())return;
-              const {error}=await supabase.rpc('unlock_invoice_for_changes',{p_invoice_id:invoice.id,p_reason:reason});if(error)alert(error.message);else loadInvoice();
+              const {error}=await supabase.rpc('unlock_invoice_for_changes',{p_invoice_id:invoice.id,p_reason:reason});if(error)notify(error.message, { theme: 'emerald', tone: 'error' });else loadInvoice();
             }}>Unlock for Changes</button>}
             {!readonly && canPay && (
               <button

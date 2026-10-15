@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Image as ImageIcon, MapPin, Calendar, User, Download, Eye, EyeOff, X } from 'lucide-react';
@@ -86,7 +87,7 @@ export function JobPhotoGallery({ workOrderId, customerView = false }: JobPhotoG
       loadPhotos();
     } catch (error) {
       console.error('Error updating photo visibility:', error);
-      alert('Failed to update photo visibility');
+      notify('Failed to update photo visibility', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -102,7 +103,7 @@ export function JobPhotoGallery({ workOrderId, customerView = false }: JobPhotoG
       setSelectedPhoto(null);
     } catch (error) {
       console.error('Error deleting photo:', error);
-      alert('Failed to delete photo');
+      notify('Failed to delete photo', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -158,7 +159,7 @@ export function JobPhotoGallery({ workOrderId, customerView = false }: JobPhotoG
           <button
             onClick={() => {
               const urls = photos.map(p => p.photo_url);
-              alert('Download all feature - integrate with batch download');
+              notify('Download all feature - integrate with batch download', { theme: 'blue', tone: 'info' });
             }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
           >

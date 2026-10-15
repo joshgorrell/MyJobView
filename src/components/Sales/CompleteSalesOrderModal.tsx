@@ -1,3 +1,6 @@
+import { CompletionDialog } from '../Shared/CompletionDialog';
+import { useCompletion } from '../../hooks/useCompletion';
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -47,6 +50,7 @@ type ExistingPortalAccess =
   | { type: 'none' };
 
 export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: CompleteSalesOrderModalProps) {
+  const completion = useCompletion(() => { onComplete(); onClose(); });
   const [loading, setLoading] = useState(false);
   const [startTestTune, setStartTestTune] = useState(true);
   const [sendPunchlistInvite, setSendPunchlistInvite] = useState(true);
@@ -244,11 +248,10 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
         });
       }
 
-      onComplete();
-      onClose();
+      completion.complete();
     } catch (error) {
       console.error('Error completing sales order:', error);
-      alert('Failed to complete sales order. Please try again.');
+      notify('Failed to complete sales order. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -256,6 +259,8 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
 
   const endDateDisplay = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString();
   const hasExistingAccess = existingAccess.type !== 'none';
+
+  if (completion.completed) return <CompletionDialog title="Sales order complete!" theme="violet" kind="check" onContinue={completion.finish} />;
 
   return (
     <div

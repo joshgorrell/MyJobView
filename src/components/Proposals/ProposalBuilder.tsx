@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import LaborRemovalChoice, { itemHasLabor, RemovalScope } from './LaborRemovalChoice';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -547,7 +548,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
   async function saveDescriptionEdit(itemId: string) {
     if (!editingDescriptionValue.trim()) {
-      alert('Description cannot be empty');
+      notify('Description cannot be empty', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -591,7 +592,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
             console.error('Error removing CO-added item:', err);
           }
         }
-        if(await itemHasLabor(item))setLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){alert(result.error.message);return;}await updateCOTotals(changeOrderId!,onCORefresh);await refreshCOLineItems();await loadProposal();}else await doRemoveCOAddedItem();});
+        if(await itemHasLabor(item))setLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){notify(result.error.message, { theme: 'violet', tone: 'error' });return;}await updateCOTotals(changeOrderId!,onCORefresh);await refreshCOLineItems();await loadProposal();}else await doRemoveCOAddedItem();});
         else setConfirmModal({ title: 'Remove Item', message: 'Remove this newly-added item from the change order?', onConfirm: doRemoveCOAddedItem });
         return;
       }
@@ -835,7 +836,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
       // Validate: target parent must not be nested (only top-level items can be parents)
       if (targetParent.parent_item_id) {
-        alert('Cannot nest under a nested item. Only top-level items can be parents.');
+        notify('Cannot nest under a nested item. Only top-level items can be parents.', { theme: 'violet', tone: 'warning' });
         return;
       }
 
@@ -845,7 +846,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       );
 
       if (itemsWithChildren.length > 0) {
-        alert('Cannot nest items that have children. Please unnest their children first.');
+        notify('Cannot nest items that have children. Please unnest their children first.', { theme: 'violet', tone: 'warning' });
         return;
       }
 
@@ -862,7 +863,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setSelectedItemIds(new Set());
     } catch (error) {
       console.error('Error nesting items:', error);
-      alert('Failed to nest items. Please try again.');
+      notify('Failed to nest items. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -893,7 +894,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setSelectedItemIds(new Set());
     } catch (error) {
       console.error('Error unnesting items:', error);
-      alert('Failed to unnest items. Please try again.');
+      notify('Failed to unnest items. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1064,7 +1065,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setEditingItem(null);
     } catch (error) {
       console.error('Error substituting product:', error);
-      alert('Failed to substitute product. Please try again.');
+      notify('Failed to substitute product. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1178,7 +1179,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setPendingBulkUpdate(null);
     } catch (error) {
       console.error('Error updating single item:', error);
-      alert('Failed to update item. Please try again.');
+      notify('Failed to update item. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }
@@ -1238,7 +1239,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setPendingBulkUpdate(null);
     } catch (error) {
       console.error('Error updating all instances:', error);
-      alert('Failed to update all instances. Please try again.');
+      notify('Failed to update all instances. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }

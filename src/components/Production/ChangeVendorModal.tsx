@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -50,13 +51,13 @@ export function ChangeVendorModal({ selectedItemIds, onClose, onSuccess }: Chang
       setVendors(data || []);
     } catch (error: any) {
       console.error('Error loading vendors:', error);
-      alert('Error loading vendors: ' + error.message);
+      notify('Error loading vendors: ' + error.message, { theme: 'blue', tone: 'error' });
     }
   };
 
   const handleAddVendor = async () => {
     if (!newVendor.vendor_name.trim()) {
-      alert('Please enter a vendor name');
+      notify('Please enter a vendor name', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -87,7 +88,7 @@ export function ChangeVendorModal({ selectedItemIds, onClose, onSuccess }: Chang
       });
     } catch (error: any) {
       console.error('Error adding vendor:', error);
-      alert('Error adding vendor: ' + error.message);
+      notify('Error adding vendor: ' + error.message, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -95,7 +96,7 @@ export function ChangeVendorModal({ selectedItemIds, onClose, onSuccess }: Chang
 
   const handleChangeVendor = async () => {
     if (!selectedVendor) {
-      alert('Please select a vendor');
+      notify('Please select a vendor', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -108,12 +109,12 @@ export function ChangeVendorModal({ selectedItemIds, onClose, onSuccess }: Chang
 
       if (error) throw error;
 
-      alert(`Successfully updated vendor for ${selectedItemIds.length} item(s)!`);
+      notify(`Successfully updated vendor for ${selectedItemIds.length} item(s)!`, { theme: 'blue', tone: 'success' });
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Error changing vendor:', error);
-      alert('Error changing vendor: ' + error.message);
+      notify('Error changing vendor: ' + error.message, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { calculateConvenienceFee } from '../../lib/convenienceFee';
@@ -240,13 +241,13 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
   async function handleAddressSubmit() {
     // Validate address
     if (!addressData.street_address || !addressData.city || !addressData.state || !addressData.zip_code) {
-      alert('Please fill in all address fields');
+      notify('Please fill in all address fields', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     const contactId = await getContactId();
     if (!contactId) {
-      alert('Contact information not found');
+      notify('Contact information not found', { theme: 'blue', tone: 'error' });
       return;
     }
 
@@ -268,7 +269,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
       setShowPaymentModal(true);
     } catch (error) {
       console.error('Error saving address:', error);
-      alert('Failed to save address. Please try again.');
+      notify('Failed to save address. Please try again.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -355,11 +356,9 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         subscription = newSub;
       }
 
-      alert(
-        currentSubscription?.status === 'trial'
+      notify(currentSubscription?.status === 'trial'
           ? 'Payment successful! Your trial has been converted to a paid membership.'
-          : 'Payment successful! Your VIP membership is now active. Welcome to the VIP program!'
-      );
+          : 'Payment successful! Your VIP membership is now active. Welcome to the VIP program!', { theme: 'blue', tone: 'success' });
       setShowPaymentModal(false);
       setSelectedPlan(null);
       loadData();
@@ -386,12 +385,12 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       if (error) throw error;
 
-      alert('Your VIP membership has been cancelled. You will have access until your next billing date.');
+      notify('Your VIP membership has been cancelled. You will have access until your next billing date.', { theme: 'blue', tone: 'info' });
       setShowCancelModal(false);
       loadData();
     } catch (error) {
       console.error('Error cancelling subscription:', error);
-      alert('Failed to cancel subscription. Please contact support.');
+      notify('Failed to cancel subscription. Please contact support.', { theme: 'blue', tone: 'error' });
     }
   }
 

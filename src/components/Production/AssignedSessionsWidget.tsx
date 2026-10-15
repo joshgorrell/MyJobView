@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -173,7 +174,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
       onRefreshParent?.();
     } catch (err: any) {
       console.error('Error clocking in:', err);
-      alert(err.message || 'Failed to clock in');
+      notify(err.message || 'Failed to clock in', { theme: 'blue', tone: 'error' });
     } finally {
       setClockingIn(null);
     }
@@ -217,7 +218,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
       onRefreshParent?.();
     } catch (err: any) {
       console.error('Error clocking out:', err);
-      alert(err.message || 'Failed to clock out');
+      notify(err.message || 'Failed to clock out', { theme: 'blue', tone: 'error' });
     } finally {
       setClockinOut(null);
     }
@@ -238,7 +239,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
       loadSessions();
     } catch (err: any) {
       console.error('Error cancelling request:', err);
-      alert(err.message || 'Failed to cancel request');
+      notify(err.message || 'Failed to cancel request', { theme: 'blue', tone: 'error' });
     } finally {
       setCancellingId(null);
     }

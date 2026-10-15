@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useCompletion } from '../../hooks/useCompletion';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Copy, User, AlertCircle, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
@@ -31,6 +32,8 @@ export function DuplicateProposalModal({
   onOpenRevisionManager
 }: DuplicateProposalModalProps) {
   const { profile } = useAuth();
+  const newProposalId = useRef('');
+  const completion = useCompletion(() => onSuccess(newProposalId.current));
   const [duplicationType, setDuplicationType] = useState<'same' | 'different'>('same');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string>(currentContactId);
@@ -134,7 +137,8 @@ export function DuplicateProposalModal({
 
       const {data:newId,error:copyError}=await supabase.rpc('duplicate_job_proposal',{p_source:proposalId,p_contact:targetContactId,p_title:newTitle,p_include:includeLineItems});
       if(copyError)throw copyError;
-      onSuccess(newId);
+      newProposalId.current = newId;
+      completion.complete();
     } catch (error: any) {
       console.error('Error duplicating proposal:', error);
       setError(error.message || 'Failed to duplicate proposal');
@@ -150,7 +154,7 @@ export function DuplicateProposalModal({
   );
 
   return (
-    <QuickActionModal title="Duplicate Proposal" icon={<Copy className="w-5 h-5" />} onClose={onClose} scrollBody={false}>
+    <QuickActionModal title="Duplicate Proposal" icon={<Copy className="w-5 h-5" />} onClose={completion.completed ? completion.finish : onClose} scrollBody={false} showSuccess={completion.completed} successMessage="Proposal duplicated!" successIcon={<Copy className="h-20 w-20" strokeWidth={1.5} />}>
       <div className="duplicate-proposal flex flex-col min-h-0">
         <div className="duplicate-proposal-body p-3 sm:p-4 space-y-3 overflow-y-auto min-h-0">
           {error && (

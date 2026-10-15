@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { Send, ListTodo, HelpCircle, MessageCircle, Calendar, ChevronDown, ChevronUp, Users, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -210,7 +211,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
-      alert('Failed to create post. Please try again.');
+      notify('Failed to create post. Please try again.', { theme: 'cyan', tone: 'error' });
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,4 @@
+import { requestText } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Search, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileText, Eye, CreditCard as Edit2, Filter, ArrowLeft, Loader2, Unlock, X, Pencil, Check } from 'lucide-react';
@@ -156,7 +157,7 @@ export function ChangeOrdersView({ initialCoId, onCoOpened, onCoIdChange }: Chan
   }
 
   async function handleReject(changeOrderId: string) {
-    const reason = prompt('Reason for rejection:');
+    const reason = (await requestText('Reason for rejection:', '', { theme: 'blue' }));
     if (!reason) return;
 
     try {

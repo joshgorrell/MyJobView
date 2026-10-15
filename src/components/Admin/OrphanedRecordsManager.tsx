@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { UserPlus, AlertCircle, Search, ChevronDown, ChevronRight } from 'lucide-react';
@@ -314,7 +315,7 @@ export default function OrphanedRecordsManager() {
       setSelectedUser('');
     } catch (error) {
       console.error('Error reassigning records:', error);
-      alert('Error reassigning records. Please try again.');
+      notify('Error reassigning records. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setReassigning(false);
     }

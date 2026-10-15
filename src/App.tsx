@@ -1,3 +1,4 @@
+import { notify } from './lib/feedback';
 import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
 import { PasswordSetup } from './components/Auth/PasswordSetup';
 import { canManageTimeOff } from './lib/timeOff';
@@ -1312,7 +1313,7 @@ function AppContent() {
             };
             const requiredModule = action.type === 'NAVIGATE_TO' ? action.tab : actionModule[action.type];
             if (!requiredModule || !checkModuleAccess(requiredModule)) {
-              window.alert('That action is not available with your current permissions.');
+              notify('That action is not available with your current permissions.', { theme: 'blue', tone: 'info' });
               return;
             }
             if (action.type === 'CREATE_CONTACT') {

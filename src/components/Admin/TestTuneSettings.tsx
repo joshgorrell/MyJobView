@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -359,7 +360,7 @@ export function TestTuneSettings() {
       setSalesRateReason('');
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings. Please try again.');
+      notify('Failed to save settings. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

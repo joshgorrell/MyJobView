@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { notifyTechJobReassigned } from '../../lib/dispatchNotifications';
@@ -134,7 +135,7 @@ export function JobAcceptanceQueue() {
 
   async function handleReassign(workOrderId: string, currentTechId: string, currentTechName: string) {
     if (!selectedTech) {
-      alert('Please select a technician');
+      notify('Please select a technician', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -174,7 +175,7 @@ export function JobAcceptanceQueue() {
       await loadData();
     } catch (error) {
       console.error('Error reassigning job:', error);
-      alert('Failed to reassign job');
+      notify('Failed to reassign job', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -205,7 +206,7 @@ export function JobAcceptanceQueue() {
       await loadData();
     } catch (error) {
       console.error('Error force accepting job:', error);
-      alert('Failed to force accept job');
+      notify('Failed to force accept job', { theme: 'blue', tone: 'error' });
     }
   }
 

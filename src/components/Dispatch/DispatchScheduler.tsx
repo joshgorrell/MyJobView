@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
 import { dateKey } from '../../lib/workOrderScheduling';
@@ -308,7 +309,7 @@ export function DispatchScheduler() {
   async function handleDrop(technicianId: string, date: Date, startTime?: string) {
     if (!draggedWorkOrder) return;
 
-    if (!window.confirm('Confirm this schedule move?')) return;
+    if (!(await requestConfirmation('Confirm this schedule move?', { theme: 'blue' }))) return;
 
     try {
       const wo = workOrders.find(w => w.id === draggedWorkOrder);
@@ -327,7 +328,7 @@ export function DispatchScheduler() {
       );
 
       if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+        if (!(await requestConfirmation('Scheduling conflict detected. Proceed anyway?', { theme: 'blue' }))) {
           return;
         }
         await rescheduleWorkOrder(draggedWorkOrder, newDate, newStart, newEnd, technicianId || undefined, { force: true });

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, DollarSign, FileText, CheckCircle, Mail, Copy, AlertCircle, Clock, ChevronDown, ChevronUp, Save, Check, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -349,7 +350,7 @@ export default function ApprovalActionModal({ proposal, contact, onClose, onComp
   const copyPortalLink = () => {
     const portalUrl = `${window.location.origin}/portal/proposals/${proposal.id}`;
     navigator.clipboard.writeText(portalUrl);
-    alert('Portal link copied to clipboard!');
+    notify('Portal link copied to clipboard!', { theme: 'violet', tone: 'info' });
   };
 
   const getActionIcon = (action: string) => {

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
@@ -212,7 +213,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
 
       // Show offline notification if applicable
       if (!navigator.onLine) {
-        alert('You clocked out offline. Your data will sync when you reconnect. Photos will be uploaded when online.');
+        notify('You clocked out offline. Your data will sync when you reconnect. Photos will be uploaded when online.', { theme: 'blue', tone: 'info' });
       }
 
       onSuccess();

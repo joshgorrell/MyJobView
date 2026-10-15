@@ -1,3 +1,4 @@
+import { notify } from '../../../lib/feedback';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { GitBranch, Plus, X } from 'lucide-react';
@@ -101,7 +102,7 @@ export default function PayrollCorrectionsPanel({ payPeriodId }: { payPeriodId: 
       await loadCorrections();
     } catch (err: any) {
       console.error('Error creating correction:', err);
-      alert(err.message || 'Failed to create correction');
+      notify(err.message || 'Failed to create correction', { theme: 'blue', tone: 'error' });
     }
   };
 

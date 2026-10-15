@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, User, Phone, Mail, MessageSquare, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -143,7 +144,7 @@ export default function ConnectionForm({ onClose, onSuccess, contactId, editConn
     setLoading(false);
 
     if (error) {
-      alert('Failed to create connection: ' + error.message);
+      notify('Failed to create connection: ' + error.message, { theme: 'cyan', tone: 'error' });
       return;
     }
 

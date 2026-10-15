@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Wrench, X, Plus, AlertCircle } from 'lucide-react';
@@ -121,7 +122,7 @@ export default function TechNotesEditor({
       onClose();
     } catch (error) {
       console.error('Error saving tech notes:', error);
-      alert('Failed to save tech notes');
+      notify('Failed to save tech notes', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Trash2, GripVertical, Save } from 'lucide-react';
@@ -78,7 +79,7 @@ export default function ClassManager() {
   }
 
   async function deleteClass(id: string) {
-    if (!confirm('Delete this class? Items using this class will have it removed.')) return;
+    if (!(await requestConfirmation('Delete this class? Items using this class will have it removed.', { theme: 'violet' }))) return;
 
     try {
       const { error } = await supabase

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useOfflineStorage } from '../../hooks/useOfflineStorage';
@@ -122,7 +123,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
       setProducts(productsWithLaborCost);
     } catch (error) {
       console.error('Error loading products:', error);
-      alert('Failed to load products. Please try again.');
+      notify('Failed to load products. Please try again.', { theme: 'amber', tone: 'error' });
     } finally {
       setLoadingProducts(false);
     }
@@ -220,7 +221,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
       setPackageItems(itemsWithLaborCost);
     } catch (error) {
       console.error('Error loading package:', error);
-      alert('Failed to load package');
+      notify('Failed to load package', { theme: 'amber', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -230,7 +231,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        notify('Please select an image file', { theme: 'amber', tone: 'warning' });
         return;
       }
       setNewImage(file);
@@ -289,7 +290,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
   function addProduct(product: Product) {
     const existing = packageItems.find(item => item.product_id === product.id);
     if (existing) {
-      alert('This product is already in the package');
+      notify('This product is already in the package', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -399,23 +400,23 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
     }
 
     if (!formData.package_name.trim()) {
-      alert('Package name is required');
+      notify('Package name is required', { theme: 'amber', tone: 'warning' });
       return;
     }
 
     if (!formData.package_price || Number(formData.package_price) <= 0) {
-      alert('Package price is required and must be greater than 0');
+      notify('Package price is required and must be greater than 0', { theme: 'amber', tone: 'warning' });
       return;
     }
 
     if (packageItems.length === 0) {
-      alert('Add at least one product to the package');
+      notify('Add at least one product to the package', { theme: 'amber', tone: 'info' });
       return;
     }
 
     const invalidItems = packageItems.filter(item => item.quantity < 1);
     if (invalidItems.length > 0) {
-      alert('All products must have a quantity of at least 1');
+      notify('All products must have a quantity of at least 1', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -490,14 +491,14 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
           }
         } catch (error) {
           console.error('Error uploading image:', error);
-          alert('Package saved but image upload failed. You can try uploading the image again by editing the package.');
+          notify('Package saved but image upload failed. You can try uploading the image again by editing the package.', { theme: 'amber', tone: 'error' });
         }
       }
 
       onSave();
     } catch (error) {
       console.error('Error saving package:', error);
-      alert('Failed to save package');
+      notify('Failed to save package', { theme: 'amber', tone: 'error' });
     } finally {
       setSaving(false);
     }

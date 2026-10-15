@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -86,7 +87,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       setLastSaved(new Date());
     } catch (error) {
       console.error('Error adding area:', error);
-      alert('Failed to add area');
+      notify('Failed to add area', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -129,7 +130,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       setLastSaved(new Date());
     } catch (error) {
       console.error('Error adding item:', error);
-      alert('Failed to add item');
+      notify('Failed to add item', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -177,7 +178,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       setLastSaved(new Date());
     } catch (error) {
       console.error('Error adding item to multiple areas:', error);
-      alert('Failed to add item');
+      notify('Failed to add item', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -671,10 +672,10 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
               if (error) throw error;
               setProposal({ ...proposal, expiration_date: date });
               setShowExpirationModal(false);
-              alert('Expiration date updated successfully');
+              notify('Expiration date updated successfully', { theme: 'violet', tone: 'success' });
             } catch (error) {
               console.error('Error updating expiration date:', error);
-              alert('Failed to update expiration date');
+              notify('Failed to update expiration date', { theme: 'violet', tone: 'error' });
             }
           }}
         />

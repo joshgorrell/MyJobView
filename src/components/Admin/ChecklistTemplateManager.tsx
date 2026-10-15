@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Edit2, Trash2, CheckCircle, Save, X } from 'lucide-react';
@@ -113,17 +114,17 @@ export function ChecklistTemplateManager() {
     if (!editingTemplate) return;
 
     if (!editingTemplate.job_type.trim() || !editingTemplate.template_name.trim()) {
-      alert('Please fill in job type and template name');
+      notify('Please fill in job type and template name', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (editingTemplate.checklist_items.length === 0) {
-      alert('Please add at least one checklist item');
+      notify('Please add at least one checklist item', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (editingTemplate.checklist_items.some(item => !item.item.trim())) {
-      alert('Please fill in all checklist items');
+      notify('Please fill in all checklist items', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -156,7 +157,7 @@ export function ChecklistTemplateManager() {
       cancelEditing();
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      notify('Failed to save template', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -171,7 +172,7 @@ export function ChecklistTemplateManager() {
       loadTemplates();
     } catch (error) {
       console.error('Error deleting template:', error);
-      alert('Failed to delete template');
+      notify('Failed to delete template', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -186,7 +187,7 @@ export function ChecklistTemplateManager() {
       loadTemplates();
     } catch (error) {
       console.error('Error updating template:', error);
-      alert('Failed to update template');
+      notify('Failed to update template', { theme: 'blue', tone: 'error' });
     }
   }
 

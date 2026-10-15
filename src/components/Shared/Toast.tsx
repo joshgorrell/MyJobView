@@ -17,7 +17,7 @@ interface ToastContextValue {
   error: (message: string, title?: string) => void;
   warning: (message: string, title?: string) => void;
   info: (message: string, title?: string) => void;
-  confirm: (message: string, onConfirm: () => void, title?: string) => void;
+  confirm: (message: string, onConfirm: () => void | Promise<void>, title?: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -64,7 +64,7 @@ interface ConfirmDialog {
   id: string;
   message: string;
   title?: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
@@ -124,15 +124,30 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
 function ConfirmDialogItem({ dialog, onClose }: { dialog: ConfirmDialog; onClose: (id: string) => void }) {
   const [visible, setVisible] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const submitting = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const titleId = React.useId();
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    cancelRef.current?.focus();
+    return () => { if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 10);
     return () => clearTimeout(t);
   }, []);
 
-  function handleConfirm() {
-    dialog.onConfirm();
-    close();
+  async function handleConfirm() {
+    if (submitting.current) return;
+    submitting.current = true; setPending(true); setError('');
+    try { await dialog.onConfirm(); close(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Unable to complete this action. Please try again.'); }
+    finally { submitting.current = false; setPending(false); }
   }
 
   function close() {
@@ -146,9 +161,19 @@ function ConfirmDialogItem({ dialog, onClose }: { dialog: ConfirmDialog; onClose
     >
       <div
         className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}
-        onClick={close}
+        onClick={() => { if (!pending) close(); }}
       />
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-busy={pending}
+        onKeyDown={event => {
+          if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!pending) close(); }
+          if (event.key !== 'Tab') return;
+          const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled])') || []);
+          const first = controls[0]; const last = controls[controls.length - 1];
+          if (!first) { event.preventDefault(); return; }
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }}
         className={`relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full transition-all duration-300 ${visible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'}`}
       >
         <div className="flex items-start gap-4 mb-5">
@@ -156,24 +181,26 @@ function ConfirmDialogItem({ dialog, onClose }: { dialog: ConfirmDialog; onClose
             <AlertTriangle className="w-5 h-5 text-amber-500" />
           </div>
           <div>
-            {dialog.title && (
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">{dialog.title}</h3>
+            {(
+              <h3 id={titleId} className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">{dialog.title || 'Confirm action'}</h3>
             )}
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{dialog.message}</p>
           </div>
         </div>
+        {error && <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>}
         <div className="flex gap-3 justify-end">
           <button
+            ref={cancelRef} disabled={pending}
             onClick={close}
             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={handleConfirm}
+            onClick={handleConfirm} disabled={pending}
             className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
           >
-            Confirm
+            {pending ? 'Working…' : 'Confirm'}
           </button>
         </div>
       </div>
@@ -203,7 +230,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const warning = useCallback((message: string, title?: string) => showToast(message, 'warning', title), [showToast]);
   const info = useCallback((message: string, title?: string) => showToast(message, 'info', title), [showToast]);
 
-  const confirm = useCallback((message: string, onConfirm: () => void, title?: string) => {
+  const confirm = useCallback((message: string, onConfirm: () => void | Promise<void>, title?: string) => {
     const id = `confirm-${Date.now()}-${Math.random()}`;
     setConfirms(prev => [...prev, { id, message, title, onConfirm }]);
   }, []);

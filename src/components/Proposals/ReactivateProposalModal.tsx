@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { CalendarDays, Check, Copy, Download, Globe, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -66,7 +67,8 @@ export function ReactivateProposalModal({
         if (error) throw error;
       }
       setPortalVisible(makeVisible);
-      await onSuccess();
+      await notify('Proposal reactivated!', { theme: 'violet', tone: 'success' });
+      onSuccess();
       if (copyAfter) {
         const { data, error: linkError } = await supabase.functions.invoke('manage-proposal-share-link', {
           body: { proposalId, action: 'create' },

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, AlertCircle, DollarSign, Calendar, Package, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -300,11 +301,11 @@ export default function CreateProgressInvoiceModal({
   }
 
   async function handleSubmit() {
-    if (!invoiceTitle.trim()) { alert('Please enter an invoice title'); return; }
+    if (!invoiceTitle.trim()) { notify('Please enter an invoice title', { theme: 'violet', tone: 'warning' }); return; }
     const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0) +
       Object.values(selectedChangeOrders).reduce((sum, a) => sum + a, 0);
     const total = subtotal + taxAmount;
-    if (subtotal === 0) { alert('Please add at least one line item'); return; }
+    if (subtotal === 0) { notify('Please add at least one line item', { theme: 'violet', tone: 'warning' }); return; }
 
     if (validationResult && !validationResult.valid) {
       setConfirmModal({
@@ -386,11 +387,12 @@ export default function CreateProgressInvoiceModal({
         if (coErr) throw coErr;
       }
 
+      notify('Progress invoice created!', { theme: 'violet', tone: 'success' });
       onSuccess(invoice.id);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert('Failed to create invoice. Please try again.');
+      notify('Failed to create invoice. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

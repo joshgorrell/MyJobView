@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { punchlistDescription } from '../../lib/punchlist';
 import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect, useRef } from 'react';
@@ -290,7 +291,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
     const orgId = contactOrgId || user?.app_metadata?.organization_id || null;
     if (!orgId) {
-      alert('Unable to determine your organization. Please refresh and try again.');
+      notify('Unable to determine your organization. Please refresh and try again.', { theme: 'blue', tone: 'error' });
       return;
     }
 
@@ -321,7 +322,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error ? String((error as {message: unknown}).message) : String(error));
       console.error('Error creating task:', error);
-      alert(`Failed to create task: ${msg}`);
+      notify(`Failed to create task: ${msg}`, { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -330,7 +331,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -383,7 +384,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     const timer = saveTimers.current.get(taskId);
     if (timer) clearTimeout(timer);
     saveTimers.current.set(taskId, setTimeout(() => {
-      savePendingTask(taskId).catch(() => alert('Your edit could not be saved. Please try again.'));
+      savePendingTask(taskId).catch(() => notify('Your edit could not be saved. Please try again.', { theme: 'blue', tone: 'error' }));
     }, 1000));
   }
 
@@ -405,7 +406,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       if (contactId) loadTasks(contactId);
     } catch (error) {
       console.error('Error deleting task:', error);
-      alert((error as { message?: string }).message || 'This item could not be removed. Please contact your service manager.');
+      notify((error as { message?: string }).message || 'This item could not be removed. Please contact your service manager.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -442,7 +443,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       setShowCamera(null);
     } catch (error: any) {
       console.error('Error uploading photo:', error);
-      alert(`Failed to upload photo: ${error.message}`);
+      notify(`Failed to upload photo: ${error.message}`, { theme: 'blue', tone: 'error' });
     } finally {
       setUploadingPhoto(null);
     }
@@ -482,7 +483,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       if (contactId) loadTasks(contactId);
     } catch (error) {
       console.error('Error deleting photo:', error);
-      alert('Failed to delete photo');
+      notify('Failed to delete photo', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -495,7 +496,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       : tasks.filter(t => t.status === 'draft');
 
     if (tasksToSubmit.length === 0) {
-      alert('No unrequested items available to submit.');
+      notify('No unrequested items available to submit.', { theme: 'blue', tone: 'info' });
       return;
     }
 
@@ -519,12 +520,12 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
           if (error) throw error;
 
-          alert('Service requested successfully! Our team has been notified and will contact you soon.');
+          notify('Service requested successfully! Our team has been notified and will contact you soon.', { theme: 'blue', tone: 'success' });
           setSelectedTaskIds(new Set());
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error requesting service:', error);
-          alert(`Failed to request service: ${error.message || 'Unknown error'}`);
+          notify(`Failed to request service: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
         } finally {
           setRequestingService(false);
         }
@@ -549,7 +550,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error) {
           console.error('Error marking complete:', error);
-          alert('Failed to mark task as complete');
+          notify('Failed to mark task as complete', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -559,7 +560,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     const hasWorkOrder = task.service_request?.work_order_id || task.work_order_id;
 
     if (hasWorkOrder) {
-      alert('This task already has a work order assigned — it cannot be cancelled at this stage. Please contact us if you need to make changes.');
+      notify('This task already has a work order assigned — it cannot be cancelled at this stage. Please contact us if you need to make changes.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -575,7 +576,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error cancelling service request:', error);
-          alert(`Failed to cancel service request: ${error.message || 'Unknown error'}`);
+          notify(`Failed to cancel service request: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -598,7 +599,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error deleting task:', error);
-          alert(`Failed to delete task: ${error.message || 'Unknown error'}`);
+          notify(`Failed to delete task: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -617,7 +618,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error) {
           console.error('Error reopening task:', error);
-          alert('Failed to reopen task');
+          notify('Failed to reopen task', { theme: 'blue', tone: 'error' });
         }
       }
     });

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -156,7 +157,7 @@ export function MobileTechView() {
       await loadMyJobs();
     } catch (error) {
       console.error('Error starting job:', error);
-      alert('Failed to start job');
+      notify('Failed to start job', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -173,7 +174,7 @@ export function MobileTechView() {
       await loadMyJobs();
     } catch (error) {
       console.error('Error completing job:', error);
-      alert('Failed to complete job');
+      notify('Failed to complete job', { theme: 'blue', tone: 'error' });
     }
   }
 

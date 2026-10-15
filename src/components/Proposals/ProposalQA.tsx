@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, X, Loader, ImagePlus, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -263,7 +264,7 @@ export function ProposalQA({
       setPendingAttachment({ url: urlData.publicUrl, preview: resolved.attachment_url || undefined, type: 'image' });
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image. Please try again.');
+      notify('Failed to upload image. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setUploading(false);
     }
@@ -316,7 +317,7 @@ export function ProposalQA({
       onMessagesChanged?.();
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
+      notify('Failed to send message. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSending(false);
     }

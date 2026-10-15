@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -153,10 +154,10 @@ export default function StickyNotes() {
         archived: true
       });
 
-      alert('Sticky note converted to task!');
+      notify('Sticky note converted to task!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error converting to task:', error);
-      alert('Failed to convert to task');
+      notify('Failed to convert to task', { theme: 'violet', tone: 'error' });
     }
   };
 
@@ -179,10 +180,10 @@ export default function StickyNotes() {
         archived: true
       });
 
-      alert('Sticky note converted to discussion post!');
+      notify('Sticky note converted to discussion post!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error converting to discussion:', error);
-      alert('Failed to convert to discussion');
+      notify('Failed to convert to discussion', { theme: 'violet', tone: 'error' });
     }
   };
 

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Proposal } from '../../lib/types';
@@ -84,7 +85,7 @@ export default function ProposalRevisionManager({
       }
     } catch (error) {
       console.error('Error creating revision:', error);
-      alert('Failed to create revision');
+      notify('Failed to create revision', { theme: 'violet', tone: 'error' });
     } finally {
       setCreating(false);
     }
@@ -124,7 +125,7 @@ export default function ProposalRevisionManager({
       await loadRevisions();
     } catch (error) {
       console.error('Error setting active revision:', error);
-      alert('Failed to set active revision');
+      notify('Failed to set active revision', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -138,7 +139,7 @@ export default function ProposalRevisionManager({
       await loadRevisions();
     } catch (error) {
       console.error('Error toggling visibility:', error);
-      alert('Failed to toggle portal visibility');
+      notify('Failed to toggle portal visibility', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -164,7 +165,7 @@ export default function ProposalRevisionManager({
       await loadRevisions();
     } catch (error) {
       console.error('Error deleting revision:', error);
-      alert('Failed to delete revision');
+      notify('Failed to delete revision', { theme: 'violet', tone: 'error' });
     }
   }
 

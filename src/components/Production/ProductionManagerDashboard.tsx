@@ -1,3 +1,4 @@
+import { notify, requestText } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -342,12 +343,12 @@ export function ProductionManagerDashboard() {
       loadDashboardData();
     } catch (error) {
       console.error('Error approving part request:', error);
-      alert('Failed to approve request');
+      notify('Failed to approve request', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function handleRejectPart(partId: string) {
-    const reason = prompt('Rejection reason (optional):');
+    const reason = (await requestText('Rejection reason (optional):', '', { theme: 'blue' }));
     try {
       const { error } = await supabase
         .from('product_requests')
@@ -363,7 +364,7 @@ export function ProductionManagerDashboard() {
       loadDashboardData();
     } catch (error) {
       console.error('Error rejecting part request:', error);
-      alert('Failed to reject request');
+      notify('Failed to reject request', { theme: 'blue', tone: 'error' });
     }
   }
 

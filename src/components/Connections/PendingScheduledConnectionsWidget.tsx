@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, AlertTriangle, ExternalLink, CheckCircle2, FileText, X, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -122,7 +123,7 @@ export function PendingScheduledConnectionsWidget() {
       setSwipedItem(null);
     } catch (error) {
       console.error('Error skipping connection:', error);
-      alert('Failed to skip connection. Please try again.');
+      notify('Failed to skip connection. Please try again.', { theme: 'cyan', tone: 'error' });
     }
   }
 

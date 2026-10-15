@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { Fish, AlertCircle, Building2, Mail, Phone, Tag, Clock, Award, MailOpen } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -210,7 +211,7 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
       loadFishbowlLeads();
     } catch (error) {
       console.error('Error claiming lead:', error);
-      alert('Failed to claim lead');
+      notify('Failed to claim lead', { theme: 'blue', tone: 'error' });
     } finally {
       setClaiming(null);
     }

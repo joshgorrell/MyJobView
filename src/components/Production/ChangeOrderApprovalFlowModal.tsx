@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -182,7 +183,7 @@ export function ChangeOrderApprovalFlowModal({
       setPath('manual_done');
     } catch (err) {
       console.error(err);
-      alert('Approval could not be fully applied. Review the change order before retrying.');
+      notify('Approval could not be fully applied. Review the change order before retrying.', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -190,13 +191,13 @@ export function ChangeOrderApprovalFlowModal({
 
   async function handleEmailSend() {
     if (!emailTo) {
-      alert('Please enter a recipient email address');
+      notify('Please enter a recipient email address', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     const ok = await submitForApproval('email');
     if (!ok) {
-      alert('Failed to update change order status');
+      notify('Failed to update change order status', { theme: 'blue', tone: 'error' });
       setLoading(false);
       return;
     }
@@ -222,7 +223,7 @@ export function ChangeOrderApprovalFlowModal({
         onSuccess();
         onClose();
       } else {
-        alert('Failed to send email: ' + msg);
+        notify('Failed to send email: ' + msg, { theme: 'blue', tone: 'error' });
       }
     } finally {
       setLoading(false);
@@ -232,7 +233,7 @@ export function ChangeOrderApprovalFlowModal({
   async function handlePortalSend() {
     const ok = await submitForApproval('portal');
     if (!ok) {
-      alert('Failed to update change order status');
+      notify('Failed to update change order status', { theme: 'blue', tone: 'error' });
       setLoading(false);
       return;
     }
@@ -252,7 +253,7 @@ export function ChangeOrderApprovalFlowModal({
       setPath('portal');
     } catch (err: any) {
       console.error(err);
-      alert('Failed to generate portal link: ' + (err?.message || String(err)));
+      notify('Failed to generate portal link: ' + (err?.message || String(err)), { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { FeedbackHost } from './components/Shared/FeedbackHost';
 import { PortalProposalEngagement } from './components/Portal/PortalProposalEngagement';
 import './index.css';
 import './proposal-workflow.css';
@@ -25,6 +26,7 @@ if ('serviceWorker' in navigator) {
 createRoot(document.getElementById('root')!).render(
   <>
     <App />
+    <FeedbackHost />
     <PortalProposalEngagement />
   </>
 );

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useRef, useState } from 'react';
 import { MessageSquare, Heart, Trash2, ListTodo, HelpCircle, MessageCircle, Reply, TrendingUp, CheckCircle, Award, User, Lock, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -252,7 +253,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       loadPosts();
     } catch (error) {
       console.error('Error posting reply:', error);
-      alert('Failed to post reply. Please try again.');
+      notify('Failed to post reply. Please try again.', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -261,13 +262,13 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
 
     try {
       if ((post as any).is_completed) {
-        alert('This has already been completed');
+        notify('This has already been completed', { theme: 'cyan', tone: 'warning' });
         return;
       }
 
       const assignedTo = (post as any).assigned_to;
       if (assignedTo && assignedTo !== profile.id) {
-        alert('Only the assigned person can mark this as complete');
+        notify('Only the assigned person can mark this as complete', { theme: 'cyan', tone: 'info' });
         return;
       }
 
@@ -315,7 +316,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       loadPosts();
     } catch (error) {
       console.error('Error completing post:', error);
-      alert('Failed to mark as complete');
+      notify('Failed to mark as complete', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -327,12 +328,12 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       const hoursSinceCreation = postAge / (1000 * 60 * 60);
 
       if (hoursSinceCreation < 4) {
-        alert('Posts can only be bumped after 4 hours');
+        notify('Posts can only be bumped after 4 hours', { theme: 'cyan', tone: 'info' });
         return;
       }
 
       if (post.reply_count && post.reply_count > 0) {
-        alert('This post already has replies');
+        notify('This post already has replies', { theme: 'cyan', tone: 'warning' });
         return;
       }
 
@@ -342,7 +343,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
         const hoursSinceLastBump = timeSinceLastBump / (1000 * 60 * 60);
 
         if (hoursSinceLastBump < 24) {
-          alert('Posts can only be bumped once every 24 hours');
+          notify('Posts can only be bumped once every 24 hours', { theme: 'cyan', tone: 'info' });
           return;
         }
       }
@@ -382,7 +383,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       loadPosts();
     } catch (error) {
       console.error('Error bumping post:', error);
-      alert('Failed to bump post');
+      notify('Failed to bump post', { theme: 'cyan', tone: 'error' });
     }
   }
 

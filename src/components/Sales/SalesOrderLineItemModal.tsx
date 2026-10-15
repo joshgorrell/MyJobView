@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { X, Lock, Pencil, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
@@ -225,7 +226,7 @@ export function SalesOrderLineItemModal({
       }, 700);
     } catch (err) {
       console.error('Error saving line item:', err);
-      alert('Failed to save changes.');
+      notify('Failed to save changes.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

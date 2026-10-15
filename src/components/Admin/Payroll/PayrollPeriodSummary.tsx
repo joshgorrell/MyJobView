@@ -1,3 +1,4 @@
+import { notify } from '../../../lib/feedback';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Calendar, Lock, CheckCircle, AlertCircle, Clock, FileText, RefreshCw, RotateCcw } from 'lucide-react';
@@ -126,9 +127,7 @@ export default function PayrollPeriodSummary({
     const nextStatus = VISIBLE_FLOW[currentIdx + 1];
 
     if (nextStatus === 'payroll_approved' && readiness && !readiness.ready_for_submission) {
-      alert(
-        `Cannot advance to Payroll Approved. ${readiness.unassigned_jurisdiction} segments have unassigned jurisdiction, ${readiness.gps_mismatches} have GPS mismatches, and ${readiness.pending_count} employees are pending approval.`
-      );
+      notify(`Cannot advance to Payroll Approved. ${readiness.unassigned_jurisdiction} segments have unassigned jurisdiction, ${readiness.gps_mismatches} have GPS mismatches, and ${readiness.pending_count} employees are pending approval.`, { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -155,7 +154,7 @@ export default function PayrollPeriodSummary({
       await loadReadiness();
     } catch (err: any) {
       console.error('Error advancing status:', err);
-      alert(err.message || 'Failed to advance pay period status');
+      notify(err.message || 'Failed to advance pay period status', { theme: 'blue', tone: 'error' });
     } finally {
       setAdvancing(false);
     }
@@ -189,7 +188,7 @@ export default function PayrollPeriodSummary({
       await loadPeriods();
     } catch (err: any) {
       console.error('Error creating pay period:', err);
-      alert(err.message || 'Failed to create pay period');
+      notify(err.message || 'Failed to create pay period', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -211,7 +210,7 @@ export default function PayrollPeriodSummary({
       onRefresh?.();
     } catch (err: any) {
       console.error('Error reopening pay period:', err);
-      alert(err.message || 'Failed to reopen pay period');
+      notify(err.message || 'Failed to reopen pay period', { theme: 'blue', tone: 'error' });
     } finally {
       setReopening(false);
     }

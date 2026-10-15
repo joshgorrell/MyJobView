@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
 import { dateKey } from '../../lib/workOrderScheduling';
@@ -251,7 +252,7 @@ export function CrewScheduleView() {
   async function handleDrop(crewId: string, date: Date) {
     if (!draggedJob) return;
 
-    if (!window.confirm('Confirm this schedule move?')) return;
+    if (!(await requestConfirmation('Confirm this schedule move?', { theme: 'blue' }))) return;
 
     try {
       const job = jobs.find(j => j.id === draggedJob);
@@ -261,7 +262,7 @@ export function CrewScheduleView() {
 
       const result = await rescheduleWorkOrder(draggedJob, newDate, newStart, newEnd, undefined);
       if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+        if (!(await requestConfirmation('Scheduling conflict detected. Proceed anyway?', { theme: 'blue' }))) {
           return;
         }
         await rescheduleWorkOrder(draggedJob, newDate, newStart, newEnd, undefined, { force: true });

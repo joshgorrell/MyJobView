@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { MyJobTimeView } from './MyJobTimeView';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
@@ -129,7 +130,7 @@ export function MyTimeView() {
       loadRequests();
     } catch (error) {
       console.error('Error cancelling request:', error);
-      alert('Failed to cancel request');
+      notify('Failed to cancel request', { theme: 'blue', tone: 'error' });
     }
   }
 

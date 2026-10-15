@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Mail, Plus, Play, Pause, Trash2, Edit, Eye, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -77,7 +78,7 @@ export function EmailWorkflows() {
       loadWorkflows();
     } catch (error) {
       console.error('Error toggling workflow:', error);
-      alert('Failed to update workflow status');
+      notify('Failed to update workflow status', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -92,7 +93,7 @@ export function EmailWorkflows() {
       loadWorkflows();
     } catch (error) {
       console.error('Error deleting workflow:', error);
-      alert('Failed to delete workflow');
+      notify('Failed to delete workflow', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -291,7 +292,7 @@ function CreateWorkflowModal({
       onSuccess();
     } catch (error) {
       console.error('Error creating workflow:', error);
-      alert('Failed to create workflow');
+      notify('Failed to create workflow', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Edit2, Trash2, Save, X, Radio } from 'lucide-react';
@@ -100,7 +101,7 @@ export default function MonitoringServicesCatalog() {
       loadServices();
     } catch (error) {
       console.error('Error saving service:', error);
-      alert('Failed to save service');
+      notify('Failed to save service', { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -117,7 +118,7 @@ export default function MonitoringServicesCatalog() {
       loadServices();
     } catch (error) {
       console.error('Error deleting service:', error);
-      alert('Failed to delete service. It may be in use by existing contracts.');
+      notify('Failed to delete service. It may be in use by existing contracts.', { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -134,7 +135,7 @@ export default function MonitoringServicesCatalog() {
       loadServices();
     } catch (error) {
       console.error('Error updating service:', error);
-      alert('Failed to update service');
+      notify('Failed to update service', { theme: 'amber', tone: 'error' });
     }
   }
 

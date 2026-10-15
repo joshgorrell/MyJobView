@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, AlertCircle, Info, Megaphone, Newspaper, Calendar, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -80,7 +81,7 @@ export function CompanyMessagesManagement() {
 
       if (error) {
         console.error('Error updating message:', error);
-        alert('Failed to update message');
+        notify('Failed to update message', { theme: 'blue', tone: 'error' });
       } else {
         setShowForm(false);
         setEditingMessage(null);
@@ -94,7 +95,7 @@ export function CompanyMessagesManagement() {
 
       if (error) {
         console.error('Error creating message:', error);
-        alert('Failed to create message');
+        notify('Failed to create message', { theme: 'blue', tone: 'error' });
       } else {
         setShowForm(false);
         resetForm();
@@ -124,7 +125,7 @@ export function CompanyMessagesManagement() {
 
     if (error) {
       console.error('Error deleting message:', error);
-      alert('Failed to delete message');
+      notify('Failed to delete message', { theme: 'blue', tone: 'error' });
     } else {
       loadMessages();
     }

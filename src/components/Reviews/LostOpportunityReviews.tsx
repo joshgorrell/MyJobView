@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { FullEmailPreview } from "./FullEmailPreview";
 import AdminSalesReviewModal from "./AdminSalesReviewModal";
 import React, { useEffect, useState } from "react";
@@ -675,7 +676,7 @@ export default function LostOpportunityReviews(
                     aria-label="Delete lost opportunity review"
                     title="Delete review"
                     onClick={async () => {
-                      if (!window.confirm("Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.")) return;
+                      if (!(await requestConfirmation("Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.", { theme: 'blue' }))) return;
                       if (await action({ action: "delete", request_id: v.request_id })) {
                         setExpandedReview(null);
                         setNotice("Lost opportunity review deleted.");

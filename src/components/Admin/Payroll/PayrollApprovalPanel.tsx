@@ -1,3 +1,4 @@
+import { notify } from '../../../lib/feedback';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { CheckCircle, XCircle, Users } from 'lucide-react';
@@ -97,7 +98,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
       await loadApprovals();
     } catch (err: any) {
       console.error('Error updating approval:', err);
-      alert(err.message || 'Failed to update approval');
+      notify(err.message || 'Failed to update approval', { theme: 'blue', tone: 'error' });
     } finally {
       setUpdating(false);
     }
@@ -139,7 +140,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
       await loadApprovals();
     } catch (err: any) {
       console.error('Error approving all:', err);
-      alert(err.message || 'Failed to approve all');
+      notify(err.message || 'Failed to approve all', { theme: 'blue', tone: 'error' });
     } finally {
       setUpdating(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { X, Search, Trash2, Package, ShoppingCart, Wrench, ClipboardList, Calendar, Target, Layers, User } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -376,13 +377,13 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) { alert('Add at least one item'); return; }
+    if (items.length === 0) { notify('Add at least one item', { theme: 'blue', tone: 'info' }); return; }
 
     if (targetMode === 'single' && sourceType !== 'general') {
-      if (!customerContactId) { alert('Please select a customer'); return; }
-      if (sourceType === 'sales_order' && !salesOrderId) { alert('Please select a Sales Order'); return; }
-      if (sourceType === 'work_order' && !workOrderId && !projectId) { alert('Please select a Project or Work Order'); return; }
-      if (sourceType === 'service_request' && !serviceRequestId) { alert('Please select a Service Request'); return; }
+      if (!customerContactId) { notify('Please select a customer', { theme: 'blue', tone: 'warning' }); return; }
+      if (sourceType === 'sales_order' && !salesOrderId) { notify('Please select a Sales Order', { theme: 'blue', tone: 'warning' }); return; }
+      if (sourceType === 'work_order' && !workOrderId && !projectId) { notify('Please select a Project or Work Order', { theme: 'blue', tone: 'warning' }); return; }
+      if (sourceType === 'service_request' && !serviceRequestId) { notify('Please select a Service Request', { theme: 'blue', tone: 'warning' }); return; }
     }
 
     setSubmitting(true);
@@ -443,11 +444,11 @@ export function PartsRequestForm({ onClose, onSuccess }: PartsRequestFormProps) 
         })));
       }
 
-      alert('Product request submitted successfully!');
+      notify('Product request submitted successfully!', { theme: 'blue', tone: 'success' });
       onSuccess();
     } catch (error: any) {
       console.error('Error submitting product request:', error);
-      alert(`Error submitting request: ${error.message || 'Unknown error'}`);
+      notify(`Error submitting request: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

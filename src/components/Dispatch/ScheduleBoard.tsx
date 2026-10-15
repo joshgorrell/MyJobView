@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, User, MapPin, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
@@ -148,7 +149,7 @@ export function ScheduleBoard() {
       );
 
       if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+        if (!(await requestConfirmation('Scheduling conflict detected. Proceed anyway?', { theme: 'blue' }))) {
           return;
         }
         await rescheduleAppointment(draggedAppointment, newDate, apt.start_time, apt.end_time, newTech, { force: true });

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -212,7 +213,7 @@ export function DispatchCustomerComms() {
       await loadMessages(selectedWO.projects.contact_id);
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message');
+      notify('Failed to send message', { theme: 'blue', tone: 'error' });
     } finally {
       setSendingMessage(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { AIFormFill } from '../Shared/AIFormFill';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Flag, Users, Plus, UserPlus, ListTodo } from 'lucide-react';
@@ -159,7 +160,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
   async function handleCreateContact() {
     if (!newContactData.contact_name.trim()) {
-      alert('Contact name is required');
+      notify('Contact name is required', { theme: 'cyan', tone: 'warning' });
       return;
     }
 
@@ -194,7 +195,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       loadContacts();
     } catch (err: any) {
       console.error('Error creating contact:', err);
-      alert('Failed to create contact: ' + err.message);
+      notify('Failed to create contact: ' + err.message, { theme: 'cyan', tone: 'error' });
     }
   }
 

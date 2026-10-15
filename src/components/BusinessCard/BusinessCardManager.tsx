@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { CreditCard, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -60,7 +61,7 @@ export function BusinessCardManager() {
       loadCards();
     } catch (error) {
       console.error('Error deleting card:', error);
-      alert('Failed to delete business card');
+      notify('Failed to delete business card', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -75,7 +76,7 @@ export function BusinessCardManager() {
       loadCards();
     } catch (error) {
       console.error('Error updating card:', error);
-      alert('Failed to update business card');
+      notify('Failed to update business card', { theme: 'blue', tone: 'error' });
     }
   }
 

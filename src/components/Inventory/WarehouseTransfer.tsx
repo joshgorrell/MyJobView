@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ArrowRightLeft, Plus, Check, X, MapPin, Trash2 } from 'lucide-react';
@@ -106,13 +107,13 @@ export function WarehouseTransfer() {
       .maybeSingle();
 
     if (!inventory || inventory.quantity_available <= 0) {
-      alert('Product not available in source warehouse');
+      notify('Product not available in source warehouse', { theme: 'amber', tone: 'info' });
       return;
     }
 
     const existing = transferItems.find(item => item.product_id === selectedProduct);
     if (existing) {
-      alert('Product already in transfer list');
+      notify('Product already in transfer list', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -155,17 +156,17 @@ export function WarehouseTransfer() {
 
   async function handleTransfer() {
     if (!fromWarehouse || !toWarehouse) {
-      alert('Please select source and destination warehouses');
+      notify('Please select source and destination warehouses', { theme: 'amber', tone: 'warning' });
       return;
     }
 
     if (fromWarehouse === toWarehouse) {
-      alert('Source and destination warehouses must be different');
+      notify('Source and destination warehouses must be different', { theme: 'amber', tone: 'warning' });
       return;
     }
 
     if (transferItems.length === 0) {
-      alert('Please add items to transfer');
+      notify('Please add items to transfer', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -256,11 +257,11 @@ export function WarehouseTransfer() {
           ]);
       }
 
-      alert('Transfer completed successfully!');
+      notify('Transfer completed successfully!', { theme: 'amber', tone: 'success' });
       setTransferItems([]);
     } catch (error) {
       console.error('Error processing transfer:', error);
-      alert('Error processing transfer. Please try again.');
+      notify('Error processing transfer. Please try again.', { theme: 'amber', tone: 'error' });
     } finally {
       setTransferring(false);
     }

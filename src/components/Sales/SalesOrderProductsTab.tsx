@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Package, Loader2, Hash, Tag, ChevronDown, ChevronRight, LayoutList, Clock, Wrench, Building2, LayoutGrid, List, Columns2 as Columns, Check, Printer, AlertCircle, ShoppingCart, Layers, X } from 'lucide-react';
@@ -268,7 +269,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) { alert('You must be signed in to request parts'); return; }
+      if (!userId) { notify('You must be signed in to request parts', { theme: 'violet', tone: 'warning' }); return; }
 
       const { data: req, error: reqError } = await supabase
         .from('product_requests')
@@ -297,10 +298,10 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
         });
       if (itemError) throw itemError;
 
-      alert('Parts request created successfully! Purchasing has been notified.');
+      notify('Parts request created successfully! Purchasing has been notified.', { theme: 'violet', tone: 'success' });
       setRequestingItem(null);
     } catch (err: any) {
-      alert(`Error creating parts request: ${err.message}`);
+      notify(`Error creating parts request: ${err.message}`, { theme: 'violet', tone: 'error' });
     } finally {
       setRequestSaving(false);
     }
@@ -309,7 +310,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
   async function submitBulkPartRequest(selected: ProductLineItem[]) {
     const requestable = selected.filter(i => i.product_id && i.quantity && isVisibleItem(i) && !i.is_hidden);
     if (requestable.length === 0) {
-      alert('No requestable products selected.');
+      notify('No requestable products selected.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -317,7 +318,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) { alert('You must be signed in to request parts'); return; }
+      if (!userId) { notify('You must be signed in to request parts', { theme: 'violet', tone: 'warning' }); return; }
 
       // Group by vendor so each vendor gets its own clean request.
       const byVendor = new Map<string, ProductLineItem[]>();
@@ -373,10 +374,10 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
         createdCount++;
       }
 
-      alert(`Created ${createdCount} parts request${createdCount !== 1 ? 's' : ''} (${byVendor.size} vendor${byVendor.size !== 1 ? 's' : ''}). Purchasing has been notified.`);
+      notify(`Created ${createdCount} parts request${createdCount !== 1 ? 's' : ''} (${byVendor.size} vendor${byVendor.size !== 1 ? 's' : ''}). Purchasing has been notified.`, { theme: 'violet', tone: 'success' });
       clearSelection();
     } catch (err: any) {
-      alert(`Error creating parts requests: ${err.message}`);
+      notify(`Error creating parts requests: ${err.message}`, { theme: 'violet', tone: 'error' });
     } finally {
       setBulkRequestSaving(false);
     }
