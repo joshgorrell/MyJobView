@@ -6,6 +6,8 @@ for (const [label, pattern] of [
   ['locked intake', /where id = target_intake for update/],
   ['locked routing claim', /where intake_id = target_intake for update/],
   ['completed retry returns prior ID', /if claim\.state = 'completed'[\s\S]*?return claim\.destination_id/],
+  ['claim tenant consistency', /claim\.organization_id is distinct from item\.organization_id/],
+  ['null-safe readiness', /item\.missing_fields is distinct from '\\[\\]'::jsonb/],
   ['requires verified details', /from public\.intake_service_details/],
   ['blocks unsafe attachments', /a\.scan_status <> 'clean' or a\.disposition = 'pending'/],
   ['creates real service request', /insert into public\.service_requests/],
