@@ -42,7 +42,8 @@ begin
   if not found then raise exception 'Intake not found'; end if;
   if current_item.contact_id is null
     or current_item.classification not in ('service','task','sales')
-    or current_item.status not in ('ready','needs_review','awaiting_employee','awaiting_customer') then
+    or current_item.status <> 'ready'
+    or current_item.missing_fields <> '[]'::jsonb then
     return false;
   end if;
   if exists (
@@ -51,6 +52,15 @@ begin
     where m.intake_id = target_intake
       and (a.scan_status <> 'clean' or a.disposition = 'pending')
   ) then
+    return false;
+  end if;
+  -- Never enqueue a receipt that has no safely persisted message content.
+  if not exists (
+    select 1 from public.intake_messages m
+    where m.intake_id = target_intake
+      and m.direction = 'inbound'
+      and nullif(btrim(m.body), '') is not null
+  ) and nullif(btrim(current_item.raw_body), '') is null then
     return false;
   end if;
   insert into public.intake_routing_claims (intake_id, organization_id)
