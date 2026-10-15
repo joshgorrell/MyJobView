@@ -10,7 +10,7 @@ const TaskForm = lazy(() => import('../Tasks/TaskForm').then(m => ({ default: m.
 type IntakeType = 'service' | 'support' | 'task';
 type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null; office_id: string | null };
 
-export function ManualIntake({ onClose, onCreated }: { onClose: () => void; onCreated?: () => void }) {
+export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onClose: () => void; onCreated?: () => void; serviceOnly?: boolean }) {
   const { tenant } = useTenant();
   const { profile } = useAuth();
   const organizationId = tenant?.organizationId && profile?.organization_id === tenant.organizationId
@@ -146,8 +146,8 @@ export function ManualIntake({ onClose, onCreated }: { onClose: () => void; onCr
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-1 text-sm text-gray-300">Type
           <select value={type} onChange={e => setType(e.target.value as IntakeType)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
-            <option value="service">Service Request</option><option value="support">Customer Support</option>
-            <option value="task">Task</option>
+            <option value="service">Service Request</option>{!serviceOnly && <option value="support">Customer Support</option>}
+            {!serviceOnly && <option value="task">Task</option>}
           </select>
         </label>
         <label className="space-y-1 text-sm text-gray-300">Priority
