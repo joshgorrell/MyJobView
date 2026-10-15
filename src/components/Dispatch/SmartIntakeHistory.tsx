@@ -274,7 +274,7 @@ export function SmartIntakeHistory() {
               <label className="block">Email (optional)<input type="email" maxLength={254} value={newCustomerEmail} onChange={e => setNewCustomerEmail(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
               <label className="block">Phone (optional)<input type="tel" maxLength={40} value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
               <button type="button" disabled={confirmingCustomer || !newCustomerName.trim()} onClick={() => void createCustomerAndConfirm()} className="min-h-11 rounded bg-blue-600 px-3 text-white disabled:opacity-50">Create and confirm customer</button>
-            </div></p>
+            </div>}
           </div>}
           {selected.item.contact_id && selected.item.classification === 'service' && selected.item.status !== 'processed' && <div className="space-y-2 rounded-lg border border-gray-700 p-3">
             <h4 className="font-semibold">Verify service request details</h4>
