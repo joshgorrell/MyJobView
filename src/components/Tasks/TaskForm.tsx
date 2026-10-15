@@ -1,3 +1,4 @@
+import { AIFormFill } from '../Shared/AIFormFill';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Flag, Users, Plus, UserPlus, ListTodo } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -27,12 +28,13 @@ interface TaskFormProps {
   onClose: () => void;
   onSuccess: () => void;
   aiPrefill?: AIPrefill | null;
+  supportMode?: boolean;
 }
 
-export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill }: TaskFormProps) {
+export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill, supportMode = false }: TaskFormProps) {
   const { profile } = useAuth();
   const [formData, setFormData] = useState({
-    title: task?.title || '',
+    title: task?.title || (supportMode ? 'Support: ' : ''),
     description: task?.description || '',
     priority: task?.priority || 'medium',
     due_date: task?.due_date ? task.due_date.split('T')[0] : '',
@@ -53,7 +55,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
-  const autoSaveKey = task ? `task_edit_${task.id}` : 'task_new';
+  const autoSaveKey = task ? `task_edit_${task.id}` : supportMode ? 'task_new_support' : 'task_new';
   const { restoreSavedData, clearSavedData } = useAutoSave({
     key: autoSaveKey,
     data: formData,
@@ -80,7 +82,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       if (aiPrefill) {
         setFormData(prev => ({
           ...prev,
-          title: aiPrefill.title || prev.title,
+          title: supportMode && aiPrefill.title && !/^Support:/i.test(aiPrefill.title) ? `Support: ${aiPrefill.title}` : aiPrefill.title || prev.title,
           description: aiPrefill.description || prev.description,
           priority: aiPrefill.priority || prev.priority,
           due_date: aiPrefill.dueDate || prev.due_date,
@@ -90,7 +92,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       } else {
         const savedData = restoreSavedData();
         if (savedData) {
-          setFormData(savedData);
+          setFormData(prev => ({ ...prev, ...savedData, title: supportMode && !String(savedData.title || '').trim() ? 'Support: ' : savedData.title }));
         }
       }
     }
@@ -200,6 +202,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     e.preventDefault();
     if (!profile) return;
 
+    if (supportMode && !formData.title.replace(/^Support:\s*/i, '').trim()) {
+      setError('Enter a short description of the support needed.');
+      return;
+    }
+    if (supportMode && !formData.contact_id) {
+      setError('Select a customer contact for this support request.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -339,8 +349,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <QuickActionModal
       scrollBody={false}
       stableHeight
-      title={task ? 'Edit Task' : 'New Task'}
-      subtitle={task ? 'Update task details' : 'Assign and track a new task'}
+      title={task ? 'Edit Task' : supportMode ? 'New Support Request' : 'New Task'}
+      subtitle={task ? 'Update task details' : supportMode ? 'Customer assistance tracked as a task' : 'Assign and track a new task'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
@@ -350,6 +360,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
           <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 space-y-4">
+            <AIFormFill kind={supportMode ? 'support' : 'task'} onFill={prefill => setFormData(previous => ({ ...previous, title: prefill.title ? (supportMode && !/^Support:/i.test(prefill.title) ? `Support: ${prefill.title}` : prefill.title) : previous.title, description: prefill.description ?? previous.description, priority: prefill.priority ?? previous.priority, due_date: prefill.dueDate ?? previous.due_date, contact_id: prefill.contactId ?? previous.contact_id }))} />
             {error && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
                 {error}
@@ -430,7 +441,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             {/* Contact - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
-                Contact <span className="text-muted font-normal">(optional)</span>
+                Contact <span className="text-muted font-normal">{supportMode ? '(required for support)' : '(optional)'}</span>
               </label>
               <div className="flex gap-2">
                 <ContactSearchSelect

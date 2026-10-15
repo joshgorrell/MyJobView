@@ -22,7 +22,7 @@ import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
-import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
 import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
@@ -188,12 +188,15 @@ function AppContent() {
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [aiLeadPrefill, setAiLeadPrefill] = useState<LeadPrefill | null>(null);
   const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
+  const [showServiceTypePicker, setShowServiceTypePicker] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
+  const [showSupportTaskForm, setShowSupportTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
@@ -821,7 +824,7 @@ function AppContent() {
             onCreateLead={() => setShowLeadForm(true)}
             onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
-            onCreateServiceRequest={() => setShowServiceRequestForm(true)}
+            onCreateServiceRequest={() => setShowServiceTypePicker(true)}
             onCreateTask={() => {
               setAiTaskPrefill(null);
               setShowAiTaskForm(true);
@@ -1193,13 +1196,28 @@ function AppContent() {
       {showLeadForm && (
         <Suspense fallback={null}>
           <LeadForm
-            onClose={() => setShowLeadForm(false)}
+            aiPrefill={aiLeadPrefill}
+            onClose={() => { setShowLeadForm(false); setAiLeadPrefill(null); }}
             onSuccess={() => {
               setShowLeadForm(false);
+              setAiLeadPrefill(null);
               setActiveTab('feed');
             }}
           />
         </Suspense>
+      )}
+
+      {showServiceTypePicker && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowServiceTypePicker(false); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="service-type-heading" className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 text-white shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="service-type-heading" className="text-xl font-semibold">New Service Request</h2><p className="mt-1 text-sm text-gray-300">What do you need to create?</p></div><button type="button" onClick={() => setShowServiceTypePicker(false)} className="rounded p-2 text-gray-300 hover:bg-gray-800" aria-label="Close">✕</button></div>
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowServiceRequestForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Service</span><span className="text-sm text-gray-300">On-site work, repairs, troubleshooting, or dispatch</span></button>
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setAiTaskPrefill(null); setShowSupportTaskForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Support</span><span className="text-sm text-gray-300">Customer assistance and remote support</span></button>
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowAiTaskForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Task</span><span className="text-sm text-gray-300">Follow-ups and assigned action items</span></button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showServiceRequestForm && (
@@ -1212,6 +1230,17 @@ function AppContent() {
               setActiveTab('dispatch_dashboard');
             }}
             aiPrefill={aiServiceRequestPrefill}
+          />
+        </Suspense>
+      )}
+
+      {showSupportTaskForm && (
+        <Suspense fallback={null}>
+          <TaskForm
+            supportMode
+            aiPrefill={aiTaskPrefill}
+            onClose={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
+            onSuccess={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
           />
         </Suspense>
       )}
@@ -1276,7 +1305,7 @@ function AppContent() {
           onRegisterOpen={(fn) => { openAIAssistantRef.current = fn; }}
           onAction={(action) => {
             const actionModule: Record<string, string> = {
-              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks',
+              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks', CREATE_SUPPORT_REQUEST: 'tasks',
               CREATE_SERVICE_REQUEST: 'service_requests', CREATE_MESSAGE: 'messages',
               CREATE_PROPOSAL: 'proposals', CREATE_SECURITY_CONTRACT: 'security_onboarding',
               OPEN_PROPOSAL: 'proposals',
@@ -1289,10 +1318,14 @@ function AppContent() {
             if (action.type === 'CREATE_CONTACT') {
               setShowContactForm(true);
             } else if (action.type === 'CREATE_LEAD') {
+              setAiLeadPrefill((action.prefill as LeadPrefill | undefined) ?? null);
               setShowLeadForm(true);
             } else if (action.type === 'CREATE_TASK') {
               if (action.prefill) setAiTaskPrefill(action.prefill as { title?: string; description?: string; priority?: string; dueDate?: string });
               setShowAiTaskForm(true);
+            } else if (action.type === 'CREATE_SUPPORT_REQUEST') {
+              setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
+              setShowSupportTaskForm(true);
             } else if (action.type === 'CREATE_SERVICE_REQUEST') {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);

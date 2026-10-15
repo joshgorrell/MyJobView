@@ -264,7 +264,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <Wrench className="w-4 h-4 text-orange-400" />
                     <div>
-                      <div className="font-medium">Work Order Request</div>
+                      <div className="font-medium">Service Request</div>
                       <div className="text-xs text-muted">Request service or project work</div>
                     </div>
                   </button>
@@ -485,7 +485,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <Wrench className="w-4 h-4 text-orange-400 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium">Work Order Request</div>
+                      <div className="text-sm font-medium">Service Request</div>
                       <div className="text-xs text-muted">Request service or project work</div>
                     </div>
                   </button>

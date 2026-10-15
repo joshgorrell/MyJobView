@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, X, Send, Loader, RotateCcw, Zap, CheckCircle, FileText } from 'lucide-react';
+import { Sparkles, X, Send, Loader, RotateCcw, Zap, CheckCircle, FileText, Mic, MicOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import DesignBriefModal from '../Sales/DesignBriefModal';
@@ -177,6 +177,53 @@ export function AIAssistant({
   const activeRequestRef = useRef<AbortController | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  type BrowserSpeechRecognition = {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>>; resultIndex: number }) => void) | null;
+    onerror: ((event: { error: string }) => void) | null;
+    onend: (() => void) | null;
+    start: () => void;
+    stop: () => void;
+  };
+  const [listening, setListening] = useState(false);
+  const [speechError, setSpeechError] = useState('');
+  const speechRef = useRef<{ start: () => void; stop: () => void } | null>(null);
+
+  useEffect(() => () => { speechRef.current?.stop(); speechRef.current = null; }, []);
+
+  function toggleDictation() {
+    if (listening) { speechRef.current?.stop(); return; }
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: new () => BrowserSpeechRecognition;
+      webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+    };
+    const SpeechRecognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechError('Voice dictation is not supported in this browser. You can use your keyboard microphone instead.');
+      return;
+    }
+    setSpeechError('');
+    const recognition = new SpeechRecognition();
+    recognition.lang = navigator.language || 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.onresult = (event: { results: ArrayLike<ArrayLike<{ transcript: string }>>; resultIndex: number }) => {
+      const words = Array.from(event.results).slice(event.resultIndex)
+        .map(result => result[0]?.transcript?.trim() ?? '').filter(Boolean).join(' ');
+      if (words) setInput(previous => [previous.trim(), words].filter(Boolean).join(' '));
+    };
+    recognition.onerror = (event: { error: string }) => {
+      setSpeechError(event.error === 'not-allowed' ? 'Microphone access was denied.' : 'Dictation stopped. You can retry or type your request.');
+      setListening(false);
+    };
+    recognition.onend = () => { setListening(false); speechRef.current = null; };
+    speechRef.current = recognition;
+    try { recognition.start(); setListening(true); }
+    catch { speechRef.current = null; setSpeechError('Unable to start microphone dictation.'); }
+  }
+
 
   useEffect(() => {
     activeRequestRef.current?.abort();
@@ -502,6 +549,16 @@ export function AIAssistant({
                     }}
                   />
                   <button
+                    type="button"
+                    aria-label={listening ? 'Stop dictation' : 'Start voice dictation'}
+                    aria-pressed={listening}
+                    title={listening ? 'Stop dictation' : 'Dictate your request'}
+                    onClick={toggleDictation}
+                    className={`w-11 h-11 flex-shrink-0 rounded-xl border flex items-center justify-center ${listening ? 'border-red-500 text-red-500 bg-red-500/10' : 'border-subtle text-primary bg-surface hover:bg-elevated'}`}
+                  >
+                    {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                  <button
                     aria-label="Send message"
                     onClick={() => sendMessage()}
                     disabled={!input.trim() || loading}
@@ -510,7 +567,8 @@ export function AIAssistant({
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-xs text-muted mt-1.5 text-center">Enter to send · Shift+Enter for new line</p>
+                {speechError && <p role="alert" className="text-xs text-amber-500 mt-1.5">{speechError}</p>}
+                <p className="text-xs text-muted mt-1.5 text-center">{listening ? 'Listening… stop dictation to review before sending' : 'Enter to send · Shift+Enter for new line'}</p>
               </div>
           </div>
         </QuickActionModal>
