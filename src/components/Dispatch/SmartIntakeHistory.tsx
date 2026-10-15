@@ -41,6 +41,13 @@ export function SmartIntakeHistory() {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerEmail, setNewCustomerEmail] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [serviceAddress, setServiceAddress] = useState('');
+  const [serviceCity, setServiceCity] = useState('');
+  const [serviceState, setServiceState] = useState('');
+  const [serviceZip, setServiceZip] = useState('');
+  const [serviceBillingBy, setServiceBillingBy] = useState<'dispatch'|'admin'>('dispatch');
+  const [savingService, setSavingService] = useState(false);
+  const [serviceMessage, setServiceMessage] = useState('');
   const inspectionVersion = useRef(0);
   const orgId = tenant?.organizationId && profile?.organization_id === tenant.organizationId ? tenant.organizationId : profile?.organization_id && !tenant ? profile.organization_id : null;
 
@@ -132,6 +139,30 @@ export function SmartIntakeHistory() {
     }
   }
 
+  async function verifyServiceDetails() {
+    if (!selected || !selected.item.contact_id || selected.item.classification !== 'service' || !serviceAddress.trim() || savingService) return;
+    setSavingService(true);
+    setServiceMessage('');
+    try {
+      const { error: saveError } = await supabase.rpc('smart_intake_verify_service_details', {
+        target_intake: selected.item.id,
+        location_address: serviceAddress.trim(),
+        location_city: serviceCity.trim(),
+        location_state: serviceState.trim(),
+        location_zip: serviceZip.trim(),
+        billing_type: 'billable',
+        billing_by: serviceBillingBy,
+      });
+      if (saveError) throw saveError;
+      setServiceMessage('Service details verified. Routing remains pending.');
+      await inspect(selected.item.id);
+    } catch (e) {
+      setServiceMessage(e instanceof Error ? e.message : 'Unable to verify service details.');
+    } finally {
+      setSavingService(false);
+    }
+  }
+
   async function inspect(id: string) {
     if (!orgId) return;
     const version = ++inspectionVersion.current;
@@ -139,6 +170,7 @@ export function SmartIntakeHistory() {
     setAttachments([]);
     setCustomer(null);
     setCustomerSearch('');
+    setServiceMessage('');
     setNewCustomerOpen(false);
     setNewCustomerName('');
     setNewCustomerEmail('');
@@ -224,6 +256,20 @@ export function SmartIntakeHistory() {
               <label className="block">Phone (optional)<input type="tel" maxLength={40} value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
               <button type="button" disabled={confirmingCustomer || !newCustomerName.trim()} onClick={() => void createCustomerAndConfirm()} className="min-h-11 rounded bg-blue-600 px-3 text-white disabled:opacity-50">Create and confirm customer</button>
             </div></p>
+          </div>}
+          {selected.item.contact_id && selected.item.classification === 'service' && selected.item.status !== 'processed' && <div className="space-y-2 rounded-lg border border-gray-700 p-3">
+            <h4 className="font-semibold">Verify service request details</h4>
+            <p className="text-xs text-gray-400">Confirm the job location and billing owner before routing. This does not create a service request.</p>
+            <label className="block">Job street address<input value={serviceAddress} maxLength={500} onChange={e => setServiceAddress(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <label>City<input value={serviceCity} maxLength={120} onChange={e => setServiceCity(e.target.value)} className="w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
+              <label>State<input value={serviceState} maxLength={80} onChange={e => setServiceState(e.target.value)} className="w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
+              <label>ZIP<input value={serviceZip} maxLength={20} onChange={e => setServiceZip(e.target.value)} className="w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
+            </div>
+            <label className="block">Billing owner<select value={serviceBillingBy} onChange={e => setServiceBillingBy(e.target.value as 'dispatch'|'admin')} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2"><option value="dispatch">Dispatch</option><option value="admin">Admin</option></select></label>
+            <p className="text-xs text-gray-400">Billing type: Billable. Warranty and sales-rep billing require the full Service Request form.</p>
+            <button type="button" disabled={savingService || !serviceAddress.trim()} onClick={() => void verifyServiceDetails()} className="min-h-11 rounded bg-blue-600 px-3 text-white disabled:opacity-50">Verify service details</button>
+            {serviceMessage && <p role="status">{serviceMessage}</p>}
           </div>}
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
           <h4 className="font-semibold">Attachments</h4>
