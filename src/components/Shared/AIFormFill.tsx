@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Mic, Sparkles, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -11,8 +11,12 @@ export function AIFormFill({ kind, onFill }: { kind: FormKind; onFill: (prefill:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => () => recognitionRef.current?.stop(), []);
 
   function dictate() {
+    if (listening) { recognitionRef.current?.stop(); return; }
     const w = window as typeof window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
     const Recognition = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Recognition) { setError('Voice dictation is unavailable in this browser. You can type instead.'); return; }
@@ -23,10 +27,11 @@ export function AIFormFill({ kind, onFill }: { kind: FormKind; onFill: (prefill:
       setInput(previous => [previous, transcript].filter(Boolean).join(' '));
     };
     recognition.onerror = () => { setListening(false); setError('Could not capture speech. Try again or type.'); };
-    recognition.onend = () => setListening(false);
+    recognition.onend = () => { recognitionRef.current = null; setListening(false); };
+    recognitionRef.current = recognition;
     setError('');
     setListening(true);
-    recognition.start();
+    try { recognition.start(); } catch { setListening(false); recognitionRef.current = null; setError('Unable to start dictation.'); }
   }
 
   async function fill() {
@@ -63,19 +68,19 @@ export function AIFormFill({ kind, onFill }: { kind: FormKind; onFill: (prefill:
 
   return (
     <div className="mb-3">
-      <button type="button" onClick={() => setOpen(value => !value)} className="inline-flex items-center gap-1.5 text-sm font-medium text-cyan-600 hover:text-cyan-500">
+      <button type="button" onClick={() => { if (open) recognitionRef.current?.stop(); setOpen(value => !value); }} className="inline-flex items-center gap-1.5 text-sm font-medium text-cyan-600 hover:text-cyan-500">
         <Sparkles className="h-4 w-4" /> Fill with AI
       </button>
       {open && (
         <div className="mt-2 rounded-lg border border-subtle bg-surface p-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-primary">Describe what you need</span>
-            <button type="button" aria-label="Close AI form fill" onClick={() => setOpen(false)}><X className="h-4 w-4" /></button>
+            <button type="button" aria-label="Close AI form fill" onClick={() => { recognitionRef.current?.stop(); setOpen(false); }}><X className="h-4 w-4" /></button>
           </div>
           <textarea value={input} onChange={event => setInput(event.target.value)} rows={3} placeholder="Type the details, or use the microphone..." className="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-primary" />
           {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
           <div className="flex items-center justify-between gap-2">
-            <button type="button" onClick={dictate} disabled={busy || listening} className="inline-flex items-center gap-1 text-sm text-secondary"><Mic className="h-4 w-4" /> {listening ? 'Listening...' : 'Dictate'}</button>
+            <button type="button" onClick={dictate} disabled={busy} className="inline-flex items-center gap-1 text-sm text-secondary"><Mic className="h-4 w-4" /> {listening ? 'Stop listening' : 'Dictate'}</button>
             <button type="button" onClick={fill} disabled={busy || !input.trim()} className="rounded-md bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">{busy ? 'Filling...' : 'Fill Form'}</button>
           </div>
           <p className="text-xs text-secondary">Review the populated fields before saving. Unknown details are left unchanged.</p>
