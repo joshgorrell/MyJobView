@@ -1,3 +1,4 @@
+import { AIFormFill } from '../Shared/AIFormFill';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Flag, Users, Plus, UserPlus, ListTodo } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -359,6 +360,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
           <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 space-y-4">
+            <AIFormFill kind={supportMode ? 'support' : 'task'} onFill={prefill => setFormData(previous => ({ ...previous, title: prefill.title ? (supportMode && !/^Support:/i.test(prefill.title) ? `Support: ${prefill.title}` : prefill.title) : previous.title, description: prefill.description ?? previous.description, priority: prefill.priority ?? previous.priority, due_date: prefill.dueDate ?? previous.due_date, contact_id: prefill.contactId ?? previous.contact_id }))} />
             {error && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
                 {error}
