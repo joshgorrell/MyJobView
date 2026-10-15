@@ -359,12 +359,12 @@ for(const width of [320,390,768,1440]) {
  await productPage.getByRole('heading',{name:'QN85Q8F',exact:true}).waitFor();
  const description=productPage.getByText(productDescription,{exact:true});
  assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'3','Overview intentionally previews three lines');
+ assert.equal(await productPage.getByText('Non-Inventory',{exact:true}).count(),0);
+ assert.equal(await productPage.getByLabel('Product type: Non-Inventory',{exact:true}).count(),1);
  await productPage.getByRole('button',{name:'Details',exact:true}).click();
  const fullDescription=productPage.getByText(productDescription,{exact:true});
  assert.equal(await fullDescription.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none','Details must show the full description');
  assert.ok(await productPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Product modal fits '+width);
- assert.equal(await productPage.getByText('Non-Inventory',{exact:true}).count(),0);
- assert.equal(await productPage.getByLabel('Product type: Non-Inventory',{exact:true}).count(),1);
  const close=productPage.getByRole('button',{name:'Close',exact:true});
  const rect=await close.boundingBox();assert.ok(rect.y+rect.height<=844,'Close stays inside visible viewport');
  await close.click();assert.equal(await productPage.title(),'Product closed');
