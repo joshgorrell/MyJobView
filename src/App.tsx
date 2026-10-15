@@ -22,7 +22,7 @@ import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
-import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
 import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
@@ -188,6 +188,7 @@ function AppContent() {
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [aiLeadPrefill, setAiLeadPrefill] = useState<LeadPrefill | null>(null);
   const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
@@ -1194,9 +1195,11 @@ function AppContent() {
       {showLeadForm && (
         <Suspense fallback={null}>
           <LeadForm
-            onClose={() => setShowLeadForm(false)}
+            aiPrefill={aiLeadPrefill}
+            onClose={() => { setShowLeadForm(false); setAiLeadPrefill(null); }}
             onSuccess={() => {
               setShowLeadForm(false);
+              setAiLeadPrefill(null);
               setActiveTab('feed');
             }}
           />
@@ -1303,6 +1306,7 @@ function AppContent() {
             if (action.type === 'CREATE_CONTACT') {
               setShowContactForm(true);
             } else if (action.type === 'CREATE_LEAD') {
+              setAiLeadPrefill((action.prefill as LeadPrefill | undefined) ?? null);
               setShowLeadForm(true);
             } else if (action.type === 'CREATE_TASK') {
               if (action.prefill) setAiTaskPrefill(action.prefill as { title?: string; description?: string; priority?: string; dueDate?: string });
