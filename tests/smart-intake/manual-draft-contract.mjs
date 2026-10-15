@@ -15,6 +15,6 @@ assert.match(form, /validateManualIntakeDraft\(/);
 assert.match(form, /smart_intake_create_manual_service/);
 assert.match(form, /Create Service Request/);
 assert.match(form, /type !== 'service' \|\| !draftValidation.ok \|\| submitting/);
-assert.match(draft, /if \(service && !jobAddress/);
+assert.match(draft, /if \(service && \(!jobAddress \|\| jobAddress\.length > 300\)\)/);
 assert.doesNotMatch(draft, /\.from\(|\.insert\(|\.update\(|fetch\(/);
 console.log('Manual intake validation contract passed');
