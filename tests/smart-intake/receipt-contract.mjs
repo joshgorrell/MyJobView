@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const endpoint = readFileSync(new URL('../../supabase/functions/smart-intake-email/index.ts', import.meta.url), 'utf8');
 const foundation = readFileSync(new URL('../../supabase/migrations/20261014120000_smart_intake_foundation.sql', import.meta.url), 'utf8');
+const manifest = readFileSync(new URL('../../supabase/functions/smart-intake-email/attachment-manifest.ts', import.meta.url), 'utf8');
 const purpose = readFileSync(new URL('../../supabase/migrations/20261014150000_smart_intake_destination_purpose.sql', import.meta.url), 'utf8');
 
 assert.match(endpoint, /SMART_INTAKE_EMAIL_ENABLED/);
@@ -28,8 +29,8 @@ assert.match(endpoint, /Invalid provider response/);
 assert.match(endpoint, /Attachment processing pending/);
 assert.match(endpoint, /parseAttachmentManifest\(email\.attachments\)/);
 assert.match(endpoint, /attachments\.length > 0/);
-assert.match(endpoint, /attachments\.length > 20/);
-assert.match(endpoint, /Attachment count exceeds limit/);
+assert.match(manifest, /value\.length > 20/);
+assert.match(manifest, /value\.length > 20/);
 assert.match(endpoint, /Malformed attachment metadata/);
 assert.match(endpoint, /event_type: "attachments_pending"/);
 assert.match(endpoint, /HTML email too large/);
