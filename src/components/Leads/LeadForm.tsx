@@ -61,6 +61,17 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   });
 
   useEffect(() => {
+    loadSalesReps();
+    loadOffices();
+
+    // Auto-restore saved data on mount
+    const savedData = restoreSavedData();
+    if (savedData) {
+      setFormData(savedData);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!aiPrefill) return;
     setFormData(previous => ({
       ...previous,
@@ -72,17 +83,6 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       priority: ['low', 'medium', 'high', 'urgent'].includes(aiPrefill.priority ?? '') ? aiPrefill.priority! : previous.priority,
     }));
   }, [aiPrefill]);
-
-  useEffect(() => {
-    loadSalesReps();
-    loadOffices();
-
-    // Auto-restore saved data on mount
-    const savedData = restoreSavedData();
-    if (savedData) {
-      setFormData(savedData);
-    }
-  }, []);
 
   useEffect(() => {
     if (contactMode !== 'existing') return;
