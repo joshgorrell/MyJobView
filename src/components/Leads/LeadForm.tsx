@@ -9,6 +9,7 @@ import { generateUsername, generateUniqueUsername } from '../../lib/username';
 import { offlineSupabaseInsert } from '../../lib/offlineSupport';
 
 interface LeadFormProps {
+  aiPrefill?: { contactName?: string; company?: string; email?: string; phone?: string; description?: string; priority?: string } | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -23,7 +24,7 @@ interface ContactSearchResult {
   assigned_to: string | null;
 }
 
-export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
+export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   const { profile } = useAuth();
   const [salesReps, setSalesReps] = useState<Profile[]>([]);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
@@ -58,6 +59,19 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
     data: formData,
     enabled: true
   });
+
+  useEffect(() => {
+    if (!aiPrefill) return;
+    setFormData(previous => ({
+      ...previous,
+      contact_name: aiPrefill.contactName ?? previous.contact_name,
+      company_name: aiPrefill.company ?? previous.company_name,
+      email: aiPrefill.email ?? previous.email,
+      phone: aiPrefill.phone ?? previous.phone,
+      opportunity_description: aiPrefill.description ?? previous.opportunity_description,
+      priority: ['low', 'medium', 'high', 'urgent'].includes(aiPrefill.priority ?? '') ? aiPrefill.priority! : previous.priority,
+    }));
+  }, [aiPrefill]);
 
   useEffect(() => {
     loadSalesReps();
