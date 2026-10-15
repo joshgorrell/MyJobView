@@ -41,7 +41,7 @@ begin
     where id = target_intake for update;
   if not found then raise exception 'Intake not found'; end if;
   if current_item.contact_id is null
-    or current_item.classification not in ('service','task','sales')
+    or current_item.classification <> 'service'
     or current_item.status <> 'ready'
     or current_item.missing_fields is distinct from '[]'::jsonb then
     return false;
