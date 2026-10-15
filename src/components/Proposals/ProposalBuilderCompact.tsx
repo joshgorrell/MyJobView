@@ -1,5 +1,5 @@
 import { proposalPresentation, proposalStatusLabel } from '../../lib/proposalPresentation';
-import { ProposalLockControl, ProposalReviewControls } from './ProposalReviewControls';
+import { ProposalReviewControls } from './ProposalReviewControls';
 import { ProposalActivityDialog } from './ProposalActivityDialog';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import LaborRemovalChoice, { itemHasLabor } from './LaborRemovalChoice';
@@ -3350,11 +3350,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
           {/* Right: Badges + All Actions */}
           <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end min-w-0 w-full sm:w-auto">
-              {/* Editing lock is independent of approval and portal visibility. */}
-              {presentation.locked && <ProposalLockControl onUnlock={() => setShowUnlockWarningModal(true)} />}
 
               {/* Expiration Badge — countdown only for sent/portal; expired status is shown in the status control */}
-              {(proposal?.status === 'sent' || proposal?.status === 'portal') && proposal?.sent_at && (() => {
+              {(proposal?.status === 'sent' || proposal?.status === 'portal') && proposal?.sent_at && !presentation.expired && (() => {
                 const expiresAt = proposal.expires_at
                   ? new Date(proposal.expires_at)
                   : new Date(new Date(proposal.sent_at).getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -3462,13 +3460,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
             {/* Status is informational; status transitions live in More options. */}
             {proposal && (
-              <span className="inline-flex h-10 shrink-0 items-center rounded-lg border border-subtle bg-elevated px-3 text-xs font-medium text-secondary" title="Current proposal status">
+              <span className={`inline-flex shrink-0 items-center px-2 text-xs font-medium ${presentation.expired ? "text-amber-400" : "text-secondary"}`} title="Current proposal status">
                 {presentation.expired ? 'Expired' : proposalStatusLabel(proposal.status)}
               </span>
             )}
 
-            {/* Add Item Button */}
-            <button
+            {/* Editing actions are unavailable on locked proposals. */}
+            {!presentation.locked && <button
               onClick={() => {
                 setShowAddItemToAreasModal(true);
               }}
@@ -3477,7 +3475,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add</span>
-            </button>
+            </button>}
 
             {/* More Options Menu */}
             <div className="relative">
@@ -3493,6 +3491,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMoreOptionsMenu(false)} />
                   <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
+                    {presentation.locked && <button type="button" onClick={() => { setShowUnlockWarningModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm">Create revision / Unlock</button>}
                     {(proposal?.current_portal_version ?? 0) > 0 && (
                       <button
                         onClick={() => { setShowPortalVersionHistory(true); setShowMoreOptionsMenu(false); }}
