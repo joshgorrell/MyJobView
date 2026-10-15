@@ -22,7 +22,7 @@ export function SmartIntakeHistory() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [channel, setChannel] = useState<'all'|'email'|'sms'|'mms'>('all');
-  const [view, setView] = useState<'attention'|'all'>('attention');
+  const [view, setView] = useState<'unmatched'|'all'>('unmatched');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<Timeline | null>(null);
@@ -44,7 +44,7 @@ export function SmartIntakeHistory() {
     setBusy(true);
     setError('');
     try {
-      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, status: status === 'all' ? undefined : status, statuses: view === 'attention' && status === 'all' ? ATTENTION_STATUSES : undefined, from: dateFrom || undefined, to: dateTo || undefined, limit: 100 });
+      const result = await listIntakeHistory(supabase, { organizationId: orgId, search, channel: channel === 'all' ? undefined : channel, status: view === 'all' && status !== 'all' ? status : undefined, unmatchedOnly: view === 'unmatched', from: dateFrom || undefined, to: dateTo || undefined, limit: 100 });
       setRows(result);
     } catch (e) {
       setRows([]);
@@ -121,7 +121,7 @@ export function SmartIntakeHistory() {
   }
 
   const visible = rows;
-  const unresolvedCustomers = rows.filter(row => !row.contact_id && ATTENTION_STATUSES.includes(row.status)).length;
+  const unresolvedCustomers = view === 'unmatched' ? rows.length : rows.filter(row => !row.contact_id && ATTENTION_STATUSES.includes(row.status)).length;
   return (
     <section className="min-w-0 space-y-4" aria-label="Smart Intake history">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -130,14 +130,14 @@ export function SmartIntakeHistory() {
       </div>
       {unresolvedCustomers > 0 && <p role="status" className="rounded-lg border border-amber-700 p-3 text-sm text-amber-200">{unresolvedCustomers} incoming messages need customer identification before routing.</p>}
       <div className="flex flex-wrap gap-2">
-        {(['attention','all'] as const).map(tab => <button key={tab} type="button" onClick={() => { setView(tab); setStatus('all'); inspectionVersion.current++; setSelected(null); setAttachments([]); setCustomer(null); }} aria-pressed={view === tab} className={`min-h-11 rounded-lg px-4 text-sm font-medium ${view === tab ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}>{tab === 'attention' ? 'Needs Attention' : 'All Activity'}</button>)}
+        {(['unmatched','all'] as const).map(tab => <button key={tab} type="button" onClick={() => { setView(tab); setStatus('all'); inspectionVersion.current++; setSelected(null); setAttachments([]); setCustomer(null); }} aria-pressed={view === tab} className={`min-h-11 rounded-lg px-4 text-sm font-medium ${view === tab ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}>{tab === 'unmatched' ? 'Unmatched' : 'Activity'}</button>)}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
         <label className="relative"><Search className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" /><span className="sr-only">Search intake history</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search sender, recipient or subject" className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-900 pl-10 pr-3 text-white" /></label>
         <label className="flex items-center gap-2 text-sm text-gray-300">Channel <select value={channel} onChange={e => setChannel(e.target.value as typeof channel)} className="min-h-11 rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All</option><option value="email">Email</option><option value="sms">SMS</option><option value="mms">MMS</option></select></label>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <label className="text-sm text-gray-300">Status<select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All statuses</option>{(view === 'attention' ? ATTENTION_STATUSES : ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','ready','processed','duplicate_linked','dismissed','failed_retryable']).map(value => <option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></label>
+        <label className="text-sm text-gray-300">Status<select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white"><option value="all">All statuses</option>{(view === 'unmatched' ? ATTENTION_STATUSES : ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','ready','processed','duplicate_linked','dismissed','failed_retryable']).map(value => <option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></label>
         <label className="text-sm text-gray-300">From<input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white" /></label>
         <label className="text-sm text-gray-300">Through<input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 text-white" /></label>
       </div>
