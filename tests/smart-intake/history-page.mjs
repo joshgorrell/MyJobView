@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/smart-intake/history-page.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+const cursor = {createdAt:'2026-10-14T00:00:00Z',id:'00000000-0000-4000-8000-000000000001'};
+assert.equal(exports.decodeHistoryCursor(exports.encodeHistoryCursor(cursor)).id,cursor.id);
+assert.throws(()=>exports.decodeHistoryCursor('[]'));
+console.log('History pagination cursor checks passed');

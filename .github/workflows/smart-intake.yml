@@ -1,0 +1,37 @@
+name: Smart Intake contract checks
+on:
+  push:
+    branches:
+      - feature/smart-intake-foundation
+  pull_request:
+    paths:
+      - 'supabase/functions/smart-intake-email/**'
+      - 'supabase/functions/smart-intake-route-service/**'
+      - 'src/components/Dispatch/ManualIntake.tsx'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'supabase/migrations/*smart_intake*'
+      - 'src/lib/smart-intake/**'
+      - 'src/components/Dispatch/SmartIntakeHistory.tsx'
+      - 'tests/smart-intake/**'
+      - '.github/workflows/smart-intake.yml'
+  workflow_dispatch:
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      # Full-project typecheck currently reports unrelated legacy errors; keep it visible but nonblocking.
+      - name: Repository-wide typecheck (informational)
+        run: npm run typecheck
+        continue-on-error: true
+      - name: Production frontend build
+        run: npm run build
+      - name: Smart Intake contract tests
+        run: npm run test:smart-intake

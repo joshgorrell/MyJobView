@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+const src = fs.readFileSync('src/lib/smart-intake/history-export.ts','utf8');
+vm.runInNewContext(ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+const csv = exports.makeHistoryCsv([{id:'a',channel:'email',source_address:'=HYPERLINK(1)',subject:'Hello, "world"',status:'received',created_at:'2026-10-14'}]);
+assert.match(csv,/Hello, ""world""/);
+assert.match(csv,/'=HYPERLINK/);
+console.log('History CSV escaping passed');
