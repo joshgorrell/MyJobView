@@ -4388,7 +4388,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               return (
                             <tr
                               key={item.id}
-                              className={`border-t border-subtle hover:bg-surface/50 transition-colors h-10 relative ${
+                              className={`border-t border-subtle hover:bg-surface/50 transition-colors relative ${isNested ? 'h-9 bg-elevated/40' : 'h-10'} ${
                                 isCoRemoved ? 'bg-red-950/30 opacity-60' : ''
                               } ${
                                 isCoAdded ? 'bg-emerald-950/30' : ''
@@ -4412,7 +4412,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   : 'Drag to reorder'
                               }
                             >
-                              <td className="text-center py-2 px-2" style={{ paddingLeft: isNested ? '1rem' : undefined }}>
+                              <td className="text-center py-2 px-2" >
                                 <div className="flex items-center justify-center gap-1">
                                   {hasChildren && (
                                     <button
@@ -4473,7 +4473,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   className="py-2 px-3 text-primary whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px] cursor-pointer hover:bg-elevated"
                                   title={isNested ? `Nested under: ${parentItem?.description || 'Unknown'}` : "Click to edit description"}
                                   onClick={() => startEditingItem(item.id, 'description', item.description)}
-                                  style={{ paddingLeft: isNested ? '1.5rem' : undefined }}
+                                  style={{ paddingLeft: isNested ? '2.5rem' : undefined }}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_description`] !== undefined && !isCoRemoved ? (
                                     <input
@@ -4490,8 +4490,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                     />
                                   ) : (
                                     <div className="flex items-center gap-2">
-                                      <span className={`${isNested && !isCoRemoved ? 'text-green-200 text-xs' : ''} ${materialStrike}`}>
-                                        {isNested && !isCoRemoved && '↳ '}
+                                      <span className={`${materialStrike}`}>
+                                        {isNested && !isCoRemoved && <span className="text-emerald-400 font-semibold mr-2" aria-hidden="true">↳</span>}
                                         {item.description}
                                       </span>
                                       <ProductStatusNotice product={item.products} />
