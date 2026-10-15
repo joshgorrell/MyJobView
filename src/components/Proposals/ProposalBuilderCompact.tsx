@@ -1722,44 +1722,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   function handleDragOver(e: React.DragEvent, itemId: string) {
     e.preventDefault();
-
-    if (!draggedItem) return;
-
-    // Don't allow dropping on self
-    if (draggedItem === itemId) {
-      e.dataTransfer.dropEffect = 'none';
-      return;
-    }
-
-    const draggedItemObj = rooms.flatMap(r => r.line_items).find(item => item.id === draggedItem);
-    const targetItem = rooms.flatMap(r => r.line_items).find(item => item.id === itemId);
-
-    // If dragging a nested item
-    if (draggedItemObj?.parent_item_id) {
-      // Can only reorder with siblings (items with same parent) or unnest
-      if (targetItem?.parent_item_id === draggedItemObj.parent_item_id) {
-        // Reordering among siblings - allowed
-        e.dataTransfer.dropEffect = 'move';
-      } else if (!targetItem?.parent_item_id) {
-        // Unnesting - can drop on top-level items
-        e.dataTransfer.dropEffect = 'move';
-      } else {
-        // Can't drop on items with different parents
-        e.dataTransfer.dropEffect = 'none';
-        return;
-      }
-    } else {
-      // Dragging a top-level item
-      // Can only reorder with other top-level items
-      if (targetItem?.parent_item_id) {
-        e.dataTransfer.dropEffect = 'none';
-        return;
-      }
-      e.dataTransfer.dropEffect = 'move';
-    }
-
-    // Only update state if it changed
-    if (dragOverItem !== itemId) setDragOverItem(itemId);
+    const source = rooms.flatMap(r => r.line_items).find(item => item.id === draggedItem);
+    const target = rooms.flatMap(r => r.line_items).find(item => item.id === itemId);
+    const sameRoom = rooms.some(room => room.line_items.some(item => item.id === draggedItem) && room.line_items.some(item => item.id === itemId));
+    const allowed = !!source && !!target && draggedItem !== itemId && sameRoom
+      && (source.parent_item_id ?? null) === (target.parent_item_id ?? null);
+    e.dataTransfer.dropEffect = allowed ? 'move' : 'none';
+    setDragOverItem(allowed ? itemId : null);
   }
 
   function handleDragLeave() {
@@ -1768,87 +1737,54 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   async function handleDrop(e: React.DragEvent, targetItemId: string, roomId: string) {
     e.preventDefault();
+    const sourceId = draggedItem;
+    setDraggedItem(null);
+    setDragOverItem(null);
+    if (!sourceId || sourceId === targetItemId || saving) return;
 
-    if (!draggedItem || draggedItem === targetItemId) {
-      setDraggedItem(null);
-      setDragOverItem(null);
-      return;
-    }
+    const room = rooms.find(r => r.id === roomId);
+    const source = room?.line_items.find(item => item.id === sourceId);
+    const target = room?.line_items.find(item => item.id === targetItemId);
+    if (!room || !source || !target || (source.parent_item_id ?? null) !== (target.parent_item_id ?? null)) return;
 
+    // Reordering is deliberately separate from Nest / Unnest toolbar actions.
+    // Move a parent and all its children as one contiguous block.
+    const ordered = [...room.line_items].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const siblings = ordered.filter(item => (item.parent_item_id ?? null) === (source.parent_item_id ?? null));
+    const from = siblings.findIndex(item => item.id === sourceId);
+    const to = siblings.findIndex(item => item.id === targetItemId);
+    if (from < 0 || to < 0 || from === to) return;
+    const [moved] = siblings.splice(from, 1);
+    siblings.splice(to, 0, moved);
+
+    const next = source.parent_item_id
+      ? ordered.filter(item => item.parent_item_id !== source.parent_item_id)
+          .flatMap(item => item.id === source.parent_item_id ? [item, ...siblings] : [item])
+      : siblings.flatMap(item => [item, ...ordered.filter(child => child.parent_item_id === item.id)]);
+    if (next.length !== ordered.length || new Set(next.map(item => item.id)).size !== ordered.length) return;
+
+    const changes = next.map((item, index) => ({ id: item.id, before: item.sort_order, after: index }))
+      .filter(item => item.before !== item.after);
     setSaving(true);
+    const applied: typeof changes = [];
     try {
-      // Get all items in this room
-      const room = rooms.find(r => r.id === roomId);
-      if (!room) return;
-
-      const items = [...room.line_items].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-      // Find the dragged and target items
-      const draggedIndex = items.findIndex(item => item.id === draggedItem);
-      const targetIndex = items.findIndex(item => item.id === targetItemId);
-
-      if (draggedIndex === -1 || targetIndex === -1) return;
-
-      const draggedItemData = items[draggedIndex];
-      const targetItemData = items[targetIndex];
-
-      const draggedIsNested = draggedItemData.parent_item_id !== null;
-      const targetIsNested = targetItemData.parent_item_id !== null;
-
-      let shouldUnnest = false;
-      let shouldNest = false;
-
-      if (draggedIsNested && !targetIsNested) {
-        shouldUnnest = true;
-      } else if (!draggedIsNested && !targetIsNested) {
-        const hasChildren = room.line_items.some(li => li.parent_item_id === draggedItem);
-        if (hasChildren) {
-          alert('Cannot nest items that already have nested accessories');
-          return;
-        }
-        shouldNest = true;
-      } else if (draggedIsNested && targetIsNested && draggedItemData.parent_item_id !== targetItemData.parent_item_id) {
-        return;
-      }
-
-      // Reorder the items array
-      const [movedItem] = items.splice(draggedIndex, 1);
-      items.splice(targetIndex, 0, movedItem);
-
-      // Update sort_order for all items in this room
-      const updates = items.map((item, index) => ({
-        id: item.id,
-        sort_order: index,
-        ...(item.id === draggedItem && shouldUnnest ? { parent_item_id: null } : {}),
-        ...(item.id === draggedItem && shouldNest ? { parent_item_id: targetItemId } : {})
-      }));
-
-      // Update all items
-      for (const update of updates) {
-        const updateData: any = { sort_order: update.sort_order };
-        if (update.id === draggedItem && shouldUnnest) {
-          updateData.parent_item_id = null;
-        }
-        if (update.id === draggedItem && shouldNest) {
-          updateData.parent_item_id = targetItemId;
-        }
-
-        const { error } = await supabase
-          .from('proposal_line_items')
-          .update(updateData)
-          .eq('id', update.id);
-
+      for (const change of changes) {
+        const { error } = await supabase.from('proposal_line_items').update({ sort_order: change.after }).eq('id', change.id);
         if (error) throw error;
+        applied.push(change);
       }
-
       await loadData();
-    } catch (error: any) {
-      console.error('Error updating items:', error);
-      alert('Failed to update items');
+    } catch (error) {
+      console.error('Failed to reorder proposal items', error);
+      // Best-effort rollback until an atomic reorder RPC is available.
+      for (const change of applied.reverse()) {
+        const { error: rollbackError } = await supabase.from('proposal_line_items').update({ sort_order: change.before }).eq('id', change.id);
+        if (rollbackError) console.error('Failed to roll back item order', rollbackError);
+      }
+      await loadData();
+      alert('Could not reorder items. Please try again.');
     } finally {
       setSaving(false);
-      setDraggedItem(null);
-      setDragOverItem(null);
     }
   }
 
@@ -4437,7 +4373,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   {!hasChildren && (
                                     <div
                                       className="cursor-move text-muted hover:text-secondary"
-                                      title={isNested ? "Drag to reorder with siblings or unnest" : "Drag to reorder"}
+                                      title={isNested ? "Drag to reorder within this parent" : "Drag to reorder parent and its accessories"}
                                     >
                                       <GripVertical className="w-4 h-4 sm:w-3 sm:h-3" />
                                     </div>
