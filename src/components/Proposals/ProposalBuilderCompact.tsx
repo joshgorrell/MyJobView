@@ -3501,52 +3501,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         Portal Version History
                       </button>
                     )}
-                    {/* Customer Section */}
+                    {/* Administrative actions only: delivery and status controls live in the toolbar. */}
                     {proposal?.contact_id && (
-                      <>
-                        <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Customer</div>
-                        <a
-                          href={`/contacts?id=${proposal.contact_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span>View Customer</span>
-                        </a>
-                        <button
-                          onClick={() => {
-                            setShowEditCustomerModal(true);
-                            setShowMoreOptionsMenu(false);
-                          }}
-                          className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          <span>Change Customer</span>
-                        </button>
-                        <div className="border-t border-subtle my-1" />
-                      </>
+                      <button type="button" onClick={() => { setShowEditCustomerModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm">
+                        <Edit2 className="w-4 h-4" />Change Customer
+                      </button>
                     )}
-
-                    {/* Secondary proposal actions — deliberately not in the main header. */}
-                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Delivery &amp; access</div>
-                    <button type="button" onClick={() => { setShowSubmissionModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><Send className="w-4 h-4" />Submission options</button>
-                    <button type="button" onClick={() => { setShowPdfModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><FileText className="w-4 h-4" />Print / PDF</button>
-                    <button type="button" onClick={() => { setShowTasksPanel(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><ListChecks className="w-4 h-4" />Proposal tasks</button>
-                    <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleRevokeProposalLinks(); }} disabled={copyingShareLink} className="w-full px-3 py-2 text-left text-red-400 hover:bg-elevated flex items-center gap-2 text-sm disabled:opacity-40"><Unlink className="w-4 h-4" />Revoke customer link</button>
-                    <div className="border-t border-subtle my-1" />
-
-                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Status management</div>
-                    {proposal?.status !== 'approved' && (
-                      <>
-                        <button type="button" onClick={() => { setShowManualApprovalModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><CheckCircle2 className="w-4 h-4" />Mark approved</button>
-                        {proposal?.status !== 'declined' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleDeclineProposal(); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><XCircle className="w-4 h-4" />Mark declined</button>}
-                        {proposal?.status === 'designing' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('ready_to_submit'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><ThumbsUp className="w-4 h-4" />Mark ready</button>}
-                        {proposal?.status !== 'designing' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('designing'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><Edit2 className="w-4 h-4" />Return to designing</button>}
-                      </>
+                    {proposal?.status !== 'designing' && proposal?.status !== 'approved' && (
+                      <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('designing'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm">
+                        <Edit2 className="w-4 h-4" />Return to designing
+                      </button>
                     )}
                     <div className="border-t border-subtle my-1" />
-                    {/* Proposal Actions */}
+                                        {/* Proposal Actions */}
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Proposal</div>
                     <button
                       onClick={() => {
