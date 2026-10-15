@@ -32,6 +32,10 @@ export function SmartIntakeHistory() {
   const [attachmentError, setAttachmentError] = useState('');
   const [customer, setCustomer] = useState<IntakeCustomerContext | null>(null);
   const [customerError, setCustomerError] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerMatches, setCustomerMatches] = useState<IntakeCustomerContext[]>([]);
+  const [customerSearchBusy, setCustomerSearchBusy] = useState(false);
+  const [customerSearchError, setCustomerSearchError] = useState('');
   const inspectionVersion = useRef(0);
   const orgId = tenant?.organizationId && profile?.organization_id === tenant.organizationId ? tenant.organizationId : profile?.organization_id && !tenant ? profile.organization_id : null;
 
@@ -50,12 +54,47 @@ export function SmartIntakeHistory() {
 
   useEffect(() => { void reload(); }, [reload]);
 
+  useEffect(() => {
+    if (!orgId || !selected || selected.item.contact_id || customerSearch.trim().length < 2) {
+      setCustomerMatches([]);
+      setCustomerSearchBusy(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setCustomerSearchBusy(true);
+      setCustomerSearchError('');
+      const term = customerSearch.trim().replace(/[%_,()\\]/g, '');
+      if (term.length < 2) { setCustomerMatches([]); setCustomerSearchBusy(false); return; }
+      const result = await supabase.from('contacts')
+        .select('id,company_name,contact_name,email')
+        .eq('organization_id', orgId)
+        .or('company_name.ilike.%' + term + '%,contact_name.ilike.%' + term + '%,email.ilike.%' + term + '%')
+        .limit(20);
+      if (cancelled) return;
+      setCustomerSearchBusy(false);
+      if (result.error) {
+        setCustomerMatches([]);
+        setCustomerSearchError('Unable to search customers.');
+      } else {
+        setCustomerMatches((result.data ?? []).map(contact => ({
+          id: contact.id,
+          name: contact.company_name || contact.contact_name || contact.email || 'Customer',
+          email: contact.email ?? null,
+        })));
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [orgId, selected, customerSearch]);
+
   async function inspect(id: string) {
     if (!orgId) return;
     const version = ++inspectionVersion.current;
     setSelected(null);
     setAttachments([]);
     setCustomer(null);
+    setCustomerSearch('');
+    setCustomerMatches([]);
     setCustomerError('');
     setAttachmentError('');
     setDetailError('');
@@ -120,6 +159,17 @@ export function SmartIntakeHistory() {
           <p><strong>Status:</strong> {selected.item.status} · <strong>Classification:</strong> {selected.item.classification}</p>
           <p><strong>Customer:</strong> {customer ? customer.name : selected.item.contact_id ? "Contact matched — details unavailable" : "Unmatched incoming message — employee review required before routing"}</p>
           {customerError && <p role="status" className="text-amber-300">{customerError}</p>}
+          {!selected.item.contact_id && <div className="space-y-2 rounded-lg border border-amber-700 p-3">
+            <p className="font-semibold text-amber-200">Customer gatekeeper — incoming message</p>
+            <p className="text-xs text-gray-300">Search existing customers. Linking or creating a customer is not enabled until the secure resolution workflow is available.</p>
+            <label className="block text-sm">Find customer
+              <input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Name or email" className="mt-1 w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
+            </label>
+            {customerSearchBusy && <p role="status">Searching…</p>}
+            {customerSearchError && <p role="alert" className="text-amber-300">{customerSearchError}</p>}
+            {customerMatches.map(match => <p key={match.id} className="rounded border border-gray-700 p-2">{match.name}{match.email ? ' · ' + match.email : ''} <span className="text-xs text-gray-400">— match candidate (not linked)</span></p>)}
+            <p className="text-xs text-gray-400">New customer creation and confirmation will be available here after authorization and audit logging are implemented.</p>
+          </div>}
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
           <h4 className="font-semibold">Attachments</h4>
           {attachmentError && <p role="status" className="text-amber-300">{attachmentError}</p>}
