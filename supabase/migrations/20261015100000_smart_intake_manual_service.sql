@@ -53,7 +53,7 @@ begin
     source_address,destination_address,subject,raw_body,status,classification,
     priority,contact_id,service_request_id
   ) values (
-    target_org,target_office,'email','manual',gen_random_uuid()::text,
+    target_org,target_office,'manual','manual',gen_random_uuid()::text,
     'staff:'||actor::text,'manual',btrim(request_subject),btrim(request_details),
     'processed','service',request_priority,target_contact,request_id
   ) returning id into intake_id;
