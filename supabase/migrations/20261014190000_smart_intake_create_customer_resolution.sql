@@ -15,6 +15,8 @@ declare
   current_contact uuid;
   current_status text;
   new_contact uuid;
+  target_office uuid;
+  generated_username text;
   cleaned_name text := nullif(btrim(customer_name), '');
   cleaned_email text := nullif(lower(btrim(customer_email)), '');
   cleaned_phone text := nullif(btrim(customer_phone), '');
@@ -22,8 +24,8 @@ begin
   if (select auth.uid()) is null then
     raise exception 'Authentication required';
   end if;
-  select organization_id, contact_id, status
-    into item_org, current_contact, current_status
+  select organization_id, contact_id, status, office_id
+    into item_org, current_contact, current_status, target_office
   from public.intake_items
   where id = target_intake and channel in ('email','sms','mms')
   for update;
@@ -46,9 +48,13 @@ begin
   ) then
     raise exception 'A customer with this email already exists. Select the existing customer.';
   end if;
-  insert into public.contacts (organization_id, company_name, email, phone)
-    values (item_org, cleaned_name, cleaned_email, cleaned_phone)
-    returning id into new_contact;
+  if target_office is null then
+    raise exception 'Intake must have an office before creating a customer';
+  end if;
+  new_contact := gen_random_uuid();
+  generated_username := 'intake-' || replace(new_contact::text, '-', '');
+  insert into public.contacts (id, organization_id, office_id, company_name, contact_name, username, email, phone)
+    values (new_contact, item_org, target_office, cleaned_name, cleaned_name, generated_username, cleaned_email, cleaned_phone);
   update public.intake_items
     set contact_id = new_contact, updated_at = now()
     where id = target_intake;
