@@ -1,5 +1,8 @@
 name: Smart Intake contract checks
 on:
+  push:
+    branches:
+      - feature/smart-intake-foundation
   pull_request:
     paths:
       - 'supabase/functions/smart-intake-email/**'
