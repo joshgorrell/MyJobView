@@ -6,8 +6,8 @@ create table if not exists public.intake_service_details (
   job_location_city text,
   job_location_state text,
   job_location_zip text,
-  billable_type text not null check (length(btrim(billable_type)) between 1 and 80),
-  billable_by text not null check (length(btrim(billable_by)) between 1 and 80),
+  billable_type text not null check (billable_type in ('billable','warranty')),
+  billable_by text not null check (billable_by in ('admin','dispatch','assigned_sales_rep','other_sales_rep')),
   verified_by uuid not null references public.profiles(id),
   verified_at timestamptz not null default now()
 );
@@ -37,12 +37,17 @@ begin
   end if;
   if nullif(btrim(location_address),'') is null
     or length(location_address) > 500
-    or nullif(btrim(billing_type),'') is null or length(billing_type) > 80
-    or nullif(btrim(billing_by),'') is null or length(billing_by) > 80
+    or billing_type not in ('billable','warranty')
+    or billing_by not in ('admin','dispatch','assigned_sales_rep','other_sales_rep')
     or length(coalesce(location_city,'')) > 120
     or length(coalesce(location_state,'')) > 80
     or length(coalesce(location_zip,'')) > 20 then
     raise exception 'Invalid service details';
+  end if;
+  -- Rep-owned billing requires a verified rep and warranty requires a warranty reference.
+  -- Those fields are not collected by this workflow yet: block unsupported combinations.
+  if billing_by in ('assigned_sales_rep','other_sales_rep') or billing_type = 'warranty' then
+    raise exception 'Use the full service request form for sales-rep billing or warranty';
   end if;
   if exists (select 1 from public.intake_routing_claims where intake_id = target_intake) then
     raise exception 'Intake routing already queued';
