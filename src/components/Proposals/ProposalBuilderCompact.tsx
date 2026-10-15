@@ -28,6 +28,7 @@ const ProposalTaxReport = lazy(() => import('./ProposalTaxReport'));
 const LaborPhaseReport = lazy(() => import('./LaborPhaseReport'));
 const ProductDetailModal = lazy(() => import('./ProductDetailModal'));
 const EditCustomerModal = lazy(() => import('./EditCustomerModal'));
+const ContactQuickViewModal = lazy(() => import('../Shared/ContactQuickViewModal').then(m => ({ default: m.ContactQuickViewModal })));
 const ManualApprovalModal = lazy(() => import('./ManualApprovalModal').then(m => ({ default: m.ManualApprovalModal })));
 const ProposalNotificationHistory = lazy(() => import('./ProposalNotificationHistory'));
 const ApprovalActionModal = lazy(() => import('./ApprovalActionModal'));
@@ -591,6 +592,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
+  const [showCustomerQuickView, setShowCustomerQuickView] = useState(false);
   const [showManualApprovalModal, setShowManualApprovalModal] = useState(false);
   const [showNotificationHistory, setShowNotificationHistory] = useState(false);
   const [showApprovalActionModal, setShowApprovalActionModal] = useState(false);
@@ -3341,7 +3343,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </div>
                 <div className="flex items-center flex-wrap gap-1.5 text-xs text-muted mt-0.5">
                   <User className="w-3 h-3 flex-shrink-0" />
-                  <span className="truncate">{proposal?.contacts?.full_name || 'Loading...'}</span>
+                  <button type="button" disabled={!proposal?.contact_id} onClick={() => setShowCustomerQuickView(true)} className="truncate text-left hover:text-blue-500 hover:underline disabled:no-underline disabled:cursor-default" title="View customer details">{proposal?.contacts?.full_name || proposal?.contacts?.company_name || 'Loading...'}</button>
                   <span className="text-gray-600">•</span>
                   <span className="text-muted">#{proposal?.proposal_number}</span>
                 </div>
@@ -6597,6 +6599,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             </div>
           </div>
         </div>
+      )}
+
+      {showCustomerQuickView && proposal?.contact_id && (
+        <Suspense fallback={null}>
+          <ContactQuickViewModal contactId={proposal.contact_id} onClose={() => setShowCustomerQuickView(false)} />
+        </Suspense>
       )}
 
       {showEditCustomerModal && proposal && (
