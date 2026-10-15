@@ -191,6 +191,7 @@ function AppContent() {
   const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
+  const [showServiceTypePicker, setShowServiceTypePicker] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
@@ -821,7 +822,7 @@ function AppContent() {
             onCreateLead={() => setShowLeadForm(true)}
             onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
-            onCreateServiceRequest={() => setShowServiceRequestForm(true)}
+            onCreateServiceRequest={() => setShowServiceTypePicker(true)}
             onCreateTask={() => {
               setAiTaskPrefill(null);
               setShowAiTaskForm(true);
@@ -1200,6 +1201,19 @@ function AppContent() {
             }}
           />
         </Suspense>
+      )}
+
+      {showServiceTypePicker && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowServiceTypePicker(false); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="service-type-heading" className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 text-white shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="service-type-heading" className="text-xl font-semibold">New Service Request</h2><p className="mt-1 text-sm text-gray-300">What do you need to create?</p></div><button type="button" onClick={() => setShowServiceTypePicker(false)} className="rounded p-2 text-gray-300 hover:bg-gray-800" aria-label="Close">✕</button></div>
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowServiceRequestForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Service</span><span className="text-sm text-gray-300">On-site work, repairs, troubleshooting, or dispatch</span></button>
+              <button type="button" disabled title="Support workflow is being connected" className="w-full cursor-not-allowed rounded-lg border border-gray-700 p-4 text-left opacity-60"><span className="block font-semibold">Support · Coming soon</span><span className="text-sm text-gray-300">Customer assistance and remote support</span></button>
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowAiTaskForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Task</span><span className="text-sm text-gray-300">Follow-ups and assigned action items</span></button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showServiceRequestForm && (
