@@ -17,6 +17,7 @@ interface AIPrefill {
   description?: string;
   priority?: string;
   dueDate?: string;
+  assigneeId?: string;
 }
 
 interface TaskFormProps {
@@ -84,6 +85,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
           priority: aiPrefill.priority || prev.priority,
           due_date: aiPrefill.dueDate || prev.due_date,
           contact_id: aiPrefill.contactId || prev.contact_id,
+          assigned_to: aiPrefill.assigneeId || prev.assigned_to,
         }));
       } else {
         const savedData = restoreSavedData();
