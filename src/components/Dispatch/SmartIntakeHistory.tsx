@@ -181,14 +181,14 @@ export function SmartIntakeHistory() {
           {customerError && <p role="status" className="text-amber-300">{customerError}</p>}
           {!selected.item.contact_id && <div className="space-y-2 rounded-lg border border-amber-700 p-3">
             <p className="font-semibold text-amber-200">Customer gatekeeper — incoming message</p>
-            <p className="text-xs text-gray-300">Search existing customers. Linking or creating a customer is not enabled until the secure resolution workflow is available.</p>
+            <p className="text-xs text-gray-300">Search for an existing customer and confirm the correct match. This records the decision but does not yet route the message.</p>
             <label className="block text-sm">Find customer
               <input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Name or email" className="mt-1 w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
             </label>
             {customerSearchBusy && <p role="status">Searching…</p>}
             {customerSearchError && <p role="alert" className="text-amber-300">{customerSearchError}</p>}
             {customerMatches.map(match => <p key={match.id} className="rounded border border-gray-700 p-2">{match.name}{match.email ? ' · ' + match.email : ''} <span className="text-xs text-gray-400">— match candidate (not linked)</span><button type="button" disabled={confirmingCustomer} onClick={() => void confirmCustomer(match)} className="ml-2 rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">Confirm customer</button></p>)}
-            <p className="text-xs text-gray-400">New customer creation and confirmation will be available here after authorization and audit logging are implemented.</p>
+            <p className="text-xs text-gray-400">Creating a new customer from this message is not available yet.</p>
           </div>}
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
           <h4 className="font-semibold">Attachments</h4>
