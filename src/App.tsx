@@ -196,6 +196,7 @@ function AppContent() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
+  const [showSupportTaskForm, setShowSupportTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
@@ -1212,7 +1213,7 @@ function AppContent() {
             <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="service-type-heading" className="text-xl font-semibold">New Service Request</h2><p className="mt-1 text-sm text-gray-300">What do you need to create?</p></div><button type="button" onClick={() => setShowServiceTypePicker(false)} className="rounded p-2 text-gray-300 hover:bg-gray-800" aria-label="Close">✕</button></div>
             <div className="space-y-2">
               <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowServiceRequestForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Service</span><span className="text-sm text-gray-300">On-site work, repairs, troubleshooting, or dispatch</span></button>
-              <button type="button" disabled title="Support workflow is being connected" className="w-full cursor-not-allowed rounded-lg border border-gray-700 p-4 text-left opacity-60"><span className="block font-semibold">Support · Coming soon</span><span className="text-sm text-gray-300">Customer assistance and remote support</span></button>
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setAiTaskPrefill(null); setShowSupportTaskForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Support</span><span className="text-sm text-gray-300">Customer assistance and remote support</span></button>
               <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowAiTaskForm(true); }} className="w-full rounded-lg border border-gray-600 p-4 text-left hover:border-blue-400 hover:bg-gray-800"><span className="block font-semibold">Task</span><span className="text-sm text-gray-300">Follow-ups and assigned action items</span></button>
             </div>
           </div>
@@ -1229,6 +1230,16 @@ function AppContent() {
               setActiveTab('dispatch_dashboard');
             }}
             aiPrefill={aiServiceRequestPrefill}
+          />
+        </Suspense>
+      )}
+
+      {showSupportTaskForm && (
+        <Suspense fallback={null}>
+          <TaskForm
+            supportMode
+            onClose={() => setShowSupportTaskForm(false)}
+            onSuccess={() => setShowSupportTaskForm(false)}
           />
         </Suspense>
       )}
