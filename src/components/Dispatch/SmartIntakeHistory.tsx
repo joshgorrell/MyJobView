@@ -171,6 +171,11 @@ export function SmartIntakeHistory() {
     setCustomer(null);
     setCustomerSearch('');
     setServiceMessage('');
+    setServiceAddress('');
+    setServiceCity('');
+    setServiceState('');
+    setServiceZip('');
+    setServiceBillingBy('dispatch');
     setNewCustomerOpen(false);
     setNewCustomerName('');
     setNewCustomerEmail('');
@@ -184,6 +189,20 @@ export function SmartIntakeHistory() {
       const timeline = await loadIntakeTimeline(supabase, orgId, id);
       if (version !== inspectionVersion.current) return;
       setSelected(timeline);
+      if (timeline.item.classification === 'service' && timeline.item.contact_id) {
+        const { data: verified, error: detailsError } = await supabase.from('intake_service_details')
+          .select('job_location_address,job_location_city,job_location_state,job_location_zip,billable_by')
+          .eq('intake_id', id).eq('organization_id', orgId).maybeSingle();
+        if (version !== inspectionVersion.current) return;
+        if (detailsError) setServiceMessage('Unable to load previously verified service details.');
+        else if (verified) {
+          setServiceAddress(verified.job_location_address ?? '');
+          setServiceCity(verified.job_location_city ?? '');
+          setServiceState(verified.job_location_state ?? '');
+          setServiceZip(verified.job_location_zip ?? '');
+          setServiceBillingBy(verified.billable_by === 'admin' ? 'admin' : 'dispatch');
+        }
+      }
       try {
         const context = await loadIntakeCustomerContext(supabase, orgId, timeline.item.contact_id);
         if (version === inspectionVersion.current) setCustomer(context);
