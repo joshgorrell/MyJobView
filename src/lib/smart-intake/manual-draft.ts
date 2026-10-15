@@ -14,6 +14,12 @@ export type ManualIntakeDraft = {
   assignmentNotes?: string;
   assigneeId?: string;
   officeId?: string;
+  jobAddress?: string;
+  jobCity?: string;
+  jobState?: string;
+  jobZip?: string;
+  billableType?: string;
+  billableBy?: string;
 };
 
 export type ValidatedManualIntakeDraft = {
@@ -27,6 +33,12 @@ export type ValidatedManualIntakeDraft = {
   assignmentNotes: string | null;
   assigneeId: string | null;
   officeId: string | null;
+  jobAddress: string | null;
+  jobCity: string | null;
+  jobState: string | null;
+  jobZip: string | null;
+  billableType: string | null;
+  billableBy: string | null;
 };
 
 export function validateManualIntakeDraft(draft: ManualIntakeDraft):
@@ -40,6 +52,13 @@ export function validateManualIntakeDraft(draft: ManualIntakeDraft):
   const assignmentNotes = draft.assignmentNotes?.trim() || null;
   const assigneeId = draft.purpose === 'service' ? null : draft.assigneeId?.trim() || null;
   const officeId = draft.officeId?.trim() || null;
+  const service = draft.purpose === 'service';
+  const jobAddress = service ? draft.jobAddress?.trim() || null : null;
+  const jobCity = service ? draft.jobCity?.trim() || null : null;
+  const jobState = service ? draft.jobState?.trim() || null : null;
+  const jobZip = service ? draft.jobZip?.trim() || null : null;
+  const billableType = service ? draft.billableType?.trim() || null : null;
+  const billableBy = service ? draft.billableBy?.trim() || null : null;
   const dueDate = draft.purpose === 'task' ? draft.dueDate?.trim() || null : null;
   if (!['service', 'support', 'task'].includes(draft.purpose)) errors.push('Choose a valid intake purpose.');
   if (!organizationId) errors.push('Organization is required.');
@@ -48,11 +67,19 @@ export function validateManualIntakeDraft(draft: ManualIntakeDraft):
   if (!description || description.length > 10000) errors.push('Details must be 1–10000 characters.');
   if (assignmentNotes && assignmentNotes.length > 1000) errors.push('Assignment notes must be at most 1000 characters.');
   if (!['low', 'normal', 'high', 'urgent'].includes(draft.priority)) errors.push('Choose a valid priority.');
+  if (service && !officeId) errors.push('Select the service office.');
+  if (service && (!jobAddress || jobAddress.length > 300)) errors.push('Enter the service job address (up to 300 characters).');
+  if (service && jobCity && jobCity.length > 100) errors.push('City is too long.');
+  if (service && jobState && jobState.length > 50) errors.push('State is too long.');
+  if (service && jobZip && jobZip.length > 20) errors.push('ZIP is too long.');
+  if (service && !['billable', 'warranty'].includes(billableType || '')) errors.push('Choose a valid billing type.');
+  if (service && !['admin', 'dispatch', 'assigned_sales_rep', 'other_sales_rep'].includes(billableBy || '')) errors.push('Choose billing responsibility.');
   if (dueDate && !isCalendarDate(dueDate)) errors.push('Enter a valid due date.');
   if (errors.length) return { ok: false, errors };
   return { ok: true, value: {
     purpose: draft.purpose, organizationId, contactId, subject, description,
     priority: draft.priority, dueDate, assignmentNotes, assigneeId, officeId,
+    jobAddress, jobCity, jobState, jobZip, billableType, billableBy,
   } };
 }
 
