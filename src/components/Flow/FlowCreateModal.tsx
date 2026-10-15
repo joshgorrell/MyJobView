@@ -34,14 +34,14 @@ export function FlowCreateModal({
     : mode === "choose"
       ? "Create in Flow"
       : mode === "chat"
-        ? "Internal chat"
+        ? "Message"
         : mode === "update"
           ? "Activity update"
           : "Log interaction";
   return createPortal(
     <QuickActionModal
       title={title}
-      subtitle="Messages, customer interactions and follow-ups in one place"
+      subtitle={mode === "chat" ? "Send a message to your team" : "Messages, customer interactions and follow-ups in one place"}
       icon={<FlowWaveIcon className="text-2xl" />}
       onClose={onClose}
     >
@@ -60,7 +60,7 @@ export function FlowCreateModal({
             <button onClick={() => setMode("chat")}>
               <MessageSquare />
               <span>
-                <strong>Internal chat</strong>
+                <strong>Message</strong>
                 <small>Teammates, departments or everyone</small>
               </span>
             </button>
