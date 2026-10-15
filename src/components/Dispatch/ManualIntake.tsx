@@ -24,6 +24,12 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('normal');
   const [dueDate, setDueDate] = useState('');
+  const [jobAddress, setJobAddress] = useState('');
+  const [jobCity, setJobCity] = useState('');
+  const [jobState, setJobState] = useState('');
+  const [jobZip, setJobZip] = useState('');
+  const [billableType, setBillableType] = useState('billable');
+  const [billableBy, setBillableBy] = useState('dispatch');
   const [assigneeNotes, setAssigneeNotes] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
   const [officeId, setOfficeId] = useState('');
@@ -91,7 +97,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     task: 'Internal follow-up or action for an employee. Assign an owner and optional due date.',
   };
   const draftValidation = validateManualIntakeDraft({
-    purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes, assigneeId, officeId,
+    purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes, assigneeId, officeId, jobAddress, jobCity, jobState, jobZip, billableType, billableBy,
   });
 
 
@@ -146,6 +152,25 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       <label className="block space-y-1 text-sm text-gray-300">Details
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} maxLength={10000} className="w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-white" />
       </label>
+      {type === 'service' && <div className="space-y-3 rounded-lg border border-gray-700 p-3" aria-label="Service request details">
+        <h4 className="font-medium text-white">Service location & billing</h4>
+        <label className="block space-y-1 text-sm text-gray-300">Job address
+          <input value={jobAddress} onChange={e => setJobAddress(e.target.value)} maxLength={300} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
+        </label>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="space-y-1 text-sm text-gray-300">City<input value={jobCity} onChange={e => setJobCity(e.target.value)} maxLength={100} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" /></label>
+          <label className="space-y-1 text-sm text-gray-300">State<input value={jobState} onChange={e => setJobState(e.target.value)} maxLength={50} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" /></label>
+          <label className="space-y-1 text-sm text-gray-300">ZIP<input value={jobZip} onChange={e => setJobZip(e.target.value)} maxLength={20} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" /></label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1 text-sm text-gray-300">Billing type
+            <select value={billableType} onChange={e => setBillableType(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white"><option value="billable">Billable</option><option value="warranty">Warranty</option></select>
+          </label>
+          <label className="space-y-1 text-sm text-gray-300">Billing responsibility
+            <select value={billableBy} onChange={e => setBillableBy(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white"><option value="dispatch">Dispatch</option><option value="admin">Administration</option><option value="assigned_sales_rep">Assigned sales rep</option><option value="other_sales_rep">Other sales rep</option></select>
+          </label>
+        </div>
+      </div>}
       {(type === 'task' || type === 'support') && <label className="block space-y-1 text-sm text-gray-300">Assign to employee
         <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
           <option value="">Unassigned</option>
