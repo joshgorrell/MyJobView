@@ -8,7 +8,7 @@ import { toTaskDraft } from '../../lib/smart-intake/task-payload';
 const TaskForm = lazy(() => import('../Tasks/TaskForm').then(m => ({ default: m.TaskForm })));
 
 type IntakeType = 'service' | 'support' | 'task';
-type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null };
+type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null; office_id: string | null };
 
 export function ManualIntake({ onClose }: { onClose: () => void }) {
   const { tenant } = useTenant();
@@ -44,7 +44,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       const safe = query.replace(/[%_,()\\]/g, '').slice(0, 80);
       if (!safe) { if (active) setCustomerLoading(false); return; }
       const { data, error: lookupError } = await supabase.from('contacts')
-        .select('id,company_name,contact_name,email')
+        .select('id,company_name,contact_name,email,office_id')
         .eq('organization_id', organizationId)
         .or(['company_name.ilike.%' + safe + '%', 'contact_name.ilike.%' + safe + '%', 'email.ilike.%' + safe + '%'].join(','))
         .order('company_name').limit(25);
@@ -134,7 +134,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       {customerLoading && <p role="status" className="text-xs text-gray-400">Searching customers…</p>}
       <p className="text-sm text-blue-300">{purposeGuidance[type]}</p>
       <label className="block space-y-1 text-sm text-gray-300">Customer
-        <select value={contactId} onChange={e => { const id = e.target.value; setContactId(id); setSelectedCustomer(filtered.find(customer => customer.id === id) ?? null); }} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
+        <select value={contactId} onChange={e => { const id = e.target.value; setContactId(id); const customer = filtered.find(customer => customer.id === id) ?? null; setSelectedCustomer(customer); if (customer?.office_id) setOfficeId(customer.office_id); }} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
           <option value="">Select an existing customer</option>
           {filtered.map(customer => <option key={customer.id} value={customer.id}>{customer.company_name || customer.contact_name || customer.email || 'Unnamed contact'}</option>)}
         </select>
