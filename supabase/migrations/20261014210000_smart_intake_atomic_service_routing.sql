@@ -11,6 +11,7 @@ declare
   contact public.contacts%rowtype;
   new_request uuid;
   body_text text;
+  verified_details public.intake_service_details%rowtype;
 begin
   if (select auth.role()) <> 'service_role' then
     raise exception 'Trusted processor required';
@@ -50,6 +51,9 @@ begin
     order by m.created_at limit 1
   )) into body_text;
   if body_text is null then raise exception 'Message content incomplete'; end if;
+  select * into verified_details from public.intake_service_details
+    where intake_id = target_intake and organization_id = intake.organization_id;
+  if not found then raise exception 'Service location and billing details must be verified'; end if;
   -- Service request fields requiring scheduling, billing, and location decisions
   -- cannot safely be inferred from a sender address. Do not fabricate them.
   -- A separately verified structured intake payload is required here.
