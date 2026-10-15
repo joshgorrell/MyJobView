@@ -81,7 +81,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       if (aiPrefill) {
         setFormData(prev => ({
           ...prev,
-          title: aiPrefill.title || prev.title,
+          title: supportMode && aiPrefill.title && !/^Support:/i.test(aiPrefill.title) ? `Support: ${aiPrefill.title}` : aiPrefill.title || prev.title,
           description: aiPrefill.description || prev.description,
           priority: aiPrefill.priority || prev.priority,
           due_date: aiPrefill.dueDate || prev.due_date,
