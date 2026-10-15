@@ -17,6 +17,9 @@ begin
   if not found then raise exception 'Intake not found'; end if;
   select * into claim from public.intake_routing_claims where intake_id = target_intake for update;
   if not found then raise exception 'Intake not queued'; end if;
+  if claim.organization_id is distinct from item.organization_id then
+    raise exception 'Routing claim tenant mismatch';
+  end if;
   if claim.state = 'completed' then
     if claim.destination_kind <> 'service' or claim.destination_id is null then
       raise exception 'Inconsistent completed claim';
@@ -25,7 +28,7 @@ begin
   end if;
   if claim.state <> 'pending' or item.status <> 'ready'
     or item.classification <> 'service' or item.contact_id is null
-    or item.missing_fields <> '[]'::jsonb then
+    or item.missing_fields is distinct from '[]'::jsonb then
     raise exception 'Intake not ready';
   end if;
   select * into customer from public.contacts
