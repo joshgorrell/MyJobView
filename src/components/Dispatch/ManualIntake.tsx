@@ -38,6 +38,7 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
   const [customerLoading, setCustomerLoading] = useState(false);
   const [error, setError] = useState('');
   const [taskReviewOpen, setTaskReviewOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -100,6 +101,33 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
     purpose: type, organizationId, contactId, subject, description, priority, dueDate, assignmentNotes: assigneeNotes, assigneeId, officeId, jobAddress, jobCity, jobState, jobZip, billableType, billableBy,
   });
 
+
+  const submitService = async () => {
+    if (!draftValidation.ok || draftValidation.value.purpose !== 'service' || submitting) return;
+    const draft = draftValidation.value;
+    if (selectedCustomer?.id !== draft.contactId || selectedCustomer.office_id !== draft.officeId) {
+      setError('Select a customer and their matching office before submitting.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const { error: submitError } = await supabase.rpc('smart_intake_create_manual_service', {
+        target_org: draft.organizationId, target_contact: draft.contactId,
+        target_office: draft.officeId, request_subject: draft.subject,
+        request_details: draft.description, request_priority: draft.priority,
+        job_address: draft.jobAddress, job_city: draft.jobCity,
+        job_state: draft.jobState, job_zip: draft.jobZip,
+        billing_type: draft.billableType, billing_by: draft.billableBy,
+      });
+      if (submitError) throw submitError;
+      onClose();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Could not create the Service Request.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (taskReviewOpen && draftValidation.ok && draftValidation.value.purpose === 'task') {
     const taskDraft = toTaskDraft(draftValidation.value);
@@ -188,11 +216,11 @@ export function ManualIntake({ onClose }: { onClose: () => void }) {
       {type === 'task' && draftValidation.ok && <button type="button" onClick={() => setTaskReviewOpen(true)} className="min-h-11 rounded-lg bg-blue-600 px-4 font-medium text-white hover:bg-blue-500">Review in Task Form</button>}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="min-h-11 rounded-lg px-4 text-gray-300">Cancel</button>
-        <button type="button" disabled title="Unified intake submission is not connected yet" className="min-h-11 rounded-lg bg-gray-700 px-4 font-medium text-gray-300 disabled:opacity-50">
-          Create {type === 'service' ? 'Service Request' : type === 'support' ? 'Support Issue' : 'Task'} (coming soon)
+        <button type="button" onClick={() => { if (type === 'service') void submitService(); }} disabled={type !== 'service' || !draftValidation.ok || submitting} className="min-h-11 rounded-lg bg-blue-600 px-4 font-medium text-white disabled:opacity-50">
+          {submitting ? 'Creating…' : type === 'service' ? 'Create Service Request' : type === 'support' ? 'Support submission coming soon' : 'Task submission coming soon'}
         </button>
       </div>
-      <p className="text-xs text-gray-400">One form will capture, classify, and route the request. Submission is disabled until the unified creation and audit flow is implemented.</p>
+      <p className="text-xs text-gray-400">Service Requests are created directly with a linked audit record. Support and Task submission are still being connected.</p>
     </section>
   );
 }
