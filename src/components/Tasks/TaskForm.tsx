@@ -201,6 +201,10 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     e.preventDefault();
     if (!profile) return;
 
+    if (supportMode && !formData.title.replace(/^Support:\s*/i, '').trim()) {
+      setError('Enter a short description of the support needed.');
+      return;
+    }
     if (supportMode && !formData.contact_id) {
       setError('Select a customer contact for this support request.');
       return;
