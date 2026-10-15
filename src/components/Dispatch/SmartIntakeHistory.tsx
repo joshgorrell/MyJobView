@@ -82,12 +82,14 @@ export function SmartIntakeHistory() {
   }
 
   const visible = rows;
+  const unresolvedCustomers = rows.filter(row => !row.contact_id && ATTENTION_STATUSES.includes(row.status)).length;
   return (
     <section className="min-w-0 space-y-4" aria-label="Smart Intake history">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="text-xl font-semibold text-white">Smart Intake</h2><p className="text-sm text-gray-400">Investigate every message received by your dealer's intake channel.</p></div>
+        <div><h2 className="text-xl font-semibold text-white">Smart Intake</h2><p className="text-sm text-gray-400">Review incoming email and texts. Manual entries select or create a customer directly.</p></div>
         <button type="button" onClick={() => void reload()} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-700 px-3 text-gray-200 hover:bg-gray-800"><RefreshCw className="h-4 w-4" /> Refresh</button>
       </div>
+      {unresolvedCustomers > 0 && <p role="status" className="rounded-lg border border-amber-700 p-3 text-sm text-amber-200">{unresolvedCustomers} incoming messages need customer identification before routing.</p>}
       <div className="flex flex-wrap gap-2">
         {(['attention','all'] as const).map(tab => <button key={tab} type="button" onClick={() => { setView(tab); setStatus('all'); inspectionVersion.current++; setSelected(null); setAttachments([]); setCustomer(null); }} aria-pressed={view === tab} className={`min-h-11 rounded-lg px-4 text-sm font-medium ${view === tab ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}>{tab === 'attention' ? 'Needs Attention' : 'All Activity'}</button>)}
       </div>
@@ -116,7 +118,7 @@ export function SmartIntakeHistory() {
           <p><strong>From:</strong> {selected.item.source_address}</p><p><strong>To:</strong> {selected.item.destination_address}</p><p><strong>Subject:</strong> {selected.item.subject || '(No subject)'}</p>
           <div className="whitespace-pre-wrap break-words rounded-lg bg-gray-800 p-3">{selected.item.raw_body?.trim() ? selected.item.raw_body : '(Blank message body)'}</div>
           <p><strong>Status:</strong> {selected.item.status} · <strong>Classification:</strong> {selected.item.classification}</p>
-          <p><strong>Customer:</strong> {customer ? customer.name : selected.item.contact_id ? "Contact matched — details unavailable" : "Not confirmed — select a customer before saving media"}</p>
+          <p><strong>Customer:</strong> {customer ? customer.name : selected.item.contact_id ? "Contact matched — details unavailable" : "Unmatched incoming message — employee review required before routing"}</p>
           {customerError && <p role="status" className="text-amber-300">{customerError}</p>}
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
           <h4 className="font-semibold">Attachments</h4>
