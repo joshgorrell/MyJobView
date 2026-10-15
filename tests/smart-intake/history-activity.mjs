@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+const src = fs.readFileSync('src/lib/smart-intake/history-activity.ts','utf8');
+vm.runInNewContext(ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+const result = exports.mergeHistoryActivity([{id:'b',at:'2026-10-15',kind:'event',label:'done'},{id:'a',at:'2026-10-14',kind:'message',label:'received'}]);
+assert.equal(result[0].id,'a');
+console.log('History timeline ordering passed');
