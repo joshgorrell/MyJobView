@@ -27,12 +27,13 @@ interface TaskFormProps {
   onClose: () => void;
   onSuccess: () => void;
   aiPrefill?: AIPrefill | null;
+  supportMode?: boolean;
 }
 
-export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill }: TaskFormProps) {
+export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill, supportMode = false }: TaskFormProps) {
   const { profile } = useAuth();
   const [formData, setFormData] = useState({
-    title: task?.title || '',
+    title: task?.title || (supportMode ? 'Support: ' : ''),
     description: task?.description || '',
     priority: task?.priority || 'medium',
     due_date: task?.due_date ? task.due_date.split('T')[0] : '',
@@ -200,6 +201,10 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     e.preventDefault();
     if (!profile) return;
 
+    if (supportMode && !formData.contact_id) {
+      setError('Select a customer contact for this support request.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -339,8 +344,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <QuickActionModal
       scrollBody={false}
       stableHeight
-      title={task ? 'Edit Task' : 'New Task'}
-      subtitle={task ? 'Update task details' : 'Assign and track a new task'}
+      title={task ? 'Edit Task' : supportMode ? 'New Support Request' : 'New Task'}
+      subtitle={task ? 'Update task details' : supportMode ? 'Customer assistance tracked as a task' : 'Assign and track a new task'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
@@ -430,7 +435,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             {/* Contact - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
-                Contact <span className="text-muted font-normal">(optional)</span>
+                Contact <span className="text-muted font-normal">{supportMode ? '(required for support)' : '(optional)'}</span>
               </label>
               <div className="flex gap-2">
                 <ContactSearchSelect
