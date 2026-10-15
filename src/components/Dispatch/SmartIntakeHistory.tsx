@@ -37,6 +37,10 @@ export function SmartIntakeHistory() {
   const [customerSearchBusy, setCustomerSearchBusy] = useState(false);
   const [customerSearchError, setCustomerSearchError] = useState('');
   const [confirmingCustomer, setConfirmingCustomer] = useState(false);
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerEmail, setNewCustomerEmail] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const inspectionVersion = useRef(0);
   const orgId = tenant?.organizationId && profile?.organization_id === tenant.organizationId ? tenant.organizationId : profile?.organization_id && !tenant ? profile.organization_id : null;
 
@@ -107,6 +111,27 @@ export function SmartIntakeHistory() {
     }
   }
 
+  async function createCustomerAndConfirm() {
+    if (!selected || !orgId || selected.item.contact_id || confirmingCustomer || !newCustomerName.trim()) return;
+    setConfirmingCustomer(true);
+    setCustomerSearchError('');
+    try {
+      const { error: createError } = await supabase.rpc('smart_intake_create_customer_and_confirm', {
+        target_intake: selected.item.id,
+        customer_name: newCustomerName.trim(),
+        customer_email: newCustomerEmail.trim() || null,
+        customer_phone: newCustomerPhone.trim() || null,
+      });
+      if (createError) throw createError;
+      await inspect(selected.item.id);
+      await reload();
+    } catch (e) {
+      setCustomerSearchError(e instanceof Error ? e.message : 'Unable to create customer.');
+    } finally {
+      setConfirmingCustomer(false);
+    }
+  }
+
   async function inspect(id: string) {
     if (!orgId) return;
     const version = ++inspectionVersion.current;
@@ -114,6 +139,10 @@ export function SmartIntakeHistory() {
     setAttachments([]);
     setCustomer(null);
     setCustomerSearch('');
+    setNewCustomerOpen(false);
+    setNewCustomerName('');
+    setNewCustomerEmail('');
+    setNewCustomerPhone('');
     setCustomerMatches([]);
     setCustomerError('');
     setAttachmentError('');
@@ -188,7 +217,13 @@ export function SmartIntakeHistory() {
             {customerSearchBusy && <p role="status">Searching…</p>}
             {customerSearchError && <p role="alert" className="text-amber-300">{customerSearchError}</p>}
             {customerMatches.map(match => <p key={match.id} className="rounded border border-gray-700 p-2">{match.name}{match.email ? ' · ' + match.email : ''} <span className="text-xs text-gray-400">— match candidate (not linked)</span><button type="button" disabled={confirmingCustomer} onClick={() => void confirmCustomer(match)} className="ml-2 rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">Confirm customer</button></p>)}
-            <p className="text-xs text-gray-400">Creating a new customer from this message is not available yet.</p>
+            <p className="text-xs text-gray-400"><button type="button" onClick={() => setNewCustomerOpen(value => !value)} className="min-h-11 rounded border border-gray-600 px-3 text-white">{newCustomerOpen ? 'Cancel new customer' : 'Create new customer'}</button>
+            {newCustomerOpen && <div className="space-y-2">
+              <label className="block">Customer name<input required maxLength={200} value={newCustomerName} onChange={e => setNewCustomerName(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
+              <label className="block">Email (optional)<input type="email" maxLength={254} value={newCustomerEmail} onChange={e => setNewCustomerEmail(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
+              <label className="block">Phone (optional)<input type="tel" maxLength={40} value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2" /></label>
+              <button type="button" disabled={confirmingCustomer || !newCustomerName.trim()} onClick={() => void createCustomerAndConfirm()} className="min-h-11 rounded bg-blue-600 px-3 text-white disabled:opacity-50">Create and confirm customer</button>
+            </div></p>
           </div>}
           <p><strong>Linked service request:</strong> {selected.item.service_request_id || 'None'}</p>
           <h4 className="font-semibold">Attachments</h4>
