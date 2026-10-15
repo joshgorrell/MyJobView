@@ -5,6 +5,7 @@ export type IntakeHistoryFilters = {
   search?: string;
   channel?: 'email' | 'sms' | 'mms';
   status?: string;
+  unmatchedOnly?: boolean;
   statuses?: string[];
   before?: string;
   from?: string;
@@ -19,10 +20,11 @@ export async function listIntakeHistory(db: SupabaseClient, filters: IntakeHisto
   if (!filters.organizationId) throw new Error('Organization required');
   const limit = Math.max(1, Math.min(filters.limit ?? 50, 100));
   let query = db.from('intake_items')
-    .select('id,channel,source_address,destination_address,subject,status,classification,priority,created_at,last_activity_at,service_request_id,lead_id')
+    .select('id,channel,source_address,destination_address,subject,status,classification,priority,created_at,last_activity_at,service_request_id,lead_id,contact_id')
     .eq('organization_id', filters.organizationId)
     .order('created_at', { ascending: false })
     .limit(limit);
+  if (filters.unmatchedOnly) query = query.is('contact_id', null).in('status', ['received','analyzing','awaiting_customer','awaiting_employee','needs_review','failed_retryable']);
   if (filters.channel) query = query.eq('channel', filters.channel);
   if (filters.status) query = query.eq('status', filters.status);
   else if (filters.statuses?.length) query = query.in('status', filters.statuses);
