@@ -1763,24 +1763,16 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       : siblings.flatMap(item => [item, ...ordered.filter(child => child.parent_item_id === item.id)]);
     if (next.length !== ordered.length || new Set(next.map(item => item.id)).size !== ordered.length) return;
 
-    const changes = next.map((item, index) => ({ id: item.id, before: item.sort_order, after: index }))
-      .filter(item => item.before !== item.after);
     setSaving(true);
-    const applied: typeof changes = [];
     try {
-      for (const change of changes) {
-        const { error } = await supabase.from('proposal_line_items').update({ sort_order: change.after }).eq('id', change.id);
-        if (error) throw error;
-        applied.push(change);
-      }
+      const { error } = await supabase.rpc('reorder_proposal_room_items', {
+        p_room_id: roomId,
+        p_order: next.map(item => item.id),
+      });
+      if (error) throw error;
       await loadData();
     } catch (error) {
       console.error('Failed to reorder proposal items', error);
-      // Best-effort rollback until an atomic reorder RPC is available.
-      for (const change of applied.reverse()) {
-        const { error: rollbackError } = await supabase.from('proposal_line_items').update({ sort_order: change.before }).eq('id', change.id);
-        if (rollbackError) console.error('Failed to roll back item order', rollbackError);
-      }
       await loadData();
       alert('Could not reorder items. Please try again.');
     } finally {
