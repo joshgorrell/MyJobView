@@ -490,12 +490,22 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         const changed = (payload.new || payload.old) as { work_order_id?: string };
         if (!changed.work_order_id || idsInclude(changed.work_order_id)) void refresh();
       }).subscribe();
-    const onFocus = () => { if (document.visibilityState === 'visible') void refresh(); };
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeNow(Date.now());
+        void refresh();
+      }
+    };
+    const onOnline = () => void refresh();
     document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
     void refresh();
     return () => {
       disposed = true; window.clearInterval(tick); window.clearInterval(poll);
       document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
       void supabase.removeChannel(channel);
     };
   }, [workOrderId, workOrder?.work_order_group_id, linkedWorkOrders]);
