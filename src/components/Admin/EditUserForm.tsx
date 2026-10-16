@@ -767,7 +767,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           p_arrangement_type: salesCompensation.arrangement,
           p_base_amount_cents: salesCompensation.arrangement === 'base_plus_commission' ? Math.round(Number(salesCompensation.baseAmount) * 100) : 0,
           p_base_frequency: salesCompensation.arrangement === 'base_plus_commission' ? salesCompensation.baseFrequency : null,
-          p_effective_from: new Date().toISOString().slice(0, 10),
         });
         if (saveError) throw saveError;
       }
