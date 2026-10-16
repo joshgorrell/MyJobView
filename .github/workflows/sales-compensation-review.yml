@@ -18,7 +18,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Sales compensation contract
-        run: node tests/user-setup/sales-compensation.mjs
+        run: node tests/user-setup/sales-compensation.mjs && node tests/user-setup/sales-compensation-database.mjs
       - name: TypeScript
         run: npm run typecheck
       - name: Frontend build
