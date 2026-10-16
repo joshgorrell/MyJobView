@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
@@ -91,7 +92,7 @@ export function RequestInternalTimeModal({
       onSubmitted();
     } catch (err: any) {
       console.error('Error submitting request:', err);
-      alert(err.message || 'Failed to submit request');
+      notify(err.message || 'Failed to submit request', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

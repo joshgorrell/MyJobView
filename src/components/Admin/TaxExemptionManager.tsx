@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -309,7 +310,7 @@ function UploadCertificateModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) {
-      alert('Please select a certificate file to upload.');
+      notify('Please select a certificate file to upload.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -355,7 +356,7 @@ function UploadCertificateModal({
       onSave();
     } catch (error) {
       console.error('Error uploading certificate:', error);
-      alert('Failed to upload certificate.');
+      notify('Failed to upload certificate.', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
     }
@@ -619,7 +620,7 @@ function CertificateListModal({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading certificate:', error);
-      alert('Failed to download certificate.');
+      notify('Failed to download certificate.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -639,7 +640,7 @@ function CertificateListModal({
       onUpdate();
     } catch (error) {
       console.error('Error deleting certificate:', error);
-      alert('Failed to delete certificate.');
+      notify('Failed to delete certificate.', { theme: 'blue', tone: 'error' });
     }
   }
 

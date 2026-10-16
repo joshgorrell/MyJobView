@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Plus, TrendingUp, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Plus, TrendingUp, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -50,11 +50,11 @@ interface ProgressBillingManagerProps {
 }
 
 export default function ProgressBillingManager({
-  proposalId,
+  proposalId: _proposalId,
   salesOrderId,
   onCreateInvoice
 }: ProgressBillingManagerProps) {
-  const { profile } = useAuth();
+  const { profile: _profile } = useAuth();
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
   const [loading, setLoading] = useState(true);
 

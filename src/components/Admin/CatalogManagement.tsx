@@ -142,7 +142,7 @@ export default function CatalogManagement() {
     try {
       setError(null);
 
-      let query;
+
       let tableName: string;
 
       switch (activeTab) {

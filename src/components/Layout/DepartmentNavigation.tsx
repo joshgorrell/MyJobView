@@ -1,5 +1,5 @@
 import { getIcon } from '../../lib/iconMap';
-import { Menu, ChevronDown, ChevronRight, Star } from 'lucide-react';
+import { Menu, ChevronDown, Star } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useToast } from '../Shared/Toast';
@@ -12,7 +12,7 @@ interface DepartmentNavigationProps {
 export function DepartmentNavigation({ activeModule, onModuleChange }: DepartmentNavigationProps) {
   const toast = useToast();
   const { mainDepartments, getUserModules, starredModules, starModule, unstarModule, loading } = useDepartments();
-  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const [_expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,24 +70,6 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
     return 'text-info';
   };
 
-  const toggleDepartment = (deptId: string) => {
-    setExpandedDepartments(prev => {
-      const next = new Set(prev);
-      if (next.has(deptId)) {
-        next.delete(deptId);
-      } else {
-        next.add(deptId);
-      }
-      return next;
-    });
-  };
-
-  const handleDepartmentClick = (dept: any) => {
-    const modules = getUserModules(dept.id);
-    if (modules.length > 0) {
-      toggleDepartment(dept.id);
-    }
-  };
 
   const handleModuleClick = (moduleKey: string) => {
     if (moduleKey === 'tv_dashboard' || moduleKey === 'sales_tv_dashboard') {
@@ -152,7 +134,7 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
     <nav className="hidden md:flex flex-wrap gap-2 sm:gap-4">
       {mainDepartments.map((dept) => {
         const modules = getUserModules(dept.id);
-        const isExpanded = expandedDepartments.has(dept.id);
+
         const hasActiveModule = modules.some(m => m.module_key === activeModule);
         const isOpen = openDropdown === dept.id;
 

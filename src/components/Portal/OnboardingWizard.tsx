@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { securityOnboardingRequest, securityPaymentRequest, type SecurityDraftForm, type PortalSecurityAgreement, type SecurityAgreementDocument } from '../../lib/securityOnboarding';
 import SecurityPaymentEnrollment from './SecurityPaymentEnrollment';
@@ -184,7 +185,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
         5: 'Please select a billing preference.',
         6: 'Please review the terms, acknowledge your agreement, and provide your signature.'
       };
-      alert(messages[currentStep] || 'Please complete all required fields.');
+      notify(messages[currentStep] || 'Please complete all required fields.', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (await saveProgress(Math.min(steps.length, currentStep + 1))) {

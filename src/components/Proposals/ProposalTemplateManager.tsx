@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Plus, Copy, Trash2, Star, X, Eye, EyeOff, FileText, Settings, CheckCircle, LayoutGrid } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface ReportTemplate {
+  created_at?: string;
+  updated_at?: string;
+  company_id?: string;
   id: string;
   name: string;
   description: string | null;
@@ -217,7 +221,7 @@ const templateSections: TemplateSection[] = [
 ];
 
 export default function ProposalTemplateManager() {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -226,7 +230,7 @@ export default function ProposalTemplateManager() {
   const [saving, setSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
-  const canManage = profile?.role === 'admin' || profile?.role === 'sales_manager';
+  const canManage = profile?.role === 'admin' || profile?.role === 'manager';
   const canEditSelected = selectedTemplate && (
     !selectedTemplate.is_personal || selectedTemplate.created_by === profile?.id
   ) && (selectedTemplate.is_personal || canManage);
@@ -258,7 +262,7 @@ export default function ProposalTemplateManager() {
       }
     } catch (error) {
       console.error('Error loading templates:', error);
-      alert('Failed to load templates');
+      notify('Failed to load templates', { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -293,10 +297,10 @@ export default function ProposalTemplateManager() {
         .eq('id', profile.id);
 
       if (error) throw error;
-      alert('Default proposal template saved!');
+      notify('Default proposal template saved!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error saving template preference:', error);
-      alert('Failed to save template preference');
+      notify('Failed to save template preference', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingDefaultTemplate(false);
     }
@@ -322,10 +326,10 @@ export default function ProposalTemplateManager() {
 
       await loadTemplates();
       setIsEditing(false);
-      alert('Template saved successfully!');
+      notify('Template saved successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      notify('Failed to save template', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -336,7 +340,7 @@ export default function ProposalTemplateManager() {
 
     // Validate: only admins/sales managers can create company-wide templates
     if (!newTemplate.is_personal && !canManage) {
-      alert('Only admins and sales managers can create company-wide templates');
+      notify('Only admins and sales managers can create company-wide templates', { theme: 'violet', tone: 'info' });
       return;
     }
 
@@ -345,7 +349,7 @@ export default function ProposalTemplateManager() {
       const { data, error } = await supabase
         .from('proposal_report_templates')
         .insert({
-          company_id: profile.company_id,
+          company_id: companySettings?.id,
           created_by: profile.id,
           ...newTemplate
         })
@@ -357,10 +361,10 @@ export default function ProposalTemplateManager() {
       await loadTemplates();
       setSelectedTemplate(data);
       setIsCreating(false);
-      alert('Template created successfully!');
+      notify('Template created successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error creating template:', error);
-      alert('Failed to create template');
+      notify('Failed to create template', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -402,10 +406,10 @@ export default function ProposalTemplateManager() {
 
       setSelectedTemplate(null);
       await loadTemplates();
-      alert('Template deleted successfully!');
+      notify('Template deleted successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error deleting template:', error);
-      alert('Failed to delete template');
+      notify('Failed to delete template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -417,7 +421,7 @@ export default function ProposalTemplateManager() {
       await supabase
         .from('proposal_report_templates')
         .update({ is_default: false })
-        .eq('company_id', profile.company_id);
+        .eq('company_id', companySettings?.id);
 
       // Set this one as default
       const { error } = await supabase
@@ -428,10 +432,10 @@ export default function ProposalTemplateManager() {
       if (error) throw error;
 
       await loadTemplates();
-      alert('Default template updated!');
+      notify('Default template updated!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error setting default:', error);
-      alert('Failed to set default template');
+      notify('Failed to set default template', { theme: 'violet', tone: 'error' });
     }
   }
 

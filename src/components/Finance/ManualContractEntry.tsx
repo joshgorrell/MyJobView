@@ -1,3 +1,4 @@
+import { requestConfirmation, notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { staffSecurityOnboarding, securityPaymentRequest } from '../../lib/securityOnboarding';
 import SecurityPaymentEnrollment from '../Portal/SecurityPaymentEnrollment';
@@ -85,10 +86,10 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
     return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
   }, [formData, paperSigned, autopayAccepted, loading, loadError]);
 
-  function closeEntry() {
+  async function closeEntry() {
     if (saving) return;
     if ((JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted) &&
-        !window.confirm('Discard this unsaved manual entry? This information has not been submitted.')) return;
+        !(await requestConfirmation('Discard this unsaved manual entry? This information has not been submitted.', { theme: 'emerald' }))) return;
     onClose();
   }
 
@@ -115,27 +116,27 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   async function handleSave() {
     if (saving || loading || loadError || !documentVersion) return;
     if (!paperSigned) {
-      alert('Confirm that the customer signed the paper agreement before completing onboarding.');
+      notify('Confirm that the customer signed the paper agreement before completing onboarding.', { theme: 'emerald', tone: 'info' });
       return;
     }
     if (formData.emergencyContacts.length < 2) {
-      alert('Please add at least 2 emergency contacts');
+      notify('Please add at least 2 emergency contacts', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     const missingFields = formData.emergencyContacts.some(c => !c.name || !c.phone || !c.password);
     if (missingFields) {
-      alert('Please fill in all emergency contact fields (name, phone, password)');
+      notify('Please fill in all emergency contact fields (name, phone, password)', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     if (!formData.accountType) {
-      alert('Please select an Account Type (Residential or Commercial)');
+      notify('Please select an Account Type (Residential or Commercial)', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     if (!formData.propertyAddress || !formData.propertyCity || !formData.propertyState || !formData.propertyZip) {
-      alert('Please fill in all property address fields');
+      notify('Please fill in all property address fields', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -156,11 +157,11 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
         },
       });
 
-      alert('Contract information saved successfully!');
+      notify('Contract information saved successfully!', { theme: 'emerald', tone: 'success' });
       onComplete();
     } catch (error) {
       console.error('Error saving contract:', error);
-      alert(error instanceof Error ? error.message : 'Failed to save contract information');
+      notify(error instanceof Error ? error.message : 'Failed to save contract information', { theme: 'emerald', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -169,7 +170,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   async function handlePrintBlankForm() {
     const printTab = window.open('', '_blank');
     if (!printTab) {
-      alert('Please allow popups to print this form.');
+      notify('Please allow popups to print this form.', { theme: 'emerald', tone: 'warning' });
       return;
     }
     printTab.document.write('<p>Preparing printable onboarding form...</p>');
@@ -185,7 +186,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
       printTab.document.close();
     } catch (error) {
       printTab.close();
-      alert(error instanceof Error ? error.message : 'Could not print the form.');
+      notify(error instanceof Error ? error.message : 'Could not print the form.', { theme: 'emerald', tone: 'error' });
     }
   }
 

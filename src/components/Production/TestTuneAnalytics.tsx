@@ -19,7 +19,6 @@ import {
 } from 'recharts';
 import {
   TrendingUp,
-  TrendingDown,
   BarChart3,
   PieChart as PieChartIcon,
   Clock,
@@ -339,7 +338,7 @@ export function TestTuneAnalytics({ permissions }: TestTuneAnalyticsProps) {
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} width={40} />
                 <Tooltip
-                  formatter={(v: number, name: string) => [`$${v.toLocaleString()}`, name]}
+                  formatter={(v: number = 0, name: string = '') => [`$${v.toLocaleString()}`, name]}
                   contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -360,7 +359,7 @@ export function TestTuneAnalytics({ permissions }: TestTuneAnalyticsProps) {
                       cy="50%"
                       outerRadius="40%"
                       dataKey="count"
-                      label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                      label={({ percent = 0 }) => `${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
                     >
                       {tierData.map((entry, i) => (
@@ -368,7 +367,7 @@ export function TestTuneAnalytics({ permissions }: TestTuneAnalyticsProps) {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(v: number, _name: string, props: any) => [
+                      formatter={(v: number = 0, _name: string = '', props: any) => [
                         `${v} projects${permissions.can_view_bonus_amounts ? ` · $${props.payload?.amount?.toLocaleString()}` : ''}`,
                         'Count'
                       ]}
@@ -397,7 +396,7 @@ export function TestTuneAnalytics({ permissions }: TestTuneAnalyticsProps) {
                 <YAxis yAxisId="left" tick={{ fontSize: 10 }} tickFormatter={v => `${v}%`} domain={[0, 120]} width={36} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} tickFormatter={v => `${v}%`} domain={[0, 100]} width={36} />
                 <Tooltip
-                  formatter={(v: number, name: string) => [`${v.toFixed(1)}%`, name]}
+                  formatter={(v: number = 0, name: string = '') => [`${v.toFixed(1)}%`, name]}
                   contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -441,7 +440,7 @@ export function TestTuneAnalytics({ permissions }: TestTuneAnalyticsProps) {
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals={false} width={30} />
                 <Tooltip
-                  formatter={(v: number, name: string) => [v, name.charAt(0).toUpperCase() + name.slice(1)]}
+                  formatter={(v: number = 0, name: string = '') => [v, name.charAt(0).toUpperCase() + name.slice(1)]}
                   contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />

@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import LegacyHandoffReview from './LegacyHandoffReview';
 import {useJobDraft} from '../../lib/useJobDraft';
 import { useEffect, useState } from 'react';
@@ -29,7 +30,7 @@ export default function ProjectTasksList({ projectId, canEdit=false }: {projectI
   const result=editing.id ? await supabase.from('project_tasks').update(values).eq('id',editing.id) : await supabase.from('project_tasks').insert({...values,project_id:projectId,status:'open',sort_order:tasks.length});
   setSaving(false);if(result.error){setError(result.error.message);return;}setEditing(null);await load();
  }
- async function status(task:Task,value:string){if(!window.confirm(`${value==='completed'?'Complete the entire project task':value==='cancelled'?'Cancel project work':'Reopen project work'}: ${task.title}?`))return;
+ async function status(task:Task,value:string){if(!(await requestConfirmation(`${value==='completed'?'Complete the entire project task':value==='cancelled'?'Cancel project work':'Reopen project work'}: ${task.title}?`, { theme: 'blue' })))return;
   const result=await supabase.from('project_tasks').update({status:value,completed_at:value==='completed'?new Date().toISOString():null,...(modern?{progress_status:value==='completed'?'completed':'pending'}:{}),is_auto_completed:false,auto_completed_by:null}).eq('id',task.id);
   if(result.error)setError(result.error.message);else await load();
  }

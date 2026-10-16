@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, ArrowLeft, Calendar, DollarSign, User, MapPin } from 'lucide-react';
+import { Briefcase, ArrowLeft, Calendar, User, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Project {
@@ -23,7 +23,7 @@ interface PortalProjectsProps {
 export function PortalProjects({ isEmbedded = false }: PortalProjectsProps = {}) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [_selectedProject, _setSelectedProject] = useState<string | null>(null);
 
   useEffect(() => {
     loadProjects();

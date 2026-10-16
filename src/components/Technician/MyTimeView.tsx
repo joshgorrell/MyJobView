@@ -1,7 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { MyJobTimeView } from './MyJobTimeView';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Clock, Calendar, Coffee, Lock, AlertCircle, Edit2, XCircle, CheckCircle, Clock3 } from 'lucide-react';
@@ -129,7 +130,7 @@ export function MyTimeView() {
       loadRequests();
     } catch (error) {
       console.error('Error cancelling request:', error);
-      alert('Failed to cancel request');
+      notify('Failed to cancel request', { theme: 'blue', tone: 'error' });
     }
   }
 

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { X, Plus, Users, Edit2, Trash2, Star, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -118,7 +119,7 @@ export function CalendarManagementModal({
             role
           )
         `)
-        .eq('calendar_id', selectedCalendar.id);
+        .eq('calendar_id', selectedCalendar.id).overrideTypes<CalendarMember[], { merge: false }>();
 
       if (error) throw error;
       setMembers(data || []);
@@ -144,7 +145,7 @@ export function CalendarManagementModal({
 
   async function handleCreateCalendar() {
     if (!formData.name.trim()) {
-      alert('Please enter a calendar name');
+      notify('Please enter a calendar name', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -177,7 +178,7 @@ export function CalendarManagementModal({
       setView('list');
     } catch (error) {
       console.error('Error creating calendar:', error);
-      alert('Failed to create calendar');
+      notify('Failed to create calendar', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -202,7 +203,7 @@ export function CalendarManagementModal({
       setSelectedCalendar(null);
     } catch (error) {
       console.error('Error updating calendar:', error);
-      alert('Failed to update calendar');
+      notify('Failed to update calendar', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -222,7 +223,7 @@ export function CalendarManagementModal({
       await loadCalendars();
     } catch (error) {
       console.error('Error deleting calendar:', error);
-      alert('Failed to delete calendar');
+      notify('Failed to delete calendar', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -242,7 +243,7 @@ export function CalendarManagementModal({
       await loadMembers();
     } catch (error) {
       console.error('Error adding member:', error);
-      alert('Failed to add member');
+      notify('Failed to add member', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -257,7 +258,7 @@ export function CalendarManagementModal({
       await loadMembers();
     } catch (error) {
       console.error('Error removing member:', error);
-      alert('Failed to remove member');
+      notify('Failed to remove member', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -276,7 +277,7 @@ export function CalendarManagementModal({
       await loadCalendars();
     } catch (error) {
       console.error('Error setting default:', error);
-      alert('Failed to set default calendar');
+      notify('Failed to set default calendar', { theme: 'blue', tone: 'error' });
     }
   }
 

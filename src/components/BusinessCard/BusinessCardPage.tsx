@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { Send, Check, MapPin, Edit3, Download, QrCode, X, Copy, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -118,7 +119,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading vCard:', error);
-      alert('Failed to download contact card');
+      notify('Failed to download contact card', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -160,7 +161,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
       setShowQRModal(true);
     } catch (error) {
       console.error('Error generating QR code:', error);
-      alert('Failed to generate QR code');
+      notify('Failed to generate QR code', { theme: 'blue', tone: 'error' });
     } finally {
       setLoadingQR(false);
     }
@@ -212,7 +213,7 @@ export function BusinessCardPage({ slug, isOwnCard = false, onCardUpdated }: Bus
       setTimeout(() => setSent(false), 5000);
     } catch (error) {
       console.error('Error sending card:', error);
-      alert('Failed to send business card. Please try again.');
+      notify('Failed to send business card. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSending(false);
     }

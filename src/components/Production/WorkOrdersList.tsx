@@ -1,7 +1,7 @@
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Search, Filter, Clock, Calendar, User, AlertCircle, Camera, Wrench, CheckCircle, X, Mail, MailCheck, Phone, PhoneOff, ArrowUpDown, ArrowDown, ArrowUp, Repeat } from 'lucide-react';
+import { Plus, Search, Filter, Clock, Calendar, User, AlertCircle, Camera, Wrench, CheckCircle, X, MailCheck, Phone, PhoneOff, ArrowDown, ArrowUp, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
 
@@ -157,11 +157,11 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
         `)
         .order('created_at', { ascending: sortDir === 'asc' });
 
-      if (profile?.role === 'technician' || profile?.role === 'field_tech') {
+      if (profile?.role === 'tech') {
         query = query.eq('assigned_to', profile.id);
       }
 
-      const { data: woData, error: woError } = await withinDeadline(query);
+      const { data: woData, error: woError } = await withinDeadline(query.overrideTypes<Omit<WorkOrder, 'parts_count' | 'pending_parts' | 'photos_count' | 'is_completed'>[], { merge: false }>());
       if (woError) throw woError;
 
       const woList = woData || [];
@@ -371,7 +371,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
             </span>
           )}
         </button>
-        {(profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'project_manager') && (
+        {(profile?.role === 'admin' || profile?.role === 'manager') && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"

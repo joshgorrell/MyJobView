@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { accessoryPricing } from '../../lib/accessoryPricing';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -201,7 +202,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
           )
         `)
         .in('status', ['planning', 'active'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).overrideTypes<SalesOrder[], { merge: false }>();
 
       if (error) throw error;
       setSalesOrders(data || []);
@@ -269,7 +270,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
           )
         `)
         .eq('id', selectedSalesOrder)
-        .single();
+        .single().overrideTypes<{ contract_total: number; proposal: { id: string; tax_environment: string | null; tax_project_type: string | null; tax_rate: number | null; contact: { tax_rate: number | null; is_tax_exempt: boolean | null } | null; proposal_settings: ProposalSettings[] } | null }, { merge: false }>();
 
       if (error) throw error;
 
@@ -592,7 +593,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
   async function handleSave(submit: boolean) {
     if (!selectedSalesOrder || !title || lineItems.length === 0) {
-      alert('Please fill in all required fields and add at least one line item');
+      notify('Please fill in all required fields and add at least one line item', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -810,7 +811,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       handleClose();
     } catch (error: any) {
       console.error('Error creating change order:', error);
-      alert('Failed to create change order: ' + (error?.message || String(error)));
+      notify('Failed to create change order: ' + (error?.message || String(error)), { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -841,7 +842,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
   async function handleCreateDraft() {
     if (!selectedSalesOrder || !title) {
-      alert('Please enter a title for the change order');
+      notify('Please enter a title for the change order', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -910,7 +911,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       handleClose();
     } catch (error: any) {
       console.error('Error creating change order:', error);
-      alert('Failed to create change order: ' + (error?.message || String(error)));
+      notify('Failed to create change order: ' + (error?.message || String(error)), { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -1141,7 +1142,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                         className={`p-4 border rounded-lg space-y-3 ${
                           isAccessory
                             ? 'ml-4 sm:ml-8 border-blue-200 bg-blue-50/30 border-l-4 border-l-blue-400'
-                            : item.action_type === 'remove' || item.action_type === 'remove_scope'
+                            : item.action_type === 'remove'
                               ? 'border-red-200 bg-red-50/40 border-l-4 border-l-red-400'
                               : item.action_type === 'add'
                                 ? 'border-blue-200 bg-blue-50/40 border-l-4 border-l-blue-400'

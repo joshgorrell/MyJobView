@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Search, Image as ImageIcon, Loader2, ExternalLink } from 'lucide-react';
 
 interface ImageSearchModalProps {

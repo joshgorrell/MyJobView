@@ -11,7 +11,7 @@ export interface Profile {
   first_name?: string;
   last_name?: string;
   username: string;
-  role: 'admin' | 'finance' | 'manager' | 'sales' | 'tech';
+  role: 'admin' | 'finance' | 'manager' | 'service_manager' | 'sales' | 'tech';
   is_active: boolean;
   avatar_url: string | null;
   email_leads: boolean;
@@ -23,6 +23,8 @@ export interface Profile {
   notify_on_product_requests?: boolean;
   organization_id?: string | null;
   primary_office_id?: string | null;
+  default_proposal_report_template_id?: string | null;
+  can_see_all_review_requests?: boolean;
   default_office_id?: string | null;
   can_view_team_pulse?: boolean;
   can_access_recur?: boolean;
@@ -46,6 +48,8 @@ export interface Profile {
 }
 
 export interface Lead {
+  priority?: string | null;
+  google_calendar_event_id?: string | null;
   id: string;
   company_name: string | null;
   contact_name: string;
@@ -217,6 +221,10 @@ export interface Task {
   id: string;
   lead_id: string | null;
   contact_id: string | null;
+  reminder_date?: string | null;
+  assigned_to?: string | null;
+  assigned_department_id?: string | null;
+  google_calendar_event_id?: string | null;
   user_id: string;
   title: string;
   description: string;
@@ -233,6 +241,8 @@ export interface Task {
 export interface CompanySettings {
   id: string;
   company_name: string;
+  google_maps_api_key?: string | null;
+  company_email?: string | null;
   company_logo_url: string | null;
   print_accent_color?: string | null;
   business_card_banner_url?: string | null;
@@ -373,6 +383,20 @@ export interface Product {
   our_price?: number;
   cost: number | null;
   unit: string;
+  item_name?: string | null;
+  manufacturer_id?: string | null;
+  manufacturer_model_number?: string | null;
+  default_qty?: number | null;
+  class_id?: string | null;
+  subcategory?: string | null;
+  manufacturers?: { name: string } | null;
+  sales_description?: string | null;
+  purchase_description?: string | null;
+  default_install_task?: string | null;
+  default_programming_hours?: number | null;
+  default_programming_notes?: string | null;
+  image_url?: string | null;
+  product_link?: string | null;
   default_labor_hours?: number | null;
   labor_phase_id?: string | null;
   portal_io_product_id: string | null;
@@ -403,6 +427,10 @@ export interface Proposal {
   total: number;
   deposit_percent: number;
   deposit_amount: number;
+  deposit_amount_due?: number | null;
+  approval_completed_at?: string | null;
+  require_deposit?: boolean;
+  deposit_paid?: boolean;
   discount_amount?: number;
   project_management_amount?: number;
   project_design_amount?: number;
@@ -447,6 +475,7 @@ export interface Proposal {
 }
 
 export interface ProposalRoom {
+  organization_id?: string | null;
   id: string;
   proposal_id: string;
   name: string;
@@ -481,6 +510,9 @@ export interface ProposalLineItem {
   parent_item_id?: string | null;
   display_mode?: 'itemized' | 'bundle' | 'collapsed';
   accessories?: ProposalLineItem[];
+  programming_labor_hours?: number | null;
+  programming_notes?: string | null;
+  show_programming_notes?: boolean;
   show_task_notes?: boolean;
   is_hidden?: boolean;
   labor_phase_id?: string | null;

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { SecurityFieldVisibility, SecurityVisibilityGuide } from './SecurityFieldVisibility';
 import React, { useState, useEffect, useRef } from 'react';
 import { SECURITY_INITIAL_TERMS, staffSecurityOnboarding } from '../../lib/securityOnboarding';
@@ -213,7 +214,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Failed to load data');
+      notify('Failed to load data', { theme: 'emerald', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -268,7 +269,8 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
       creationRequest.current = crypto.randomUUID();
       if (onPaperCreated) onPaperCreated(contractData);
-      else onSuccess(contractData);
+      else notify('Security contract created!', { theme: 'emerald', tone: 'success' });
+      onSuccess(contractData);
     } catch (error: any) {
       console.error('Error creating contract:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
@@ -289,7 +291,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
         displayMessage += `\n\nHint: ${errorHint}`;
       }
 
-      alert(displayMessage);
+      notify(displayMessage, { theme: 'emerald', tone: 'error' });
     } finally {
       setSaving(false);
     }

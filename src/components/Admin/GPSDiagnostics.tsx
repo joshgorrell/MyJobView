@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { MapPin, TrendingUp, TrendingDown, Activity, Download, RefreshCw, Calendar } from 'lucide-react';
+import { MapPin, TrendingUp, Activity, Download, RefreshCw, Calendar } from 'lucide-react';
 
 interface TechnicianStats {
   technician_id: string;

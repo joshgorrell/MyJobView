@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import {useJobDraft} from '../../lib/useJobDraft';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -40,7 +41,7 @@ export default function ProposalTasksPanel({ proposalId, onClose }: { proposalId
     setSaving(false); if(result.error) { setError(result.error.message); return; } setEditing(null); await load();
   }
   async function remove(task: Task) {
-    if(!window.confirm(`Delete "${task.title}"? It will remain excluded after labor edits.`)) return;
+    if(!(await requestConfirmation(`Delete "${task.title}"? It will remain excluded after labor edits.`, { theme: 'violet' }))) return;
     const {error: failure} = await supabase.from('proposal_tasks').delete().eq('id',task.id);
     if(failure) setError(failure.message); else await load();
   }

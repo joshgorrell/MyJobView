@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { RotateCcw, AlertTriangle, Calendar, Globe, FileText, X, CheckCircle, TrendingUp, TrendingDown, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -18,7 +19,7 @@ export function ReactivateProposalModalEnhanced({
   proposalId,
   proposalNumber,
   lastModified,
-  totalAmount,
+  totalAmount: _totalAmount,
   onClose,
   onSuccess,
   onReview
@@ -66,7 +67,7 @@ export function ReactivateProposalModalEnhanced({
       }
     } catch (error) {
       console.error('Error analyzing pricing:', error);
-      alert('Failed to analyze pricing. You can still reopen the proposal.');
+      notify('Failed to analyze pricing. You can still reopen the proposal.', { theme: 'violet', tone: 'error' });
     } finally {
       setAnalyzing(false);
     }
@@ -156,10 +157,11 @@ export function ReactivateProposalModalEnhanced({
         }
       });
 
+      notify('Proposal reactivated!', { theme: 'violet', tone: 'success' });
       onSuccess();
     } catch (error) {
       console.error('Error reopening proposal:', error);
-      alert('Failed to reopen proposal. Please try again.');
+      notify('Failed to reopen proposal. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

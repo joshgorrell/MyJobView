@@ -1,10 +1,10 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { notifyTechJobReassigned } from '../../lib/dispatchNotifications';
 import ConfirmModal from '../ui/ConfirmModal';
 import {
   CheckCircle,
-  XCircle,
   Clock,
   AlertCircle,
   User,
@@ -105,7 +105,7 @@ export function JobAcceptanceQueue() {
       if (error) throw error;
 
       const pending = (data || []).filter(wo => {
-        const hasAccepted = wo.job_acceptance_log?.some(log => log.action === 'accepted');
+        const hasAccepted = wo.job_acceptance_log?.some((log: { action: string }) => log.action === 'accepted');
         return !hasAccepted;
       });
 
@@ -134,7 +134,7 @@ export function JobAcceptanceQueue() {
 
   async function handleReassign(workOrderId: string, currentTechId: string, currentTechName: string) {
     if (!selectedTech) {
-      alert('Please select a technician');
+      notify('Please select a technician', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -174,7 +174,7 @@ export function JobAcceptanceQueue() {
       await loadData();
     } catch (error) {
       console.error('Error reassigning job:', error);
-      alert('Failed to reassign job');
+      notify('Failed to reassign job', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -205,7 +205,7 @@ export function JobAcceptanceQueue() {
       await loadData();
     } catch (error) {
       console.error('Error force accepting job:', error);
-      alert('Failed to force accept job');
+      notify('Failed to force accept job', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -261,7 +261,7 @@ export function JobAcceptanceQueue() {
       ) : (
         <div className="space-y-3">
           {pendingJobs.map(job => {
-            const hasDeclined = job.job_acceptance_log?.some(log => log.action === 'declined');
+            const hasDeclined = job.job_acceptance_log?.some((log: { action: string }) => log.action === 'declined');
             const timeSinceAssigned = getTimeAgo(job.created_at);
 
             return (

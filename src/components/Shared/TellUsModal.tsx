@@ -1,3 +1,4 @@
+import './feedback.css';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Bug, CheckCircle2, FileText, Image, Lightbulb, Loader2, MessageSquare, Paperclip, Video, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -253,8 +254,8 @@ export default function TellUsModal({ isOpen, onClose }: TellUsModalProps) {
 
         {success ? (
           <div className="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-8">
-            <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-6 text-center">
-              <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-green-400" />
+            <div className="tell-us-complete rounded-xl border p-6 text-center" style={{ color: feedbackType === 'idea' ? '#fbbf24' : feedbackType === 'bug' ? '#4ade80' : '#60a5fa', borderColor: 'currentColor', animation: 'feedbackEnter .3s ease-out both' }}>
+              <CheckCircle2 className="mx-auto mb-3 h-14 w-14" style={{ animation: 'feedbackCheck .5s ease-out both' }} />
               <h3 className="text-lg font-semibold text-white">Thanks!</h3>
               <p className="mt-1 text-gray-300">Your feedback has been sent to the MyJobView team.</p>
               <button

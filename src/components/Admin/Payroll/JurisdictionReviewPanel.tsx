@@ -1,6 +1,7 @@
+import { notify } from '../../../lib/feedback';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { MapPin, AlertTriangle, CheckCircle, Edit3, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Edit3, X } from 'lucide-react';
 
 interface Segment {
   id: string;
@@ -100,7 +101,7 @@ export default function JurisdictionReviewPanel({ payPeriodId }: { payPeriodId: 
           work_jurisdiction_state: overrideState.trim().toUpperCase(),
           work_jurisdiction_source: 'manual_override',
           work_jurisdiction_confidence: 'high',
-          work_jurisdiction_override_by: userData.data.user?.id,
+          work_jurisdiction_override_by: userData.user?.id,
           work_jurisdiction_override_reason: overrideReason.trim(),
         })
         .eq('id', segmentId);
@@ -112,7 +113,7 @@ export default function JurisdictionReviewPanel({ payPeriodId }: { payPeriodId: 
       await loadSegments();
     } catch (err: any) {
       console.error('Error saving override:', err);
-      alert(err.message || 'Failed to save override');
+      notify(err.message || 'Failed to save override', { theme: 'blue', tone: 'error' });
     }
   };
 

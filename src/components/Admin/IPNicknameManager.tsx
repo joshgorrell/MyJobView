@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { MapPin, Plus, Edit2, Trash2, Save, X, Home, Building2, Wifi, Coffee, Shield, Smartphone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -108,7 +109,7 @@ export function IPNicknameManager() {
       loadIPNicknames();
     } catch (error) {
       console.error('Error saving IP nickname:', error);
-      alert('Error saving IP nickname');
+      notify('Error saving IP nickname', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -123,7 +124,7 @@ export function IPNicknameManager() {
       loadIPNicknames();
     } catch (error) {
       console.error('Error deleting IP nickname:', error);
-      alert('Error deleting IP nickname');
+      notify('Error deleting IP nickname', { theme: 'blue', tone: 'error' });
     }
   }
 

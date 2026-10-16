@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CreateInvoiceFromWorkOrderModal } from '../Invoices/CreateInvoiceFromWorkOrderModal';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   CheckCircle,
   DollarSign,
-  FileText,
   User,
   Calendar,
   TrendingUp,
@@ -78,7 +77,7 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
   const [showFilters, setShowFilters] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
-  const isManager = profile?.role === 'admin' || profile?.role === 'dispatch' || profile?.role === 'production_manager' || profile?.role === 'service_manager';
+  const isManager = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'service_manager';
 
   useEffect(() => {
     loadQueueItems();

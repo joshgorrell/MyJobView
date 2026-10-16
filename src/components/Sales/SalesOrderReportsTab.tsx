@@ -1,8 +1,9 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   FileText, Printer, Loader2, BarChart3, Clock, Wrench, ListChecks,
-  DollarSign, Layers, CheckSquare, Square, Receipt, Package, TrendingUp,
+  Layers, CheckSquare, Square, Receipt, Package, TrendingUp,
   CreditCard, Users, ChevronDown, ChevronUp, PieChart
 } from 'lucide-react';
 import { getTaxApplicability, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
@@ -90,7 +91,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
     } catch (err) {
       console.error('Report error:', err);
       if (w) { w.document.open(); w.document.write(errorPageHtml(String(err))); w.document.close(); }
-      else { alert('Failed to generate report. Please try again.'); }
+      else { notify('Failed to generate report. Please try again.', { theme: 'violet', tone: 'error' }); }
     } finally {
       setGeneratingReport(null);
     }
@@ -431,7 +432,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
     if (w) { w.document.write(loadingPageHtml('Building Job Time Report...')); w.document.close(); }
     setGeneratingReport('job_time');
     try {
-      const { data: wos } = await supabase.from('work_orders').select('id, work_order_number, title, type, status, estimated_hours, actual_hours, technician:profiles!work_orders_assigned_to_fkey(full_name), labor_phase:labor_phases(name)').eq('project_id', order.project_id).order('created_at', { ascending: true });
+      const { data: wos } = await supabase.from('work_orders').select('id, work_order_number, title, type, status, estimated_hours, actual_hours, technician:profiles!work_orders_assigned_to_fkey(full_name), labor_phase:labor_phases(name)').eq('project_id', order.project_id).order('created_at', { ascending: true }).overrideTypes<{id: string; work_order_number: string; title: string; type: string; status: string; priority?: string; start_date?: string | null; target_completion_date?: string | null; estimated_hours: number | null; actual_hours: number | null; technician: {full_name: string} | null; labor_phase: {name: string} | null}[], { merge: false }>();
       const woIds = (wos || []).map(w => w.id);
       let completions: any[] = [];
       if (woIds.length > 0) {
@@ -467,7 +468,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
     if (w) { w.document.write(loadingPageHtml('Building Work Orders Summary...')); w.document.close(); }
     setGeneratingReport('work_orders');
     try {
-      const { data: wos } = await supabase.from('work_orders').select('id, work_order_number, title, type, status, priority, start_date, target_completion_date, estimated_hours, actual_hours, technician:profiles!work_orders_assigned_to_fkey(full_name), labor_phase:labor_phases(name)').eq('project_id', order.project_id).order('created_at', { ascending: true });
+      const { data: wos } = await supabase.from('work_orders').select('id, work_order_number, title, type, status, priority, start_date, target_completion_date, estimated_hours, actual_hours, technician:profiles!work_orders_assigned_to_fkey(full_name), labor_phase:labor_phases(name)').eq('project_id', order.project_id).order('created_at', { ascending: true }).overrideTypes<{id: string; work_order_number: string; title: string; type: string; status: string; priority?: string; start_date?: string | null; target_completion_date?: string | null; estimated_hours: number | null; actual_hours: number | null; technician: {full_name: string} | null; labor_phase: {name: string} | null}[], { merge: false }>();
       const data = wos || [];
       const totalEst = data.reduce((s, w) => s + (w.estimated_hours || 0), 0);
       const totalActual = data.reduce((s, w) => s + (w.actual_hours || 0), 0);
@@ -490,7 +491,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
     if (w) { w.document.write(loadingPageHtml('Building Labor Phase Report...')); w.document.close(); }
     setGeneratingReport('labor_phase');
     try {
-      const { data: tasks } = await supabase.from('project_tasks').select('id, title, estimated_hours, status, labor_phase:labor_phases(id, name)').eq('project_id', order.project_id).order('sort_order', { ascending: true });
+      const { data: tasks } = await supabase.from('project_tasks').select('id, title, estimated_hours, status, labor_phase:labor_phases(id, name)').eq('project_id', order.project_id).order('sort_order', { ascending: true }).overrideTypes<{id: string; title: string; estimated_hours: number | null; status: string; labor_phase: {id: string; name: string} | null}[], { merge: false }>();
       const taskIds = (tasks || []).map(t => t.id);
       let completionHours: Record<string, number> = {};
       if (taskIds.length > 0) {
@@ -537,7 +538,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
     if (w) { w.document.write(loadingPageHtml('Building Project Tasks Checklist...')); w.document.close(); }
     setGeneratingReport('tasks_checklist');
     try {
-      const { data: tasks } = await supabase.from('project_tasks').select('id, title, description, estimated_hours, status, labor_phase:labor_phases(name)').eq('project_id', order.project_id).order('sort_order', { ascending: true });
+      const { data: tasks } = await supabase.from('project_tasks').select('id, title, description, estimated_hours, status, labor_phase:labor_phases(name)').eq('project_id', order.project_id).order('sort_order', { ascending: true }).overrideTypes<{id: string; title: string; description: string | null; estimated_hours: number | null; status: string; labor_phase: {name: string} | null}[], { merge: false }>();
       const grouped: Record<string, any[]> = {};
       (tasks || []).forEach(t => { const phase = t.labor_phase?.name || 'General'; if (!grouped[phase]) grouped[phase] = []; grouped[phase].push(t); });
       let content = '';
@@ -589,7 +590,7 @@ export function SalesOrderReportsTab({ order, changeOrders }: SalesOrderReportsT
   }
 
   async function generateSalesTaxReport() {
-    if (!order.proposal_id) { alert('No proposal linked to this sales order.'); return; }
+    if (!order.proposal_id) { notify('No proposal linked to this sales order.', { theme: 'violet', tone: 'info' }); return; }
     const w = window.open('', '_blank');
     if (w) { w.document.write(loadingPageHtml('Building Sales Tax Report...')); w.document.close(); }
     setGeneratingReport('sales_tax');

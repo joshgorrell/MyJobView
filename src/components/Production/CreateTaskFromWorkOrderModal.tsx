@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, CheckSquare, User, Calendar, AlertCircle, Tag, MessageSquare } from 'lucide-react';
@@ -25,7 +26,7 @@ interface Profile {
 }
 
 export function CreateTaskFromWorkOrderModal({
-  workOrderId,
+  workOrderId: _workOrderId,
   workOrderNumber,
   workOrderTitle,
   contactId,
@@ -152,7 +153,7 @@ export function CreateTaskFromWorkOrderModal({
     if (!profile) return;
 
     if (!formData.assigned_to) {
-      alert('Please assign this task to someone');
+      notify('Please assign this task to someone', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -200,10 +201,11 @@ export function CreateTaskFromWorkOrderModal({
 
       if (commentError) console.error('Error adding comment:', commentError);
 
+      notify('Task created!', { theme: 'blue', tone: 'success' });
       onSuccess(task.id);
     } catch (error: any) {
       console.error('Error creating task:', error);
-      alert(`Failed to create task: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to create task: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

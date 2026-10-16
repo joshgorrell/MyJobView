@@ -1,0 +1,23 @@
+name: Proposal drag reorder verification
+
+on:
+  pull_request:
+    paths:
+      - 'src/components/Proposals/ProposalBuilderCompact.tsx'
+      - 'supabase/migrations/*proposal_room_reorder.sql'
+      - '.github/workflows/proposal-drag-reorder.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck

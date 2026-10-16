@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { TrendingUp, TrendingDown, DollarSign, Target, FileText, Users, Calendar, Clock, AlertCircle, Award, Phone, Mail, MapPin, CheckCircle, XCircle, Eye, Plus, ArrowRight, Sparkles, Activity, BarChart3, Flame, RefreshCw, MessageSquare, CreditCard as Edit, ShoppingCart, ClipboardList, Layers, Ban, Zap, Star, Building2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Target, FileText, Users, Calendar, Clock, AlertCircle, Award, Phone, Mail, MapPin, CheckCircle, Eye, Plus, ArrowRight, Sparkles, Activity, BarChart3, Flame, RefreshCw, MessageSquare, CreditCard as Edit, ShoppingCart, ClipboardList, Layers, Ban, Star, Building2 } from 'lucide-react';
 import { LeadDetail } from '../Leads/LeadDetail';
 import { WeeklyCheckInBanner } from './WeeklyCheckInBanner';
 import { ManagerCheckInCompliance } from './ManagerCheckInCompliance';
@@ -539,8 +539,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       const isAllTime = currentRange === 'all_time';
 
       // Calculate last month dates for comparison (not used but kept for compatibility)
-      const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-      const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+
 
       // Build queries conditionally based on date range
       let closedLeadsQuery = supabase
@@ -664,7 +663,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       // Parallel data fetching (all queries run simultaneously)
       // Each query uses .catch() so a single failure degrades gracefully instead of blanking the dashboard
-      const safe = (q: any) => Promise.resolve(q).catch(() => ({ data: null, count: null, error: null }));
+      const safe = <T,>(q: PromiseLike<T>) => Promise.resolve(q).catch(() => ({ data: null, count: null, error: null }));
       const [
         myLeadsResult,
         closedLeadsThisMonthResult,
@@ -688,7 +687,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         // My open leads for pipeline value
         safe(supabase
           .from('leads')
-          .select('estimated_value, status, priority, company_name, contact_name, created_at, last_contact_date')
+          .select('id, estimated_value, status, priority, company_name, contact_name, created_at, last_contact_date')
           .eq('assigned_to', targetId)
           .in('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation'])),
 
@@ -696,7 +695,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         safe(closedLeadsQuery),
 
         // Proposals (filtered by range or all time)
-        safe(proposalsQuery),
+        safe(proposalsQuery.overrideTypes<Proposal[], { merge: false }>()),
 
         // Active pipeline proposals — always all-time snapshot (no date filter)
         safe(supabase
@@ -830,7 +829,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
 
       // Pipeline Value = all currently active proposals (always a real-time snapshot, not date-filtered)
       const pipelineValue = activePipelineProposals.reduce((sum, p) => {
-        return sum + parseFloat(p.total || '0');
+        return sum + parseFloat(String(p.total || '0'));
       }, 0);
 
       // Proposals out with customers = sent/viewed from the live pipeline
@@ -859,7 +858,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         p.status === 'approved' || p.status === 'approved_pending_action'
       );
       const approvedProposalRevenue = wonProposalsForRevenue.reduce((sum, p) => {
-        return sum + parseFloat(p.total || '0');
+        return sum + parseFloat(String(p.total || '0'));
       }, 0);
 
       // Sum sales_monthly_stats for the range (source of truth, includes manually-entered totals)
@@ -2283,7 +2282,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
           ) : null}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {/* Historical Year Cards */}
-            {historicalSales.map((record, index) => (
+            {historicalSales.map((record, _index) => (
               <div
                 key={record.year}
                 className={`rounded-lg p-4 hover:bg-canvas transition-colors ${

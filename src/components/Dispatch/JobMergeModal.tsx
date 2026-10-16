@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,9 +10,7 @@ import {
   CheckCircle,
   AlertCircle,
   User,
-  Calendar,
-  MapPin
-} from 'lucide-react';
+  Calendar} from 'lucide-react';
 
 interface JobMergeModalProps {
   initialWorkOrders?: Array<{
@@ -143,7 +142,7 @@ export function JobMergeModal({ initialWorkOrders, onClose, onSuccess }: JobMerg
 
   function removeJob(jobId: string) {
     if (selectedJobs.length <= 2) {
-      alert('Must have at least 2 jobs to merge');
+      notify('Must have at least 2 jobs to merge', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -174,7 +173,7 @@ export function JobMergeModal({ initialWorkOrders, onClose, onSuccess }: JobMerg
   async function handleMerge() {
     const validation = canMerge();
     if (!validation.valid) {
-      alert(validation.reason);
+      notify(validation.reason, { theme: 'blue', tone: 'info' });
       return;
     }
 
@@ -236,12 +235,12 @@ export function JobMergeModal({ initialWorkOrders, onClose, onSuccess }: JobMerg
 
       if (targetUpdateError) throw targetUpdateError;
 
-      alert(`Successfully merged ${selectedJobs.length} jobs!`);
+      notify(`Successfully merged ${selectedJobs.length} jobs!`, { theme: 'blue', tone: 'success' });
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error merging jobs:', error);
-      alert('Failed to merge jobs');
+      notify('Failed to merge jobs', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

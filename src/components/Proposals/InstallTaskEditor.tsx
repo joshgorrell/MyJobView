@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Wrench, X, Eye, EyeOff, Lock } from 'lucide-react';
+import { Wrench, X, Eye, Lock } from 'lucide-react';
 
 interface InstallTaskEditorProps {
   lineItemId: string;
@@ -39,7 +40,7 @@ export default function InstallTaskEditor({
       onClose();
     } catch (error) {
       console.error('Error saving install task:', error);
-      alert('Failed to save install task');
+      notify('Failed to save install task', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

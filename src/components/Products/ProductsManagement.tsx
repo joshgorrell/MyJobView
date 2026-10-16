@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -262,14 +263,14 @@ export default function ProductsManagement() {
       const msg = error?.message || 'Failed to delete product';
       if (error?.code === '23503' || msg.includes('violates')) {
         setConfirmModal({ title: 'Product is in use', message: 'This product cannot be deleted because it is used in existing records or has stock. Archive it to hide it from the current catalog?', onConfirm: () => handleArchive(id, true) });
-      } else alert(msg);
+      } else notify(msg, { theme: 'amber', tone: 'error' });
       return false;
     }
   }
 
   async function handleArchive(id: string, archive: boolean) {
     const { error } = await supabase.from('products').update({ is_active: !archive }).eq('id', id);
-    if (error) { alert(error.message); return; }
+    if (error) { notify(error.message, { theme: 'amber', tone: 'error' }); return; }
     await loadProducts();
   }
 

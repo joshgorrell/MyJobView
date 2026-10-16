@@ -1,3 +1,4 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { ScheduleWorkOrderModal } from './ScheduleWorkOrderModal';
 import { NotesPolishButton } from '../Shared/NotesPolishButton';
 import {CreateInvoiceFromWorkOrderModal} from '../Invoices/CreateInvoiceFromWorkOrderModal';
@@ -5,10 +6,10 @@ import {InvoiceDetailModal} from '../Invoices/InvoiceDetailModal';
 import { WorkOrderTimeControl } from './WorkOrderTimeControl';
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import Flow from '../Flow/Flow';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, AlertCircle, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Tag, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartRequestForm } from './PartRequestForm';
@@ -409,7 +410,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             product_request_items(id, product_name, quantity_requested, estimated_cost)
           `)
           .eq('work_order_id', workOrderId)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false }).overrideTypes<PartRequest[], { merge: false }>(),
         supabase
           .from('job_photos')
           .select('*')
@@ -512,46 +513,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     }
   }
 
-  async function handleConfirmCustomerContact() {
-    if (!profile || !workOrder) return;
-    if (workOrder.customer_contact_confirmed_at) {
-      setConfirmModal({
-        title: 'Update Contact Timestamp',
-        message: 'Customer contact has already been recorded. Do you want to update the timestamp to now?',
-        onConfirm: async () => {
-          try {
-            const { error } = await supabase
-              .from('work_orders')
-              .update({
-                customer_contact_confirmed_at: new Date().toISOString(),
-                customer_contact_confirmed_by: profile.id,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', workOrderId);
-            if (error) throw error;
-            loadWorkOrderData();
-          } catch (error) {
-            console.error('Error confirming customer contact:', error);
-          }
-        }
-      });
-      return;
-    }
-    try {
-      const { error } = await supabase
-        .from('work_orders')
-        .update({
-          customer_contact_confirmed_at: new Date().toISOString(),
-          customer_contact_confirmed_by: profile.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', workOrderId);
-      if (error) throw error;
-      loadWorkOrderData();
-    } catch (error) {
-      console.error('Error confirming customer contact:', error);
-    }
-  }
 
   async function handleArchive() {
     if (!profile || !workOrder) return;
@@ -579,10 +540,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           }
 
           loadWorkOrderData();
-          alert(workOrder.is_archived ? 'Work order unarchived successfully!' : 'Work order archived successfully!');
+          notify(workOrder.is_archived ? 'Work order unarchived successfully!' : 'Work order archived successfully!', { theme: 'blue', tone: 'success' });
         } catch (error) {
           console.error('Error archiving work order:', error);
-          alert('Failed to archive work order. Please try again.');
+          notify('Failed to archive work order. Please try again.', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -590,7 +551,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   async function handleLinkWorkOrders() {
     if (selectedLinkIds.length === 0) {
-      alert('Please select at least one work order to link');
+      notify('Please select at least one work order to link', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -605,10 +566,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       setShowLinkModal(false);
       setSelectedLinkIds([]);
       loadWorkOrderData();
-      alert(`Successfully linked ${allIds.length} work orders together!`);
+      notify(`Successfully linked ${allIds.length} work orders together!`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error linking work orders:', error);
-      alert('Failed to link work orders. Please try again.');
+      notify('Failed to link work orders. Please try again.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -625,10 +586,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           if (error) throw error;
 
           loadWorkOrderData();
-          alert('Work order unlinked successfully!');
+          notify('Work order unlinked successfully!', { theme: 'blue', tone: 'success' });
         } catch (error) {
           console.error('Error unlinking work order:', error);
-          alert('Failed to unlink work order. Please try again.');
+          notify('Failed to unlink work order. Please try again.', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -696,10 +657,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   }
 
   const canEdit = profile?.role === 'admin' ||
-    profile?.role === 'office_manager' ||
-    profile?.role === 'project_manager';
+    profile?.role === 'manager';
 
-  const canArchive = profile?.role === 'admin' || profile?.role === 'finance' || profile?.role === 'office_manager';
+  const canArchive = profile?.role === 'admin' || profile?.role === 'finance' || profile?.role === 'manager';
 
   const canManageParts = ['admin','office_manager','project_manager','service_manager','manager','finance'].includes(profile?.role || '') || workOrder.assigned_to===profile?.id;
   const isAssignedTech = workOrder.assigned_to === profile?.id;
@@ -802,7 +762,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           {workOrder.type==='service' && workOrder.status!=='cancelled' && ['admin','manager','service_manager','finance'].includes(profile?.role || '') && <button onClick={async()=>{
             const {data:link,error}=await supabase.from('work_order_invoice_links').select('invoice_id').eq('work_order_id',workOrderId).maybeSingle();
-            if(error){alert(error.message);return;}
+            if(error){notify(error.message, { theme: 'blue', tone: 'error' });return;}
             if(link){const {data:inv}=await supabase.from('invoices').select('status').eq('id',link.invoice_id).single();if(inv?.status!=='draft'){setBillingInvoiceId(link.invoice_id);return;}}
             setShowBillingReview(true);
           }} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">Review & Invoice</button>}
@@ -1375,7 +1335,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
             <WorkOrderTasksChecklist
               workOrderId={workOrderId}
-              projectId={workOrder.project_id}
+              projectId={workOrder.project_id ?? undefined}
               laborPhaseId={workOrder.labor_phase_id}
               workOrderGroupId={workOrder.work_order_group_id}
               isGroupWorkOrder={workOrder.is_group_work_order}
@@ -1461,7 +1421,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                 Add Photos
               </button>
             )}
-            <JobPhotoGallery workOrderId={workOrderId} photos={jobPhotos} onUpdate={loadWorkOrderData} />
+            <JobPhotoGallery workOrderId={workOrderId} />
           </div>
         )}
 
@@ -1518,15 +1478,15 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                           const quantity=Number(e.target.value);if(!Number.isFinite(quantity) || quantity<=0){e.target.value=String(part.quantity);return;}
                           if(quantity===Number(part.quantity))return;
                           const {error}=await supabase.from('service_parts_used').update({quantity}).eq('id',part.id);
-                          if(error){alert(error.message);e.target.value=String(part.quantity);}else loadWorkOrderData();
+                          if(error){notify(error.message, { theme: 'blue', tone: 'error' });e.target.value=String(part.quantity);}else loadWorkOrderData();
                         }}/> : part.quantity}</td>
                         <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_cost)}</td>
                         <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_price)}</td>
                         <td className="py-2.5 font-semibold text-gray-900 text-right">{formatCurrency(part.total_price)}</td>
                         <td className="py-2.5 text-center">
                           {canManageParts && <button aria-label={`Remove ${part.part_name}`} className="block mx-auto mb-1 text-xs text-red-700 underline" onClick={async()=>{
-                            if(!window.confirm(`Remove ${part.part_name} from this visit's parts list?`))return;
-                            const {error}=await supabase.from('service_parts_used').delete().eq('id',part.id);if(error)alert(error.message);else loadWorkOrderData();
+                            if(!(await requestConfirmation(`Remove ${part.part_name} from this visit's parts list?`, { theme: 'blue' })))return;
+                            const {error}=await supabase.from('service_parts_used').delete().eq('id',part.id);if(error)notify(error.message, { theme: 'blue', tone: 'error' });else loadWorkOrderData();
                           }}>Remove</button>}
                           {part.warranty_item ? (
                             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Warranty</span>
@@ -1806,7 +1766,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="bg-white rounded-xl w-full max-w-lg">
             <PartRequestForm
               workOrderId={workOrderId}
-              projectId={workOrder.project_id}
+              projectId={workOrder.project_id ?? undefined}
               onSuccess={() => { setShowPartRequestForm(false); loadWorkOrderData(); }}
               onCancel={() => setShowPartRequestForm(false)}
             />
@@ -1838,7 +1798,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       {showAddPartsModal && (
         <AddPartsModal
           workOrderId={workOrderId}
-          projectId={workOrder.project_id}
+          projectId={workOrder.project_id ?? undefined}
           onClose={() => setShowAddPartsModal(false)}
           onSuccess={() => { setShowAddPartsModal(false); loadWorkOrderData(); }}
         />
@@ -1861,7 +1821,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             if (findingId && taskId) {
               const { error } = await supabase.rpc('link_vip_follow_up_task', { p_finding_id: findingId, p_task_id: taskId });
               if (error) {
-                alert(`Task was created, but the VIP Finding could not be linked: ${error.message}`);
+                notify(`Task was created, but the VIP Finding could not be linked: ${error.message}`, { theme: 'blue', tone: 'error' });
                 return;
               }
             }

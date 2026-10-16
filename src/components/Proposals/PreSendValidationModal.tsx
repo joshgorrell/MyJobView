@@ -115,7 +115,7 @@ export function PreSendValidationModal({
     );
   }
 
-  const { sections = [], overallProgress = 0, isReady = false } = validationData || {};
+  const { sections = [], overallProgress = 0, isReady: _isReady = false } = validationData || {};
   const invalidSections = sections.filter((s: ValidationSection) => !s.isValid);
 
   return (

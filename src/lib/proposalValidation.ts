@@ -87,7 +87,7 @@ function validateDetailsSection(proposal: any): ValidationSection {
   };
 }
 
-function validateScopeSection(proposal: any, settings: any, lineItemCount: number): ValidationSection {
+function validateScopeSection(_proposal: any, settings: any, lineItemCount: number): ValidationSection {
   const issues: string[] = [];
 
   if (lineItemCount === 0) {

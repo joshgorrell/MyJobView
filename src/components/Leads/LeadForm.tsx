@@ -1,5 +1,7 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { X, AtSign, Users, Search, UserCheck, ChevronDown } from 'lucide-react';
+import { AtSign, Users, Search, UserCheck } from 'lucide-react';
+import { AIFormFill } from '../Shared/AIFormFill';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
@@ -9,6 +11,7 @@ import { generateUsername, generateUniqueUsername } from '../../lib/username';
 import { offlineSupabaseInsert } from '../../lib/offlineSupport';
 
 interface LeadFormProps {
+  aiPrefill?: { contactName?: string; company?: string; email?: string; phone?: string; description?: string; priority?: string } | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -23,7 +26,7 @@ interface ContactSearchResult {
   assigned_to: string | null;
 }
 
-export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
+export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   const { profile } = useAuth();
   const [salesReps, setSalesReps] = useState<Profile[]>([]);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
@@ -69,6 +72,19 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       setFormData(savedData);
     }
   }, []);
+
+  useEffect(() => {
+    if (!aiPrefill) return;
+    setFormData(previous => ({
+      ...previous,
+      contact_name: aiPrefill.contactName ?? previous.contact_name,
+      company_name: aiPrefill.company ?? previous.company_name,
+      email: aiPrefill.email ?? previous.email,
+      phone: aiPrefill.phone ?? previous.phone,
+      opportunity_description: aiPrefill.description ?? previous.opportunity_description,
+      priority: ['low', 'medium', 'high', 'urgent'].includes(aiPrefill.priority ?? '') ? aiPrefill.priority! : previous.priority,
+    }));
+  }, [aiPrefill]);
 
   useEffect(() => {
     if (contactMode !== 'existing') return;
@@ -183,7 +199,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
           .maybeSingle();
 
         if (existingLead) {
-          alert(`Username "@${username}" is already taken. Please choose a different username or leave it blank to auto-generate.`);
+          notify(`Username "@${username}" is already taken. Please choose a different username or leave it blank to auto-generate.`, { theme: 'blue', tone: 'warning' });
           setLoading(false);
           return;
         }
@@ -378,7 +394,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       }
     } catch (error) {
       console.error('Error creating lead:', error);
-      alert('Failed to create lead. Please try again.');
+      notify('Failed to create lead. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -403,6 +419,7 @@ export function LeadForm({ onClose, onSuccess }: LeadFormProps) {
       successMessage="Lead Created!"
     >
         <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4 min-w-0">
+          <AIFormFill kind="lead" onFill={prefill => setFormData(previous => ({ ...previous, contact_name: prefill.contactName ?? previous.contact_name, company_name: prefill.company ?? previous.company_name, email: prefill.email ?? previous.email, phone: prefill.phone ?? previous.phone, opportunity_description: prefill.description ?? previous.opportunity_description, priority: ['low', 'medium', 'high', 'urgent'].includes(prefill.priority ?? '') ? prefill.priority! : previous.priority }))} />
           {/* Contact Mode Toggle */}
           <div>
             <label className="block text-sm font-medium text-secondary mb-2">

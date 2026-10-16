@@ -108,8 +108,8 @@ function TrendIcon({ current, previous }: { current: number | null; previous: nu
   if (current === null || previous === null) return <Minus className="w-4 h-4 text-gray-400" />;
   const delta = ((current - previous) / previous) * 100;
   if (Math.abs(delta) < 5) return <Minus className="w-4 h-4 text-gray-400" />;
-  if (delta > 0) return <TrendingUp className="w-4 h-4 text-red-500" title={`+${delta.toFixed(0)}% vs prior period`} />;
-  return <TrendingDown className="w-4 h-4 text-emerald-500" title={`${delta.toFixed(0)}% vs prior period`} />;
+  if (delta > 0) return <TrendingUp className="w-4 h-4 text-red-500"><title>{`+${delta.toFixed(0)}% vs prior period`}</title></TrendingUp>;
+  return <TrendingDown className="w-4 h-4 text-emerald-500"><title>{`${delta.toFixed(0)}% vs prior period`}</title></TrendingDown>;
 }
 
 interface KPICardProps {
@@ -194,7 +194,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function ServiceRequestAnalytics() {
-  const { profile } = useAuth();
+  const { profile: _profile } = useAuth();
   const [rows, setRows] = useState<AnalyticsRow[]>([]);
   const [prevRows, setPrevRows] = useState<AnalyticsRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -584,7 +584,7 @@ export function ServiceRequestAnalytics() {
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
-                  formatter={(value: number, name: string) => [`${value}h`, name]}
+                  formatter={(value: number = 0, name: string = '') => [`${value}h`, name]}
                   contentStyle={{ fontSize: 12 }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />

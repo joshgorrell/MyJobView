@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { X, AlertTriangle, DollarSign, Calendar, CheckCircle, Loader2, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -28,7 +29,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<'select' | 'form' | 'success'>('select');
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [selectedContractId, setSelectedContractId] = useState<string>(contractId || '');
+  const [_selectedContractId, setSelectedContractId] = useState<string>(contractId || '');
 
   const [formData, setFormData] = useState({
     cancellation_reason: '',
@@ -158,7 +159,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
       setStep('success');
     } catch (error) {
       console.error('Error submitting cancellation:', error);
-      alert('Failed to submit cancellation request. Please try again.');
+      notify('Failed to submit cancellation request. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

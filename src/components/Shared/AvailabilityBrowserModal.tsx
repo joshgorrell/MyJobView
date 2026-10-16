@@ -28,7 +28,7 @@ export function AvailabilityBrowserModal({
   const [selectedTechIds, setSelectedTechIds] = useState<string[]>(initialTechnicianIds);
   const [techPickerOpen, setTechPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [pendingSlot, setPendingSlot] = useState<{ date: string; startTime: string; endTime: string } | null>(null);
+  const [_pendingSlot, setPendingSlot] = useState<{ date: string; startTime: string; endTime: string } | null>(null);
 
   useEffect(() => {
     loadTechnicians();

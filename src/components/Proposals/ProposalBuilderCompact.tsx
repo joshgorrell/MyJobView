@@ -1,5 +1,5 @@
+import { requestConfirmation, notify } from '../../lib/feedback';
 import { proposalPresentation, proposalStatusLabel } from '../../lib/proposalPresentation';
-import { ProposalLockControl, ProposalReviewControls } from './ProposalReviewControls';
 import { ProposalActivityDialog } from './ProposalActivityDialog';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import LaborRemovalChoice, { itemHasLabor } from './LaborRemovalChoice';
@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Send, ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, DollarSign, ChevronDown, ChevronRight, GitBranch, Target, Zap, X, AlignJustify, Maximize2, CheckCircle2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, MapPin, Download, Filter, Receipt, Copy, RefreshCw, Save, Mail, ExternalLink, RotateCcw, Clock, MoreVertical, Bell, XCircle, ThumbsUp, Layers, Unlink, AlertTriangle, AlertCircle, Globe, Activity, Indent, Outdent, MessageSquare, Monitor, ListChecks } from 'lucide-react';
+import { Send, ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, ChevronDown, ChevronRight, GitBranch, Target, X, Maximize2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, Download, Filter, Receipt, Copy, RefreshCw, Save, RotateCcw, Clock, MoreVertical, Bell, Layers, AlertTriangle, AlertCircle, Activity, Indent, Outdent, MessageSquare } from 'lucide-react';
 import {
   recordCOAction,
   recordCOModifierChange,
@@ -23,11 +23,11 @@ const ProposalSettings = lazy(() => import('./ProposalSettings'));
 const ProposalRevisionManager = lazy(() => import('./ProposalRevisionManager'));
 const AddItemToAreasModal = lazy(() => import('./AddItemToAreasModal'));
 const AreaScopeEditor = lazy(() => import('./AreaScopeEditor'));
-import InlineProductSearch from './InlineProductSearch';
 const ProposalTaxReport = lazy(() => import('./ProposalTaxReport'));
 const LaborPhaseReport = lazy(() => import('./LaborPhaseReport'));
 const ProductDetailModal = lazy(() => import('./ProductDetailModal'));
 const EditCustomerModal = lazy(() => import('./EditCustomerModal'));
+const ContactQuickViewModal = lazy(() => import('../Shared/ContactQuickViewModal').then(m => ({ default: m.ContactQuickViewModal })));
 const ManualApprovalModal = lazy(() => import('./ManualApprovalModal').then(m => ({ default: m.ManualApprovalModal })));
 const ProposalNotificationHistory = lazy(() => import('./ProposalNotificationHistory'));
 const ApprovalActionModal = lazy(() => import('./ApprovalActionModal'));
@@ -145,7 +145,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
               <input
                 type="number"
                 value={discountPercent}
-                onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setDiscountPercent(parseFloat(String(e.target.value)) || 0)}
                 step="0.01"
                 className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyDiscount ? 'opacity-40' : ''}`}
                 placeholder="0.00"
@@ -169,7 +169,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
               <input
                 type="number"
                 value={pmPercent}
-                onChange={(e) => setPmPercent(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPmPercent(parseFloat(String(e.target.value)) || 0)}
                 step="0.01"
                 className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyPm ? 'opacity-40' : ''}`}
                 placeholder="0.00"
@@ -193,7 +193,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
               <input
                 type="number"
                 value={designPercent}
-                onChange={(e) => setDesignPercent(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setDesignPercent(parseFloat(String(e.target.value)) || 0)}
                 step="0.01"
                 className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyDesign ? 'opacity-40' : ''}`}
                 placeholder="0.00"
@@ -217,7 +217,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
               <input
                 type="number"
                 value={systemDesignPercent}
-                onChange={(e) => setSystemDesignPercent(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setSystemDesignPercent(parseFloat(String(e.target.value)) || 0)}
                 step="0.01"
                 className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applySystemDesign ? 'opacity-40' : ''}`}
                 placeholder="0.00"
@@ -241,7 +241,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
               <input
                 type="number"
                 value={miscPartsPercent}
-                onChange={(e) => setMiscPartsPercent(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setMiscPartsPercent(parseFloat(String(e.target.value)) || 0)}
                 step="0.01"
                 className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyMiscParts ? 'opacity-40' : ''}`}
                 placeholder="0.00"
@@ -276,7 +276,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                   <input
                     type="number"
                     value={custom1Percent}
-                    onChange={(e) => setCustom1Percent(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setCustom1Percent(parseFloat(String(e.target.value)) || 0)}
                     step="0.01"
                     className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyCustom1 ? 'opacity-40' : ''}`}
                     placeholder="0.00"
@@ -307,7 +307,7 @@ function PricingModifiersModal({ proposal, showApplyToggles = false, onClose, on
                   <input
                     type="number"
                     value={custom2Percent}
-                    onChange={(e) => setCustom2Percent(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setCustom2Percent(parseFloat(String(e.target.value)) || 0)}
                     step="0.01"
                     className={`w-full bg-elevated border border-strong rounded-lg px-3 py-2 text-primary transition-opacity ${showApplyToggles && !applyCustom2 ? 'opacity-40' : ''}`}
                     placeholder="0.00"
@@ -481,7 +481,7 @@ function FilterModal({
   );
 }
 
-export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateToSalesOrder, targetRoomIds: externalTargetRoomIds, onTargetRoomsChange, isStandalone = false, onProposalIdChange, aiPrefillRooms, changeOrderId, onCORefresh, autoOpenQA = false, autoThreadId = null }: ProposalBuilderCompactProps) {
+export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateToSalesOrder, targetRoomIds: _externalTargetRoomIds, onTargetRoomsChange: _onTargetRoomsChange, isStandalone = false, onProposalIdChange, aiPrefillRooms, changeOrderId, onCORefresh, autoOpenQA = false, autoThreadId = null }: ProposalBuilderCompactProps) {
   const isCoMode = !!changeOrderId;
   const { profile } = useAuth();
   const [proposal, setProposal] = useState<any>(null);
@@ -497,8 +497,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   // Helper function to calculate parts and labor tax for a single line item
   function calculateItemTax(item: any, proposal: any) {
     const taxRate = proposal?.tax_rate || 0;
-    const priceTotal = parseFloat(item.price_total || 0);
-    const laborTotal = parseFloat(item.labor_total || 0);
+    const priceTotal = parseFloat(String(item.price_total || 0));
+    const laborTotal = parseFloat(String(item.labor_total || 0));
 
     if (!item.is_taxable || taxRate === 0) {
       return { partsTax: 0, laborTax: 0 };
@@ -514,7 +514,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     };
   }
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
-  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [_editingItem, _setEditingItem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showRevisionManager, setShowRevisionManager] = useState(false);
   const [pricingExpanded, setPricingExpanded] = useState(false);
@@ -522,7 +522,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [addedLaborChoice,setAddedLaborChoice]=useState<((scope:'parts_only'|'parts_and_labor')=>void)|null>(null);
   const [showModifiersModal, setShowModifiersModal] = useState(false);
   const [showAddItemToAreasModal, setShowAddItemToAreasModal] = useState(false);
-  const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
+  const [_showQuickAddProduct, _setShowQuickAddProduct] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Start collapsed for max screen space
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
@@ -541,8 +541,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [newAreaName, setNewAreaName] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<{[key: string]: any}>({});
-  const [addingItemToRoom, setAddingItemToRoom] = useState<string | null>(null);
-  const [newItemValues, setNewItemValues] = useState({
+  const [_addingItemToRoom, _setAddingItemToRoom] = useState<string | null>(null);
+  const [_newItemValues, _setNewItemValues] = useState({
     description: '',
     quantity: 1,
     price: 0,
@@ -569,7 +569,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [dragOverItem, setDragOverItem] = useState<string | null>(null);
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
-  const [editingItemNotes, setEditingItemNotes] = useState<{id: string, notes: string | null, showNotes: boolean} | null>(null);
+  const [_editingItemNotes, _setEditingItemNotes] = useState<{id: string, notes: string | null, showNotes: boolean} | null>(null);
   const [editingLaborItem, setEditingLaborItem] = useState<{
     id: string;
     description: string;
@@ -584,36 +584,21 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     newValues: any;
   } | null>(null);
   const [laborPhases, setLaborPhases] = useState<any[]>([]);
-  const [programmingPhase, setProgrammingPhase] = useState<any | null>(null);
+  const [_programmingPhase, setProgrammingPhase] = useState<any | null>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfTemplates, setPdfTemplates] = useState<any[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
+  const [showCustomerQuickView, setShowCustomerQuickView] = useState(false);
   const [showManualApprovalModal, setShowManualApprovalModal] = useState(false);
   const [showNotificationHistory, setShowNotificationHistory] = useState(false);
   const [showApprovalActionModal, setShowApprovalActionModal] = useState(false);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [copyingShareLink, setCopyingShareLink] = useState(false);
   const [shareLinkMessage, setShareLinkMessage] = useState('');
-  const handleRevokeProposalLinks = async () => {
-    if (!proposal || copyingShareLink) return;
-    if (!window.confirm('Revoke all previously shared customer links for this proposal? Customers will no longer be able to open those links.')) return;
-    setCopyingShareLink(true);
-    setShareLinkMessage('');
-    try {
-      const { data, error } = await supabase.functions.invoke('manage-proposal-share-link', {
-        body: { proposalId: proposal.id, action: 'revoke' },
-      });
-      if (error || !data?.revoked) throw new Error('Could not revoke proposal links.');
-      setShareLinkMessage('All previously shared links have been revoked.');
-    } catch (error) {
-      setShareLinkMessage(error instanceof Error ? error.message : 'Unable to revoke proposal links.');
-    } finally {
-      setCopyingShareLink(false);
-    }
-  };
+
   const handleCopyProposalLink = async () => {
     if (!proposal || copyingShareLink) return;
     setCopyingShareLink(true);
@@ -640,8 +625,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [newTemplateIsPersonal, setNewTemplateIsPersonal] = useState(true);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [sending, setSending] = useState(false);
-  const [recalling, setRecalling] = useState(false);
-  const [showPortalDropdown, setShowPortalDropdown] = useState(false);
+  const [_recalling, _setRecalling] = useState(false);
+  const [_showPortalDropdown, _setShowPortalDropdown] = useState(false);
   const [previewHideCosts, setPreviewHideCosts] = useState(false);
   const [showPortalPreview, setShowPortalPreview] = useState(false);
   const [showMoreOptionsMenu, setShowMoreOptionsMenu] = useState(false);
@@ -651,7 +636,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [showPromoteRevisionModal, setShowPromoteRevisionModal] = useState(false);
   const [showEmailProposalModal, setShowEmailProposalModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [proposalReadiness, setProposalReadiness] = useState<any>(null);
+  const [_proposalReadiness, setProposalReadiness] = useState<any>(null);
   const [pdfDisplayOptions, setPdfDisplayOptions] = useState({
     showRoomScope: true,
     showProposalNotes: true,
@@ -692,7 +677,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [showTasksPanel, setShowTasksPanel] = useState(false);
   const [autoQaThreadId, setAutoQaThreadId] = useState<string | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
-  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
+  const [_messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
   const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const totalUnreadCount = Object.values(unreadByContext).reduce((sum, n) => sum + n, 0);
 
@@ -716,8 +701,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [executingBulkRemoval, setExecutingBulkRemoval] = useState(false);
 
   // Use external state if provided, otherwise use local state
-  const targetRoomIds = externalTargetRoomIds || new Set<string>();
-  const setTargetRoomIds = onTargetRoomsChange || (() => {});
+
 
   const refreshCOLineItems = useCallback(async () => {
     if (!changeOrderId) return;
@@ -963,7 +947,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       }
     } catch (error: any) {
       console.error('Error loading PDF templates:', error);
-      alert('Failed to load PDF templates: ' + (error.message || 'Unknown error'));
+      notify('Failed to load PDF templates: ' + (error.message || 'Unknown error'), { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1015,7 +999,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       }
     } catch (error) {
       console.error('Error fetching activity data:', error);
-      alert('Failed to load activity history');
+      notify('Failed to load activity history', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1127,7 +1111,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           .eq('id', selectedTemplateId);
 
         if (error) throw error;
-        alert('Template updated successfully!');
+        notify('Template updated successfully!', { theme: 'violet', tone: 'success' });
       } else {
         // Insert new template
         const { error } = await supabase
@@ -1135,7 +1119,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           .insert(templateData);
 
         if (error) throw error;
-        alert('Template saved successfully!');
+        notify('Template saved successfully!', { theme: 'violet', tone: 'success' });
       }
 
       setShowSaveTemplateModal(false);
@@ -1145,45 +1129,34 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       loadPdfTemplates();
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      notify('Failed to save template', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingTemplate(false);
     }
   }
 
-  function deleteTemplate(templateId: string) {
-    setConfirmModal({
-      title: 'Delete Template',
-      message: 'Are you sure you want to delete this template?',
-      variant: 'danger',
-      onConfirm: async () => {
-        setConfirmModal(null);
-        try {
-          const { error } = await supabase
-            .from('proposal_report_templates')
-            .delete()
-            .eq('id', templateId);
-
-          if (error) throw error;
-
-          alert('Template deleted successfully!');
-
-          if (selectedTemplateId === templateId) {
-            setSelectedTemplateId(null);
-          }
-
-          loadPdfTemplates();
-        } catch (error) {
-          console.error('Error deleting template:', error);
-          alert('Failed to delete template');
-        }
-      },
-    });
+  async function deleteTemplate(templateId: string) {
+    if (!await requestConfirmation('Are you sure you want to delete this template?', {
+      title: 'Delete Template', theme: 'violet', tone: 'warning', confirmLabel: 'Delete',
+    })) return;
+    try {
+      const { error } = await supabase
+        .from('proposal_report_templates')
+        .delete()
+        .eq('id', templateId);
+      if (error) throw error;
+      notify('Template deleted successfully!', { theme: 'violet', tone: 'success' });
+      if (selectedTemplateId === templateId) setSelectedTemplateId(null);
+      await loadPdfTemplates();
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      notify('Failed to delete template', { theme: 'violet', tone: 'error' });
+    }
   }
 
   async function handleGeneratePdf() {
     if (!selectedTemplateId) {
-      alert('Please select a template');
+      notify('Please select a template', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -1349,7 +1322,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (propError) {
         console.error('Error loading proposal:', propError);
-        alert('Failed to load proposal: ' + propError.message);
+        notify('Failed to load proposal: ' + propError.message, { theme: 'violet', tone: 'error' });
         return [];
       }
 
@@ -1377,7 +1350,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (roomsError) {
         console.error('Error loading rooms:', roomsError);
-        alert('Failed to load areas: ' + roomsError.message);
+        notify('Failed to load areas: ' + roomsError.message, { theme: 'violet', tone: 'error' });
         return [];
       }
 
@@ -1404,7 +1377,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (itemsError) {
         console.error('Error loading items:', itemsError);
-        alert('Failed to load line items: ' + itemsError.message);
+        notify('Failed to load line items: ' + itemsError.message, { theme: 'violet', tone: 'error' });
         return [];
       }
 
@@ -1443,7 +1416,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       return roomsWithItems;
     } catch (error: any) {
       console.error('Error in loadData:', error);
-      alert('Failed to load data: ' + error.message);
+      notify('Failed to load data: ' + error.message, { theme: 'violet', tone: 'error' });
       return [];
     } finally {
       setLoading(false);
@@ -1463,40 +1436,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (error) throw error;
       await loadData();
-      setShowStatusDropdown(false);
     } catch (error) {
       console.error('Error updating proposal status:', error);
-      alert('Failed to update proposal status');
+      notify('Failed to update proposal status', { theme: 'violet', tone: 'error' });
     } finally {
       setUpdatingStatus(false);
     }
   }
 
-  async function handleDeclineProposal() {
-    if (!confirm('Are you sure you want to decline this proposal?')) return;
-    await handleUpdateStatus('declined');
-  }
-
-  function getStatusBadge(status: string) {
-    const statusConfig: Record<string, { label: string; bgColor: string; textColor: string; icon?: React.ReactNode }> = {
-      'designing': { label: 'Designing', bgColor: 'bg-pink-700', textColor: 'text-white' },
-      'ready_to_submit': { label: 'Ready to Send', bgColor: 'bg-yellow-400', textColor: 'text-gray-900' },
-      'sent': { label: 'Sent to Customer', bgColor: 'bg-blue-600', textColor: 'text-white' },
-      'portal': { label: 'Sent to Customer', bgColor: 'bg-blue-600', textColor: 'text-white' },
-      'accepted': { label: 'Accepted', bgColor: 'bg-green-600', textColor: 'text-white', icon: <CheckCircle2 className="w-3 h-3" /> },
-      'declined': { label: 'Declined', bgColor: 'bg-red-600', textColor: 'text-white' },
-      'expired': { label: 'Expired', bgColor: 'bg-orange-600', textColor: 'text-white' }
-    };
-
-    const config = statusConfig[status] || { label: status, bgColor: 'bg-gray-600', textColor: 'text-primary' };
-
-    return (
-      <span className={`inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded font-medium ${config.bgColor} ${config.textColor}`}>
-        {config.icon}
-        <span>{config.label}</span>
-      </span>
-    );
-  }
 
   const presentation = proposalPresentation(proposal);
 
@@ -1549,129 +1496,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     }
   }
 
-  // Handler to unlock a locked proposal
-  async function handleUnlockProposal() {
-    try {
-      const { data, error } = await supabase.rpc('unlock_proposal', {
-        proposal_id_param: proposalId
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        // Also hide from portal so the customer doesn't see mid-edit state
-        await supabase
-          .from('proposals')
-          .update({ is_portal_visible: false })
-          .eq('id', proposalId);
-
-        await loadData();
-        setShowUnlockWarningModal(false);
-      } else {
-        alert(data?.error || 'Failed to unlock proposal');
-      }
-    } catch (error: any) {
-      console.error('Error unlocking proposal:', error);
-      alert('Failed to unlock proposal: ' + error.message);
-    }
-  }
-
   // Handler to create a revision
-  async function handleCreateRevision() {
-    try {
-      // Create a new revision by duplicating the current proposal
-      const { data: newRevision, error: createError } = await supabase
-        .from('proposals')
-        .insert({
-          contact_id: proposal.contact_id,
-          lead_id: proposal.lead_id,
-          title: proposal.title,
-          status: 'designing',
-          is_revision: true,
-          parent_proposal_id: proposal.parent_proposal_id || proposal.id,
-          revision_name: `Revision ${(proposal.revision_count || 0) + 1}`,
-          is_active_revision: false,
-          is_portal_visible: false,
-          created_by: profile?.id
-        })
-        .select()
-        .single();
 
-      if (createError) throw createError;
-
-      // Copy rooms and line items
-      const { data: roomsData, error: roomsError } = await supabase
-        .from('proposal_rooms')
-        .select('*')
-        .eq('proposal_id', proposalId);
-
-      if (roomsError) throw roomsError;
-
-      for (const room of roomsData || []) {
-        const { data: newRoom, error: roomError } = await supabase
-          .from('proposal_rooms')
-          .insert({
-            proposal_id: newRevision.id,
-            name: room.name,
-            description: room.description,
-            sort_order: room.sort_order,
-            show_scope: room.show_scope
-          })
-          .select()
-          .single();
-
-        if (roomError) throw roomError;
-
-        // Copy line items for this room
-        const { data: itemsData, error: itemsError } = await supabase
-          .from('proposal_line_items')
-          .select('*')
-          .eq('room_id', room.id);
-
-        if (itemsError) throw itemsError;
-
-        for (const item of itemsData || []) {
-          await supabase
-            .from('proposal_line_items')
-            .insert({
-              proposal_id: newRevision.id,
-              room_id: newRoom.id,
-              product_id: item.product_id,
-              description: item.description,
-              quantity: item.quantity,
-              unit: item.unit,
-              unit_price: item.unit_price,
-              cost: item.cost,
-              line_total: item.line_total,
-              sort_order: item.sort_order,
-              is_custom: item.is_custom,
-              labor_hours: item.labor_hours,
-              labor_rate: item.labor_rate,
-              labor_total: item.labor_total,
-              item_type: item.item_type,
-              task_notes: item.task_notes,
-              parent_item_id: item.parent_item_id,
-              display_mode: item.display_mode,
-              show_task_notes: item.show_task_notes,
-              is_hidden: item.is_hidden,
-              labor_phase_id: item.labor_phase_id,
-              class_id: item.class_id,
-              is_taxable: item.is_taxable,
-              is_customer_supplied: item.is_customer_supplied
-            });
-        }
-      }
-
-      // Navigate to the new revision
-      setShowUnlockWarningModal(false);
-      if (onProposalIdChange) {
-        onProposalIdChange(newRevision.id);
-      }
-    } catch (error: any) {
-      console.error('Error creating revision:', error);
-      alert('Failed to create revision: ' + error.message);
-    }
-  }
 
   // Handler to promote a revision to live
   async function handlePromoteRevision(sendNotification: boolean, notificationMessage: string) {
@@ -1688,11 +1514,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         await loadData(); // Reload to get updated status
         setShowPromoteRevisionModal(false);
       } else {
-        alert(data?.error || 'Failed to promote revision');
+        notify(data?.error || 'Failed to promote revision', { theme: 'violet', tone: 'error' });
       }
     } catch (error: any) {
       console.error('Error promoting revision:', error);
-      alert('Failed to promote revision: ' + error.message);
+      notify('Failed to promote revision: ' + error.message, { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1720,44 +1546,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   function handleDragOver(e: React.DragEvent, itemId: string) {
     e.preventDefault();
-
-    if (!draggedItem) return;
-
-    // Don't allow dropping on self
-    if (draggedItem === itemId) {
-      e.dataTransfer.dropEffect = 'none';
-      return;
-    }
-
-    const draggedItemObj = rooms.flatMap(r => r.line_items).find(item => item.id === draggedItem);
-    const targetItem = rooms.flatMap(r => r.line_items).find(item => item.id === itemId);
-
-    // If dragging a nested item
-    if (draggedItemObj?.parent_item_id) {
-      // Can only reorder with siblings (items with same parent) or unnest
-      if (targetItem?.parent_item_id === draggedItemObj.parent_item_id) {
-        // Reordering among siblings - allowed
-        e.dataTransfer.dropEffect = 'move';
-      } else if (!targetItem?.parent_item_id) {
-        // Unnesting - can drop on top-level items
-        e.dataTransfer.dropEffect = 'move';
-      } else {
-        // Can't drop on items with different parents
-        e.dataTransfer.dropEffect = 'none';
-        return;
-      }
-    } else {
-      // Dragging a top-level item
-      // Can only reorder with other top-level items
-      if (targetItem?.parent_item_id) {
-        e.dataTransfer.dropEffect = 'none';
-        return;
-      }
-      e.dataTransfer.dropEffect = 'move';
-    }
-
-    // Only update state if it changed
-    if (dragOverItem !== itemId) setDragOverItem(itemId);
+    const source = rooms.flatMap(r => r.line_items).find(item => item.id === draggedItem);
+    const target = rooms.flatMap(r => r.line_items).find(item => item.id === itemId);
+    const sameRoom = rooms.some(room => room.line_items.some(item => item.id === draggedItem) && room.line_items.some(item => item.id === itemId));
+    const allowed = !!source && !!target && draggedItem !== itemId && sameRoom
+      && (source.parent_item_id ?? null) === (target.parent_item_id ?? null);
+    e.dataTransfer.dropEffect = allowed ? 'move' : 'none';
+    setDragOverItem(allowed ? itemId : null);
   }
 
   function handleDragLeave() {
@@ -1766,93 +1561,49 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   async function handleDrop(e: React.DragEvent, targetItemId: string, roomId: string) {
     e.preventDefault();
+    const sourceId = draggedItem;
+    setDraggedItem(null);
+    setDragOverItem(null);
+    if (!sourceId || sourceId === targetItemId || saving) return;
 
-    if (!draggedItem || draggedItem === targetItemId) {
-      setDraggedItem(null);
-      setDragOverItem(null);
-      return;
-    }
+    const room = rooms.find(r => r.id === roomId);
+    const source = room?.line_items.find(item => item.id === sourceId);
+    const target = room?.line_items.find(item => item.id === targetItemId);
+    if (!room || !source || !target || (source.parent_item_id ?? null) !== (target.parent_item_id ?? null)) return;
+
+    // Reordering is deliberately separate from Nest / Unnest toolbar actions.
+    // Move a parent and all its children as one contiguous block.
+    const ordered = [...room.line_items].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const siblings = ordered.filter(item => (item.parent_item_id ?? null) === (source.parent_item_id ?? null));
+    const from = siblings.findIndex(item => item.id === sourceId);
+    const to = siblings.findIndex(item => item.id === targetItemId);
+    if (from < 0 || to < 0 || from === to) return;
+    const [moved] = siblings.splice(from, 1);
+    siblings.splice(to, 0, moved);
+
+    const next = source.parent_item_id
+      ? ordered.filter(item => item.parent_item_id !== source.parent_item_id)
+          .flatMap(item => item.id === source.parent_item_id ? [item, ...siblings] : [item])
+      : siblings.flatMap(item => [item, ...ordered.filter(child => child.parent_item_id === item.id)]);
+    if (next.length !== ordered.length || new Set(next.map(item => item.id)).size !== ordered.length) return;
 
     setSaving(true);
     try {
-      // Get all items in this room
-      const room = rooms.find(r => r.id === roomId);
-      if (!room) return;
-
-      const items = [...room.line_items].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-      // Find the dragged and target items
-      const draggedIndex = items.findIndex(item => item.id === draggedItem);
-      const targetIndex = items.findIndex(item => item.id === targetItemId);
-
-      if (draggedIndex === -1 || targetIndex === -1) return;
-
-      const draggedItemData = items[draggedIndex];
-      const targetItemData = items[targetIndex];
-
-      const draggedIsNested = draggedItemData.parent_item_id !== null;
-      const targetIsNested = targetItemData.parent_item_id !== null;
-
-      let shouldUnnest = false;
-      let shouldNest = false;
-
-      if (draggedIsNested && !targetIsNested) {
-        shouldUnnest = true;
-      } else if (!draggedIsNested && !targetIsNested) {
-        const hasChildren = room.line_items.some(li => li.parent_item_id === draggedItem);
-        if (hasChildren) {
-          alert('Cannot nest items that already have nested accessories');
-          return;
-        }
-        shouldNest = true;
-      } else if (draggedIsNested && targetIsNested && draggedItemData.parent_item_id !== targetItemData.parent_item_id) {
-        return;
-      }
-
-      // Reorder the items array
-      const [movedItem] = items.splice(draggedIndex, 1);
-      items.splice(targetIndex, 0, movedItem);
-
-      // Update sort_order for all items in this room
-      const updates = items.map((item, index) => ({
-        id: item.id,
-        sort_order: index,
-        ...(item.id === draggedItem && shouldUnnest ? { parent_item_id: null } : {}),
-        ...(item.id === draggedItem && shouldNest ? { parent_item_id: targetItemId } : {})
-      }));
-
-      // Update all items
-      for (const update of updates) {
-        const updateData: any = { sort_order: update.sort_order };
-        if (update.id === draggedItem && shouldUnnest) {
-          updateData.parent_item_id = null;
-        }
-        if (update.id === draggedItem && shouldNest) {
-          updateData.parent_item_id = targetItemId;
-        }
-
-        const { error } = await supabase
-          .from('proposal_line_items')
-          .update(updateData)
-          .eq('id', update.id);
-
-        if (error) throw error;
-      }
-
+      const { error } = await supabase.rpc('reorder_proposal_room_items', {
+        p_room_id: roomId,
+        p_order: next.map(item => item.id),
+      });
+      if (error) throw error;
       await loadData();
-    } catch (error: any) {
-      console.error('Error updating items:', error);
-      alert('Failed to update items');
+    } catch (error) {
+      console.error('Failed to reorder proposal items', error);
+      await loadData();
+      notify('Could not reorder items. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
-      setDraggedItem(null);
-      setDragOverItem(null);
     }
   }
 
-  async function handleSendToPortal() {
-    setShowSubmissionModal(true);
-  }
 
   async function handleConfirmSubmission(sendToPortal: boolean, _approvalWindowDays: number, keepDeliveryOpen = false) {
     if (sending || !proposal || ['approved', 'accepted', 'approved_pending_action', 'declined'].includes(proposal.status)) {
@@ -1888,72 +1639,21 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       // Submission and delivery are separate customer-facing actions.
       // Email is sent only when the user explicitly chooses Email Proposal.
       if (!keepDeliveryOpen) {
-        alert(sendToPortal
+        notify(sendToPortal
           ? 'Proposal submitted and visible in the customer portal. No email was sent.'
-          : 'Proposal submitted. No email was sent.');
+          : 'Proposal submitted. No email was sent.', { theme: 'violet', tone: 'success' });
       }
       await loadData();
       if (!keepDeliveryOpen) setShowSubmissionModal(false);
     } catch (error: any) {
       console.error('Error submitting proposal:', error);
-      alert('Failed to submit proposal: ' + (error.message || 'Unknown error'));
+      notify('Failed to submit proposal: ' + (error.message || 'Unknown error'), { theme: 'violet', tone: 'error' });
       throw error;
     } finally {
       setSending(false);
     }
   }
 
-  async function handleRecallProposal() {
-    if (!confirm('This will return the proposal to designing status and remove it from the customer portal. Continue?')) {
-      return;
-    }
-
-    setRecalling(true);
-    try {
-      const { error } = await supabase
-        .from('proposals')
-        .update({
-          status: 'designing',
-          sent_at: null,
-          is_portal_visible: false,
-          is_locked: false,
-          locked_at: null,
-          locked_by: null
-        })
-        .eq('id', proposalId);
-
-      if (error) throw error;
-
-      // Log activity
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('activity_feed')
-          .insert({
-            user_id: user.id,
-            activity_type: 'proposal_recalled',
-            entity_type: 'proposal',
-            entity_id: proposalId,
-            description: 'Recalled proposal from customer portal'
-          });
-      }
-
-      // Reload the data to show updated status
-      await loadData();
-      setShowPortalDropdown(false);
-    } catch (error) {
-      console.error('Error recalling proposal:', error);
-      alert('Failed to recall proposal. Please try again.');
-    } finally {
-      setRecalling(false);
-    }
-  }
-
-  function openPortalPreview() {
-    setPreviewHideCosts(false);
-    setShowPortalPreview(true);
-    setShowPortalDropdown(false);
-  }
 
   async function handleAddArea() {
     if (!newAreaName.trim()) return;
@@ -1974,7 +1674,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error adding area:', error);
-      alert('Failed to add area');
+      notify('Failed to add area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -1997,7 +1697,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error updating area:', error);
-      alert('Failed to update area');
+      notify('Failed to update area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2005,7 +1705,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   async function handleDeleteArea(areaId: string) {
     if (isCoMode) {
-      alert('Areas cannot be deleted while editing a Change Order. Remove individual items instead.');
+      notify('Areas cannot be deleted while editing a Change Order. Remove individual items instead.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -2013,7 +1713,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     if (!area) return;
 
     if (area.line_items.length > 0) {
-      if (!confirm(`This area contains ${area.line_items.length} items. Are you sure you want to delete it and all its items?`)) {
+      if (!(await requestConfirmation(`This area contains ${area.line_items.length} items. Are you sure you want to delete it and all its items?`, { theme: 'violet' }))) {
         return;
       }
     }
@@ -2033,7 +1733,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error deleting area:', error);
-      alert('Failed to delete area');
+      notify('Failed to delete area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2057,8 +1757,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const existingCORecord = coLineItems.find(c => c.proposal_line_item_id === itemId);
 
       if (existingCORecord?.action_type === 'add') {
-        if(await itemHasLabor(item)){setAddedLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setAddedLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){alert(result.error.message);return;}}else {const co=await supabase.from('change_order_line_items').delete().eq('id',existingCORecord.id);if(co.error){alert(co.error.message);return;}const li=await supabase.from('proposal_line_items').delete().eq('id',itemId);if(li.error){alert(li.error.message);return;}}await updateCOTotals(changeOrderId,onCORefresh);await refreshCOLineItems();await loadData();});return;}
-        if (!confirm('Remove this newly-added item from the change order?')) return;
+        if(await itemHasLabor(item)){setAddedLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setAddedLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){notify(result.error.message, { theme: 'violet', tone: 'error' });return;}}else {const co=await supabase.from('change_order_line_items').delete().eq('id',existingCORecord.id);if(co.error){notify(co.error.message, { theme: 'violet', tone: 'error' });return;}const li=await supabase.from('proposal_line_items').delete().eq('id',itemId);if(li.error){notify(li.error.message, { theme: 'violet', tone: 'error' });return;}}await updateCOTotals(changeOrderId,onCORefresh);await refreshCOLineItems();await loadData();});return;}
+        if (!(await requestConfirmation('Remove this newly-added item from the change order?', { theme: 'violet' }))) return;
         setSaving(true);
         try {
           await supabase.from('change_order_line_items').delete().eq('id', existingCORecord.id);
@@ -2072,7 +1772,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
         } catch (error: any) {
           console.error('Error removing added CO item:', error);
-          alert('Failed to remove item');
+          notify('Failed to remove item', { theme: 'violet', tone: 'error' });
         } finally {
           setSaving(false);
         }
@@ -2092,7 +1792,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         setMatchingAction({ action: 'delete', itemId, items: targets });
         return;
       }
-      if (!confirmedItems && !confirm('Delete this line item?')) return;
+      if (!confirmedItems && !(await requestConfirmation('Delete this line item?', { theme: 'violet' }))) return;
       const { error } = await supabase
         .from('proposal_line_items')
         .delete()
@@ -2104,7 +1804,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error deleting item:', error);
-      alert('Failed to delete item');
+      notify('Failed to delete item', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2119,7 +1819,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const freshRecords = await loadCOLineItems(changeOrderId);
       const computedLineTotal = (item.line_total && item.line_total > 0)
         ? item.line_total
-        : (parseFloat(item.unit_price || 0) * (item.quantity || 1));
+        : (parseFloat(String(item.unit_price || 0)) * (item.quantity || 1));
       await recordCOAction(changeOrderId, itemId, 'remove', {
         description: (item as any).description,
         quantity: item.quantity,
@@ -2142,7 +1842,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
     } catch (error: any) {
       console.error('Error marking CO item as removed:', error);
-      alert('Failed to remove item');
+      notify('Failed to remove item', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2163,7 +1863,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await supabase.rpc('calculate_proposal_totals', { p_proposal_id: proposalId });
     } catch (error: any) {
       console.error('Error restoring line item:', error);
-      alert('Failed to restore item');
+      notify('Failed to restore item', { theme: 'violet', tone: 'error' });
     } finally {
       setRestoringItemId(null);
     }
@@ -2198,7 +1898,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       return;
     }
 
-    if (!confirm(`Delete ${selectedItems.size} selected item${selectedItems.size > 1 ? 's' : ''}?`)) return;
+    if (!(await requestConfirmation(`Delete ${selectedItems.size} selected item${selectedItems.size > 1 ? 's' : ''}?`, { theme: 'violet' }))) return;
 
     setSaving(true);
     try {
@@ -2212,7 +1912,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error deleting items:', error);
-      alert('Failed to delete items');
+      notify('Failed to delete items', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2263,7 +1963,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setBulkCORemovalScopes({});
     } catch (error: any) {
       console.error('Error executing bulk CO removal:', error);
-      alert('Failed to remove items from change order');
+      notify('Failed to remove items from change order', { theme: 'violet', tone: 'error' });
     } finally {
       setExecutingBulkRemoval(false);
     }
@@ -2293,23 +1993,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             room_id: targetRoomId,
             product_id: item.product_id,
             description: item.description,
-            manufacturer: item.manufacturer,
-            model: item.model,
-            sku: item.sku,
             quantity: item.quantity,
-            unit_cost: item.unit_cost,
+            cost: item.cost,
+            unit: item.unit,
+            line_total: item.line_total,
+            is_custom: item.is_custom,
             unit_price: item.unit_price,
             labor_hours: item.labor_hours,
             labor_rate: item.labor_rate,
             sort_order: maxSortOrder + i,
-            notes: item.notes,
+            task_notes: item.task_notes,
+            show_task_notes: item.show_task_notes,
+            is_taxable: item.is_taxable,
             labor_phase_id: item.labor_phase_id,
-            install_instructions: item.install_instructions,
-            color: item.color,
-            parent_package_item_id: item.parent_package_item_id,
-            is_accessory_item: item.is_accessory_item,
-            is_package_item: item.is_package_item,
-            package_description: item.package_description,
             class_id: item.class_id
           };
 
@@ -2328,7 +2024,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error copying items:', error);
-      alert('Failed to copy items to areas');
+      notify('Failed to copy items to areas', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2345,7 +2041,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     );
 
     if (hasChildItems) {
-      alert('Cannot nest items that already have nested accessories.');
+      notify('Cannot nest items that already have nested accessories.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -2359,7 +2055,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     // Check if all selected items are in the same room
     const uniqueRooms = new Set(selectedItemsData.map(item => item.room_id));
     if (uniqueRooms.size > 1) {
-      alert('All selected items must be in the same area to nest/unnest them.');
+      notify('All selected items must be in the same area to nest/unnest them.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -2450,7 +2146,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setSelectedItems(new Set());
     } catch (error: any) {
       console.error('Error nesting/unnesting items:', error);
-      alert('Failed to nest/unnest items');
+      notify('Failed to nest/unnest items', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2479,7 +2175,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error adding area:', error);
-      alert('Failed to add new area');
+      notify('Failed to add new area', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2552,7 +2248,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await loadData();
     } catch (error: any) {
       console.error('Error substituting item:', error);
-      alert('Failed to substitute item: ' + error.message);
+      notify('Failed to substitute item: ' + error.message, { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2590,97 +2286,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     setRooms(updatedRooms);
   }
 
-  async function saveItemNotes() {
-    if (!editingItemNotes) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('proposal_line_items')
-        .update({
-          task_notes: editingItemNotes.notes,
-          show_task_notes: editingItemNotes.showNotes
-        })
-        .eq('id', editingItemNotes.id);
-
-      if (error) throw error;
-      await loadData();
-      setEditingItemNotes(null);
-    } catch (error: any) {
-      console.error('Error toggling scope visibility:', error);
-      alert('Failed to update scope visibility');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveProjectInfo() {
-    if (!editingProjectInfo) return;
-
-    // Count instances of this product in the proposal
-    const productId = editingProjectInfo.product_id;
-    const allItems = rooms.flatMap(r => r.line_items);
-    const instances = allItems.filter(item => item.product_id === productId);
-
-    // Check if values have changed
-    const currentItem = allItems.find(i => i.id === editingProjectInfo.id);
-    const installChanged = currentItem?.task_notes !== editingProjectInfo.installNotes ||
-                          currentItem?.show_task_notes !== editingProjectInfo.showInstallNotes;
-    const programmingChanged = currentItem?.programming_labor_hours !== editingProjectInfo.programmingHours ||
-                              currentItem?.programming_notes !== editingProjectInfo.programmingNotes ||
-                              currentItem?.show_programming_notes !== editingProjectInfo.showProgrammingNotes;
-
-    // If multiple instances and something changed, show bulk update modal
-    if (instances.length > 1 && (installChanged || programmingChanged)) {
-      let field: 'install' | 'programming' = 'install';
-      if (programmingChanged && !installChanged) field = 'programming';
-
-      setBulkUpdateProjectInfo({
-        itemId: editingProjectInfo.id,
-        productId: editingProjectInfo.product_id,
-        description: editingProjectInfo.description,
-        field,
-        instanceCount: instances.length,
-        newValues: {
-          task_notes: editingProjectInfo.installNotes,
-          show_task_notes: editingProjectInfo.showInstallNotes,
-          programming_labor_hours: editingProjectInfo.programmingHours,
-          programming_notes: editingProjectInfo.programmingNotes,
-          show_programming_notes: editingProjectInfo.showProgrammingNotes
-        }
-      });
-      return;
-    }
-
-    // Single instance or no change - update directly
-    await updateProjectInfoSingle(editingProjectInfo.id, {
-      task_notes: editingProjectInfo.installNotes,
-      show_task_notes: editingProjectInfo.showInstallNotes,
-      programming_labor_hours: editingProjectInfo.programmingHours,
-      programming_notes: editingProjectInfo.programmingNotes,
-      show_programming_notes: editingProjectInfo.showProgrammingNotes
-    });
-  }
-
-  async function toggleTaskCompleted(itemId: string, currentValue: boolean) {
-    try {
-      const { error } = await supabase
-        .from('proposal_line_items')
-        .update({ task_completed: !currentValue })
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      setRooms(prev => prev.map(room => ({
-        ...room,
-        line_items: room.line_items.map(li =>
-          li.id === itemId ? { ...li, task_completed: !currentValue } : li
-        )
-      })));
-    } catch (error: any) {
-      console.error('Error toggling task completion:', error);
-    }
-  }
 
   async function updateProjectInfoSingle(itemId: string, updates: any) {
     setSaving(true);
@@ -2692,11 +2297,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (error) throw error;
       await loadData();
-      setEditingProjectInfo(null);
       setBulkUpdateProjectInfo(null);
     } catch (error: any) {
       console.error('Error updating project info:', error);
-      alert('Failed to update project information');
+      notify('Failed to update project information', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2718,11 +2322,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (error) throw error;
       await loadData();
-      setEditingProjectInfo(null);
       setBulkUpdateProjectInfo(null);
     } catch (error: any) {
       console.error('Error updating all project info:', error);
-      alert('Failed to update project information');
+      notify('Failed to update project information', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -2879,7 +2482,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       await applyLineItemUpdate(itemId, updates);
     } catch (error: any) {
       console.error('Error updating line item:', error);
-      alert('Failed to update item');
+      notify('Failed to update item', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -2891,7 +2494,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setPendingBulkUpdate(null);
     } catch (error: any) {
       console.error('Error updating single item:', error);
-      alert('Failed to update item');
+      notify('Failed to update item', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }
@@ -2917,7 +2520,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           item => item.product_id === pendingBulkUpdate.productId
         );
         for (const item of affectedItems) {
-          const newLineTotal = item.quantity * pendingBulkUpdate.newValue;
+
           const laborTotal = (item.labor_hours || 0) * item.quantity * (item.labor_rate || 0);
           await supabase
             .from('proposal_line_items')
@@ -2959,7 +2562,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       setPendingBulkUpdate(null);
     } catch (error: any) {
       console.error('Error updating all instances:', error);
-      alert('Failed to update all instances');
+      notify('Failed to update all instances', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }
@@ -2992,15 +2595,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     const updates: any = {};
 
     if (field === 'quantity') {
-      updates.quantity = parseFloat(value) || 0;
+      updates.quantity = parseFloat(String(value)) || 0;
     } else if (field === 'cost') {
-      updates.cost = parseFloat(value) || 0;
+      updates.cost = parseFloat(String(value)) || 0;
     } else if (field === 'unit_price') {
-      updates.unit_price = parseFloat(value) || 0;
+      updates.unit_price = parseFloat(String(value)) || 0;
     } else if (field === 'labor_hours') {
-      updates.labor_hours = parseFloat(value) || 0;
+      updates.labor_hours = parseFloat(String(value)) || 0;
     } else if (field === 'labor_rate') {
-      updates.labor_rate = parseFloat(value) || 0;
+      updates.labor_rate = parseFloat(String(value)) || 0;
     } else if (field === 'labor_phase_id') {
       updates.labor_phase_id = value || null;
 
@@ -3041,8 +2644,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       room.line_items.filter(item => !item.parent_item_id).forEach(item => {
         // Calculate item total including its nested children
         const itemMaterialTotal = item.unit_price * item.quantity;
-        const itemLaborTotal = parseFloat(item.labor_total || 0);
-        const itemLaborHours = parseFloat(item.labor_hours || 0);
+        const itemLaborTotal = parseFloat(String(item.labor_total || 0));
+        const itemLaborHours = parseFloat(String(item.labor_hours || 0));
 
         // Track labor hours by phase
         if (itemLaborHours > 0) {
@@ -3060,9 +2663,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         const nestedMaterialTotal = nestedChildren.reduce((sum, nested) =>
           sum + (nested.unit_price * nested.quantity), 0);
         const nestedLaborTotal = nestedChildren.reduce((sum, nested) =>
-          sum + parseFloat(nested.labor_total || 0), 0);
+          sum + parseFloat(String(nested.labor_total || 0)), 0);
         const nestedLaborHours = nestedChildren.reduce((sum, nested) => {
-          const hours = parseFloat(nested.labor_hours || 0);
+          const hours = parseFloat(String(nested.labor_hours || 0));
           if (hours > 0) {
             const phaseName = nested.labor_phases?.name || 'Unassigned';
             const phaseId = nested.labor_phase_id || 'unassigned';
@@ -3090,35 +2693,35 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     // Use database-stored values when available (but keep materials/labor from line items)
     if (proposal && proposal.subtotal !== undefined && proposal.total !== undefined) {
       return {
-        subtotal: parseFloat(proposal.subtotal || 0),
+        subtotal: parseFloat(String(proposal.subtotal || 0)),
         totalLabor,
         totalMaterials,
         totalLaborHours,
         laborHoursByPhase: Object.values(laborHoursByPhase).sort((a, b) => a.name.localeCompare(b.name)),
         discountPercent: proposalSettings?.discount_percent || 0,
-        discountAmount: parseFloat(proposal.discount_amount || 0),
+        discountAmount: parseFloat(String(proposal.discount_amount || 0)),
         pmPercent: proposalSettings?.project_management_percent || 0,
-        pmAmount: parseFloat(proposal.project_management_amount || 0),
+        pmAmount: parseFloat(String(proposal.project_management_amount || 0)),
         designPercent: proposalSettings?.project_design_percent || 0,
-        designAmount: parseFloat(proposal.project_design_amount || 0),
+        designAmount: parseFloat(String(proposal.project_design_amount || 0)),
         systemDesignPercent: proposalSettings?.system_design_percent || 0,
-        systemDesignAmount: parseFloat(proposal.system_design_amount || 0),
+        systemDesignAmount: parseFloat(String(proposal.system_design_amount || 0)),
         ccFeePercent: proposalSettings?.credit_card_fee_percent || 0,
-        ccFeeAmount: parseFloat(proposal.credit_card_fee_amount || 0),
+        ccFeeAmount: parseFloat(String(proposal.credit_card_fee_amount || 0)),
         miscPartsPercent: proposalSettings?.misc_parts_percent || 0,
-        miscPartsAmount: parseFloat(proposal.misc_parts_amount || 0),
+        miscPartsAmount: parseFloat(String(proposal.misc_parts_amount || 0)),
         custom1Label: proposalSettings?.custom_modifier_1_label || '',
         custom1Percent: proposalSettings?.custom_modifier_1_percent || 0,
-        custom1Amount: parseFloat(proposal.custom_modifier_1_amount || 0),
+        custom1Amount: parseFloat(String(proposal.custom_modifier_1_amount || 0)),
         custom2Label: proposalSettings?.custom_modifier_2_label || '',
         custom2Percent: proposalSettings?.custom_modifier_2_percent || 0,
-        custom2Amount: parseFloat(proposal.custom_modifier_2_amount || 0),
-        adjustedSubtotal: parseFloat(proposal.subtotal || 0) - parseFloat(proposal.discount_amount || 0) + parseFloat(proposal.project_management_amount || 0) + parseFloat(proposal.project_design_amount || 0) + parseFloat(proposal.system_design_amount || 0) + parseFloat(proposal.credit_card_fee_amount || 0) + parseFloat(proposal.misc_parts_amount || 0) + parseFloat(proposal.custom_modifier_1_amount || 0) + parseFloat(proposal.custom_modifier_2_amount || 0),
+        custom2Amount: parseFloat(String(proposal.custom_modifier_2_amount || 0)),
+        adjustedSubtotal: parseFloat(String(proposal.subtotal || 0)) - parseFloat(String(proposal.discount_amount || 0)) + parseFloat(String(proposal.project_management_amount || 0)) + parseFloat(String(proposal.project_design_amount || 0)) + parseFloat(String(proposal.system_design_amount || 0)) + parseFloat(String(proposal.credit_card_fee_amount || 0)) + parseFloat(String(proposal.misc_parts_amount || 0)) + parseFloat(String(proposal.custom_modifier_1_amount || 0)) + parseFloat(String(proposal.custom_modifier_2_amount || 0)),
         taxRate: proposal?.tax_rate || 0,
-        taxAmount: parseFloat(proposal.tax_amount || 0),
-        total: parseFloat(proposal.total || 0),
+        taxAmount: parseFloat(String(proposal.tax_amount || 0)),
+        total: parseFloat(String(proposal.total || 0)),
         depositPercent: proposal?.deposit_percent || 0,
-        depositAmount: parseFloat(proposal.deposit_amount || 0)
+        depositAmount: parseFloat(String(proposal.deposit_amount || 0))
       };
     }
 
@@ -3208,7 +2811,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       custom2Percent,
       custom2Amount,
       adjustedSubtotal,
-      taxRate: taxRate * 100,
+      taxRate: taxRateDecimal * 100,
       taxAmount,
       total,
       depositPercent,
@@ -3230,6 +2833,15 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       totalMaterials: 0,
       totalLaborHours: 0,
       laborHoursByPhase: [],
+      discountAmount: 0, discountPercent: 0,
+      pmAmount: 0, pmPercent: 0,
+      designAmount: 0, designPercent: 0,
+      systemDesignAmount: 0, systemDesignPercent: 0,
+      ccFeeAmount: 0, ccFeePercent: 0,
+      miscPartsAmount: 0, miscPartsPercent: 0,
+      custom1Amount: 0, custom1Percent: 0, custom1Label: '',
+      custom2Amount: 0, custom2Percent: 0, custom2Label: '',
+      depositAmount: 0, depositPercent: 0,
       taxRate: 0,
       taxAmount: 0,
       total: 0
@@ -3279,7 +2891,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     );
   }
 
-  const activeArea = rooms.find(r => r.id === activeAreaId);
 
   // Get all line items with filtering
   // In non-CO mode, hide items marked is_hidden (they don't belong to this view)
@@ -3304,10 +2915,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
   // Get unique values for filter options
   const uniquePhases = Array.from(new Set(rooms.flatMap(r =>
-    r.line_items.map(item => item.labor_phases?.name).filter(Boolean)
+    r.line_items.map(item => item.labor_phases?.name).filter((value): value is string => Boolean(value))
   )));
   const uniqueManufacturers = Array.from(new Set(rooms.flatMap(r =>
-    r.line_items.map(item => item.products?.manufacturers?.name).filter(Boolean)
+    r.line_items.map(item => item.products?.manufacturers?.name).filter((value): value is string => Boolean(value))
   )));
 
   const activeFilterCount = filters.areas.length + filters.phases.length + filters.manufacturers.length;
@@ -3341,7 +2952,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </div>
                 <div className="flex items-center flex-wrap gap-1.5 text-xs text-muted mt-0.5">
                   <User className="w-3 h-3 flex-shrink-0" />
-                  <span className="truncate">{proposal?.contacts?.full_name || 'Loading...'}</span>
+                  <button type="button" disabled={!proposal?.contact_id} onClick={() => setShowCustomerQuickView(true)} className="truncate text-left hover:text-blue-500 hover:underline disabled:no-underline disabled:cursor-default" title="View customer details">{proposal?.contacts?.full_name || proposal?.contacts?.company_name || 'Loading...'}</button>
                   <span className="text-gray-600">•</span>
                   <span className="text-muted">#{proposal?.proposal_number}</span>
                 </div>
@@ -3350,11 +2961,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
           {/* Right: Badges + All Actions */}
           <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end min-w-0 w-full sm:w-auto">
-              {/* Editing lock is independent of approval and portal visibility. */}
-              {presentation.locked && <ProposalLockControl onUnlock={() => setShowUnlockWarningModal(true)} />}
 
               {/* Expiration Badge — countdown only for sent/portal; expired status is shown in the status control */}
-              {(proposal?.status === 'sent' || proposal?.status === 'portal') && proposal?.sent_at && (() => {
+              {(proposal?.status === 'sent' || proposal?.status === 'portal') && proposal?.sent_at && !presentation.expired && (() => {
                 const expiresAt = proposal.expires_at
                   ? new Date(proposal.expires_at)
                   : new Date(new Date(proposal.sent_at).getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -3462,13 +3071,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
             {/* Status is informational; status transitions live in More options. */}
             {proposal && (
-              <span className="inline-flex h-10 shrink-0 items-center rounded-lg border border-subtle bg-elevated px-3 text-xs font-medium text-secondary" title="Current proposal status">
+              <span className={`inline-flex shrink-0 items-center px-2 text-xs font-medium ${presentation.expired ? "text-amber-400" : "text-secondary"}`} title="Current proposal status">
                 {presentation.expired ? 'Expired' : proposalStatusLabel(proposal.status)}
               </span>
             )}
 
-            {/* Add Item Button */}
-            <button
+            {/* Editing actions are unavailable on locked proposals. */}
+            {!presentation.locked && <button
               onClick={() => {
                 setShowAddItemToAreasModal(true);
               }}
@@ -3477,7 +3086,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add</span>
-            </button>
+            </button>}
 
             {/* More Options Menu */}
             <div className="relative">
@@ -3493,6 +3102,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMoreOptionsMenu(false)} />
                   <div className="absolute top-full right-0 mt-1 bg-canvas text-primary rounded-lg shadow-xl border border-subtle py-1 z-20 min-w-[200px]">
+                    {presentation.locked && <button type="button" onClick={() => { setShowUnlockWarningModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm">Create revision / Unlock</button>}
                     {(proposal?.current_portal_version ?? 0) > 0 && (
                       <button
                         onClick={() => { setShowPortalVersionHistory(true); setShowMoreOptionsMenu(false); }}
@@ -3502,52 +3112,19 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         Portal Version History
                       </button>
                     )}
-                    {/* Customer Section */}
+                    {/* Administrative actions only: delivery and status controls live in the toolbar. */}
                     {proposal?.contact_id && (
-                      <>
-                        <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Customer</div>
-                        <a
-                          href={`/contacts?id=${proposal.contact_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span>View Customer</span>
-                        </a>
-                        <button
-                          onClick={() => {
-                            setShowEditCustomerModal(true);
-                            setShowMoreOptionsMenu(false);
-                          }}
-                          className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          <span>Change Customer</span>
-                        </button>
-                        <div className="border-t border-subtle my-1" />
-                      </>
+                      <button type="button" onClick={() => { setShowEditCustomerModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm">
+                        <Edit2 className="w-4 h-4" />Change Customer
+                      </button>
                     )}
-
-                    {/* Secondary proposal actions — deliberately not in the main header. */}
-                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Delivery &amp; access</div>
-                    <button type="button" onClick={() => { setShowSubmissionModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><Send className="w-4 h-4" />Submission options</button>
-                    <button type="button" onClick={() => { setShowPdfModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><FileText className="w-4 h-4" />Print / PDF</button>
-                    <button type="button" onClick={() => { setShowTasksPanel(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><ListChecks className="w-4 h-4" />Proposal tasks</button>
-                    <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleRevokeProposalLinks(); }} disabled={copyingShareLink} className="w-full px-3 py-2 text-left text-red-400 hover:bg-elevated flex items-center gap-2 text-sm disabled:opacity-40"><Unlink className="w-4 h-4" />Revoke customer link</button>
-                    <div className="border-t border-subtle my-1" />
-
-                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Status management</div>
-                    {proposal?.status !== 'approved' && (
-                      <>
-                        <button type="button" onClick={() => { setShowManualApprovalModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><CheckCircle2 className="w-4 h-4" />Mark approved</button>
-                        {proposal?.status !== 'declined' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleDeclineProposal(); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><XCircle className="w-4 h-4" />Mark declined</button>}
-                        {proposal?.status === 'designing' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('ready_to_submit'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><ThumbsUp className="w-4 h-4" />Mark ready</button>}
-                        {proposal?.status !== 'designing' && <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('designing'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm"><Edit2 className="w-4 h-4" />Return to designing</button>}
-                      </>
+                    {proposal?.status !== 'designing' && proposal?.status !== 'approved' && (
+                      <button type="button" onClick={() => { setShowMoreOptionsMenu(false); void handleUpdateStatus('designing'); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm">
+                        <Edit2 className="w-4 h-4" />Return to designing
+                      </button>
                     )}
                     <div className="border-t border-subtle my-1" />
-                    {/* Proposal Actions */}
+                                        {/* Proposal Actions */}
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Proposal</div>
                     <button
                       onClick={() => {
@@ -3825,10 +3402,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 const isActive = activeAreaId === '__unassigned__';
                 const topLevelUnassigned = visibleUnassigned.filter(i => !i.parent_item_id);
                 const unassignedTotal = topLevelUnassigned.reduce((sum, item) => {
-                  const itemTotal = (item.unit_price * item.quantity) + parseFloat(item.labor_total || 0);
+                  const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
                   const nestedTotal = visibleUnassigned
                     .filter(nested => nested.parent_item_id === item.id)
-                    .reduce((ns, nested) => ns + (nested.unit_price * nested.quantity) + parseFloat(nested.labor_total || 0), 0);
+                    .reduce((ns, nested) => ns + (nested.unit_price * nested.quantity) + parseFloat(String(nested.labor_total || 0)), 0);
                   return sum + itemTotal + nestedTotal;
                 }, 0);
                 return (
@@ -3867,11 +3444,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 const isActive = activeAreaId === room.id;
                 const topLevelItems = room.line_items.filter(item => !item.parent_item_id);
                 const roomTotal = topLevelItems.reduce((sum, item) => {
-                  const itemTotal = (item.unit_price * item.quantity) + parseFloat(item.labor_total || 0);
+                  const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
                   const nestedTotal = room.line_items
                     .filter(nested => nested.parent_item_id === item.id)
                     .reduce((nestedSum, nested) =>
-                      nestedSum + (nested.unit_price * nested.quantity) + parseFloat(nested.labor_total || 0), 0
+                      nestedSum + (nested.unit_price * nested.quantity) + parseFloat(String(nested.labor_total || 0)), 0
                     );
                   return sum + itemTotal + nestedTotal;
                 }, 0);
@@ -4045,10 +3622,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   const isActive = activeAreaId === '__unassigned__';
                   const topLevelUnassigned = visibleUnassigned.filter(i => !i.parent_item_id);
                   const unassignedTotal = topLevelUnassigned.reduce((sum, item) => {
-                    const itemTotal = (item.unit_price * item.quantity) + parseFloat(item.labor_total || 0);
+                    const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
                     const nestedTotal = visibleUnassigned
                       .filter(nested => nested.parent_item_id === item.id)
-                      .reduce((ns, nested) => ns + (nested.unit_price * nested.quantity) + parseFloat(nested.labor_total || 0), 0);
+                      .reduce((ns, nested) => ns + (nested.unit_price * nested.quantity) + parseFloat(String(nested.labor_total || 0)), 0);
                     return sum + itemTotal + nestedTotal;
                   }, 0);
                   return (
@@ -4089,11 +3666,11 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   const isActive = activeAreaId === room.id;
                   const topLevelItems = room.line_items.filter(item => !item.parent_item_id);
                   const roomTotal = topLevelItems.reduce((sum, item) => {
-                    const itemTotal = (item.unit_price * item.quantity) + parseFloat(item.labor_total || 0);
+                    const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
                     const nestedTotal = room.line_items
                       .filter(nested => nested.parent_item_id === item.id)
                       .reduce((nestedSum, nested) =>
-                        nestedSum + (nested.unit_price * nested.quantity) + parseFloat(nested.labor_total || 0), 0
+                        nestedSum + (nested.unit_price * nested.quantity) + parseFloat(String(nested.labor_total || 0)), 0
                       );
                     return sum + itemTotal + nestedTotal;
                   }, 0);
@@ -4298,6 +3875,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         sort_order: -1,
                         proposal_id: proposalId,
                         organization_id: '',
+                        created_at: proposal.created_at,
+                        updated_at: proposal.updated_at,
                         line_items: visibleUnassigned as any,
                       };
 
@@ -4464,12 +4043,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                     </button>
                                   )}
                                   {hasChildren && (
-                                    <Layers className="w-4 h-4 sm:w-3 sm:h-3 text-cyan-400" title={`${childrenCount} nested accessories`} />
+                                    <Layers className="w-4 h-4 sm:w-3 sm:h-3 text-cyan-400"><title>{`${childrenCount} nested accessories`}</title></Layers>
                                   )}
                                   {!hasChildren && (
                                     <div
                                       className="cursor-move text-muted hover:text-secondary"
-                                      title={isNested ? "Drag to reorder with siblings or unnest" : "Drag to reorder"}
+                                      title={isNested ? "Drag to reorder within this parent" : "Drag to reorder parent and its accessories"}
                                     >
                                       <GripVertical className="w-4 h-4 sm:w-3 sm:h-3" />
                                     </div>
@@ -4587,7 +4166,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       step="0.01"
                                     />
                                   ) : (
-                                    formatCurrency(parseFloat(item.cost || 0))
+                                    formatCurrency(parseFloat(String(item.cost || 0)))
                                   )}
                                 </td>
                               )}
@@ -4611,7 +4190,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       step="0.01"
                                     />
                                   ) : (
-                                    formatCurrency(parseFloat(item.unit_price || 0))
+                                    formatCurrency(parseFloat(String(item.unit_price || 0)))
                                   )}
                                 </td>
                               )}
@@ -4674,7 +4253,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       step="0.01"
                                     />
                                   ) : (
-                                    parseFloat(item.labor_hours || 0).toFixed(2)
+                                    parseFloat(String(item.labor_hours || 0)).toFixed(2)
                                   )}
                                 </td>
                               )}
@@ -4698,13 +4277,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       step="0.01"
                                     />
                                   ) : (
-                                    formatCurrency(parseFloat(item.labor_rate || 0))
+                                    formatCurrency(parseFloat(String(item.labor_rate || 0)))
                                   )}
                                 </td>
                               )}
                               {visibleColumns.has('laborTotal') && (
                                 <td className={`py-2 px-3 text-right whitespace-nowrap ${laborStrike || 'text-secondary'}`}>
-                                  ${parseFloat(item.labor_total || 0).toFixed(2)}
+                                  ${parseFloat(String(item.labor_total || 0)).toFixed(2)}
                                 </td>
                               )}
                               {visibleColumns.has('partsTax') && (
@@ -4720,18 +4299,18 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               {visibleColumns.has('lineTotal') && (
                                 <td className={`py-2 px-3 text-right font-medium whitespace-nowrap ${isCoRemoved ? 'line-through text-red-400' : 'text-primary'}`}>
                                   {isCoRemoved ? (() => {
-                                    const materialTotal = parseFloat(item.unit_price || 0) * item.quantity;
-                                    const laborTotal = parseFloat(item.labor_total || 0);
+                                    const materialTotal = parseFloat(String(item.unit_price || 0)) * item.quantity;
+                                    const laborTotal = parseFloat(String(item.labor_total || 0));
                                     const negativeAmt = isPartsOnlyRemoval ? materialTotal : (materialTotal + laborTotal);
                                     return `−${formatCurrency(negativeAmt)}`;
                                   })() : (() => {
-                                    const materialTotal = parseFloat(item.unit_price || 0) * item.quantity;
-                                    const laborTotal = parseFloat(item.labor_total || 0);
+                                    const materialTotal = parseFloat(String(item.unit_price || 0)) * item.quantity;
+                                    const laborTotal = parseFloat(String(item.labor_total || 0));
                                     let displayTotal = materialTotal + laborTotal;
                                     if (hasChildren) {
                                       const nestedChildren = room.line_items.filter(nested => nested.parent_item_id === item.id);
-                                      const nestedMaterial = nestedChildren.reduce((sum, n) => sum + (parseFloat(n.unit_price || 0) * n.quantity), 0);
-                                      const nestedLabor = nestedChildren.reduce((sum, n) => sum + parseFloat(n.labor_total || 0), 0);
+                                      const nestedMaterial = nestedChildren.reduce((sum, n) => sum + (parseFloat(String(n.unit_price || 0)) * n.quantity), 0);
+                                      const nestedLabor = nestedChildren.reduce((sum, n) => sum + parseFloat(String(n.labor_total || 0)), 0);
                                       displayTotal += nestedMaterial + nestedLabor;
                                     }
                                     return formatCurrency(displayTotal);
@@ -5011,7 +4590,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     let lineItemsCost = 0;
                     rooms.forEach(room => {
                       room.line_items.forEach(item => {
-                        const itemCost = (parseFloat(item.cost || 0) * item.quantity) + (parseFloat(item.labor_cost || 0) * parseFloat(item.labor_hours || 0));
+                        const itemCost = (Number(item.cost || 0) * item.quantity);
                         lineItemsCost += itemCost;
                       });
                     });
@@ -5373,7 +4952,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               }
             } catch (error) {
               console.error('Error updating modifiers:', error);
-              alert('Failed to update modifiers');
+              notify('Failed to update modifiers', { theme: 'violet', tone: 'error' });
             }
           }}
         />
@@ -6053,6 +5632,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
           // Pre-populate PDF display options from the template
           setPdfDisplayOptions({
+            showProductImages: editingTemplate.show_product_images ?? true,
             showDescription: editingTemplate.show_line_item_description ?? true,
             showManufacturer: editingTemplate.show_manufacturer ?? true,
             showSKU: editingTemplate.show_sku ?? true,
@@ -6567,8 +6147,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 .map(product => (
                   <div
                     key={product.id}
-                    onClick={() => {
-                      if (confirm(`Replace current item with "${product.name || product.description}"?`)) {
+                    onClick={async () => {
+                      if ((await requestConfirmation(`Replace current item with "${product.name || product.description}"?`, { theme: 'violet' }))) {
                         substituteItem(product.id);
                       }
                     }}
@@ -6593,10 +6173,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="text-green-400 font-medium">${product.price?.toFixed(2) || '0.00'}</div>
+                        <div className="text-green-400 font-medium">${(product.our_price ?? product.unit_price)?.toFixed(2) || '0.00'}</div>
                         <div className="text-xs text-muted">Cost: ${product.cost?.toFixed(2) || '0.00'}</div>
-                        {product.labor_hours && (
-                          <div className="text-xs text-muted mt-1">{product.labor_hours}h labor</div>
+                        {product.default_labor_hours && (
+                          <div className="text-xs text-muted mt-1">{product.default_labor_hours}h labor</div>
                         )}
                       </div>
                     </div>
@@ -6633,12 +6213,18 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         </div>
       )}
 
+      {showCustomerQuickView && proposal?.contact_id && (
+        <Suspense fallback={null}>
+          <ContactQuickViewModal contactId={proposal.contact_id} onClose={() => setShowCustomerQuickView(false)} />
+        </Suspense>
+      )}
+
       {showEditCustomerModal && proposal && (
         <Suspense fallback={null}><EditCustomerModal
           proposalId={proposal.id}
-          currentContactId={proposal.contact_id}
+          contactId={proposal.contact_id}
           onClose={() => setShowEditCustomerModal(false)}
-          onSaved={async () => {
+          onSave={async () => {
             setShowEditCustomerModal(false);
             await loadData();
           }}
@@ -6732,7 +6318,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           proposalTitle={proposal.title || proposal.proposal_name || ''}
           customerName={proposal.contacts?.company_name || proposal.contacts?.name || [proposal.contacts?.first_name, proposal.contacts?.last_name].filter(Boolean).join(' ') || ''}
           onDownloadPdf={() => { setShowReactivateModal(false); setShowPdfModal(true); }}
-          onSuccess={() => loadData()}
+          onSuccess={async () => { await loadData(); }}
         /></Suspense>
       )}
 
@@ -6764,9 +6350,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       {showUnlockWarningModal && proposal && (
         <Suspense fallback={null}><UnlockProposalModal
+          proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
-          onCreateRevision={handleCreateRevision}
-          onUnlockAndEdit={handleUnlockProposal}
+          onUnlockAndEdit={async () => { setShowUnlockWarningModal(false); await loadData(); }}
           onClose={() => setShowUnlockWarningModal(false)}
         /></Suspense>
       )}

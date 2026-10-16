@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Plus, Search, CheckCircle, AlertCircle, Clock, Download, RefreshCw, Mail, Wrench, X, Send, Loader2, Eye, BarChart2, ExternalLink } from 'lucide-react';
+import { DollarSign, Plus, Search, CheckCircle, AlertCircle, Clock, Download, RefreshCw, Mail, Wrench, X, Send, Loader2, Eye, BarChart2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
@@ -13,6 +13,7 @@ import { InvoiceStats } from './InvoiceStats';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface Invoice {
+  updated_at: string;
   id: string;
   invoice_number: string;
   invoice_date: string;

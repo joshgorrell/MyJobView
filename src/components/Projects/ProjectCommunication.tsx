@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { MessageSquare, Send, Plus, Lock, Unlock, Paperclip } from 'lucide-react';
 import { FileUploadZone } from '../FileUpload/FileUploadZone';
-import { FileAttachmentsList } from '../FileUpload/FileAttachmentsList';
 
 interface ProjectCommunicationProps {
   projectId: string;

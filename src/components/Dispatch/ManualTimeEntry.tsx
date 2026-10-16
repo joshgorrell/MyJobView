@@ -1,7 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Clock, Save, X, Calendar, User, AlertCircle, CreditCard as Edit2, Plus } from 'lucide-react';
+import { Save, X, Calendar, User, AlertCircle, CreditCard as Edit2, Plus } from 'lucide-react';
 import {
   getOrganizationTimezone,
   createTimestampInTimezone,
@@ -155,28 +156,27 @@ export function ManualTimeEntry({ entryToEdit, onClose, onSave }: ManualTimeEntr
     }
   }
 
-  const selectedTechnician = technicians.find(t => t.id === technicianId);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!technicianId) {
-      alert('Please select a technician');
+      notify('Please select a technician', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!startDate) {
-      alert('Please select a start date');
+      notify('Please select a start date', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!clockInTime) {
-      alert('Please enter clock in time');
+      notify('Please enter clock in time', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!adjustmentReason.trim()) {
-      alert('Please provide a reason for this manual entry/adjustment');
+      notify('Please provide a reason for this manual entry/adjustment', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -194,7 +194,7 @@ export function ManualTimeEntry({ entryToEdit, onClose, onSave }: ManualTimeEntr
 
         // Validation: Ensure clock_out is after clock_in
         if (new Date(clockOutTimestamp) <= new Date(clockInTimestamp)) {
-          alert('Error: Clock out time must be after clock in time. For overnight shifts, make sure the end date is set to the next day.');
+          notify('Error: Clock out time must be after clock in time. For overnight shifts, make sure the end date is set to the next day.', { theme: 'blue', tone: 'error' });
           setLoading(false);
           return;
         }
@@ -230,21 +230,21 @@ export function ManualTimeEntry({ entryToEdit, onClose, onSave }: ManualTimeEntr
           .eq('id', entryToEdit.id);
 
         if (error) throw error;
-        alert('Time entry updated successfully');
+        notify('Time entry updated successfully', { theme: 'blue', tone: 'success' });
       } else {
         const { error } = await supabase
           .from('daily_clock_entries')
           .insert(entryData);
 
         if (error) throw error;
-        alert('Time entry created successfully');
+        notify('Time entry created successfully', { theme: 'blue', tone: 'success' });
       }
 
       onSave();
       onClose();
     } catch (error: any) {
       console.error('Error saving time entry:', error);
-      alert(error.message || 'Failed to save time entry');
+      notify(error.message || 'Failed to save time entry', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

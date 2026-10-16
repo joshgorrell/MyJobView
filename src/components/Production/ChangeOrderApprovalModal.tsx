@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, Clock, EyeOff, Building2, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -230,7 +231,7 @@ export function ChangeOrderApprovalModal({ isOpen, onClose, changeOrderId, onSuc
       }
     } catch (error) {
       console.error('Error approving change order:', error);
-      alert('Approval could not be fully applied. Review the change order before retrying.');
+      notify('Approval could not be fully applied. Review the change order before retrying.', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -280,7 +281,7 @@ export function ChangeOrderApprovalModal({ isOpen, onClose, changeOrderId, onSuc
       onClose();
     } catch (error) {
       console.error('Error finalizing change order approval:', error);
-      alert('Approval could not be fully applied. Review the change order before retrying.');
+      notify('Approval could not be fully applied. Review the change order before retrying.', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -288,7 +289,7 @@ export function ChangeOrderApprovalModal({ isOpen, onClose, changeOrderId, onSuc
 
   async function handleReject(approvalId: string) {
     if (!rejectionReason.trim()) {
-      alert('Please provide a reason for rejection');
+      notify('Please provide a reason for rejection', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -319,7 +320,7 @@ export function ChangeOrderApprovalModal({ isOpen, onClose, changeOrderId, onSuc
       onClose();
     } catch (error) {
       console.error('Error rejecting change order:', error);
-      alert('Failed to reject change order');
+      notify('Failed to reject change order', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

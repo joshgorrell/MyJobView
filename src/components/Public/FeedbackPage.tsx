@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase';
 import { CheckCircle, Star, ThumbsUp, Meh, AlertCircle, Loader2 } from 'lucide-react';
 
 
-
 type Rating = 'excellent' | 'good' | 'okay' | 'needs_attention';
 type Phase = 'rating' | 'comment' | 'positive' | 'negative' | 'submitting' | 'error';
 
@@ -45,6 +44,7 @@ function isValidRating(r: string | null): r is Rating {
 }
 
 interface CompanyInfo {
+  reviewUrl?: string;
   name: string;
   logoUrl: string;
   email: string;

@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { SecurityContractSummary } from './SecurityContractSummary';
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle, Loader2, Printer, Download, Shield } from 'lucide-react';
@@ -84,7 +85,7 @@ export default function SecurityOnboardingPortal({ token: propToken }: SecurityO
             {agreement.summary?.billing_mode === 'autopay' && !agreement.summary.autopay_revoked_at && <div className="text-sm text-gray-600 space-y-2">
               <p>You can revoke future automatic payments. Amounts owed and your monitoring agreement remain in effect. Contact your provider to arrange payment; a debit already submitted requires provider follow-up.</p>
               <button className="border rounded-lg px-3 py-2 text-gray-900" disabled={revoking} onClick={async () => {
-                if (!window.confirm('Revoke future automatic payments? This does not cancel your monitoring agreement or amounts owed.')) return;
+                if (!(await requestConfirmation('Revoke future automatic payments? This does not cancel your monitoring agreement or amounts owed.', { theme: 'blue' }))) return;
                 setRevoking(true);
                 try { await securityOnboardingRequest('revoke_autopay', agreement.id, token); await load(); }
                 catch (e) { setPrintError(e instanceof Error ? e.message : 'Could not revoke authorization. Contact your provider.'); }

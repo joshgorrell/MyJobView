@@ -19,7 +19,7 @@ export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
   const [recentlyClaimed, setRecentlyClaimed] = useState<LeadWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [recentlyClaimedLoading, setRecentlyClaimedLoading] = useState(true);
-  const [salesReps, setSalesReps] = useState<Profile[]>([]);
+  const [salesReps, setSalesReps] = useState<Pick<Profile, 'id' | 'full_name' | 'role' | 'avatar_url'>[]>([]);
   const [selectedRep, setSelectedRep] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -30,7 +30,7 @@ export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [recentlyClaimedDays, setRecentlyClaimedDays] = useState<7 | 14 | 30>(7);
 
-  const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'sales_manager';
+  const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
 
   useEffect(() => {
     if (authLoading) return;
@@ -446,7 +446,7 @@ export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {displayed.map(lead => {
-                const isUnclaimed = lead.status === 'unclaimed' || lead.status === 'fishbowl';
+                const isUnclaimed = lead.status === 'unclaimed';
                 const unclaimedTime = isUnclaimed ? getUnclaimedDuration(lead) : null;
                 const priorityInfo = getPriorityInfo(lead.priority || 'medium');
                 const statusConfig = getStatusConfig(lead.status);

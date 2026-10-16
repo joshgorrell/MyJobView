@@ -285,7 +285,6 @@ export default function ProposalWorkflowBar({ proposalId }: { proposalId: string
         <UnlockProposalModal
           proposalId={proposal.id}
           proposalNumber={proposal.proposal_number}
-          onCreateRevision={() => {}}
           onUnlockAndEdit={async () => { await load(); setShowUnlock(false); }}
           onClose={() => setShowUnlock(false)}
         />

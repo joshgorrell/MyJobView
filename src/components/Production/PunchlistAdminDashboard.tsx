@@ -2,6 +2,7 @@ import { punchlistDescription, punchlistList, canSchedulePunchlist, canRequestPu
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
+  Image as ImageIcon,
   ClipboardList,
   CheckCircle2,
   FileText,
@@ -67,6 +68,7 @@ interface PunchlistTask {
   } | null;
   photos?: Array<{
     id: string;
+    task_id: string;
     photo_url: string;
     caption: string | null;
     uploaded_at: string;
@@ -826,6 +828,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         <PunchlistTaskDetailModal
           task={{
             ...detailTask,
+            service_request_id: detailTask.service_request_id ?? null,
+            work_order_id: detailTask.work_order_id ?? null,
             contact: detailTask.contact ? {
               first_name: detailTask.contact.first_name ?? null,
               last_name: detailTask.contact.last_name ?? null,

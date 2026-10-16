@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSalesDashboard, useSalesLeaderboard } from '../../hooks/useSalesDashboard';
 import { computeGoalProgress, computeAttentionItems } from '../../lib/salesDashboardCalculations';
-import type { DashboardTab, SalesDashboardResult } from '../../lib/salesDashboardTypes';
+import type { DashboardTab } from '../../lib/salesDashboardTypes';
 import { AnnualGoalHero } from './AnnualGoalHero';
 import { SalesKpiGrid } from './SalesKpiGrid';
 import { SalesTrendChart } from './SalesTrendChart';

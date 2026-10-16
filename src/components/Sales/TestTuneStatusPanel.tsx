@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -63,7 +64,7 @@ interface ELROverrideLog {
 export function TestTuneStatusPanel({
   salesOrderId,
   salesOrderStatus,
-  initialLeadTechId,
+  initialLeadTechId: _initialLeadTechId,
   onUpdate
 }: TestTuneStatusPanelProps) {
   const { profile } = useAuth();
@@ -83,9 +84,9 @@ export function TestTuneStatusPanel({
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'finance' ||
-    profile?.role === 'sales_manager' || profile?.role === 'production_manager';
+    profile?.role === 'manager';
   const canOverrideELR = profile?.role === 'admin' || profile?.role === 'finance' ||
-    profile?.role === 'sales_manager';
+    profile?.role === 'manager';
 
   const isProjectComplete = salesOrderStatus === 'complete' || salesOrderStatus === 'completed' || salesOrderStatus === 'closed';
 
@@ -205,13 +206,13 @@ export function TestTuneStatusPanel({
 
   async function handleSaveELROverride() {
     if (!elrOverrideReason.trim()) {
-      alert('A reason is required for the per-job threshold override.');
+      notify('A reason is required for the per-job threshold override.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
     const overrideValue = elrOverrideValue === '' ? null : parseFloat(elrOverrideValue);
     if (elrOverrideValue !== '' && (isNaN(overrideValue as number) || (overrideValue as number) < 0)) {
-      alert('Please enter a valid rate (or leave blank to clear the override).');
+      notify('Please enter a valid rate (or leave blank to clear the override).', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -232,7 +233,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error saving ELR override:', error);
-      alert('Failed to save threshold override.');
+      notify('Failed to save threshold override.', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingELR(false);
     }
@@ -240,7 +241,7 @@ export function TestTuneStatusPanel({
 
   async function handleClearELROverride() {
     if (!elrOverrideReason.trim()) {
-      alert('A reason is required even when clearing an override.');
+      notify('A reason is required even when clearing an override.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -262,7 +263,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error clearing ELR override:', error);
-      alert('Failed to clear threshold override.');
+      notify('Failed to clear threshold override.', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingELR(false);
     }
@@ -270,7 +271,7 @@ export function TestTuneStatusPanel({
 
   async function handleStartTestTune() {
     if (!selectedTechId) {
-      alert('Please assign a Lead Technician before starting Test & Tune tracking.');
+      notify('Please assign a Lead Technician before starting Test & Tune tracking.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -298,7 +299,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error starting Test & Tune:', error);
-      alert('Failed to start Test & Tune tracking.');
+      notify('Failed to start Test & Tune tracking.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -319,7 +320,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error pausing Test & Tune:', error);
-      alert('Failed to pause Test & Tune tracking.');
+      notify('Failed to pause Test & Tune tracking.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -340,7 +341,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error resuming Test & Tune:', error);
-      alert('Failed to resume Test & Tune tracking.');
+      notify('Failed to resume Test & Tune tracking.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -348,7 +349,7 @@ export function TestTuneStatusPanel({
 
   async function handleSaveAssignment() {
     if (!selectedTechId) {
-      alert('Please select a Lead Technician.');
+      notify('Please select a Lead Technician.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -367,7 +368,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error saving assignment:', error);
-      alert('Failed to save Lead Technician assignment.');
+      notify('Failed to save Lead Technician assignment.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

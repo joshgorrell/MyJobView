@@ -1,6 +1,7 @@
+import { useCompletion } from '../../hooks/useCompletion';
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Activity, ArrowLeft, Calendar, MessageSquare } from "lucide-react";
+import { Activity, ArrowLeft, Calendar, MessageSquare, Send, CheckCircle2 } from "lucide-react";
 import { QuickActionModal } from "../Shared/QuickActionModal";
 import { DiscussionPostForm } from "../Feed/DiscussionPostForm";
 import { PostFlowUpdate } from "./PostFlowUpdate";
@@ -29,21 +30,28 @@ export function FlowCreateModal({
   onSaved: () => void;
 }) {
   const [mode, setMode] = useState(initial);
+  const completion = useCompletion(onSaved);
+  const { completed } = completion;
+  const finish = completion.complete;
   const title = followup
     ? "Complete follow-up"
     : mode === "choose"
       ? "Create in Flow"
       : mode === "chat"
-        ? "Internal chat"
+        ? "Message"
         : mode === "update"
           ? "Activity update"
           : "Log interaction";
   return createPortal(
     <QuickActionModal
       title={title}
-      subtitle="Messages, customer interactions and follow-ups in one place"
+      subtitle={mode === "chat" ? "Send a message to your team" : "Messages, customer interactions and follow-ups in one place"}
       icon={<FlowWaveIcon className="text-2xl" />}
-      onClose={onClose}
+      onClose={completed ? completion.finish : onClose}
+      accentColor="from-cyan-600 to-blue-700"
+      showSuccess={completed}
+      successMessage={mode === 'chat' ? 'Message sent!' : mode === 'update' ? 'Added to Flow' : followup ? 'Follow-up completed!' : 'Interaction logged!'}
+      successIcon={mode === 'chat' ? <Send className="h-20 w-20" strokeWidth={1.5} /> : <CheckCircle2 className="h-20 w-20" strokeWidth={1.5} />}
     >
       <div className="flow flow-quick-composer flow-create-modal">
         {mode !== "choose" && !followup && (
@@ -60,7 +68,7 @@ export function FlowCreateModal({
             <button onClick={() => setMode("chat")}>
               <MessageSquare />
               <span>
-                <strong>Internal chat</strong>
+                <strong>Message</strong>
                 <small>Teammates, departments or everyone</small>
               </span>
             </button>
@@ -83,19 +91,19 @@ export function FlowCreateModal({
             )}
           </div>
         ) : mode === "chat" ? (
-          <DiscussionPostForm onSuccess={onSaved} />
+          <DiscussionPostForm onSuccess={finish} />
         ) : mode === "update" ? (
           <PostFlowUpdate
             scope={scope}
             compact
             onClose={onClose}
-            onPosted={onSaved}
+            onPosted={finish}
           />
         ) : (
           <FlowInteractionForm
             scope={scope}
             followup={followup}
-            onSaved={onSaved}
+            onSaved={finish}
           />
         )}
       </div>
