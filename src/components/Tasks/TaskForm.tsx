@@ -352,7 +352,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
       showSuccess={showSuccess}
-      successMessage={task ? 'Assignment Updated!' : 'Assignment Created!'}
+      successMessage={task ? 'Assignment Updated!' : supportMode ? 'Support Request Created!' : 'Assignment Created!'}
 
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
