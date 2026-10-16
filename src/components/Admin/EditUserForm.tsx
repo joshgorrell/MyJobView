@@ -880,7 +880,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); contentRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} issues={requiredSetupIssues} />
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); contentRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} requiredSections={isEmployee ? ['profile', 'access', 'pay'] : ['profile', 'access']} issues={requiredSetupIssues} />
         {/* Messages */}
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
