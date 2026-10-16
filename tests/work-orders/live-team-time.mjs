@@ -15,6 +15,9 @@ for (const [label, pattern] of [
   ['break deduction', /Number\(entry\.break_minutes \|\| 0\) \/ 60/],
   ['linked visits included', /\.\.\.linkedWorkOrders\.map\(order => order\.id\)/],
   ['timer refresh cleanup', /clearInterval\(tick\); window\.clearInterval\(poll\)/],
+  ['refresh on browser focus', /window\.addEventListener\('focus', onFocus\)/],
+  ['refresh after reconnect', /window\.addEventListener\('online', onOnline\)/],
+  ['focus listener cleanup', /window\.removeEventListener\('focus', onFocus\)/],
 ]) assert.match(detail, pattern, label);
 assert.match(control, /\.eq\('technician_id',profile\.id\)\.is\('clock_out',null\)/);
 assert.match(control, /start_work_order_time/);
