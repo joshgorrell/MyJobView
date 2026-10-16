@@ -205,7 +205,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const validTabs = ['overview','vip','notes','tasks','materials','time','parts','photos','completion','history','flow'] as const;
   type WorkOrderTab = typeof validTabs[number];
   const requestedTab = new URLSearchParams(window.location.search).get('subtab') as WorkOrderTab | null;
-  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'overview');
+  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'tasks');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -675,9 +675,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   const tabs = [
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
     { id: 'notes', label: 'Notes', icon: FileText },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length + partsUsed.length + materials.length, badge: pendingParts },
-    { id: 'photos', label: 'Photos', icon: Camera, count: jobPhotos.length },
+    { id: 'photos', label: 'Media', icon: Camera, count: jobPhotos.length },
     { id: 'time', label: 'Time', icon: Clock, count: timeEntries.length }
   ];
 
@@ -912,7 +913,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       )}
 
       {/* Work instructions and the actual visit checklist are the primary work-order content. */}
-      <section className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 space-y-3">
+      <section className="bg-white rounded-t-xl border border-gray-200 p-3 sm:p-4 space-y-3">
         <h2 className="text-sm font-semibold text-gray-900">Work Requested</h2>
         {editing ? (
           <textarea
@@ -924,7 +925,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         ) : (
           <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
         )}
-        <div className="border-t border-gray-100 pt-3 space-y-3">
+        <div id="work-order-tasks" className="border-t border-gray-100 pt-3 space-y-3 scroll-mt-24">
           <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
           <WorkOrderTasksChecklist
             workOrderId={workOrderId}
@@ -957,49 +958,47 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         )}
       </section>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 overflow-x-auto">
-        <nav className="flex gap-1 min-w-max">
+      {/* Integrated work-order section navigation; Tasks remains inline beneath Work Requested. */}
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <nav aria-label="Work order sections" className="flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 py-1.5 sm:px-3">
           {tabs.map(tab => {
             const Icon = tab.icon;
+            const selected = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                type="button"
+                aria-current={selected ? 'page' : undefined}
                 onClick={() => {
-                  const nextTab = tab.id as WorkOrderTab;
                   if (activeTab === 'notes' && notesDirtyRef.current) void saveNotesDraft();
-                  setActiveTab(nextTab);
+                  setActiveTab(tab.id as WorkOrderTab);
                   const url = new URL(window.location.href);
-                  if (nextTab === 'overview') url.searchParams.delete('subtab'); else url.searchParams.set('subtab', nextTab);
+                  if (tab.id === 'tasks') url.searchParams.delete('subtab'); else url.searchParams.set('subtab', tab.id);
                   window.history.replaceState({}, '', url.toString());
+                  if (tab.id === 'tasks') document.getElementById('work-order-tasks')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }}
-                className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
-                }`}
+                className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${selected ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white hover:text-gray-900'}`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="h-4 w-4" />
                 {tab.label}
-                {tab.count !== undefined && tab.count > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                    activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {tab.count}
-                  </span>
-                )}
-                {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded-full text-xs font-medium">
-                    {tab.badge}
-                  </span>
-                )}
+                {tab.count !== undefined && tab.count > 0 && <span className="rounded-full bg-gray-100 px-1.5 text-xs text-gray-600">{tab.count}</span>}
+                {tab.badge !== undefined && tab.badge > 0 && <span className="rounded-full bg-orange-100 px-1.5 text-xs text-orange-700">{tab.badge}</span>}
               </button>
             );
           })}
         </nav>
+        <div className="p-3 sm:p-4">
+          {activeTab === 'tasks' && (
+            <div className="space-y-3">
+              <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />
+              {!workOrder.project_id && canEdit && (
+                <ServiceWorkOrderTaskManager workOrderId={workOrderId} workOrderGroupId={workOrder.work_order_group_id || undefined} isGroupWorkOrder={workOrder.is_group_work_order} onTasksChange={loadWorkOrderData} />
+              )}
+            </div>
+          )}
+          {activeTab !== 'tasks' && <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />}
+        </div>
       </div>
-
-      <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />
 
       {/* Tab Content */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
