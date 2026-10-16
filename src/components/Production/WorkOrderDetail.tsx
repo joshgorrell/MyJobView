@@ -642,7 +642,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   useEffect(() => {
     if (workOrder && activeTab === 'vip' && !isVipMaintenance) {
-      setActiveTab('overview');
+      setActiveTab('tasks');
       const url = new URL(window.location.href);
       url.searchParams.delete('subtab');
       window.history.replaceState({}, '', url.toString());
@@ -689,7 +689,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     { id: 'notes', label: 'Notes', icon: FileText },
     { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length + partsUsed.length + materials.length, badge: pendingParts },
     { id: 'photos', label: 'Media', icon: Camera, count: jobPhotos.length },
-    { id: 'time', label: 'Time', icon: Clock, count: timeEntries.length }
+    { id: 'time', label: 'Time', icon: Clock, count: timeEntries.length },
+    { id: 'completion', label: 'Completion', icon: Award, badge: jobCompletion ? 1 : 0 },
+    { id: 'history', label: 'Past Work', icon: History, count: customerHistory.length },
+    { id: 'flow', label: 'Activity', icon: History }
   ];
 
   return (
