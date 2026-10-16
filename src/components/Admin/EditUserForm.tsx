@@ -217,6 +217,16 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     pay_schedule_id: '' as string,
   });
 
+  // Required setup indicators are derived from actual values, never from the manual review checklist.
+  const requiredSetupIssues: Partial<Record<TabKey, string>> = {
+    ...(!formData.full_name.trim() || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(formData.email) || !formData.username.trim()
+      ? { profile: 'Complete the name, username and valid email.' } : {}),
+    ...(!formData.role_id || (classification !== 'employee' && classification !== 'non_employee')
+      ? { access: 'Select a role and employment classification.' } : {}),
+    ...(isEmployee && (!employeeForm.hire_date || !employeeForm.pay_schedule_id)
+      ? { pay: 'Enter the hire date and select a pay schedule.' } : {}),
+  };
+
   // --- Shared state ---
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -794,7 +804,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); contentRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} />
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); contentRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} issues={requiredSetupIssues} />
         {/* Messages */}
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
