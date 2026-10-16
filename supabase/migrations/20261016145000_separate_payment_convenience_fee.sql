@@ -1,9 +1,12 @@
 -- Preserve gross processor charge while accounting for invoice principal separately.
 ALTER TABLE public.payments
   ADD COLUMN IF NOT EXISTS convenience_fee_amount numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE public.payments
-  ADD CONSTRAINT payments_convenience_fee_valid
-  CHECK (convenience_fee_amount >= 0 AND convenience_fee_amount <= amount);
+DO $ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_convenience_fee_valid' AND conrelid = 'public.payments'::regclass) THEN
+  ALTER TABLE public.payments ADD CONSTRAINT payments_convenience_fee_valid
+    CHECK (convenience_fee_amount >= 0 AND convenience_fee_amount <= amount);
+ END IF;
+END $;
 
 CREATE OR REPLACE FUNCTION public.update_invoice_payment_status()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
