@@ -1,3 +1,4 @@
+import { SalesCompensationFields, defaultSalesCompensation, validateSalesCompensation, type SalesCompensationValues } from './SalesCompensationFields';
 import { UserModuleAccess } from './UserModuleAccess';
 import { effectiveModuleAccess, isPermissionModule, permissionLabel, permissionOverridesMap } from '../../lib/permissionCatalog';
 import {
@@ -227,6 +228,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       ? { pay: 'Enter the hire date and select a pay schedule.' } : {}),
   };
 
+  const [salesCompensation, setSalesCompensation] = useState<SalesCompensationValues>(defaultSalesCompensation);
+  const [savedSalesCompensation, setSavedSalesCompensation] = useState<SalesCompensationValues>(defaultSalesCompensation);
+
   // --- Shared state ---
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -239,6 +243,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       loadUserOffices(),
       loadPaySchedules(),
       loadEmployeeData(),
+      loadSalesCompensation(),
       loadDepartments(),
       loadModules(),
     ]).finally(() => setDataLoading(false));
@@ -314,6 +319,28 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       setDataLoadFailed(true);
       setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading pay schedules:', error);
+    }
+  }
+
+  async function loadSalesCompensation() {
+    try {
+      const { data: emp, error: employeeError } = await supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle();
+      if (employeeError) throw employeeError;
+      if (!emp) return;
+      const { data, error } = await supabase.from('sales_compensation_arrangements').select('arrangement_type, base_amount_cents, base_frequency')
+        .eq('employee_id', emp.id).is('effective_to', null).maybeSingle();
+      if (error) throw error;
+      const loaded: SalesCompensationValues = data ? {
+        arrangement: data.arrangement_type as SalesCompensationValues['arrangement'],
+        baseAmount: data.arrangement_type === 'base_plus_commission' ? (data.base_amount_cents / 100).toFixed(2) : '',
+        baseFrequency: (data.base_frequency || 'weekly') as SalesCompensationValues['baseFrequency'],
+      } : defaultSalesCompensation;
+      setSalesCompensation(loaded);
+      setSavedSalesCompensation(loaded);
+    } catch (err) {
+      setDataLoadFailed(true);
+      setError('Unable to load sales compensation. Close and reopen before saving.');
+      console.error('Error loading sales compensation:', err);
     }
   }
 
@@ -547,6 +574,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (!formData.username.trim()) throw new Error('Enter a username on Profile before saving.');
       // Existing incomplete payroll records must not block unrelated profile or permission edits.
       // Never silently discard an attempted payroll change: require the missing setup first.
+      const salesArrangementChanged = JSON.stringify(salesCompensation) !== JSON.stringify(savedSalesCompensation);
+      if (salesArrangementChanged && validateSalesCompensation(salesCompensation)) {
+        setActiveTab('pay');
+        throw new Error(validateSalesCompensation(salesCompensation)!);
+      }
       const payrollIncomplete = isEmployee && (!employeeForm.hire_date || !employeeForm.pay_schedule_id);
       const payrollEdited = isEmployee && (
         (employeeRecord && (
@@ -721,6 +753,35 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           p_reviewed_by: currentUser2?.id,
         });
         if (rpcError) throw new Error(`Non-employee classification failed: ${rpcError.message}`);
+      }
+
+      if (salesArrangementChanged) {
+        const { data: emp, error: empError } = await supabase.from('employees').select('id, organization_id').eq('user_id', user.id).single();
+        if (empError || !emp) throw new Error('Employee record required for sales compensation.');
+        const { data: existing, error: existingError } = await supabase.from('sales_compensation_arrangements')
+          .select('id, effective_from').eq('employee_id', emp.id).is('effective_to', null).maybeSingle();
+        if (existingError) throw existingError;
+        const startDate = new Date().toISOString().slice(0, 10);
+        if (existing) {
+          if (existing.effective_from >= startDate) {
+            const { error: deleteError } = await supabase.from('sales_compensation_arrangements').delete().eq('id', existing.id);
+            if (deleteError) throw deleteError;
+          } else {
+            const priorDay = new Date(Date.parse(startDate + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+            const { error: closeError } = await supabase.from('sales_compensation_arrangements').update({ effective_to: priorDay, updated_by: currentUser2?.id }).eq('id', existing.id);
+            if (closeError) throw closeError;
+          }
+        }
+        if (salesCompensation.arrangement !== 'none') {
+          const { error: insertError } = await supabase.from('sales_compensation_arrangements').insert({
+            organization_id: emp.organization_id, employee_id: emp.id,
+            arrangement_type: salesCompensation.arrangement,
+            base_amount_cents: salesCompensation.arrangement === 'base_plus_commission' ? Math.round(Number(salesCompensation.baseAmount) * 100) : 0,
+            base_frequency: salesCompensation.arrangement === 'base_plus_commission' ? salesCompensation.baseFrequency : null,
+            effective_from: startDate, created_by: currentUser2?.id, updated_by: currentUser2?.id,
+          });
+          if (insertError) throw new Error('Sales compensation save failed: ' + insertError.message);
+        }
       }
 
       await saveSetupReview(
@@ -1515,7 +1576,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         </div>
                       )}
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <SalesCompensationFields value={salesCompensation} onChange={setSalesCompensation} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-1">Hire Date *</label>
                           <input
