@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Upload, FileSpreadsheet, AlertCircle, CheckCircle, X,
-  ArrowRight, ArrowLeft, Trash2, RefreshCw, RotateCcw,
+  ArrowRight, ArrowLeft, RefreshCw, RotateCcw,
   TrendingUp, Users, Calendar, DollarSign, Info, Eye
 } from 'lucide-react';
 
@@ -142,7 +142,7 @@ export function HistoricalSalesImport() {
 
   const [step, setStep] = useState<ImportStep>('upload');
   const [dragging, setDragging] = useState(false);
-  const [fileName, setFileName] = useState('');
+  const [_fileName, setFileName] = useState('');
   const [parseError, setParseError] = useState('');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [repMappings, setRepMappings] = useState<RepMapping[]>([]);
@@ -152,7 +152,7 @@ export function HistoricalSalesImport() {
   const [priorImportBatchId, setPriorImportBatchId] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importing, setImporting] = useState(false);
+  const [_importing, setImporting] = useState(false);
   const [rollbackLoading, setRollbackLoading] = useState(false);
   const [previewPage, setPreviewPage] = useState(0);
 

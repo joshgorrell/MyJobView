@@ -201,7 +201,6 @@ export function TechEfficiencyChart({ startDate, endDate, selectedTech, technici
         return row;
       });
 
-      const slotMap = new Map(slots.map(s => [s.date, s.date]));
 
       await Promise.all(activeTechs.map(async tech => {
         const isSalaryNoClock = tech.employment_type === 'salary_no_clock';
@@ -490,7 +489,7 @@ export function TechEfficiencyChart({ startDate, endDate, selectedTech, technici
               <span className="text-sm font-semibold text-white">Average Efficiency Ranking</span>
             </div>
             <div className="space-y-2">
-              {visibleLeaderboard.map(({ id, avg }, idx) => {
+              {visibleLeaderboard.map(({ id, avg }, _idx) => {
                 const globalRank = leaderboard.findIndex(l => l.id === id);
                 const color = TECH_COLORS[techIds.indexOf(id) % TECH_COLORS.length];
                 const maxAvg = visibleLeaderboard[0]?.avg || 1;

@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  FileText, Download, Calendar, DollarSign, TrendingUp,
+  FileText, Download, Calendar,
   Printer, AlertTriangle, ChevronDown, ChevronUp, Info, MapPin, Building2, BookOpen
 } from 'lucide-react';
 import {
   getTaxApplicability, TaxEnvironment, TaxProjectType,
-  EXEMPTION_CATEGORY_LABELS, ExemptionCategory, STATE_TAX_RULES
-} from '../../lib/taxCalculations';
+  EXEMPTION_CATEGORY_LABELS, ExemptionCategory} from '../../lib/taxCalculations';
 
 // ─────────────────────────────────────────────
 // Shared types

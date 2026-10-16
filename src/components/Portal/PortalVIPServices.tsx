@@ -93,7 +93,7 @@ export function PortalVIPServices({ isEmbedded = false }: { isEmbedded?: boolean
         query = query.eq('status', 'completed');
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.overrideTypes<VIPWorkOrder[], { merge: false }>();
 
       if (error) throw error;
 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, ChevronLeft, BookOpen, Settings, CheckCircle, AlertTriangle, Circle, ArrowLeft } from 'lucide-react';
+import { Search, CheckCircle, Circle, ArrowLeft } from 'lucide-react';
 import StateDetailPanel from './StateDetailPanel';
 
 interface StateIndexRow {
@@ -9,10 +9,6 @@ interface StateIndexRow {
   library_status: 'verified' | 'needs_review' | 'not_researched';
 }
 
-interface NexusRow {
-  state: string;
-  nexus_status: string;
-}
 
 interface Props {
   selectedState?: string | null;

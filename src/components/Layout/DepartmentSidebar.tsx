@@ -1,7 +1,7 @@
 import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
-import { Menu, ChevronDown, ChevronRight, Star, X, Search, ChevronsDownUp, ChevronsUpDown, Pin } from 'lucide-react';
+import { Menu, ChevronRight, Star, X, Search, ChevronsDownUp, ChevronsUpDown, Pin } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useToast } from '../Shared/Toast';

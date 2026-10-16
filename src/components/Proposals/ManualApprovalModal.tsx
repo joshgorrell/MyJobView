@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, Send, Percent, ArrowRight, ClipboardCheck, Mail, CreditCard as Edit2, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -24,7 +25,7 @@ export function ManualApprovalModal({
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successPhase, setSuccessPhase] = useState<'magic' | 'done'>('magic');
-  const [newSalesOrderId, setNewSalesOrderId] = useState<string | null>(null);
+  const [_newSalesOrderId, setNewSalesOrderId] = useState<string | null>(null);
 
   const [acceptanceMethod, setAcceptanceMethod] = useState<'purchase_order' | 'verbal'>('verbal');
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('');
@@ -41,7 +42,7 @@ export function ManualApprovalModal({
   const [paymentTermsSource, setPaymentTermsSource] = useState<'contact' | 'settings' | 'default'>('default');
   const [proposalTotal, setProposalTotal] = useState(0);
   const [contactId, setContactId] = useState<string | null>(null);
-  const [contactName, setContactName] = useState('');
+  const [_contactName, setContactName] = useState('');
   const [contactEmailResolved, setContactEmailResolved] = useState(contactEmail);
   const [editingEmail, setEditingEmail] = useState(false);
   const [emailInput, setEmailInput] = useState(contactEmail);
@@ -209,7 +210,7 @@ export function ManualApprovalModal({
 
   async function handleApprove() {
     if (acceptanceMethod === 'purchase_order' && !purchaseOrderNumber.trim()) {
-      alert('Please enter a purchase order number');
+      notify('Please enter a purchase order number', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -327,13 +328,13 @@ export function ManualApprovalModal({
       console.error('Error approving proposal:', error);
       setShowSuccessAnimation(false);
       setSuccessPhase('magic');
-      alert(error.message || 'Error approving proposal. Please try again.');
+      notify(error.message || 'Error approving proposal. Please try again.', { theme: 'violet', tone: 'error' });
       setSubmitting(false);
     }
   }
 
   const outcome = getOutcomeInfo();
-  const hasModifiers = projectManagementPercent > 0 || systemDesignPercent > 0 || miscPartsPercent > 0;
+
 
   if (showSuccessAnimation) {
     const isMagic = successPhase === 'magic';

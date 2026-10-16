@@ -6,8 +6,6 @@ import {
   Clock,
   MapPin,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   Filter,
   ChevronDown,
   ChevronUp,
@@ -15,11 +13,9 @@ import {
   FileText,
   User,
   Wrench,
-  Calendar,
   AlertTriangle,
   ListTodo,
   ClipboardList,
-  ArrowRight,
   Plus
 } from 'lucide-react';
 import { ContactLogModal } from '../Shared/ContactLogModal';
@@ -145,7 +141,7 @@ export function SalesServiceRequestsView() {
   const [contactLogRefreshKeys, setContactLogRefreshKeys] = useState<Record<string, number>>({});
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
-  const isManager = profile?.role === 'admin' || profile?.role === 'sales_manager' || profile?.role === 'manager';
+  const isManager = profile?.role === 'admin' || profile?.role === 'manager';
 
   useEffect(() => {
     if (profile) loadRequests();
@@ -189,7 +185,7 @@ export function SalesServiceRequestsView() {
         query = query.is('customer_contact_confirmed_at', null);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.overrideTypes<ServiceRequest[], { merge: false }>();
       if (error) throw error;
       setRequests(data || []);
     } catch (error) {

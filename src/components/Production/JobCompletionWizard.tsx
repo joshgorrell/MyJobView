@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { NotesPolishButton } from '../Shared/NotesPolishButton';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -122,7 +123,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Failed to load job completion data');
+      notify('Failed to load job completion data', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -156,8 +157,8 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
     if (isVipMaintenance) {
       const { data: incomplete, error: validationError } = await supabase.rpc('vip_maintenance_incomplete_sections', { p_work_order_id: workOrderId });
-      if (validationError) { alert('Unable to validate VIP Maintenance checklist.'); return; }
-      if (incomplete?.length) { alert(`VIP Maintenance is incomplete: ${incomplete.join(', ')}`); return; }
+      if (validationError) { notify('Unable to validate VIP Maintenance checklist.', { theme: 'blue', tone: 'error' }); return; }
+      if (incomplete?.length) { notify(`VIP Maintenance is incomplete: ${incomplete.join(', ')}`, { theme: 'blue', tone: 'info' }); return; }
     }
 
     setSubmitting(true);
@@ -245,7 +246,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       onComplete();
     } catch (error:any) {
       console.error('Error submitting job completion:', error);
-      alert((error as {message?: string}).message || 'Failed to submit job completion');
+      notify((error as {message?: string}).message || 'Failed to submit job completion', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

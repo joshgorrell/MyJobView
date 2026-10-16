@@ -36,7 +36,7 @@ interface MileageReminder {
 export default function MileageEntryForm() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [mileageEntries, setMileageEntries] = useState<MileageEntry[]>([]);
-  const [reminders, setReminders] = useState<MileageReminder[]>([]);
+  const [_reminders, setReminders] = useState<MileageReminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
@@ -74,7 +74,7 @@ export default function MileageEntryForm() {
             )
           `)
           .eq('user_id', user.id)
-          .eq('is_active', true),
+          .eq('is_active', true).overrideTypes<Assignment[], { merge: false }>(),
         supabase
           .from('mileage_entries')
           .select('*')
@@ -121,7 +121,7 @@ export default function MileageEntryForm() {
     const fileExt = photoFile.name.split('.').pop();
     const fileName = `${userId}/${vehicleId}/${Date.now()}.${fileExt}`;
 
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError, data: _data } = await supabase.storage
       .from('odometer-photos')
       .upload(fileName, photoFile);
 

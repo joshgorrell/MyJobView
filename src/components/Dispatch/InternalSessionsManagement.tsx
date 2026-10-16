@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateInternalSessionModal } from './CreateInternalSessionModal';
@@ -135,7 +136,7 @@ export function InternalSessionsManagement() {
         void supabase.functions.invoke('send-time-request-notification',{body:{sessionId:session.id,direction:'to_tech'}}).catch(()=>{});
       }
       await loadSessions();return true;
-    } catch(error:any) {alert(error.message||'Unable to review session');return false;}
+    } catch(error:any) {notify(error.message||'Unable to review session', { theme: 'blue', tone: 'error' });return false;}
     finally {setApprovingId(null);}
   }
   async function completeWithPredetermined(session: InternalSession) {await reviewSession(session,'complete');}
@@ -156,7 +157,7 @@ export function InternalSessionsManagement() {
       if (error) throw error;
       loadSessions();
     } catch (err: any) {
-      alert(err.message || 'Failed to cancel');
+      notify(err.message || 'Failed to cancel', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -170,7 +171,7 @@ export function InternalSessionsManagement() {
       if (error) throw error;
       setSessions(prev => prev.filter(s => s.id !== session.id));
     } catch (err: any) {
-      alert(err.message || 'Failed to delete');
+      notify(err.message || 'Failed to delete', { theme: 'blue', tone: 'error' });
     } finally {
       setDeletingId(null);
     }

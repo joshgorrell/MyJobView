@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -144,7 +145,7 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
     if (!selectedFile) return;
 
     if (!selectedFile.name.endsWith('.csv')) {
-      alert('Please upload a CSV file');
+      notify('Please upload a CSV file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -219,7 +220,7 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
 
     const validation = validateMapping(mapping, 'daily_time');
     if (!validation.isValid) {
-      alert(`Missing required field mappings:\n\n${validation.errors.join('\n')}\n\nPlease map all required fields before continuing.`);
+      notify(`Missing required field mappings:\n\n${validation.errors.join('\n')}\n\nPlease map all required fields before continuing.`, { theme: 'blue', tone: 'error' });
       return;
     }
 
@@ -498,7 +499,7 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
 
     const validRows = results.filter(r => r.valid && !r.skipped && r.matchedEmployee);
     if (validRows.length === 0) {
-      alert('No valid rows to import');
+      notify('No valid rows to import', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -575,7 +576,7 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
       setImportStats({ success: successCount, failed: failCount, batchId, errors: importErrors });
       setStep('complete');
     } catch (err: any) {
-      alert(`Import failed: ${err.message}`);
+      notify(`Import failed: ${err.message}`, { theme: 'blue', tone: 'error' });
     } finally {
       setImporting(false);
     }
@@ -611,7 +612,7 @@ export function TimeClockCSVImport({ onClose, onImportComplete }: { onClose: () 
         .update({ rollback_at: new Date().toISOString(), status: 'rolled_back' })
         .eq('batch_id', batchId);
 
-      alert('Import rolled back successfully');
+      notify('Import rolled back successfully', { theme: 'blue', tone: 'success' });
       await loadHistory();
     }
   };

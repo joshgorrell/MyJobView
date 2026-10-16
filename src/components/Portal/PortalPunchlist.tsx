@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { punchlistDescription } from '../../lib/punchlist';
 import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect, useRef } from 'react';
@@ -11,34 +12,26 @@ import {
   AlertCircle,
   Star,
   Calendar,
-  TrendingUp,
   CheckCircle2,
   MessageSquare,
   Eye,
   EyeOff,
-  GripVertical,
-  Save,
   Send,
   X,
-  Image as ImageIcon,
   Trash2,
   Camera,
   Upload,
   ExternalLink,
   ArrowLeft,
   LogOut,
-  Phone,
   Mail,
   Sparkles,
   ChevronDown,
   ChevronUp,
   Search,
-  Filter,
-  SlidersHorizontal,
   HelpCircle,
   RotateCcw
 } from 'lucide-react';
-import { FileUploadZone } from '../FileUpload/FileUploadZone';
 import { CameraCapture } from '../Contacts/CameraCapture';
 import { TrialStatusBanner } from './TrialStatusBanner';
 import { PunchlistTaskDetailModal } from './PunchlistTaskDetailModal';
@@ -118,14 +111,14 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'requested' | 'scheduled' | 'completed'>('all');
-  const [filterTimeframe, setFilterTimeframe] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [filterTimeframe, _setFilterTimeframe] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [showHelp, setShowHelp] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [requestingService, setRequestingService] = useState(false);
   const [detailTask, setDetailTask] = useState<PunchlistTask | null>(null);
-  const [appUrl, setAppUrl] = useState<string>('https://myjobview.com');
+  const [_appUrl, setAppUrl] = useState<string>('https://myjobview.com');
 
   const [newTask, setNewTask] = useState({
     details: '',
@@ -290,7 +283,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
     const orgId = contactOrgId || user?.app_metadata?.organization_id || null;
     if (!orgId) {
-      alert('Unable to determine your organization. Please refresh and try again.');
+      notify('Unable to determine your organization. Please refresh and try again.', { theme: 'blue', tone: 'error' });
       return;
     }
 
@@ -321,7 +314,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error ? String((error as {message: unknown}).message) : String(error));
       console.error('Error creating task:', error);
-      alert(`Failed to create task: ${msg}`);
+      notify(`Failed to create task: ${msg}`, { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -330,7 +323,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -383,7 +376,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     const timer = saveTimers.current.get(taskId);
     if (timer) clearTimeout(timer);
     saveTimers.current.set(taskId, setTimeout(() => {
-      savePendingTask(taskId).catch(() => alert('Your edit could not be saved. Please try again.'));
+      savePendingTask(taskId).catch(() => notify('Your edit could not be saved. Please try again.', { theme: 'blue', tone: 'error' }));
     }, 1000));
   }
 
@@ -405,7 +398,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       if (contactId) loadTasks(contactId);
     } catch (error) {
       console.error('Error deleting task:', error);
-      alert((error as { message?: string }).message || 'This item could not be removed. Please contact your service manager.');
+      notify((error as { message?: string }).message || 'This item could not be removed. Please contact your service manager.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -442,7 +435,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       setShowCamera(null);
     } catch (error: any) {
       console.error('Error uploading photo:', error);
-      alert(`Failed to upload photo: ${error.message}`);
+      notify(`Failed to upload photo: ${error.message}`, { theme: 'blue', tone: 'error' });
     } finally {
       setUploadingPhoto(null);
     }
@@ -482,7 +475,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       if (contactId) loadTasks(contactId);
     } catch (error) {
       console.error('Error deleting photo:', error);
-      alert('Failed to delete photo');
+      notify('Failed to delete photo', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -495,7 +488,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       : tasks.filter(t => t.status === 'draft');
 
     if (tasksToSubmit.length === 0) {
-      alert('No unrequested items available to submit.');
+      notify('No unrequested items available to submit.', { theme: 'blue', tone: 'info' });
       return;
     }
 
@@ -519,12 +512,12 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
 
           if (error) throw error;
 
-          alert('Service requested successfully! Our team has been notified and will contact you soon.');
+          notify('Service requested successfully! Our team has been notified and will contact you soon.', { theme: 'blue', tone: 'success' });
           setSelectedTaskIds(new Set());
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error requesting service:', error);
-          alert(`Failed to request service: ${error.message || 'Unknown error'}`);
+          notify(`Failed to request service: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
         } finally {
           setRequestingService(false);
         }
@@ -549,7 +542,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error) {
           console.error('Error marking complete:', error);
-          alert('Failed to mark task as complete');
+          notify('Failed to mark task as complete', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -559,7 +552,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
     const hasWorkOrder = task.service_request?.work_order_id || task.work_order_id;
 
     if (hasWorkOrder) {
-      alert('This task already has a work order assigned — it cannot be cancelled at this stage. Please contact us if you need to make changes.');
+      notify('This task already has a work order assigned — it cannot be cancelled at this stage. Please contact us if you need to make changes.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -575,7 +568,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error cancelling service request:', error);
-          alert(`Failed to cancel service request: ${error.message || 'Unknown error'}`);
+          notify(`Failed to cancel service request: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -598,7 +591,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error deleting task:', error);
-          alert(`Failed to delete task: ${error.message || 'Unknown error'}`);
+          notify(`Failed to delete task: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -617,7 +610,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error) {
           console.error('Error reopening task:', error);
-          alert('Failed to reopen task');
+          notify('Failed to reopen task', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -837,7 +830,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         </div>
       )}
 
-      {['test_and_tune','vip_trial','promotional'].includes(accessInfo.access_type || '') && accessInfo.days_remaining !== null && accessInfo.expiration_date && (
+      {accessInfo && ['test_and_tune','vip_trial','promotional'].includes(accessInfo.access_type || '') && accessInfo.days_remaining !== null && accessInfo.expiration_date && (
         <TrialStatusBanner
           program={accessInfo.access_type==='test_and_tune'?'test_and_tune':'vip_trial'}
           daysRemaining={accessInfo.days_remaining}
@@ -848,7 +841,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         />
       )}
 
-      {accessInfo.access_type === 'vip_membership' && (
+      {accessInfo?.access_type === 'vip_membership' && (
         <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-300 rounded-lg p-2.5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-yellow-200 rounded-full flex items-center justify-center">
@@ -1500,7 +1493,6 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                         {task.details && <p className="text-sm text-gray-500">{task.details}</p>}
 
 
-
                         {task.service_request?.work_order && (
                           <a
                             href={`/work-order/${task.service_request.work_order.id}`}
@@ -1646,7 +1638,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <p className="text-sm font-medium text-gray-700 mb-1">Your Current Access:</p>
                   <p className="text-base font-bold text-gray-900 capitalize">
-                    {accessInfo.access_type === 'vip_membership' && 'VIP Membership'}
+                    {accessInfo?.access_type === 'vip_membership' && 'VIP Membership'}
                     {accessInfo.access_type === 'test_and_tune' && 'Test & Tune Program'}
                     {accessInfo.access_type === 'test_and_tune_no_portal' && 'Test & Tune (No Portal)'}
                   </p>
@@ -1836,14 +1828,14 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{timeGreeting}, {displayName}!</h2>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {accessInfo.access_type === 'vip_membership'
+                  {accessInfo?.access_type === 'vip_membership'
                     ? `Welcome back, VIP Member${accessInfo.subscription_plan_name ? ` — ${accessInfo.subscription_plan_name}` : ''}`
                     : accessInfo.access_type === 'test_and_tune' && accessInfo.days_remaining !== null
                     ? `You have ${accessInfo.days_remaining} day${accessInfo.days_remaining !== 1 ? 's' : ''} remaining in your Test & Tune trial`
                     : 'Here are your service items'}
                 </p>
               </div>
-              {accessInfo.access_type === 'vip_membership' && (
+              {accessInfo?.access_type === 'vip_membership' && (
                 <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <Star className="w-5 h-5 text-yellow-600 fill-yellow-500" />
                 </div>

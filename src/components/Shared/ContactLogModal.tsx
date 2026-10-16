@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { X, Phone, MessageSquare, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -100,6 +101,7 @@ export function ContactLogModal({ workOrderId, serviceRequestId, customerName, o
       }
 
       window.dispatchEvent(new CustomEvent(NO_CONTACT_UPDATED_EVENT));
+      notify('Contact activity logged!', { theme: 'cyan', tone: 'success' });
       onSaved();
       onClose();
     } catch (err: any) {

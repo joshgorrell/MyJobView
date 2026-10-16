@@ -127,7 +127,6 @@ export function SalesOrderProductDetailModal({
         isTaxable: false,
         isHidden: false,
         isCustomerSupplied: false,
-        isLaborItem: false,
       });
       setLoading(false);
       return;
@@ -189,8 +188,7 @@ export function SalesOrderProductDetailModal({
           isTaxable: false,
           isHidden: false,
           isCustomerSupplied: false,
-          isLaborItem: false,
-        });
+          });
         return;
       }
 
@@ -239,7 +237,6 @@ export function SalesOrderProductDetailModal({
         isTaxable: false,
         isHidden: false,
         isCustomerSupplied: false,
-        isLaborItem: false,
       });
     } catch (err) {
       console.error('Error loading product:', err);

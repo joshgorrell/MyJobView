@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import {useWorkOrderOptions} from '../../lib/workOrderOptions';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -437,7 +438,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       setSearchResults(data || []);
     } catch (error: any) {
       console.error('Error searching contacts:', error);
-      alert(`Error searching contacts: ${error?.message || 'Please try again.'}`);
+      notify(`Error searching contacts: ${error?.message || 'Please try again.'}`, { theme: 'blue', tone: 'error' });
       setSearchResults([]);
     } finally {
       setSearching(false);
@@ -679,7 +680,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
   function addTask() {
     if (!newTaskTitle.trim()) {
-      alert('Please enter a task title');
+      notify('Please enter a task title', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -817,11 +818,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       }
 
 
+      notify('Work order created!', { theme: 'blue', tone: 'success' });
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Error creating work order:', error);
-      alert(`Failed to create work order: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to create work order: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
       submitting.current = false;
       setLoading(false);

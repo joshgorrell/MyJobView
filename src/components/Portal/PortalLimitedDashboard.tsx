@@ -19,7 +19,7 @@ export function PortalLimitedDashboard({onOpenInvoices, onOpenMessages}:{onOpenI
   const [proposals, setProposals] = useState<ProposalTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactName, setContactName] = useState('');
-  const [contactId, setContactId] = useState<string | null>(null);
+  const [_contactId, setContactId] = useState<string | null>(null);
   const [proposalsEnabled, setProposalsEnabled] = useState(true);
 
   useEffect(() => {

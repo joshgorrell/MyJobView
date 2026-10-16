@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Save, Eye, Copy, Share2, Edit3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -158,12 +159,12 @@ export function UserBusinessCardEditor() {
     if (!file || !user) return;
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      alert('Please select a JPG, PNG, or WebP image');
+      notify('Please select a JPG, PNG, or WebP image', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      notify('File size must be less than 5MB', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -188,7 +189,7 @@ export function UserBusinessCardEditor() {
       setPhotoUrl(publicUrl);
     } catch (error) {
       console.error('Error uploading photo:', error);
-      alert('Failed to upload photo');
+      notify('Failed to upload photo', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -257,7 +258,7 @@ export function UserBusinessCardEditor() {
       setShareMessage('Business card saved');
     } catch (error) {
       console.error('Error saving card:', error);
-      alert('Failed to save business card');
+      notify('Failed to save business card', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

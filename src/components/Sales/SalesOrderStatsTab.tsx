@@ -173,7 +173,7 @@ export function SalesOrderStatsTab({ order, changeOrders }: SalesOrderStatsTabPr
   const laborProfit = laborRevenue - laborCost;
   const laborMargin = laborRevenue > 0 ? (laborProfit / laborRevenue) * 100 : 0;
 
-  const coRevenue = stats.coLineItems.reduce((s, li) => s + (li.total_price || 0), 0);
+
   const coLaborRevenue = stats.coLineItems.reduce((s, li) => s + (li.labor_total || 0), 0);
 
   const approvedCOs = changeOrders.filter(co => co.status === 'approved');
@@ -530,7 +530,7 @@ function MetricCard({ label, value, icon: Icon, color }: {
   );
 }
 
-function ProfitSection({ title, icon: Icon, revenue, cost, profit, margin, goal, details }: {
+function ProfitSection({ title, icon: Icon, revenue: _revenue, cost: _cost, profit: _profit, margin, goal, details }: {
   title: string;
   icon: typeof Package;
   revenue: number;

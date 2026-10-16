@@ -289,7 +289,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                   ? new Date(order.proposal.approved_at).toLocaleDateString()
                   : null;
                 const displayDate = approvedAt || new Date(order.created_at).toLocaleDateString();
-                const dateLabel = approvedAt ? 'Approved' : 'Created';
+
                 const repName = order.sales_rep?.full_name || order.created_by_name;
                 const balanceDue = getBalanceDue(order);
 

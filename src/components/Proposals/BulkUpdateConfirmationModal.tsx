@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, DollarSign, Package, Layers } from 'lucide-react';
 
 interface BulkUpdateConfirmationModalProps {

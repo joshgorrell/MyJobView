@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Search, CreditCard as Edit2, Trash2, Star, MapPin, Key, Save, ExternalLink, Hash, Globe, Info, CheckCircle, AlertTriangle, BookOpen, Building2 } from 'lucide-react';
@@ -88,7 +89,7 @@ export default function TaxRateManagement() {
       loadJurisdictions();
     } catch (error) {
       console.error('Error deleting jurisdiction:', error);
-      alert('Failed to delete tax jurisdiction.');
+      notify('Failed to delete tax jurisdiction.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -146,11 +147,11 @@ export default function TaxRateManagement() {
 
       if (error) throw error;
       setApiKeyUpdatedAt(taxjarApiKey ? nowIso : null);
-      alert('TaxJar API key saved successfully!');
+      notify('TaxJar API key saved successfully!', { theme: 'blue', tone: 'success' });
       setShowApiKeySettings(false);
     } catch (error) {
       console.error('Error saving API key:', error);
-      alert('Failed to save API key');
+      notify('Failed to save API key', { theme: 'blue', tone: 'error' });
     } finally {
       setSavingApiKey(false);
     }
@@ -208,10 +209,10 @@ export default function TaxRateManagement() {
       }
 
       setShowNexusSettings(false);
-      alert('Nexus states saved. The tax engine will now use these states for collection status.');
+      notify('Nexus states saved. The tax engine will now use these states for collection status.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error saving nexus states:', error);
-      alert('Failed to save nexus states');
+      notify('Failed to save nexus states', { theme: 'blue', tone: 'error' });
     } finally {
       setSavingNexus(false);
     }
@@ -231,13 +232,13 @@ export default function TaxRateManagement() {
       });
       const data = await response.json();
       if (!response.ok || data.error) {
-        alert(`TaxJar connection failed: ${data.error || response.statusText}`);
+        notify(`TaxJar connection failed: ${data.error || response.statusText}`, { theme: 'blue', tone: 'error' });
       } else {
-        alert('TaxJar connection successful!');
+        notify('TaxJar connection successful!', { theme: 'blue', tone: 'success' });
       }
     } catch (error: any) {
       console.error('Error testing TaxJar API:', error);
-      alert(`Failed to test TaxJar connection: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to test TaxJar connection: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
       setTestingApiKey(false);
     }
@@ -253,12 +254,12 @@ export default function TaxRateManagement() {
         setEditingJurisdiction(result);
         setShowAddModal(true);
       } else {
-        alert('Could not find tax rate for this zip code. Please enter manually.');
+        notify('Could not find tax rate for this zip code. Please enter manually.', { theme: 'blue', tone: 'error' });
       }
     } catch (error: any) {
       console.error('Error looking up tax rate:', error);
       const errorMessage = error?.message || 'Failed to lookup tax rate. Please try again or enter manually.';
-      alert(errorMessage);
+      notify(errorMessage, { theme: 'blue', tone: 'error' });
     } finally {
       setLookingUp(false);
     }
@@ -370,7 +371,7 @@ export default function TaxRateManagement() {
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-5">
             {allStates.map(({ state_code: code, state_name: name, library_status }) => {
               const isActive = nexusStates.includes(code);
-              const hasRule = !!STATE_TAX_RULES[code];
+
               const isVerified = library_status === 'verified';
               return (
                 <label
@@ -518,7 +519,7 @@ export default function TaxRateManagement() {
                 if (error) throw error;
               } catch (error) {
                 console.error('Error saving tax origin method:', error);
-                alert('Failed to save tax origin setting');
+                notify('Failed to save tax origin setting', { theme: 'blue', tone: 'error' });
               } finally {
                 setSavingTaxOrigin(false);
               }
@@ -928,7 +929,7 @@ export default function TaxRateManagement() {
                         <button
                           onClick={() => {
                             if (jurisdiction.is_default) {
-                              alert('Cannot delete the default tax jurisdiction.');
+                              notify('Cannot delete the default tax jurisdiction.', { theme: 'blue', tone: 'warning' });
                               return;
                             }
                             setConfirmDeleteId(jurisdiction.id);
@@ -1040,7 +1041,7 @@ function JurisdictionModal({
       onSave();
     } catch (error) {
       console.error('Error saving jurisdiction:', error);
-      alert('Failed to save tax jurisdiction.');
+      notify('Failed to save tax jurisdiction.', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

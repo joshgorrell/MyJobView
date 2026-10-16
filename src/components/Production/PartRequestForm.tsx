@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Camera, Package, AlertCircle, DollarSign, Upload, X } from 'lucide-react';
@@ -51,12 +52,12 @@ export function PartRequestForm({ workOrderId, projectId, onSuccess, onCancel }:
     if (!profile) return;
 
     if (!formData.part_name.trim()) {
-      alert('Please enter part name');
+      notify('Please enter part name', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!formData.reason.trim()) {
-      alert('Please explain why this part is needed');
+      notify('Please explain why this part is needed', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -125,7 +126,7 @@ export function PartRequestForm({ workOrderId, projectId, onSuccess, onCancel }:
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error('Error submitting parts request:', error);
-      alert('Failed to submit parts request');
+      notify('Failed to submit parts request', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

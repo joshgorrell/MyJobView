@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle, XCircle, DollarSign, Calendar, User, FileText, Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, DollarSign, User, FileText, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 
@@ -109,7 +110,7 @@ export function ContractCancellationQueue() {
       loadCancellations();
     } catch (error) {
       console.error('Error updating cancellation:', error);
-      alert('Failed to update cancellation status');
+      notify('Failed to update cancellation status', { theme: 'emerald', tone: 'error' });
     } finally {
       setProcessing(false);
     }

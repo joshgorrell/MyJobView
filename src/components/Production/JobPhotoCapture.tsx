@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Camera, Upload, X, Image as ImageIcon, MapPin } from 'lucide-react';
@@ -158,7 +159,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
       onComplete?.();
     } catch (error) {
       console.error('Error uploading photos:', error);
-      alert('Failed to upload photos');
+      notify('Failed to upload photos', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
     }

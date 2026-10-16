@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { CalendarDays, Check, Copy, Download, Globe, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -27,7 +28,7 @@ export function ReactivateProposalModal({
 
   useEffect(() => {
     let mounted = true;
-    supabase.from('proposals').select('organization_id').eq('id', proposalId).single()
+    Promise.resolve(supabase.from('proposals').select('organization_id').eq('id', proposalId).single())
       .then(async ({ data, error }) => {
         if (error || !data?.organization_id) throw error || new Error('Organization not found');
         const result = await supabase.from('organizations').select('proposal_approval_days').eq('id', data.organization_id).single();
@@ -66,7 +67,8 @@ export function ReactivateProposalModal({
         if (error) throw error;
       }
       setPortalVisible(makeVisible);
-      await onSuccess();
+      await notify('Proposal reactivated!', { theme: 'violet', tone: 'success' });
+      onSuccess();
       if (copyAfter) {
         const { data, error: linkError } = await supabase.functions.invoke('manage-proposal-share-link', {
           body: { proposalId, action: 'create' },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProposalRoom, ProposalLineItem, Product, ProposalWithDetails } from '../../lib/types';
@@ -18,7 +18,7 @@ interface ProposalBuilderEnhancedProps {
 type LayoutMode = 'standard' | 'condensed' | 'all-rooms';
 
 export default function ProposalBuilderEnhanced({ proposalId, onSave }: ProposalBuilderEnhancedProps) {
-  const { profile } = useAuth();
+  const { profile: _profile } = useAuth();
   const [proposal, setProposal] = useState<ProposalWithDetails | null>(null);
   const [rooms, setRooms] = useState<(ProposalRoom & { line_items: ProposalLineItem[]; expanded: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,21 +186,21 @@ export default function ProposalBuilderEnhanced({ proposalId, onSave }: Proposal
     }
   }
 
-  async function addLineItem(roomId: string, product: Product, customData?: Partial<ProposalLineItem>) {
+  async function addLineItem(roomId: string, product: Product | null, customData?: Partial<Pick<Product, 'description' | 'unit' | 'unit_price' | 'cost'>> & { quantity?: number }) {
     if (!proposal) return;
 
     const newItem: any = {
       proposal_id: proposalId,
       room_id: roomId,
-      product_id: product.id,
-      description: customData?.description || product.name || '',
+      product_id: product?.id ?? null,
+      description: customData?.description || product?.name || '',
       quantity: customData?.quantity || 1,
-      unit: customData?.unit || product.unit || 'each',
-      unit_price: customData?.unit_price || product.unit_price || 0,
-      cost: customData?.cost || product.cost || 0,
+      unit: customData?.unit || product?.unit || 'each',
+      unit_price: customData?.unit_price || product?.unit_price || 0,
+      cost: customData?.cost || product?.cost || 0,
       line_total: 0,
       sort_order: rooms.find(r => r.id === roomId)?.line_items.length || 0,
-      is_custom: false
+      is_custom: !product
     };
 
     newItem.line_total = newItem.quantity * newItem.unit_price;
@@ -456,8 +456,8 @@ export default function ProposalBuilderEnhanced({ proposalId, onSave }: Proposal
       {/* Product Selector Modal */}
       {showProductSelector && productSelectorRoomId && (
         <ProductSelector
-          onSelect={(product) => {
-            addLineItem(productSelectorRoomId, product);
+          onSelect={(product, customData) => {
+            addLineItem(productSelectorRoomId, product, customData);
             setShowProductSelector(false);
             setProductSelectorRoomId(null);
           }}

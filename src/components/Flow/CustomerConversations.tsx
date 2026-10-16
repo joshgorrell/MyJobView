@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, AlertCircle, HelpCircle } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -471,7 +472,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
       if (activeThreadId.current === selectedThread.id) setPendingAttachment({ url: urlData.publicUrl, preview: resolved.attachment_url || undefined, type: 'image' });
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image. Please try again.');
+      notify('Failed to upload image. Please try again.', { theme: 'cyan', tone: 'error' });
     } finally {
       setUploading(false);
     }
@@ -521,7 +522,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
       await loadThreads();
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message');
+      notify('Failed to send message', { theme: 'cyan', tone: 'error' });
     } finally {
       setSending(false);
     }
@@ -529,7 +530,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
   async function handleCreateThread() {
     if (!newThreadForm.subject.trim() || !(newThreadForm.context_id || (newThreadForm.context_type === 'contact' && newThreadForm.contact_id)) || !newThreadForm.first_message.trim() || !profile) {
-      alert('Please fill in all fields');
+      notify('Please fill in all fields', { theme: 'cyan', tone: 'warning' });
       return;
     }
 
@@ -600,7 +601,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
     } catch (error) {
       console.error('Error creating thread:', error);
-      alert('Failed to create thread');
+      notify('Failed to create thread', { theme: 'cyan', tone: 'error' });
     } finally {
       setSending(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { SecurityActivationDates } from './SecurityActivationDates';
 import SecurityContractReviewFields from './SecurityContractReviewFields';
 import { sendSecurityInvitation, staffSecurityOnboarding } from '../../lib/securityOnboarding';
@@ -91,7 +92,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
       } : data);
     } catch (error) {
       console.error('Error loading contract details:', error);
-      alert('Failed to load contract details');
+      notify('Failed to load contract details', { theme: 'emerald', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -102,46 +103,46 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
     try {
       await sendSecurityInvitation(resolvedContractId);
 
-      alert('Invitation sent successfully!');
+      notify('Invitation sent successfully!', { theme: 'emerald', tone: 'success' });
       onUpdate?.();
       onClose();
     } catch (error: any) {
       console.error('Error sending invitation:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
-      alert(`Failed to send invitation: ${errorMessage}`);
+      notify(`Failed to send invitation: ${errorMessage}`, { theme: 'emerald', tone: 'error' });
     } finally {
       setSending(false);
     }
   }
 
   async function handleApprove() {
-    if (editingReview) { alert('Save or cancel the field edit before approval.'); return; }
+    if (editingReview) { notify('Save or cancel the field edit before approval.', { theme: 'emerald', tone: 'info' }); return; }
     setApproving(true);
     try {
       await staffSecurityOnboarding('approve', resolvedContractId, { revision: contractData.onboarding_revision || 0 });
 
-      alert('Contract approved!');
+      notify('Contract approved!', { theme: 'emerald', tone: 'info' });
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error approving contract:', error);
-      alert(error instanceof Error ? error.message : 'Failed to approve contract');
+      notify(error instanceof Error ? error.message : 'Failed to approve contract', { theme: 'emerald', tone: 'error' });
     } finally {
       setApproving(false);
     }
   }
 
   async function handleActivate() {
-    if (editingReview) { alert('Save or cancel the field edit before activation.'); return; }
+    if (editingReview) { notify('Save or cancel the field edit before activation.', { theme: 'emerald', tone: 'info' }); return; }
     try {
       await staffSecurityOnboarding('activate', resolvedContractId, { revision: contractData.onboarding_revision || 0, monitoring_start_date: monitoringStartDate, first_payment_date: firstPaymentDate });
 
-      alert('Contract activated!');
+      notify('Contract activated!', { theme: 'emerald', tone: 'info' });
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error activating contract:', error);
-      alert(error instanceof Error ? error.message : 'Failed to activate contract');
+      notify(error instanceof Error ? error.message : 'Failed to activate contract', { theme: 'emerald', tone: 'error' });
     }
   }
 
@@ -154,12 +155,12 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
       if (error) throw error;
 
-      alert('Contract deleted permanently');
+      notify('Contract deleted permanently', { theme: 'emerald', tone: 'info' });
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error deleting contract:', error);
-      alert('Failed to delete contract');
+      notify('Failed to delete contract', { theme: 'emerald', tone: 'error' });
     } finally {
       setShowDeleteConfirm(false);
     }
@@ -167,7 +168,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
   async function handleCancel() {
     if (!cancellationReason.trim()) {
-      alert('Please provide a cancellation reason');
+      notify('Please provide a cancellation reason', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -189,12 +190,12 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
       if (error) throw error;
 
-      alert(immediateCancel ? 'Contract cancelled immediately' : `Contract scheduled to cancel on ${finalBillingDate}`);
+      notify(immediateCancel ? 'Contract cancelled immediately' : `Contract scheduled to cancel on ${finalBillingDate}`, { theme: 'emerald', tone: 'info' });
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Error cancelling contract:', error);
-      alert('Failed to cancel contract');
+      notify('Failed to cancel contract', { theme: 'emerald', tone: 'error' });
     } finally {
       setShowCancelModal(false);
     }
@@ -206,7 +207,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
       const doc = d.onboarding_agreement_snapshot;
       const terms = readableAgreementTerms(doc.template?.contract_terms || '').replace(/\[term\]/g, `${doc.term_months} months`);
       try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date, undefined, {start_date:d.monitoring_start_date || null,first_payment_date:d.first_payment_date || null})); }
-      catch (error) { alert(error instanceof Error ? error.message : 'Could not print the agreement.'); }
+      catch (error) { notify(error instanceof Error ? error.message : 'Could not print the agreement.', { theme: 'emerald', tone: 'error' }); }
       return;
     }
     const doc = {
@@ -219,7 +220,7 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
     };
     const terms = readableAgreementTerms(d.template?.contract_terms || '').replace(/\[term\]/g, `${d.term_months} months`);
     try { printSecurityAgreement(securityAgreementHtml(doc, terms, undefined, d.customer_signature, d.customer_signature_date, undefined, {start_date:d.monitoring_start_date || null,first_payment_date:d.first_payment_date || null})); }
-    catch (error) { alert(error instanceof Error ? error.message : 'Could not print the agreement.'); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Could not print the agreement.', { theme: 'emerald', tone: 'error' }); }
   }
 
   if (loading) {

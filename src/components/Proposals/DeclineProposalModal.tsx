@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState } from 'react';
 import { X, XCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -80,14 +81,15 @@ export function DeclineProposalModal({
       if (updateError) throw updateError;
 
       // Log activity
-      await supabase.from('proposal_activity').insert({
+      await Promise.resolve(supabase.from('proposal_activity').insert({
         proposal_id: proposalId,
         activity_type: newStatus,
         metadata: { reason, notes: notes.trim() || null, by: 'rep' },
-      }).throwOnError().catch(() => {
+      }).throwOnError()).catch(() => {
         // Non-fatal if activity log fails
       });
 
+      notify('Proposal marked declined.', { theme: 'violet', tone: 'info' });
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to update proposal. Please try again.');

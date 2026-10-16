@@ -1,6 +1,6 @@
 import { WorkOrderSettings } from './WorkOrderSettings';
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Settings as SettingsIcon, Users, Building2, CreditCard, Plug, Lightbulb, Package, Award, Flag, Mail, Shield, Menu, Lock, Receipt, Layers, FileText, Clock, Wrench, Tags, AlertCircle, Activity, Megaphone, MapPin, Target, Monitor, Upload } from 'lucide-react';
+import { Settings as SettingsIcon, Users, Building2, CreditCard, Plug, Lightbulb, Package, Award, Flag, Mail, Shield, Lock, Receipt, Layers, FileText, Clock, Wrench, Tags, AlertCircle, Activity, Megaphone, MapPin, Target, Monitor, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const UserManagement = lazy(() => import('./UserManagement').then(m => ({ default: m.UserManagement })));
@@ -39,10 +39,11 @@ function SettingsLoadingFallback() {
 }
 
 export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNavigate?: (tab: string) => void } = {}) {
-  const { jobModuleEnabled, profile } = useAuth();
+  const { companySettings, profile } = useAuth();
+  const jobModuleEnabled = companySettings?.job_module_enabled ?? false;
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
-  type SettingsTab = 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders';
-  const validTabs: SettingsTab[] = ['users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders'];
+  type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders';
+  const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders'];
   const getTabFromUrl = (): SettingsTab => {
     const tab = new URLSearchParams(window.location.search).get('settingsTab') as SettingsTab | null;
     return tab && validTabs.includes(tab) ? tab : ((initialTab as SettingsTab) || 'users');

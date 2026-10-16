@@ -1,7 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
-import { X, Upload, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
+import { X, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { offlineSupabaseUpdate } from '../../lib/offlineSupport';
 
@@ -53,7 +54,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
           contact:contacts(email)
         `)
         .eq('id', workOrderId)
-        .maybeSingle();
+        .maybeSingle().overrideTypes<{ type: string; contact: { email: string | null } | null }, { merge: false }>();
 
       if (error) throw error;
 
@@ -147,7 +148,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
           const fileExt = photo.name.split('.').pop();
           const fileName = `${workOrderId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-          const { error: uploadError, data: uploadData } = await supabase.storage
+          const { error: uploadError, data: _uploadData } = await supabase.storage
             .from('job-photos')
             .upload(fileName, photo);
 
@@ -212,7 +213,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
 
       // Show offline notification if applicable
       if (!navigator.onLine) {
-        alert('You clocked out offline. Your data will sync when you reconnect. Photos will be uploaded when online.');
+        notify('You clocked out offline. Your data will sync when you reconnect. Photos will be uploaded when online.', { theme: 'blue', tone: 'info' });
       }
 
       onSuccess();

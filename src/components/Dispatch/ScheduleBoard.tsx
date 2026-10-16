@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { requestConfirmation } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, User, MapPin, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { CreateAppointmentModal } from '../Appointments/CreateAppointmentModal';
@@ -90,7 +91,7 @@ export function ScheduleBoard() {
           `)
           .eq('is_technician', true)
           .eq('is_active', true)
-          .order('full_name')
+          .order('full_name').overrideTypes<Technician[], { merge: false }>()
       ]);
 
       if (appointmentsRes.data) setAppointments(appointmentsRes.data);
@@ -148,7 +149,7 @@ export function ScheduleBoard() {
       );
 
       if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+        if (!(await requestConfirmation('Scheduling conflict detected. Proceed anyway?', { theme: 'blue' }))) {
           return;
         }
         await rescheduleAppointment(draggedAppointment, newDate, apt.start_time, apt.end_time, newTech, { force: true });
@@ -171,7 +172,7 @@ export function ScheduleBoard() {
     );
   }
 
-  const timeSlots = Array.from({ length: 12 }, (_, i) => i + 7); // 7 AM to 6 PM
+   // 7 AM to 6 PM
 
   if (loading) {
     return (

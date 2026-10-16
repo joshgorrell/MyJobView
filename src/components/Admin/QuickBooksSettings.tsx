@@ -1,22 +1,12 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { DollarSign, CheckCircle, XCircle, ExternalLink, Download, Users, RefreshCw, Eye, ArrowUpDown, AlertCircle } from 'lucide-react';
+import { DollarSign, CheckCircle, XCircle, ExternalLink, Users, RefreshCw, Eye, ArrowUpDown, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { QuickBooksSettings as QBSettings } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { QuickBooksCustomerBrowser } from './QuickBooksCustomerBrowser';
 import ConfirmModal from '../ui/ConfirmModal';
 
-interface QBCustomer {
-  id: string;
-  displayName: string;
-  givenName: string | null;
-  familyName: string | null;
-  companyName: string | null;
-  email: string | null;
-  phone: string | null;
-  balance: number;
-  active: boolean;
-}
 
 export function QuickBooksSettings() {
   const { profile } = useAuth();
@@ -103,7 +93,7 @@ export function QuickBooksSettings() {
       window.location.assign(data.authorizationUrl);
     } catch (error) {
       console.error('Error connecting to QuickBooks:', error);
-      alert('Failed to initiate QuickBooks connection');
+      notify('Failed to initiate QuickBooks connection', { theme: 'blue', tone: 'error' });
       setConnecting(false);
     }
   }
@@ -115,7 +105,7 @@ export function QuickBooksSettings() {
       await loadSettings(profile?.organization_id ?? '');
     } catch (error) {
       console.error('Error disconnecting QuickBooks:', error);
-      alert('Failed to disconnect QuickBooks');
+      notify('Failed to disconnect QuickBooks', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -130,10 +120,10 @@ export function QuickBooksSettings() {
         .eq('id', settings.id);
 
       await loadSettings(profile?.organization_id ?? '');
-      alert(`Auto-import of complete customers ${newValue ? 'enabled' : 'disabled'} successfully`);
+      notify(`Auto-import of complete customers ${newValue ? 'enabled' : 'disabled'} successfully`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error toggling auto-import:', error);
-      alert('Failed to update auto-import setting');
+      notify('Failed to update auto-import setting', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -148,10 +138,10 @@ export function QuickBooksSettings() {
         .eq('id', settings.id);
 
       await loadSettings(profile?.organization_id ?? '');
-      alert(`Auto-sync to QuickBooks ${newValue ? 'enabled' : 'disabled'} successfully`);
+      notify(`Auto-sync to QuickBooks ${newValue ? 'enabled' : 'disabled'} successfully`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error toggling auto-sync:', error);
-      alert('Failed to update auto-sync setting');
+      notify('Failed to update auto-sync setting', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -163,12 +153,12 @@ export function QuickBooksSettings() {
         const { data: result, error } = await supabase.functions.invoke(functionName, { body: { runType: 'manual' } });
         if (error || !result?.success) throw new Error(`The ${functionName.replace('quickbooks-sync-', '')} sync failed`);
       }
-      alert('Customer, invoice, and payment synchronization completed.');
+      notify('Customer, invoice, and payment synchronization completed.', { theme: 'blue', tone: 'success' });
       await loadSettings(profile?.organization_id ?? '');
       await loadSyncStats();
     } catch (error) {
       console.error('Error syncing QuickBooks:', error);
-      alert('QuickBooks synchronization could not be completed.');
+      notify('QuickBooks synchronization could not be completed.', { theme: 'blue', tone: 'error' });
     } finally {
       setSyncing(false);
     }
@@ -179,11 +169,11 @@ export function QuickBooksSettings() {
     try {
       const { data: result, error } = await supabase.functions.invoke('quickbooks-reconcile', { body: {} });
       if (error || !result?.success) throw new Error('Reconciliation failed');
-      alert(`Read-only reconciliation completed with ${result.counts?.discrepancies || 0} discrepancies for review.`);
+      notify(`Read-only reconciliation completed with ${result.counts?.discrepancies || 0} discrepancies for review.`, { theme: 'blue', tone: 'success' });
       await loadSettings(profile?.organization_id ?? '');
     } catch (error) {
       console.error('Error reconciling QuickBooks:', error);
-      alert('Read-only reconciliation could not be completed.');
+      notify('Read-only reconciliation could not be completed.', { theme: 'blue', tone: 'error' });
     } finally {
       setReconciling(false);
     }

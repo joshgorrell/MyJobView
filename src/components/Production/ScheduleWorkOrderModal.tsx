@@ -1,3 +1,4 @@
+import { useCompletion } from '../../hooks/useCompletion';
 import { useRef, useState } from 'react';
 import { Calendar } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -15,6 +16,7 @@ interface Props {
   onClose: () => void;
 }
 export function ScheduleWorkOrderModal({ title, organizationId, technicians, initialTechnicianId, initialSchedule, excludeWorkOrderIds, onSave, onClose }: Props) {
+  const completion = useCompletion(onClose);
   const [schedule, setSchedule] = useState(initialSchedule || { date: '', start: '', end: '' });
   const [ids, setIds] = useState(initialTechnicianId ? [initialTechnicianId] : []);
   const [validation, setValidation] = useState<string | null>('Check availability before saving.');
@@ -25,11 +27,11 @@ export function ScheduleWorkOrderModal({ title, organizationId, technicians, ini
   async function save() {
     if (submitting.current) return;
     submitting.current = true; setSaving(true); setError('');
-    try { await onSave(schedule, ids[0], requestId.current); onClose(); }
+    try { await onSave(schedule, ids[0], requestId.current); completion.complete(); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to save the booking. Try again.'); }
     finally { submitting.current = false; setSaving(false); }
   }
-  return <QuickActionModal title={title} icon={<Calendar />} scrollBody={false} onClose={() => { if (!saving) onClose(); }}>
+  return <QuickActionModal title={title} icon={<Calendar />} scrollBody={false} showSuccess={completion.completed} successMessage="Booking saved!" successIcon={<Calendar className="h-20 w-20" strokeWidth={1.5} />} onClose={() => { if (completion.completed) completion.finish(); else if (!saving) onClose(); }}>
     <div className="flex flex-col min-h-0">
       <div className="overflow-y-auto min-h-0 p-4 space-y-3">
         <p className="text-sm text-secondary">Choose a technician and confirm the complete booking.</p>

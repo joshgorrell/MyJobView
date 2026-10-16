@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Award, TrendingUp, TrendingDown, Clock, Target, AlertTriangle, CheckCircle2, Calendar, Filter, Download, Eye, BarChart3, DollarSign, Archive, HelpCircle, CreditCard as Edit3, Activity, Repeat, ChevronDown, ChevronUp, Trophy, LineChart } from 'lucide-react';
@@ -132,7 +133,7 @@ export function TestTunePerformanceDashboard() {
   }
 
   function exportToCSV() {
-    if (projects.length === 0) { alert('No data to export'); return; }
+    if (projects.length === 0) { notify('No data to export', { theme: 'blue', tone: 'info' }); return; }
 
     const baseColumns = [
       { key: 'contact_name', label: 'Customer Name' },
@@ -354,9 +355,9 @@ export function TestTunePerformanceDashboard() {
       {activeTab === 'bonuses' ? (
         <MyBonusesTab />
       ) : activeTab === 'analytics' ? (
-        <TestTuneAnalytics permissions={permissions} profileId={profile!.id} />
+        <TestTuneAnalytics permissions={permissions} />
       ) : activeTab === 'leaderboard' ? (
-        <TechLeaderboard permissions={permissions} currentUserId={profile!.id} />
+        <TechLeaderboard permissions={permissions} />
       ) : (
         <>
           {/* Alerts Banner */}
@@ -919,7 +920,7 @@ export function TestTunePerformanceDashboard() {
       )}
 
       {showHelp && (
-        <HelpModal onClose={() => setShowHelp(false)}>
+        <HelpModal isOpen={showHelp} title="Test & Tune Help" onClose={() => setShowHelp(false)}>
           <TestTuneHelpContent
             userRole={permissions.user_role}
             canViewBonusAmounts={permissions.can_view_bonus_amounts}

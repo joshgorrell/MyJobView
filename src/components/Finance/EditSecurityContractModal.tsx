@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { SecurityFieldVisibility, SecurityVisibilityGuide } from './SecurityFieldVisibility';
 import { staffSecurityOnboarding, SECURITY_INITIAL_TERMS } from '../../lib/securityOnboarding';
 import React, { useState, useEffect } from 'react';
@@ -115,7 +116,7 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
       setSelectedServices((contractServicesRes.data || []).map(s => s.service_id));
     } catch (error: any) {
       console.error('Error loading data:', error);
-      alert(`Failed to load data: ${error.message || 'Unknown error'}. Please try again.`);
+      notify(`Failed to load data: ${error.message || 'Unknown error'}. Please try again.`, { theme: 'emerald', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -143,12 +144,12 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
     e.preventDefault();
 
     if (!selectedContact) {
-      alert('Please select a customer');
+      notify('Please select a customer', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     if (emailOverride && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOverride)) {
-      alert('Please enter a valid email address');
+      notify('Please enter a valid email address', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -163,12 +164,12 @@ export default function EditSecurityContractModal({ contract, onClose, onSuccess
         installation_date: installationDate || null, service_account_numbers: serviceAccountNumbers, notes: notes.trim(),
       });
 
-      alert('Contract updated successfully!');
+      notify('Contract updated successfully!', { theme: 'emerald', tone: 'success' });
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error updating contract:', error);
-      alert('Failed to update contract. Please try again.');
+      notify('Failed to update contract. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setSaving(false);
     }

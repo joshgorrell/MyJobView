@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { supabase } from "../../lib/supabase";
@@ -211,7 +212,7 @@ export function MyTimeOff() {
     setBusy(false);
   }
   async function cancel(id: string) {
-    if (!window.confirm("Cancel this time off request?")) return;
+    if (!(await requestConfirmation("Cancel this time off request?", { theme: 'blue' }))) return;
     setBusy(true);
     const { error } = await supabase.rpc("cancel_time_off", { p_request: id });
     if (error) setError(error.message);

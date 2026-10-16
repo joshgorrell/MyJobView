@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, Package, Layers, Wrench, Zap } from 'lucide-react';
 
 interface BulkUpdateProjectInfoModalProps {

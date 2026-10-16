@@ -64,7 +64,7 @@ export default function InlineProductSearch({
   autoFocus,
   dataRoomId
 }: InlineProductSearchProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [packages, setPackages] = useState<ProductPackage[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
@@ -81,7 +81,7 @@ export default function InlineProductSearch({
     if (onPackageSelect) {
       loadPackages();
     }
-  }, [profile?.company_id]);
+  }, [companySettings?.id]);
 
   useEffect(() => {
     if (value.length >= 1) {
@@ -121,7 +121,7 @@ export default function InlineProductSearch({
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('company_id', profile?.company_id)
+        .eq('company_id', companySettings?.id)
         .eq('is_active', true)
         .order('sku');
 
@@ -137,7 +137,7 @@ export default function InlineProductSearch({
       const { data: pkgData, error: pkgError } = await supabase
         .from('product_packages')
         .select('id, package_name, package_sku, description, package_price, is_price_override, is_active')
-        .eq('company_id', profile?.company_id)
+        .eq('company_id', companySettings?.id)
         .eq('is_active', true)
         .not('package_sku', 'is', null)
         .order('package_name');
@@ -150,7 +150,7 @@ export default function InlineProductSearch({
             .from('product_package_items')
             .select('id, product_id, quantity, include_labor, product:products(id, sku, name, our_price, cost, unit, is_taxable, is_active, is_discontinued)')
             .eq('package_id', pkg.id)
-            .order('sort_order');
+            .order('sort_order').overrideTypes<ProductPackageItem[], { merge: false }>();
           return { ...pkg, items: items || [] };
         })
       );
@@ -167,7 +167,7 @@ export default function InlineProductSearch({
     try {
       const { data } = await supabase
         .rpc('get_recently_used_products', {
-          p_company_id: profile?.company_id,
+          p_company_id: companySettings?.id,
           p_limit: 6
         });
       if (data && data.length > 0) {
@@ -186,7 +186,7 @@ export default function InlineProductSearch({
     } finally {
       setLoadingRecent(false);
     }
-  }, [profile?.company_id, recentProducts.length]);
+  }, [companySettings?.id, recentProducts.length]);
 
   function handleFocus() {
     if (value.length >= 1 && dropdownItems.length > 0) {

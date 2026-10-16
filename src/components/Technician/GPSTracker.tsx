@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Wifi, WifiOff, Eye, EyeOff, Navigation } from 'lucide-react';
 import { gpsTrackingService } from '../../lib/gpsTracking';
 import { useAuth } from '../../contexts/AuthContext';

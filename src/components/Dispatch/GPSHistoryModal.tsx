@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, X, Calendar, Navigation, AlertCircle, CheckCircle, Ruler } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { MapPin, X, Navigation, AlertCircle, Ruler } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface GPSHistoryModalProps {

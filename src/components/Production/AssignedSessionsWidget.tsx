@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -73,7 +74,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
   const [clockingOut, setClockinOut] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [now, setNow] = useState(new Date());
+  const [_now, setNow] = useState(new Date());
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [showNotesFor, setShowNotesFor] = useState<string | null>(null);
 
@@ -100,7 +101,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
   async function loadSessions() {
     setLoading(true);
     try {
-      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
+      void (formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone()));
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const twoDaysAhead = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -173,7 +174,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
       onRefreshParent?.();
     } catch (err: any) {
       console.error('Error clocking in:', err);
-      alert(err.message || 'Failed to clock in');
+      notify(err.message || 'Failed to clock in', { theme: 'blue', tone: 'error' });
     } finally {
       setClockingIn(null);
     }
@@ -217,7 +218,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
       onRefreshParent?.();
     } catch (err: any) {
       console.error('Error clocking out:', err);
-      alert(err.message || 'Failed to clock out');
+      notify(err.message || 'Failed to clock out', { theme: 'blue', tone: 'error' });
     } finally {
       setClockinOut(null);
     }
@@ -238,7 +239,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
       loadSessions();
     } catch (err: any) {
       console.error('Error cancelling request:', err);
-      alert(err.message || 'Failed to cancel request');
+      notify(err.message || 'Failed to cancel request', { theme: 'blue', tone: 'error' });
     } finally {
       setCancellingId(null);
     }

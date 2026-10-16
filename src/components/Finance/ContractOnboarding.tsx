@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { supabase } from '../../lib/supabase';
@@ -177,12 +178,12 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
     try {
       await staffSecurityOnboarding('approve', contract.id, { revision: contract.onboarding_revision || 0 });
 
-      alert('Security contract approved. Open it to complete activation.');
+      notify('Security contract approved. Open it to complete activation.', { theme: 'emerald', tone: 'info' });
       loadContracts();
       loadCancellationStats();
     } catch (error) {
       console.error('Error approving contract:', error);
-      alert('Failed to approve security contract');
+      notify('Failed to approve security contract', { theme: 'emerald', tone: 'error' });
     }
   }
 

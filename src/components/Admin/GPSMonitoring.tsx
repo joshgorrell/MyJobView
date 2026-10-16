@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { MapPin, CheckCircle, XCircle, Clock, TrendingUp, AlertTriangle } from 'lucide-react';
+import { MapPin, Clock, TrendingUp, AlertTriangle } from 'lucide-react';
 
 interface GPSStats {
   total_entries: number;

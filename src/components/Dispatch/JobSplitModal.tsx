@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Split, Trash2 } from 'lucide-react';
@@ -40,6 +41,7 @@ export function JobSplitModal({ workOrder, onClose, onSuccess }: { workOrder: Wo
         p_parts: parts.map(part => ({ description: part.description.trim(), estimated_hours: Number(part.hours), assigned_to: part.technicianIds[0], ...part.schedule })) });
       if (error) throw error;
       for (const [index, part] of parts.entries()) await notifyTechJobAssigned(part.technicianIds[0], { work_order_number: data?.[index]?.work_order_number || '', title: part.description.trim(), scheduled_date: part.schedule.date });
+      notify('Job split created!', { theme: 'blue', tone: 'success' });
       onSuccess(); onClose();
     } catch (e) { setError((e as { message?: string }).message || 'Unable to split this work order. Try again.'); }
     finally { submitting.current = false; setSaving(false); }

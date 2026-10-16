@@ -1,7 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { PTOManagement } from './PTOManagement';
 import { canManageTimeOff } from '../../lib/timeOff';
 import { TimeReviewPanel } from './Payroll/TimeReviewPanel';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -281,7 +282,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
       }).catch(() => {});
       await loadPendingTimeRequests();
     } catch (err: any) {
-      alert(err.message || 'Failed to approve');
+      notify(err.message || 'Failed to approve', { theme: 'blue', tone: 'error' });
     } finally {
       setApprovingRequestId(null);
     }
@@ -300,7 +301,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
       setDenyReasonInput(prev => { const n = { ...prev }; delete n[id]; return n; });
       await loadPendingTimeRequests();
     } catch (err: any) {
-      alert(err.message || 'Failed to deny');
+      notify(err.message || 'Failed to deny', { theme: 'blue', tone: 'error' });
     } finally {
       setDenyingRequestId(null);
     }
@@ -370,7 +371,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
       setReviewNotes('');
     } catch (error) {
       console.error('Error updating event status:', error);
-      alert('Failed to update event status');
+      notify('Failed to update event status', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -380,7 +381,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
     const pendingCount = homeClockEvents.filter(e => e.home_clock_review_status === 'pending').length;
 
     if (pendingCount === 0) {
-      alert('No pending alerts to clear');
+      notify('No pending alerts to clear', { theme: 'blue', tone: 'info' });
       return;
     }
 
@@ -402,10 +403,10 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
       if (error) throw error;
 
       await loadHomeClockEvents();
-      alert(`Successfully marked ${pendingCount} alert(s) as reviewed`);
+      notify(`Successfully marked ${pendingCount} alert(s) as reviewed`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error clearing all pending alerts:', error);
-      alert('Failed to clear all pending alerts');
+      notify('Failed to clear all pending alerts', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -441,10 +442,10 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
 
         if (error) throw error;
       }
-      alert('Time clock settings saved successfully');
+      notify('Time clock settings saved successfully', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      notify('Failed to save settings', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -488,18 +489,18 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
 
       const result = data;
       if (result && result.success) {
-        alert(`Successfully processed ${result.entries_processed} clock entries.\n` +
+        notify(`Successfully processed ${result.entries_processed} clock entries.\n` +
               `Total points deducted: ${result.total_points_deducted || 0}\n` +
-              `${result.admin_notified ? `Notified ${result.notification_count} admin(s).` : ''}`);
+              `${result.admin_notified ? `Notified ${result.notification_count} admin(s).` : ''}`, { theme: 'blue', tone: 'success' });
         loadPendingAutoClockOuts();
         loadRecentAutoClockOuts();
         loadAutoClockOutSettings();
       } else {
-        alert(result.message || 'Failed to run auto clock-out');
+        notify(result.message || 'Failed to run auto clock-out', { theme: 'blue', tone: 'error' });
       }
     } catch (error) {
       console.error('Error running auto clock-out:', error);
-      alert('Failed to run auto clock-out');
+      notify('Failed to run auto clock-out', { theme: 'blue', tone: 'error' });
     } finally {
       setRunningAutoClockOut(false);
     }
@@ -577,7 +578,6 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
           Import CSV
         </button>
       </div>
-
 
 
       {/* Auto Clock-Out Settings */}
@@ -1840,7 +1840,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
 
       {admin && activeTab === 'payroll' && (
         <div className="space-y-6">
-          <PayrollPeriodSummary 
+          <PayrollPeriodSummary
             onPeriodSelect={setSelectedPayPeriodId}
             onRefresh={() => setPayrollRefreshKey(k => k + 1)}
           />

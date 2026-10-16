@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, X, Send, Loader, RotateCcw, Zap, CheckCircle, FileText, Mic, MicOff } from 'lucide-react';
+import { Sparkles, Send, Loader, RotateCcw, Zap, CheckCircle, FileText, Mic, MicOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import DesignBriefModal from '../Sales/DesignBriefModal';
@@ -93,6 +93,7 @@ export interface ActionPayload {
     | 'CREATE_PROPOSAL'
     | 'CREATE_CONTACT'
     | 'CREATE_LEAD'
+    | 'CREATE_SUPPORT_REQUEST'
     | 'CREATE_TASK'
     | 'CREATE_SERVICE_REQUEST'
     | 'CREATE_SECURITY_CONTRACT'

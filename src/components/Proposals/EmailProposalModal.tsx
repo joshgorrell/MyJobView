@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, X, FileText, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailProposalModalProps {

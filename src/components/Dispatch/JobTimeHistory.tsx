@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Clock, Briefcase, MapPin, Download, AlertCircle, ChevronDown, ChevronUp, Trash2, Wrench, BookOpen, Check, X } from 'lucide-react';
+import { Search, Briefcase, MapPin, Download, AlertCircle, ChevronDown, ChevronUp, Trash2, Wrench, BookOpen, Check, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
 import {
@@ -244,7 +245,7 @@ export function JobTimeHistory() {
       setEntries(prev => prev.filter(e => e.id !== entry.id));
     } catch (err) {
       console.error('Error deleting job time entry:', err);
-      alert('Failed to delete entry. You may not have permission.');
+      notify('Failed to delete entry. You may not have permission.', { theme: 'blue', tone: 'error' });
     } finally {
       setDeletingId(null);
     }

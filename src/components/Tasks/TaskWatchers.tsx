@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -99,7 +100,7 @@ export function TaskWatchers({ taskId }: TaskWatchersProps) {
       loadWatchers();
     } catch (error: any) {
       console.error('Error toggling watch status:', error);
-      alert('Failed to update watch status: ' + error.message);
+      notify('Failed to update watch status: ' + error.message, { theme: 'cyan', tone: 'error' });
     } finally {
       setLoading(false);
     }

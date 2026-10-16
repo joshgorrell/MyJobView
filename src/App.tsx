@@ -1,3 +1,4 @@
+import { notify } from './lib/feedback';
 import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
 import { PasswordSetup } from './components/Auth/PasswordSetup';
 import { canManageTimeOff } from './lib/timeOff';
@@ -8,7 +9,7 @@ import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
-import { TenantProvider, useTenant } from './contexts/TenantContext';
+import { TenantProvider } from './contexts/TenantContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
 import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
@@ -24,7 +25,7 @@ import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
-import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
+import { LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
@@ -56,8 +57,8 @@ const DepartmentManager = lazy(() => import('./components/Admin/DepartmentManage
 const GPSDiagnostics = lazy(() => import('./components/Admin/GPSDiagnostics').then(m => ({ default: m.GPSDiagnostics })));
 const ContactCSVImport = lazy(() => import('./components/Admin/ContactCSVImport').then(m => ({ default: m.ContactCSVImport })));
 const SecurityContractCSVImport = lazy(() => import('./components/Admin/SecurityContractCSVImport').then(m => ({ default: m.SecurityContractCSVImport })));
-const MaintenanceAgreements = lazy(() => import('./components/Finance/MaintenanceAgreements'));
-const EquipmentWarrantyAgreements = lazy(() => import('./components/Finance/EquipmentWarrantyAgreements'));
+
+
 const HistoricalSalesImport = lazy(() => import('./components/Admin/HistoricalSalesImport').then(m => ({ default: m.HistoricalSalesImport })));
 const DailySalesReportImport = lazy(() => import('./components/Admin/DailySalesReportImport').then(m => ({ default: m.DailySalesReportImport })));
 const TasksView = lazy(() => import('./components/Tasks/TasksView').then(m => ({ default: m.TasksView })));
@@ -79,7 +80,7 @@ const TechnicianWorkCenter = lazy(() => import('./components/Production/Technici
 const ProductionManagerDashboard = lazy(() => import('./components/Production/ProductionManagerDashboard').then(m => ({ default: m.ProductionManagerDashboard })));
 const PartsRequestManagement = lazy(() => import('./components/Production/PartsRequestManagement').then(m => ({ default: m.PartsRequestManagement })));
 const JobPhotosGallery = lazy(() => import('./components/Production/JobPhotosGallery').then(m => ({ default: m.JobPhotosGallery })));
-const TechStats = lazy(() => import('./components/Production/TechStats').then(m => ({ default: m.TechStats })));
+
 const InventoryDashboard = lazy(() => import('./components/Inventory/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
 const PurchaseOrders = lazy(() => import('./components/Inventory/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
@@ -88,20 +89,20 @@ const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopo
 const SalesDashboard = lazy(() => import('./components/SalesDashboard/SalesDashboardPage').then(m => ({ default: m.SalesDashboardPage })));
 const PipelineBoard = lazy(() => import('./components/Sales/PipelineBoard').then(m => ({ default: m.PipelineBoard })));
 const ProspectsPage = lazy(() => import('./components/Sales/ProspectsPage').then(m => ({ default: m.ProspectsPage })));
-const SalesPerformance = lazy(() => import('./components/Sales/SalesPerformance').then(m => ({ default: m.SalesPerformance })));
+
 const SalesOrdersView = lazy(() => import('./components/Sales/SalesOrdersView').then(m => ({ default: m.SalesOrdersView })));
 const SalesOrderDetail = lazy(() => import('./components/Sales/SalesOrderDetail').then(m => ({ default: m.SalesOrderDetail })));
 const ReviewsView = lazy(() => import('./components/Sales/ReviewsView'));
 const SalesServiceRequestsView = lazy(() => import('./components/Sales/SalesServiceRequestsView').then(m => ({ default: m.SalesServiceRequestsView })));
 const IndividualDashboard = lazy(() => import('./components/Dashboard/IndividualDashboard').then(m => ({ default: m.IndividualDashboard })));
-const TeamLeaderboard = lazy(() => import('./components/Dashboard/TeamLeaderboard').then(m => ({ default: m.TeamLeaderboard })));
+
 const ProjectsView = lazy(() => import('./components/Projects/ProjectsView'));
 const InvoicesView = lazy(() => import('./components/Invoices/InvoicesView').then(m => ({ default: m.InvoicesView })));
 const CommissionsPage = lazy(() => import('./components/Commissions/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
 const PunchlistAdminDashboard = lazy(() => import('./components/Production/PunchlistAdminDashboard').then(m => ({ default: m.PunchlistAdminDashboard })));
 const TestTunePerformanceDashboard = lazy(() => import('./components/Production/TestTunePerformanceDashboard').then(m => ({ default: m.TestTunePerformanceDashboard })));
 const VIPPlanManagement = lazy(() => import('./components/Finance/VIPPlanManagement').then(m => ({ default: m.VIPPlanManagement })));
-const BonusApprovalDashboard = lazy(() => import('./components/Finance/BonusApprovalDashboard').then(m => ({ default: m.BonusApprovalDashboard })));
+
 const TestTuneSettings = lazy(() => import('./components/Admin/TestTuneSettings').then(m => ({ default: m.TestTuneSettings })));
 const PortalPunchlist = lazy(() => import('./components/Portal/PortalPunchlist').then(m => ({ default: m.PortalPunchlist })));
 const PortalVIPMembership = lazy(() => import('./components/Portal/PortalVIPMembership').then(m => ({ default: m.PortalVIPMembership })));
@@ -121,7 +122,7 @@ const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m 
 const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => ({ default: m.AuthBridge })));
 const AuthCallback = lazy(() => import('./components/Auth/AuthCallback').then(m => ({ default: m.AuthCallback })));
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
-const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxInstructions').then(m => ({ default: m.default })));
+
 const LaborDashboard = lazy(() => import('./components/Production/LaborDashboard/LaborDashboard'));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
 
@@ -159,11 +160,12 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
   useEffect(() => {
     let cancelled = false;
     if (!profile?.organization_id) return;
-    supabase
+    Promise.resolve(supabase
       .from('company_settings')
-      .select(`${moduleKey}`)
+      .select(moduleKey)
       .eq('organization_id', profile.organization_id)
       .maybeSingle()
+      .overrideTypes<Record<string, boolean>, { merge: false }>())
       .then(({ data }) => {
         if (cancelled) return;
         setAllowed(data?.[moduleKey] ?? false);
@@ -253,7 +255,7 @@ function AppContent() {
     });
   };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [currentHash, setCurrentHash] = useState(window.location.hash);
+  const [_currentHash, setCurrentHash] = useState(window.location.hash);
 
   const notificationCount = useNotificationCount();
 
@@ -268,11 +270,11 @@ function AppContent() {
 
     const recordPage = () => {
       const sessionId = (window as any).__currentSessionId || null;
-      supabase.rpc('update_session_activity', {
+      Promise.resolve(supabase.rpc('update_session_activity', {
         p_user_id: user.id,
         p_page: activeTab,
         p_session_id: sessionId,
-      }).then(() => {}).catch(() => {});
+      })).then(() => {}).catch(() => {});
     };
 
     recordPage();
@@ -1082,7 +1084,6 @@ function AppContent() {
           {activeTab === 'feature_suggestions' && <ImprovementsView key={activeTab} />}
 
 
-
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
               <div className="bg-canvas text-primary rounded-xl shadow-sm border border-subtle p-4 sm:p-6">
@@ -1108,7 +1109,6 @@ function AppContent() {
           {activeTab === 'rewards_dashboard' && checkModuleAccess('rewards_dashboard') && <RewardsDashboard key={activeTab} />}
 
           {activeTab === 'time_clock_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('labor_dashboard')} />}
-
 
 
           {activeTab === 'vehicle-tracking' && (profile.role === 'admin' || profile.role === 'manager') && <VehicleManagement key={activeTab} />}
@@ -1312,7 +1312,7 @@ function AppContent() {
             };
             const requiredModule = action.type === 'NAVIGATE_TO' ? action.tab : actionModule[action.type];
             if (!requiredModule || !checkModuleAccess(requiredModule)) {
-              window.alert('That action is not available with your current permissions.');
+              notify('That action is not available with your current permissions.', { theme: 'blue', tone: 'info' });
               return;
             }
             if (action.type === 'CREATE_CONTACT') {

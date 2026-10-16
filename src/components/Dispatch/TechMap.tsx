@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MapPin, Navigation, Battery, Clock, RefreshCw } from 'lucide-react';
 
@@ -337,7 +337,7 @@ export function TechMap() {
       const { data: activeJobs } = await supabase
         .from('time_entries')
         .select('technician_id, work_order:work_orders(id, title)')
-        .is('clock_out', null);
+        .is('clock_out', null).overrideTypes<{ technician_id: string; work_order: { id: string; title: string } | null }[], { merge: false }>();
 
       // Get GPS breadcrumbs for clocked-in technicians (get latest for each tech, no time limit)
       const clockedInTechIds = dailyClocks?.map(c => c.technician_id) || [];

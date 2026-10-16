@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { TeamLeave, leaveLabel } from '../../lib/timeOff';
 import { CalendarMonthGrid } from '../Shared/Calendar/CalendarMonthGrid';
 import { CalendarGantt } from '../Shared/Calendar/CalendarGantt';
@@ -329,7 +330,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
     // Calculate new end time (maintain duration)
     const duration = minutes(appointment.end_time) - minutes(appointment.start_time);
     const endMinutes = minutes(newTime) + duration;
-    if (duration <= 0 || endMinutes >= 1440) { alert('Choose a time that ends on the same day.'); return; }
+    if (duration <= 0 || endMinutes >= 1440) { notify('Choose a time that ends on the same day.', { theme: 'blue', tone: 'warning' }); return; }
     const newEndTime = timeKey(endMinutes);
 
     // Build confirmation message
@@ -394,7 +395,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         await loadAppointments();
       } catch (error) {
         console.error('Error rescheduling:', error);
-        alert('Failed to reschedule. Please try again.');
+        notify('Failed to reschedule. Please try again.', { theme: 'blue', tone: 'error' });
       } finally {
         setDraggedItem(null);
           setConflictWarning(null);
@@ -1229,7 +1230,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
       await loadAppointments();
     } catch (error) {
       console.error('Error deleting appointment:', error);
-      alert('Failed to delete appointment');
+      notify('Failed to delete appointment', { theme: 'blue', tone: 'error' });
     }
     setRecurringDeleteTarget(null);
   }
@@ -1401,7 +1402,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         <div className="space-y-2">
           <CalendarTimeGrid columns={timeGridColumns} events={timeGridEvents} loading={loading} error={loadError} onRetry={() => { void loadAppointments(); }}
             onSlotSelect={(column, time) => openCreateModal(new Date(column.date + 'T12:00:00'), time, undefined, techTimeline ? column.key : undefined)}
-            onRangeSelect={(column, start, end) => { if (timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(end) > minutes(event.start)))) { alert('Choose an open time range.'); return; } openCreateModal(new Date(column.date + 'T12:00:00'), start, end, techTimeline ? column.key : undefined); }}
+            onRangeSelect={(column, start, end) => { if (timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(end) > minutes(event.start)))) { notify('Choose an open time range.', { theme: 'blue', tone: 'warning' }); return; } openCreateModal(new Date(column.date + 'T12:00:00'), start, end, techTimeline ? column.key : undefined); }}
             onDropDate={column => { const item = techTimeline ? draggedItem?.appointment : draggedAppointment; if (item) void handleTimeDrop(item, item.start_time.slice(0, 5), techTimeline ? column.key : undefined, column.date); }}
             onDropSlot={(column, start) => { const item = techTimeline ? draggedItem?.appointment : draggedAppointment; if (item) void handleTimeDrop(item, start, techTimeline ? column.key : undefined, column.date); }}
             slotState={(column, start) => ({ disabled: timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(start) + 30 > minutes(event.start))) })} />
