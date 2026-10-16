@@ -885,43 +885,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
       )}
 
-      {/* Linked Work Orders Banner */}
-      {workOrder.work_order_group_id && linkedWorkOrders.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Link className="w-4 h-4 text-blue-600" />
-              <span className="font-semibold text-gray-900 text-sm">
-                Linked Work Orders — {linkedWorkOrders.length + 1} total (billed together)
-              </span>
-            </div>
-            {canEdit && (
-              <button
-                onClick={handleUnlinkWorkOrder}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50"
-              >
-                <Unlink className="w-3 h-3" />
-                Unlink
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-lg text-sm">
-              <span className="font-medium text-blue-900">{workOrder.work_order_number}</span>
-              <span className="text-blue-600 text-xs">(this)</span>
-            </div>
-            {linkedWorkOrders.map(wo => (
-              <div key={wo.id} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 rounded-lg text-sm">
-                <span className="font-medium text-gray-900">{wo.work_order_number}</span>
-                {wo.technician?.full_name && (
-                  <span className="text-gray-500 text-xs">{wo.technician.full_name}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Work instructions and the actual visit checklist are the primary work-order content. */}
       <section className="bg-white rounded-t-xl border border-gray-200 p-3 sm:p-4 space-y-3">
         <h2 className="text-sm font-semibold text-gray-900">Work Requested</h2>
@@ -965,6 +928,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
               </a>
             ))}
           </div>
+        )}
+        {workOrder.work_order_group_id && canEdit && (
+          <button type="button" onClick={handleUnlinkWorkOrder} className="mt-2 text-xs text-red-600 hover:underline">Unlink this work order from the group</button>
         )}
       </section>
 
