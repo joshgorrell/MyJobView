@@ -17,14 +17,28 @@ BEGIN
       RAISE EXCEPTION 'Invoice tax snapshot missing or from another organization';
     END IF;
     v_fee := COALESCE(v_snapshot.credit_card_fee_amount, 0);
-  ELSIF EXISTS (
+  END IF;
+  -- Classification is authoritative when invoice line items exist.
+  -- Fee line items may be present even when the invoice has no tax snapshot.
+  IF EXISTS (
     SELECT 1 FROM public.invoice_line_items li
     WHERE li.invoice_id = p_invoice.id
-      AND (lower(coalesce(li.item_type,'')) LIKE '%credit%card%fee%'
-        OR lower(coalesce(li.description,'')) LIKE '%credit card fee%'
-        OR lower(coalesce(li.description,'')) LIKE '%convenience fee%')
+      AND (lower(coalesce(li.item_type,'')) = 'credit_card_fee'
+        OR EXISTS (
+          SELECT 1 FROM public.tax_classifications tc
+          WHERE tc.id = li.tax_classification_id AND tc.code = 'credit_card_fee'
+        ))
   ) THEN
-    RAISE EXCEPTION 'Commission basis requires a structured credit card fee snapshot';
+    IF p_invoice.tax_snapshot_id IS NULL THEN
+      SELECT COALESCE(SUM(li.amount),0) INTO v_fee
+      FROM public.invoice_line_items li
+      WHERE li.invoice_id = p_invoice.id
+        AND (lower(coalesce(li.item_type,'')) = 'credit_card_fee'
+          OR EXISTS (
+            SELECT 1 FROM public.tax_classifications tc
+            WHERE tc.id = li.tax_classification_id AND tc.code = 'credit_card_fee'
+          ));
+    END IF;
   END IF;
   IF v_fee < 0 OR v_fee > p_invoice.subtotal THEN
     RAISE EXCEPTION 'Invalid credit card fee in commission basis';
