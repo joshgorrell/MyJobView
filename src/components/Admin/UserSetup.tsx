@@ -91,24 +91,30 @@ export function UserSetupTabs({
   onSelect,
   reviewed,
   guided = false,
+  issues = {},
 }: {
   active: Section | 'review';
   onSelect: (section: Section | 'review') => void;
   reviewed: string[];
   guided?: boolean;
+  issues?: Partial<Record<Section | 'review', string>>;
 }) {
   return (
     <div className="flex-shrink-0">
-      <nav aria-label="User settings" className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border-b border-gray-700">
+      <nav aria-label="User settings" className="flex gap-1 overflow-x-auto border-b border-gray-700 px-3">
         {[...setupSections, { key: 'review' as const, label: 'Review / User Card' }].map((s) => (
           <button
             type="button"
             key={s.key}
             onClick={() => onSelect(s.key)}
             aria-current={active === s.key ? 'step' : undefined}
-            className={`min-h-11 px-2 py-2 text-xs sm:text-sm border-b-2 ${active === s.key ? 'text-cyan-300 border-cyan-400 bg-gray-800' : 'text-gray-300 border-transparent'}`}
+            title={issues[s.key] || undefined}
+            className={`min-h-11 shrink-0 px-3 py-2 text-xs sm:text-sm border-b-2 ${active === s.key ? 'text-cyan-300 border-cyan-400 bg-gray-800' : 'text-gray-300 border-transparent'}`}
           >
-            {s.label}
+            <span className="inline-flex items-center gap-2 whitespace-nowrap">
+              {issues[s.key] ? <span className="text-red-400 font-bold" aria-label="Required information missing">✕</span> : null}
+              {s.label}
+            </span>
             {guided && s.key !== 'review' && (
               <span className="block text-xs mt-1">
                 {reviewed.includes(s.key) ? 'Complete' : active === s.key ? 'Needs review' : 'Not started'}
