@@ -19,7 +19,7 @@ assert.match(fields, /Base pay is additional to commissions/);
 assert.match(fields, /validateSalesCompensation/);
 assert.match(add, /<SalesCompensationFields/);
 assert.match(edit, /<SalesCompensationFields/);
-assert.match(add, /sales_compensation_arrangements/);
+assert.match(add, /save_sales_compensation_arrangement/);
 assert.match(edit, /sales_compensation_arrangements/);
 assert.match(tabs, /Required information complete/);
 assert.match(tabs, /Required information missing/);
