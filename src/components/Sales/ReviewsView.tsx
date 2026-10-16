@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Shared/Toast';
-import { Star, Mail, QrCode, TrendingUp, Users, ExternalLink, Send, Check, FileText, Eye, X, Search, Calendar, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, ClipboardList, ThumbsUp, ChevronDown, CheckCircle, Lock } from 'lucide-react';
+import { Star, Mail, Users, ExternalLink, Send, Check, FileText, Eye, X, Search, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, CheckCircle, Lock } from 'lucide-react';
 import ProposalFollowUps from '../Reviews/ProposalFollowUps';
 import LostOpportunityReviews from '../Reviews/LostOpportunityReviews';
 import { CustomerSatisfactionDashboard } from './CustomerSatisfactionDashboard';
@@ -29,7 +29,7 @@ interface ReviewRequest {
   contact_id: string;
   sent_by: string;
   sent_at: string;
-  method: 'email' | 'sms' | 'qr_code' | 'manual';
+  method: 'email' | 'sms' | 'qr_code' | 'manual' | 'survey';
   email_opened: boolean;
   link_clicked: boolean;
   clicked_at: string | null;
@@ -71,33 +71,9 @@ interface EmailPreview {
 
 const REVIEW_URL = 'https://g.page/r/CZzvVUth7kuyEBM/review';
 
-function replacePlaceholders(text: string, placeholders: Record<string, string>): string {
-  let result = text;
-  for (const [key, value] of Object.entries(placeholders)) {
-    result = result.split(`{{${key}}}`).join(value || '');
-  }
-  return result;
-}
-
-function convertTextToHtml(text: string): string {
-  let html = text;
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#3b82f6;">$1</a>');
-  html = html.replace(/^• (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul style="margin:10px 0;padding-left:20px;">$&</ul>');
-  html = html.replace(/\n\n/g, '</p><p style="margin:15px 0;line-height:1.6;">');
-  html = '<p style="margin:15px 0;line-height:1.6;">' + html + '</p>';
-  return html;
-}
 
 const EL_LOGO_URL = 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png';
 
-function wrapInEmailLayout(content: string, companyName: string, companyEmail: string, headerColor = '#0e7490', logoUrl = ''): string {
-  const resolvedLogoUrl = logoUrl || EL_LOGO_URL;
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;"><tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:32px 40px 28px;text-align:center;border-bottom:3px solid ${headerColor};"><img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" /></td></tr><tr><td style="background:#ffffff;padding:40px 40px 32px;color:#374151;font-size:16px;line-height:1.7;">${content}</td></tr><tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 40px;text-align:center;border-top:1px solid #334155;"><img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:0.85;" /><p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${companyName}</p>${companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 12px 0;">${companyEmail}</p>` : ''}<p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">You received this email because you recently worked with us.<br>Thank you for your business.</p></td></tr></table></td></tr></table></body></html>`;
-}
 
 function buildEmailShell(params: { companyName: string; companyEmail: string; companyLogoUrl?: string }, headerContent: string, bodyContent: string): string {
   const logoUrl = params.companyLogoUrl || EL_LOGO_URL;
@@ -126,24 +102,6 @@ function buildEmailShell(params: { companyName: string; companyEmail: string; co
 </body></html>`;
 }
 
-function buildReviewRequestEmailPreview(params: { customerName: string; companyName: string; companyEmail: string; companyLogoUrl?: string; reviewUrl: string }): string {
-  const header = `
-    <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">Your Opinion Matters</h1>
-    <p style="color:#94a3b8;margin:0;font-size:15px;">to us and to your community</p>
-    <div style="margin-top:20px;"><span style="font-size:24px;letter-spacing:3px;color:#f59e0b;">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>`;
-  const body = `
-    <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">Hi ${params.customerName},</p>
-    <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 18px 0;">Thank you for choosing <strong style="color:#0e7490;">${params.companyName}</strong>. We take pride in every project we complete and we genuinely hope your experience exceeded your expectations.</p>
-    <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">If you have a moment, we'd be grateful if you could share your experience with others on Google. Reviews like yours help homeowners and businesses in the community find reliable, quality service.</p>
-    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 32px 0;">
-      <a href="${params.reviewUrl}" style="display:inline-block;background:#0e7490;color:#ffffff;text-decoration:none;padding:16px 48px;border-radius:10px;font-size:17px;font-weight:700;letter-spacing:0.01em;">Leave Us a Google Review</a>
-    </td></tr></table>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><tr><td style="padding:18px 22px;">
-      <p style="color:#0f172a;font-size:13px;margin:0 0 5px 0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Takes less than 2 minutes</p>
-      <p style="color:#475569;font-size:14px;margin:0;line-height:1.6;">Just a sentence or two is enough. Your words directly help our team grow.</p>
-    </td></tr></table>`;
-  return buildEmailShell(params, header, body);
-}
 
 function buildJobSurveyEmailPreview(params: { customerName: string; companyName: string; companyEmail: string; companyLogoUrl?: string; reviewUrl: string; companyWebsite?: string }): string {
   const websiteLink = params.companyWebsite
@@ -200,66 +158,6 @@ interface StaffProfile {
   full_name: string;
 }
 
-function buildSatisfactionEmailPreview(params: { customerName: string; companyName: string; companyEmail: string; companyLogoUrl?: string }): string {
-  const logoBlock = params.companyLogoUrl
-    ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
-    : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${params.companyName}</span>`;
-
-  const ratings = [
-    { label: 'Excellent', emoji: '&#128079;', bg: '#16a34a', desc: 'Everything was great' },
-    { label: 'Good', emoji: '&#128077;', bg: '#2563eb', desc: 'Happy with the results' },
-    { label: 'Okay', emoji: '&#128528;', bg: '#d97706', desc: 'Some things could improve' },
-    { label: 'Needs Attention', emoji: '&#128533;', bg: '#dc2626', desc: 'There was a problem' },
-  ];
-
-  const ratingButtons = ratings.map(r => `
-    <td align="center" style="padding:8px;">
-      <table cellpadding="0" cellspacing="0" width="120" style="border-radius:12px;overflow:hidden;background:${r.bg};">
-        <tr><td align="center" style="padding:16px 8px 8px;">
-          <span style="font-size:32px;line-height:1;">${r.emoji}</span>
-        </td></tr>
-        <tr><td align="center" style="padding:0 8px 6px;">
-          <span style="color:#ffffff;font-size:14px;font-weight:700;display:block;">${r.label}</span>
-        </td></tr>
-        <tr><td align="center" style="padding:0 8px 14px;">
-          <span style="color:rgba(255,255,255,0.8);font-size:11px;line-height:1.3;display:block;">${r.desc}</span>
-        </td></tr>
-      </table>
-    </td>`).join('');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>How did we do?</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-      <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #0e7490;">
-        <div style="margin-bottom:20px;">${logoBlock}</div>
-        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">How Did We Do?</h1>
-        <p style="color:#94a3b8;margin:0;font-size:15px;">Your feedback helps us improve</p>
-      </td></tr>
-      <tr><td style="background:#ffffff;padding:44px 44px 36px;">
-        <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 16px 0;">Hi ${params.customerName || 'there'},</p>
-        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">Thank you for choosing <strong style="color:#0e7490;">${params.companyName}</strong>. We hope your experience was exceptional. We'd love to hear how we did — just tap the button that best describes your experience:</p>
-        <table width="100%" cellpadding="0" cellspacing="0"><tr>${ratingButtons}</tr></table>
-        <p style="color:#9ca3af;font-size:13px;text-align:center;margin:28px 0 0 0;line-height:1.6;">Takes less than 60 seconds. Your feedback goes directly to our team.</p>
-      </td></tr>
-      <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 44px;text-align:center;border-top:1px solid #334155;">
-        <p style="color:#0e7490;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${params.companyName}</p>
-        ${params.companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 2px 0;">${params.companyEmail}</p>` : ''}
-        <p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">You received this email because you recently worked with us.<br>Thank you for your business.</p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
-}
 
 export default function ReviewsView() {
   const toast = useToast();
@@ -298,7 +196,7 @@ export default function ReviewsView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activitySearch, setActivitySearch] = useState('');
   const [activityType, setActivityType] = useState<'all' | 'google' | 'feedback'>('all');
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [useManualEntry, setUseManualEntry] = useState(false);
@@ -320,7 +218,7 @@ export default function ReviewsView() {
   const [satLeadTechId, setSatLeadTechId] = useState('');
   const [satSending, setSatSending] = useState(false);
   const [satSuccess, setSatSuccess] = useState(false);
-  const [stats, setStats] = useState({
+  const [_stats, setStats] = useState({
     totalSent: 0,
     emailsOpened: 0,
     linksClicked: 0,
@@ -638,7 +536,7 @@ export default function ReviewsView() {
       const templateType = 'review_request';
       const { email: recipientEmail, name: recipientName } = getRecipientInfo();
 
-      const [templateRes, settingsRes] = await Promise.all([
+      const [_templateRes, settingsRes] = await Promise.all([
         supabase
           .from('email_templates')
           .select('subject, body')
@@ -658,13 +556,6 @@ export default function ReviewsView() {
         company_website: '',
       };
 
-      const placeholders: Record<string, string> = {
-        customer_name: recipientName,
-        customer_first_name: recipientName,
-        company_name: settings.company_name,
-        review_url: REVIEW_URL,
-        company_website: (settings as any).company_website || '',
-      };
 
       let subject: string;
       let html: string;
@@ -806,23 +697,6 @@ export default function ReviewsView() {
     }
   }
 
-  async function recordQRCodeUse() {
-    try {
-      const { error } = await supabase
-        .from('review_requests')
-        .insert({
-          contact_id: null,
-          sent_by: profile?.id,
-          method: 'qr_code',
-          notes: 'QR code displayed to customer'
-        });
-
-      if (error) throw error;
-      loadReviewRequests();
-    } catch (error) {
-      console.error('Error recording QR code use:', error);
-    }
-  }
 
   async function markReviewReceived(request: ReviewRequest) {
     try {

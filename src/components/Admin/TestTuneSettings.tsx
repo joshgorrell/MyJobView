@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   Award,
   Save,
-  DollarSign,
   Percent,
   Clock,
   Users,

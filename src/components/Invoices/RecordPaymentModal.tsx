@@ -10,7 +10,7 @@ interface RecordPaymentModalProps {
   invoice: {
     id: string;
     invoice_number: string;
-    contact_id: string;
+    contact_id: string | null;
     total: number;
     amount_paid: number;
     amount_due: number;

@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { DollarSign, ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
+import { ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
@@ -161,7 +161,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             )
           `)
           .eq('contact_id', profile.contact_id)
-          .in('status', ['active', 'paused'])
+          .in('status', ['active', 'paused']).overrideTypes<RecurringSubscription[], { merge: false }>()
       ]);
 
       if (invoicesRes.error) throw invoicesRes.error;
@@ -304,6 +304,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
       const printable = {
         ...invoice,
+        tax: invoice.tax_amount,
         invoice_title: extra?.invoice_title || null,
         billing_name: extra?.billing_name || contactName || null,
         billing_address_line1: extra?.billing_address_line1 || contact?.street_address || null,

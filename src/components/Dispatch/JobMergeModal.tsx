@@ -10,9 +10,7 @@ import {
   CheckCircle,
   AlertCircle,
   User,
-  Calendar,
-  MapPin
-} from 'lucide-react';
+  Calendar} from 'lucide-react';
 
 interface JobMergeModalProps {
   initialWorkOrders?: Array<{

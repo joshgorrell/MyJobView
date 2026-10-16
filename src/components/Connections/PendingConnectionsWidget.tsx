@@ -1,6 +1,6 @@
 import { requestText, notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { Calendar, CheckCircle2, X, Clock, AlertTriangle, RefreshCw, Phone, Mail, Users, MapPin } from 'lucide-react';
+import { Calendar, CheckCircle2, X, Clock, AlertTriangle, RefreshCw, Phone, Mail, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 

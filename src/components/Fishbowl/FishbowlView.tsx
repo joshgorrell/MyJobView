@@ -59,7 +59,7 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
       let query = supabase
         .from('leads')
         .select(`
-          id,
+          *,
           contact_name,
           company_name,
           email,

@@ -32,13 +32,13 @@ interface HeaderProps {
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
-  const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
+  const { mainDepartments: _mainDepartments, footerDepartments: _footerDepartments, getUserModules: _getUserModules, starredModules, loading: deptLoading } = useDepartments();
   const [commandCenterOpen,setCommandCenterOpen] = useState(()=>new URLSearchParams(window.location.search).get('commandCenter')==='1');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [expandedMobileItems, setExpandedMobileItems] = useState<Set<string>>(new Set());
+  const [_expandedMobileItems, _setExpandedMobileItems] = useState<Set<string>>(new Set());
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
       {(profile?.avatar_url || businessCardPhoto) && (
         <img
           key={profile?.avatar_url || businessCardPhoto}
-          src={profile.avatar_url || businessCardPhoto || ''}
+          src={profile?.avatar_url || businessCardPhoto || ''}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
           onError={event => { event.currentTarget.style.display = 'none'; }}
@@ -130,15 +130,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
     return IconComponent ? <IconComponent className={className} /> : <Menu className={className} />;
   };
 
-  const toggleMobileExpand = (itemKey: string) => {
-    const newExpanded = new Set(expandedMobileItems);
-    if (newExpanded.has(itemKey)) {
-      newExpanded.delete(itemKey);
-    } else {
-      newExpanded.add(itemKey);
-    }
-    setExpandedMobileItems(newExpanded);
-  };
 
   const handleMenuClick = (key: string) => {
     onTabChange(key);

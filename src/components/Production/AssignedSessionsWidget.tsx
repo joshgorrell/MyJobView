@@ -74,7 +74,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
   const [clockingOut, setClockinOut] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [now, setNow] = useState(new Date());
+  const [_now, setNow] = useState(new Date());
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [showNotesFor, setShowNotesFor] = useState<string | null>(null);
 
@@ -101,7 +101,7 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
   async function loadSessions() {
     setLoading(true);
     try {
-      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
+      void (formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone()));
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const twoDaysAhead = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 

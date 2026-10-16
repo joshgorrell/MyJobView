@@ -1,11 +1,14 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Plus, Copy, Trash2, Star, X, Eye, EyeOff, FileText, Settings, CheckCircle, LayoutGrid } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface ReportTemplate {
+  created_at?: string;
+  updated_at?: string;
+  company_id?: string;
   id: string;
   name: string;
   description: string | null;
@@ -218,7 +221,7 @@ const templateSections: TemplateSection[] = [
 ];
 
 export default function ProposalTemplateManager() {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -227,7 +230,7 @@ export default function ProposalTemplateManager() {
   const [saving, setSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
-  const canManage = profile?.role === 'admin' || profile?.role === 'sales_manager';
+  const canManage = profile?.role === 'admin' || profile?.role === 'manager';
   const canEditSelected = selectedTemplate && (
     !selectedTemplate.is_personal || selectedTemplate.created_by === profile?.id
   ) && (selectedTemplate.is_personal || canManage);
@@ -346,7 +349,7 @@ export default function ProposalTemplateManager() {
       const { data, error } = await supabase
         .from('proposal_report_templates')
         .insert({
-          company_id: profile.company_id,
+          company_id: companySettings?.id,
           created_by: profile.id,
           ...newTemplate
         })
@@ -418,7 +421,7 @@ export default function ProposalTemplateManager() {
       await supabase
         .from('proposal_report_templates')
         .update({ is_default: false })
-        .eq('company_id', profile.company_id);
+        .eq('company_id', companySettings?.id);
 
       // Set this one as default
       const { error } = await supabase

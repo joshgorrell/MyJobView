@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { StickyNote, Plus, Pin, Archive, Trash2, MessageSquare, CheckSquare, X, Edit2 } from 'lucide-react';
@@ -35,7 +35,7 @@ export default function StickyNotes() {
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [newNote, setNewNote] = useState({ content: '', color: 'yellow' as const });
+  const [newNote, setNewNote] = useState({ content: '', color: 'yellow' as StickyNote['color'] });
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [loading, setLoading] = useState(true);

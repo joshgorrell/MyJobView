@@ -1,7 +1,7 @@
 import { requestConfirmation, requestText } from '../../lib/feedback';
 import { TeamTimeOffPanel } from "../Shared/TeamTimeOffPanel";
 import { displayDate, LeaveDay } from "../../lib/timeOff";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import {
   Calendar,
@@ -9,7 +9,6 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Plus,
   User,
   TrendingUp,
   Settings,

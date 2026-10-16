@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Package, Scan, Check, X, MapPin, FileText, AlertCircle } from 'lucide-react';
+import { Scan, Check, X, MapPin, FileText, AlertCircle } from 'lucide-react';
 import { BarcodeScanner } from './BarcodeScanner';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -106,7 +106,7 @@ export function WarehousePick() {
           )
         `)
         .eq('proposal_id', list.reference_id)
-        .not('product_id', 'is', null);
+        .not('product_id', 'is', null).overrideTypes<{ product_id: string; quantity: number; description: string; products: { id: string; name: string; sku: string | null } | null }[], { merge: false }>();
 
       if (lineItems) {
         const items: PickItem[] = [];

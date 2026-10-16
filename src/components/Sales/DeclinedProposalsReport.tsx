@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Ban, RefreshCw, Filter, User, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { RefreshCw, Filter, User, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 

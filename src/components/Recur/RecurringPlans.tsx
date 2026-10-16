@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, CreditCard as Edit2, Trash2, DollarSign, Search } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';

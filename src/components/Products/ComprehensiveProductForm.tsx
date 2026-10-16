@@ -34,7 +34,7 @@ interface ProductFormProps {
 }
 
 export default function ComprehensiveProductForm({ productId, onClose, onSave }: ProductFormProps) {
-  const { profile } = useAuth();
+  const { profile: _profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'basic' | 'pricing' | 'inventory' | 'descriptions' | 'accessories'>('basic');
   const [saving, setSaving] = useState(false);
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
@@ -151,7 +151,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
   }
 
   async function loadProduct() {
-    const { data, error } = await supabase
+    const { data, error: _error } = await supabase
       .from('products')
       .select('*')
       .eq('id', productId)
@@ -196,7 +196,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
   async function handleAddManufacturer() {
     if (!newManufacturerName.trim()) return;
 
-    const { data, error } = await supabase
+    const { data, error: _error } = await supabase
       .from('manufacturers')
       .insert({ name: newManufacturerName })
       .select()

@@ -159,7 +159,7 @@ export default function ProjectHistory({ projectId }: ProjectHistoryProps) {
             author:profiles!project_notes_author_id_fkey(full_name)
           `)
           .eq('project_id', projectId)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false }).overrideTypes<ProjectNote[], { merge: false }>(),
       ]);
 
       if (woResult.error) throw woResult.error;

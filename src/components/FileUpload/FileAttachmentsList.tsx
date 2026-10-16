@@ -1,6 +1,7 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Download, Trash2, Eye, File, Image, FileText, Video, Music } from 'lucide-react';
+import ConfirmModal from '../ui/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 
 interface FileAttachment {
@@ -29,6 +30,7 @@ export function FileAttachmentsList({
 }: FileAttachmentsListProps) {
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; path: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {

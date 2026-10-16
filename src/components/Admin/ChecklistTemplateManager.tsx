@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit2, Trash2, CheckCircle, Save, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, Save } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface ChecklistItem {

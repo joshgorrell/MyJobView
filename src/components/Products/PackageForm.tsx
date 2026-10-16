@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useOfflineStorage } from '../../hooks/useOfflineStorage';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { formatCurrency } from '../../lib/utils';
 import { X, Plus, Trash2, Save, Search, WifiOff, Upload, Image as ImageIcon } from 'lucide-react';
 
@@ -19,6 +19,7 @@ interface Product {
   cost: number;
   sku: string;
   category_id?: string;
+  category?: string | null;
   labor_phase_id?: string;
   default_labor_hours?: number;
   labor_cost?: number;
@@ -45,7 +46,7 @@ interface PackageItem {
   product?: Product;
 }
 
-export default function PackageForm({ packageId, readOnly = false, onClose, onSave }: PackageFormProps) {
+export default function PackageForm({ packageId, readOnly: _readOnly = false, onClose, onSave }: PackageFormProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -53,7 +54,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
-  const { isOnline } = useOfflineStorage();
+  const { isOnline } = useOnlineStatus();
 
   // Image upload state
   const [newImage, setNewImage] = useState<File | null>(null);
@@ -109,7 +110,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
           )
         `)
         .eq('is_active', true)
-        .order('manufacturer_model_number');
+        .order('manufacturer_model_number').overrideTypes<Product[], { merge: false }>();
 
       if (error) throw error;
 
@@ -264,7 +265,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
       const filePath = `${fileName}`;
 
       // Upload to storage
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError, data: _data } = await supabase.storage
         .from('product-images')
         .upload(filePath, newImage, {
           cacheControl: '3600',

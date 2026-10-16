@@ -1,8 +1,8 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Proposal } from '../../lib/types';
-import { GitBranch, Plus, Check, Eye, EyeOff, Star, CreditCard as Edit2, Trash2, X, CheckCircle2, Globe } from 'lucide-react';
+import { GitBranch, Plus, Eye, Star, CreditCard as Edit2, Trash2, X, CheckCircle2, Globe } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface ProposalRevisionManagerProps {
@@ -91,57 +91,6 @@ export default function ProposalRevisionManager({
     }
   }
 
-  async function handleSetActive(revisionId: string) {
-    // Check if any revision is currently live on the portal
-    const liveRevision = revisions.find(r => r.is_portal_visible);
-
-    if (liveRevision && liveRevision.id !== revisionId) {
-      setConfirmModal({
-        title: 'Take portal offline?',
-        message: 'The customer portal is currently live. Switching the active revision will take it offline. You will need to review the portal view and turn it back on when ready.',
-        onConfirm: async () => {
-          setConfirmModal(null);
-          // Hide the currently live revision before switching
-          await supabase
-            .from('proposals')
-            .update({ is_portal_visible: false })
-            .eq('id', liveRevision.id);
-          await doSetActive(revisionId);
-        },
-      });
-      return;
-    }
-
-    await doSetActive(revisionId);
-  }
-
-  async function doSetActive(revisionId: string) {
-    try {
-      const { error } = await supabase.rpc('set_active_revision', {
-        p_proposal_id: revisionId
-      });
-
-      if (error) throw error;
-      await loadRevisions();
-    } catch (error) {
-      console.error('Error setting active revision:', error);
-      notify('Failed to set active revision', { theme: 'violet', tone: 'error' });
-    }
-  }
-
-  async function handleTogglePortalVisibility(revisionId: string) {
-    try {
-      const { error } = await supabase.rpc('toggle_revision_portal_visibility', {
-        p_proposal_id: revisionId
-      });
-
-      if (error) throw error;
-      await loadRevisions();
-    } catch (error) {
-      console.error('Error toggling visibility:', error);
-      notify('Failed to toggle portal visibility', { theme: 'violet', tone: 'error' });
-    }
-  }
 
   async function handleDeleteRevision(revisionId: string) {
     setConfirmModal({
@@ -177,7 +126,6 @@ export default function ProposalRevisionManager({
     );
   }
 
-  const activeRevision = revisions.find(r => r.is_active_revision);
 
   return (
     <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">

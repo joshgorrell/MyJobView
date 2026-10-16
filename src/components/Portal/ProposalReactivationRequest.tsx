@@ -12,7 +12,7 @@ interface ProposalReactivationRequestProps {
 
 export function ProposalReactivationRequest({
   proposalId,
-  proposalNumber,
+  proposalNumber: _proposalNumber,
   onClose,
   onSuccess
 }: ProposalReactivationRequestProps) {

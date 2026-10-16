@@ -44,7 +44,7 @@ export interface ProductDetailPanelData {
 export interface LaborPhaseOption {
   id: string;
   name: string;
-  default_price?: number;
+  default_price?: number | null;
 }
 
 export interface ClassOption {

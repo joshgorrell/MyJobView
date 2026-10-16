@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, FileText, CheckCircle, XCircle, Info, DollarSign, Printer, TrendingUp, Package, BarChart3 } from 'lucide-react';
 import { getTaxApplicability, TaxEnvironment, TaxProjectType } from '../../lib/taxCalculations';

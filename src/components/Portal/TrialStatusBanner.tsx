@@ -1,4 +1,4 @@
-import { Clock, Star, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
+import { Star, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 interface TrialStatusBannerProps {
@@ -14,7 +14,7 @@ export function TrialStatusBanner({
   program='test_and_tune',
   daysRemaining,
   expirationDate,
-  subscriptionPlanName,
+  subscriptionPlanName: _subscriptionPlanName,
   showDetails = true,
   compact = false
 }: TrialStatusBannerProps) {

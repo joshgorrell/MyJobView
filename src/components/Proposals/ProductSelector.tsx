@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Product } from '../../lib/types';
@@ -18,7 +18,7 @@ interface ProductSelectorProps {
 }
 
 export default function ProductSelector({ onSelect, onClose, showCreateActions = true, priceField = 'unit_price' }: ProductSelectorProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const [products, setProducts] = useState<BrowsableProduct[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<BrowsableProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,7 +38,7 @@ export default function ProductSelector({ onSelect, onClose, showCreateActions =
 
   useEffect(() => {
     loadProducts();
-  }, [profile?.company_id]);
+  }, [companySettings?.id]);
 
   useEffect(() => {
     filterProducts();
@@ -51,7 +51,7 @@ export default function ProductSelector({ onSelect, onClose, showCreateActions =
       const { data, error } = await supabase
         .from('products')
         .select('*, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
-        .eq('company_id', profile?.company_id)
+        .eq('company_id', companySettings?.id)
         .eq('is_active', true)
         .order('sku');
 

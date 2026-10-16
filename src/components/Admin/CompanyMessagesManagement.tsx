@@ -29,8 +29,8 @@ export function CompanyMessagesManagement() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     message: '',
-    priority: 'normal' as const,
-    type: 'info' as const,
+    priority: 'normal' as CompanyMessage['priority'],
+    type: 'info' as CompanyMessage['type'],
     is_active: true,
     start_date: '',
     end_date: ''

@@ -18,7 +18,7 @@ const dispositions = [
 ] as const;
 
 type Finding={id?:string;description:string;notes:string;dispositions:string[];follow_up_type?:'punchlist'|'task'|null;punchlist_task_id?:string|null;follow_up_task_id?:string|null;routed_at?:string|null};
-type SalesLeadDraft={notes:string};
+
 
 export default function VipMaintenanceChecklist({workOrderId,onChange,onAddPart,onAddSalesLeadPhoto,onCreateFollowUpTask}:{workOrderId:string;onChange?:()=>void;onAddPart?:()=>void;onAddSalesLeadPhoto?:()=>void;onCreateFollowUpTask?:(finding:Finding)=>void}) {
  const {profile}=useAuth(); const [visit,setVisit]=useState<any>(null); const [findings,setFindings]=useState<Finding[]>([]); const [saving,setSaving]=useState(false);

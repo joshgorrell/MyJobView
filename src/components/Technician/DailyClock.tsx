@@ -1,9 +1,9 @@
 import { notify, requestConfirmation } from '../../lib/feedback';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, Calendar, X, AlertTriangle } from 'lucide-react';
+import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
@@ -450,7 +450,7 @@ export function DailyClock() {
     return `${hourStr} and ${mins} ${mins === 1 ? 'minute' : 'minutes'}`;
   }
 
-  function getRewardMessage(eventType: string, points: number, delta: number): string {
+  function getRewardMessage(eventType: string, _points: number, delta: number): string {
     if (eventType === 'early') {
       return `Great! You clocked in ${Math.abs(delta)} minutes early!`;
     } else if (eventType === 'on_time') {
@@ -551,7 +551,6 @@ export function DailyClock() {
             {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-
 
 
         {isOffline && (

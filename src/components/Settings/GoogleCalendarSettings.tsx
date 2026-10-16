@@ -115,7 +115,7 @@ export function GoogleCalendarSettings() {
           )
         `)
         .gte('appointment_date', thirtyDaysAgo.toISOString().split('T')[0])
-        .is('google_calendar_event_id', null);
+        .is('google_calendar_event_id', null).overrideTypes<{ id: string; title: string; description: string | null; appointment_date: string; start_time: string; end_time: string; contacts: { first_name: string | null; last_name: string | null; email: string | null } | null }[], { merge: false }>();
 
       if (!appointments || appointments.length === 0) {
         notify('No new appointments to sync', { theme: 'blue', tone: 'warning' });

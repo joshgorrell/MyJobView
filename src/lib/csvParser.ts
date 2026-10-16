@@ -242,9 +242,9 @@ function matchColumn(header: string, keywords: string[]): number {
 export function rowsToObjects(parsed: ParsedCSV): Record<string, string>[] {
   return parsed.rows.map(row => {
     const obj: Record<string, string> = {};
-    parsed.headers.forEach((header, index) => {
+    for (const [index, header] of parsed.headers.entries()) {
       obj[header] = row[index] || '';
-    });
+    }
     return obj;
   });
 }
@@ -316,14 +316,14 @@ export function detectColumnMapping(parsed: ParsedCSV, importType: 'job_time' | 
   for (const [field, keywords] of Object.entries(fieldKeywords)) {
     let bestMatch: { header: string; score: number; index: number } | null = null;
 
-    parsed.headers.forEach((header, index) => {
-      if (usedHeaders.has(header)) return;
+    for (const [index, header] of parsed.headers.entries()) {
+      if (usedHeaders.has(header)) continue;
 
       const score = matchColumn(header, keywords);
       if (score > 0.6 && (!bestMatch || score > bestMatch.score)) {
         bestMatch = { header, score, index };
       }
-    });
+    }
 
     if (bestMatch) {
       usedHeaders.add(bestMatch.header);
@@ -353,7 +353,7 @@ export function detectColumnMapping(parsed: ParsedCSV, importType: 'job_time' | 
  * Validate that required fields are mapped.
  * Work order is optional — rows without a matched work order will import without one.
  */
-export function validateMapping(mapping: SmartColumnMap, importType: 'job_time' | 'daily_time' = 'job_time'): { isValid: boolean; valid: boolean; errors: string[]; missing: string[] } {
+export function validateMapping(mapping: SmartColumnMap, _importType: 'job_time' | 'daily_time' = 'job_time'): { isValid: boolean; valid: boolean; errors: string[]; missing: string[] } {
   const errors: string[] = [];
   const missing: string[] = [];
 

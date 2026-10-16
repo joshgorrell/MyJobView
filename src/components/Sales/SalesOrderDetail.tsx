@@ -28,6 +28,8 @@ export interface SalesOrderFull {
   updated_at: string;
   contact_id: string;
   proposal_id: string;
+  project_id: string | null;
+  title?: string | null;
   company_id: string;
   organization_id: string;
   contact: {
@@ -236,7 +238,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
           approver:profiles!change_orders_approved_by_fkey(full_name)
         `)
         .eq('sales_order_id', orderId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).overrideTypes<ChangeOrderSummary[], { merge: false }>();
 
       if (error) throw error;
       setChangeOrders(data || []);

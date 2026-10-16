@@ -1,23 +1,12 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { DollarSign, CheckCircle, XCircle, ExternalLink, Download, Users, RefreshCw, Eye, ArrowUpDown, AlertCircle } from 'lucide-react';
+import { DollarSign, CheckCircle, XCircle, ExternalLink, Users, RefreshCw, Eye, ArrowUpDown, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { QuickBooksSettings as QBSettings } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { QuickBooksCustomerBrowser } from './QuickBooksCustomerBrowser';
 import ConfirmModal from '../ui/ConfirmModal';
 
-interface QBCustomer {
-  id: string;
-  displayName: string;
-  givenName: string | null;
-  familyName: string | null;
-  companyName: string | null;
-  email: string | null;
-  phone: string | null;
-  balance: number;
-  active: boolean;
-}
 
 export function QuickBooksSettings() {
   const { profile } = useAuth();

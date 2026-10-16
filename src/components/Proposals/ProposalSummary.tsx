@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ProposalWithDetails } from '../../lib/types';
-import { Save, Send, Eye, DollarSign, Users, RefreshCw, Clock, Mail, MessageSquare, RotateCcw, ChevronDown, ExternalLink, Activity, X, Check, Download, Globe, EyeOff, CreditCard as Edit2, Calendar, Ban, AlertTriangle, Monitor } from 'lucide-react';
+import { Save, Send, Eye, DollarSign, Users, RefreshCw, Clock, Mail, MessageSquare, RotateCcw, ChevronDown, Activity, X, Check, Download, Globe, EyeOff, CreditCard as Edit2, Ban, AlertTriangle, Monitor } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ResubmitProposalModal from './ResubmitProposalModal';
@@ -55,8 +55,8 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
   const [showQA, setShowQA] = useState(false);
   const [unreadQaCount, setUnreadQaCount] = useState(0);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
-  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
-  const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
+  const [_messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
+  const [_unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const [showPortalDropdown, setShowPortalDropdown] = useState(false);
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [activityData, setActivityData] = useState<any>(null);
@@ -65,7 +65,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
   const [notifyCustomerOnPortal, setNotifyCustomerOnPortal] = useState(true);
   const [showReactivateModal, setShowReactivateModal] = useState(false);
   const [showExpirationEditor, setShowExpirationEditor] = useState(false);
-  const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
+  const [_pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
@@ -518,10 +518,8 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
         if (markError) {
           console.error('Failed to mark activity as viewed:', markError);
         } else {
-          // Trigger a refresh if onRefresh is available
-          if (onRefresh) {
-            onRefresh();
-          }
+          // Refresh the parent after clearing the activity indicator.
+          onSave?.();
         }
       } catch (markError) {
         console.error('Error marking activity as viewed:', markError);
@@ -636,49 +634,49 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
           {(proposal.discount_amount || 0) > 0 && (
             <div className="flex justify-between text-red-400">
               <span>Discount</span>
-              <span>-${proposal.discount_amount.toFixed(2)}</span>
+              <span>-${(proposal.discount_amount ?? 0).toFixed(2)}</span>
             </div>
           )}
 
           {(proposal.project_management_amount || 0) > 0 && (
             <div className="flex justify-between text-blue-400">
               <span>Project Management</span>
-              <span>+${proposal.project_management_amount.toFixed(2)}</span>
+              <span>+${(proposal.project_management_amount ?? 0).toFixed(2)}</span>
             </div>
           )}
 
           {(proposal.project_design_amount || 0) > 0 && (
             <div className="flex justify-between text-blue-400">
               <span>Project Design</span>
-              <span>+${proposal.project_design_amount.toFixed(2)}</span>
+              <span>+${(proposal.project_design_amount ?? 0).toFixed(2)}</span>
             </div>
           )}
 
           {(proposal.system_design_amount || 0) > 0 && (
             <div className="flex justify-between text-blue-400">
               <span>System Design</span>
-              <span>+${proposal.system_design_amount.toFixed(2)}</span>
+              <span>+${(proposal.system_design_amount ?? 0).toFixed(2)}</span>
             </div>
           )}
 
           {(proposal.misc_parts_amount || 0) > 0 && (
             <div className="flex justify-between text-blue-400">
               <span>Misc Parts</span>
-              <span>+${proposal.misc_parts_amount.toFixed(2)}</span>
+              <span>+${(proposal.misc_parts_amount ?? 0).toFixed(2)}</span>
             </div>
           )}
 
           {(proposal.custom_modifier_1_amount || 0) > 0 && (
             <div className="flex justify-between text-blue-400">
               <span>Custom Modifier 1</span>
-              <span>+${proposal.custom_modifier_1_amount.toFixed(2)}</span>
+              <span>+${(proposal.custom_modifier_1_amount ?? 0).toFixed(2)}</span>
             </div>
           )}
 
           {(proposal.custom_modifier_2_amount || 0) > 0 && (
             <div className="flex justify-between text-blue-400">
               <span>Custom Modifier 2</span>
-              <span>+${proposal.custom_modifier_2_amount.toFixed(2)}</span>
+              <span>+${(proposal.custom_modifier_2_amount ?? 0).toFixed(2)}</span>
             </div>
           )}
 
@@ -891,7 +889,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
               </div>
             )}
 
-            {proposal.renewal_count > 0 && (
+            {(proposal.renewal_count ?? 0) > 0 && (
               <p className="text-gray-400 text-xs">
                 Renewed {proposal.renewal_count} time{proposal.renewal_count !== 1 ? 's' : ''}
               </p>
@@ -1123,10 +1121,6 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
           totalAmount={proposal.total}
           onClose={() => setShowReactivateModal(false)}
           onSuccess={handleReactivateSuccess}
-          onReview={() => {
-            setShowReactivateModal(false);
-            // Optionally trigger a preview or navigate to edit mode
-          }}
         />
       )}
 

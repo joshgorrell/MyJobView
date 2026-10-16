@@ -1,4 +1,3 @@
-import React from 'react';
 import { ProposalRoom, ProposalLineItem } from '../../lib/types';
 import { Plus, ChevronDown, ChevronRight, GripVertical, Trash2 } from 'lucide-react';
 
@@ -27,7 +26,7 @@ export default function ProposalBuilderAllRooms({
     <div className="p-6 overflow-y-auto">
       <div className="max-w-5xl mx-auto space-y-4">
         {/* All Rooms Stacked Vertically */}
-        {rooms.map((room, index) => (
+        {rooms.map((room, _index) => (
           <div
             key={room.id}
             className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden"

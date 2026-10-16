@@ -143,7 +143,7 @@ function formatBillingOneLine(b: BillingAddress): string {
 }
 
 export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposalId, onClose, onSuccess }: CreateInvoiceModalProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const [selectedContactId, setSelectedContactId] = useState(contactId || '');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState(projectId || '');
@@ -158,6 +158,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' }
   ]);
   const [billToContact, setBillToContact] = useState<Contact | null>(null);
+  const [billing, setBilling] = useState<BillingAddress>({ ...EMPTY_BILLING });
   const [billingSource, setBillingSource] = useState<'customer' | 'bill_to'>('customer');
   const [editingBilling, setEditingBilling] = useState(false);
   const [transactionLocation, setTransactionLocation] = useState<'customer' | 'dealer' | 'custom'>('customer');
@@ -559,7 +560,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
-          company_id: profile?.company_id,
+          company_id: companySettings?.id,
           contact_id: selectedContactId,
           project_id: selectedProjectId || null,
           sales_order_id: salesOrderId || null,

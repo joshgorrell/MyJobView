@@ -1,5 +1,5 @@
 import { requestConfirmation } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Trash2, GripVertical, Save } from 'lucide-react';
 
@@ -16,7 +16,7 @@ export default function ClassManager() {
   const [classes, setClasses] = useState<ProposalClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [showNewForm, setShowNewForm] = useState(false);
+  const [_showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
     loadClasses();
@@ -117,7 +117,7 @@ export default function ClassManager() {
       </p>
 
       <div className="space-y-2">
-        {classes.map((cls, index) => (
+        {classes.map((cls, _index) => (
           <div
             key={cls.id}
             className="bg-gray-900 rounded-lg p-4 flex items-center gap-4"

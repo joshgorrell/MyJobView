@@ -3,8 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Video, Square, Play, Pause, Trash2, Eye, EyeOff,
-  Upload, AlertCircle, Loader2, RotateCcw, CheckCircle,
+  Video, Square, Play, Trash2, Eye, EyeOff,
+  AlertCircle, Loader2, RotateCcw, CheckCircle,
   Mic, MicOff, Camera, CameraOff, Clock, GripVertical,
   Film, BookMarked
 } from 'lucide-react';
@@ -67,7 +67,7 @@ function RecordingCard({
   const [titleValue, setTitleValue] = useState(recording.title);
   const [editingDesc, setEditingDesc] = useState(false);
   const [descValue, setDescValue] = useState(recording.description || '');
-  const [playing, setPlaying] = useState(false);
+  const [_playing, setPlaying] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -75,15 +75,6 @@ function RecordingCard({
     ? signedUrls[recording.storage_path]
     : recording.video_url || undefined;
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (playing) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play();
-    }
-    setPlaying(!playing);
-  };
 
   return (
     <div className={`border rounded-xl overflow-hidden transition-all ${
@@ -432,7 +423,7 @@ function InlineRecorder({
   }
 
   const isRecording = recordingState === 'recording';
-  const isBusy = recordingState !== 'idle';
+
 
   return (
     <div className="space-y-2">

@@ -34,7 +34,7 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    if (timePolicy.dailyClock) {
+    if (timePolicy.dailyClock && profile?.id) {
       checkClockStatus();
 
       const timer = setInterval(() => {

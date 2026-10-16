@@ -33,7 +33,7 @@ export function AddPartsModal({ workOrderId, projectId, onClose, onSuccess }: Ad
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
-  const [showCustomPart, setShowCustomPart] = useState(false);
+  const [_showCustomPart, setShowCustomPart] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [catalogOffset, setCatalogOffset] = useState(0);
   const [hasMoreCatalog, setHasMoreCatalog] = useState(false);

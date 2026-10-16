@@ -1,12 +1,12 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
 import {
-  X, CheckCircle, Mail, Globe, DollarSign, FileText, AlertCircle,
+  X, CheckCircle, Mail, Globe, DollarSign, AlertCircle,
   Building2, Users, ChevronRight, Send, ExternalLink, Copy, Check,
-  Shield, CreditCard, UserCheck, Clock, Banknote
+  Shield, CreditCard, UserCheck, Banknote
 } from 'lucide-react';
 
 interface ChangeOrderSummary {

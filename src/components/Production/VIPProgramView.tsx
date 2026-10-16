@@ -1,5 +1,5 @@
 import { requestText } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Star, Calendar, CheckCircle, Clock, AlertCircle, User, Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -98,7 +98,7 @@ export function VIPProgramView() {
         `)
         .order('installation_date', { ascending: false });
 
-      if (profile?.role === 'technician' || profile?.role === 'field_tech') {
+      if (profile?.role === 'tech') {
         query = query.eq('assigned_technician', profile.id);
       }
 

@@ -19,7 +19,7 @@ export function ReactivateProposalModalEnhanced({
   proposalId,
   proposalNumber,
   lastModified,
-  totalAmount,
+  totalAmount: _totalAmount,
   onClose,
   onSuccess,
   onReview

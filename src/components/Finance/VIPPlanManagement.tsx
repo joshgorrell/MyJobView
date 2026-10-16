@@ -145,7 +145,7 @@ export function VIPPlanManagement() {
           contact:contacts!inner(full_name, email),
           plan:recurring_plans(plan_name, plan_type)
         `)
-        .order('start_date', { ascending: false });
+        .order('start_date', { ascending: false }).overrideTypes<Subscription[], { merge: false }>();
 
       if (error) throw error;
       // Promotional VIP trials intentionally have no plan; other recurring products do not belong here.
@@ -407,7 +407,7 @@ export function VIPPlanManagement() {
         <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <p className="text-sm text-secondary max-w-xl">{descriptions[selectedTab]}</p>
           <div className="flex flex-col sm:flex-row gap-2">
-            {selectedTab === 'subscriptions' && <select aria-label="Membership status" value={memberStatus} onChange={e => setMemberStatus(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm"><option value="active">Active</option><option value="all">All statuses</option>{Array.from(new Set(subscriptions.filter(s => !['active', 'trial', 'pending_payment'].includes(s.status)).map(s => s.status))).map(status => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}</select>}
+            {selectedTab === 'subscriptions' && <select aria-label="Membership status" value={memberStatus} onChange={e => setMemberStatus(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm"><option value="active">Active</option><option value="all">All statuses</option>{Array.from(new Set(subscriptions.filter(s => !['active', 'trial', 'pending_payment'].includes(s.status)).map(s => s.status))).map(status => <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>)}</select>}
             <div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-secondary" /><input aria-label="Search VIP section" value={search} onChange={e => setSearch(e.target.value)} placeholder={selectedTab === 'plans' ? 'Search plans…' : 'Search customers…'} className="w-full sm:w-56 pl-9 pr-3 py-2 text-base sm:text-sm bg-white text-gray-900 border border-gray-300 rounded-lg text-sm" /></div>
           </div>
         </div>
@@ -682,7 +682,7 @@ export function VIPPlanManagement() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-3 py-1 rounded text-sm font-medium ${sub.status === 'active' ? 'bg-successSoft text-success' : 'bg-surface text-secondary'}`}>
-                    {sub.status.replaceAll('_', ' ')}
+                    {sub.status.replace(/_/g, ' ')}
                   </span>
                   {sub.status === 'active' && sub.plan?.plan_type === 'vip_plan' && (
                     <CheckCircle2 className="w-5 h-5 text-success" aria-label="VIP Portal Access" />

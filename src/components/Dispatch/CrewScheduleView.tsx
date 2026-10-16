@@ -2,7 +2,7 @@ import { requestConfirmation } from '../../lib/feedback';
 import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
 import { dateKey } from '../../lib/workOrderScheduling';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   Users,
@@ -44,19 +44,19 @@ interface CrewJob {
   project_name: string;
   customer_name: string;
   location: string;
-  estimated_hours: number;
+  estimated_duration: number;
   required_techs: number;
 }
 
 export function CrewScheduleView() {
   const [crews, setCrews] = useState<Crew[]>([]);
   const [jobs, setJobs] = useState<CrewJob[]>([]);
-  const [technicians, setTechnicians] = useState<CrewMember[]>([]);
+  const [_technicians, setTechnicians] = useState<CrewMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [showCrewManager, setShowCrewManager] = useState(false);
-  const [editingCrew, setEditingCrew] = useState<Crew | null>(null);
+  const [_editingCrew, _setEditingCrew] = useState<Crew | null>(null);
   const [draggedJob, setDraggedJob] = useState<string | null>(null);
 
   useEffect(() => {

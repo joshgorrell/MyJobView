@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -10,12 +10,9 @@ import {
   Navigation,
   CheckCircle,
   PlayCircle,
-  AlertCircle,
   ChevronRight,
   Calendar,
-  User,
-  Wrench
-} from 'lucide-react';
+  User} from 'lucide-react';
 
 interface MobileJob {
   id: string;
@@ -224,7 +221,7 @@ export function MobileTechView() {
   }
 
   const currentJob = jobs.find(j => j.id === currentJobId);
-  const nextJob = jobs.find(j => j.id !== currentJobId && j.status === 'assigned');
+
   const todayJobs = jobs.filter(j => isToday(j.scheduled_date));
 
   return (

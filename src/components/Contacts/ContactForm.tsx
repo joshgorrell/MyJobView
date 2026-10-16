@@ -41,12 +41,7 @@ function clearDraft() {
   localStorage.removeItem(DRAFT_KEY);
 }
 
-export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactFormProps) {
-  const { profile } = useAuth();
-
-  const draft = loadDraft();
-
-  const [formData, setFormData] = useState(draft?.formData ?? {
+const DEFAULT_CONTACT_FORM = {
     contact_type: 'person' as 'person' | 'business',
     company_name: '',
     first_name: '',
@@ -70,13 +65,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
     tax_jurisdiction_id: '',
     default_payment_terms: 'Net 10',
     accepts_po: false,
-  });
+  };
+
+export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactFormProps) {
+  const { profile } = useAuth();
+
+  const draft = loadDraft();
+
+  const [formData, setFormData] = useState<typeof DEFAULT_CONTACT_FORM>(draft?.formData ?? DEFAULT_CONTACT_FORM);
   const [businessCardPhoto, setBusinessCardPhoto] = useState<File | null>(null);
   const [businessCardPhotoPreview, setBusinessCardPhotoPreview] = useState<string | null>(null);
   const [taxCertificateFile, setTaxCertificateFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [_uploadingPhoto, setUploadingPhoto] = useState(false);
   const [salesStatus, setSalesStatus] = useState<'customer' | 'prospect' | 'lead'>(draft?.salesStatus ?? initialSalesStatus ?? 'customer');
   const [leadDestination, setLeadDestination] = useState<'fishbowl' | 'assign'>(draft?.leadDestination ?? 'fishbowl');
   const [assignedTo, setAssignedTo] = useState<string>(draft?.assignedTo ?? '');
@@ -242,7 +244,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
 
       setCheckingUsername(true);
       try {
-        const { data, error } = await supabase
+        const { data, error: _error } = await supabase
           .from('contacts')
           .select('username')
           .eq('username', formData.username)
@@ -739,6 +741,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   clearDraft();
                   setHasDraft(false);
                   setFormData({
+                    tax_jurisdiction_id: '',
                     contact_type: 'person',
                     company_name: '', first_name: '', last_name: '', title: '', username: '',
                     email: '', phone: '', business_phone: '', notes: '', tags: '', office_id: '',
@@ -774,7 +777,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   name="contact_type"
                   value="person"
                   checked={formData.contact_type === 'person'}
-                  onChange={(e) => setFormData({ ...formData, contact_type: 'person' })}
+                  onChange={(_e) => setFormData({ ...formData, contact_type: 'person' })}
                   className="w-4 h-4 text-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-secondary">Person</span>
@@ -785,7 +788,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   name="contact_type"
                   value="business"
                   checked={formData.contact_type === 'business'}
-                  onChange={(e) => setFormData({ ...formData, contact_type: 'business' })}
+                  onChange={(_e) => setFormData({ ...formData, contact_type: 'business' })}
                   className="w-4 h-4 text-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-secondary">Business</span>

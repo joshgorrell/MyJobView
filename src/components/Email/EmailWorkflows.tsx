@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { Mail, Plus, Play, Pause, Trash2, Edit, Eye, Clock } from 'lucide-react';
+import { Mail, Plus, Play, Pause, Trash2, Eye, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ConfirmModal from '../ui/ConfirmModal';
 

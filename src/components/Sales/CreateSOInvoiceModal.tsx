@@ -3,13 +3,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  X, Save, AlertTriangle, Check, DollarSign, FileText, TrendingUp, TrendingDown,
+  X, Save, AlertTriangle, Check, FileText, TrendingUp, TrendingDown,
   CreditCard as Edit2, Mail, Send, ExternalLink, CheckSquare, Square, ShieldAlert,
   CheckCircle, XCircle, Info, CreditCard
 } from 'lucide-react';
 import type { SalesOrderFull, ChangeOrderSummary } from './SalesOrderDetail';
 import {
-  getTaxApplicability, getEnvironmentDisplayName, getProjectTypeDisplayName,
+  getTaxApplicability,
   computeInvoiceTax,
   type TaxEnvironment, type TaxProjectType,
 } from '../../lib/taxCalculations';
@@ -97,7 +97,7 @@ interface CreateSOInvoiceModalProps {
 }
 
 // Effective pre-selected IDs resolved before row construction
-const effectivePreSelectedIds: string[] = [];
+
 
 export function CreateSOInvoiceModal({
   order,
@@ -207,7 +207,7 @@ export function CreateSOInvoiceModal({
   const [checkingFirstInvoice, setCheckingFirstInvoice] = useState(false);
   const [sendToCustomer, setSendToCustomer] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
-  const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [_sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   // Labor/material split derived from proposal line items
   const [proposalLaborPct, setProposalLaborPct] = useState(0.5);
@@ -295,14 +295,7 @@ export function CreateSOInvoiceModal({
   }
 
   // For each selected row, compute labor and material portions from the back-calculated subtotal.
-  function getRowLaborMaterialAmounts(row: BillingRow): { laborAmt: number; materialAmt: number } {
-    const sign = row.isNegative ? -1 : 1;
-    const { subtotal } = backCalcTotals(Math.abs(row.selectedAmount));
-    return {
-      laborAmt: sign * subtotal * proposalLaborPct,
-      materialAmt: sign * subtotal * (1 - proposalLaborPct),
-    };
-  }
+
 
   // Compute invoice totals — entered amounts are tax-inclusive; back-calculate subtotal and tax.
   function computeInvoiceTotals() {
@@ -324,7 +317,7 @@ export function CreateSOInvoiceModal({
   const totalNegCOCredit = selectedNegCOs.reduce((s, r) => s + Math.abs(r.selectedAmount), 0);
 
   const isCreditMemoInvoice = invoiceTotal < -0.001;
-  const absoluteInvoiceTotal = Math.abs(invoiceTotal);
+
 
   const remainingAfterInvoice = remainingToInvoice - invoiceTotal;
   const isOverBilling = !isCreditMemoInvoice && invoiceTotal > remainingToInvoice + 0.01;

@@ -5,7 +5,6 @@ import { notifyTechJobReassigned } from '../../lib/dispatchNotifications';
 import ConfirmModal from '../ui/ConfirmModal';
 import {
   CheckCircle,
-  XCircle,
   Clock,
   AlertCircle,
   User,
@@ -106,7 +105,7 @@ export function JobAcceptanceQueue() {
       if (error) throw error;
 
       const pending = (data || []).filter(wo => {
-        const hasAccepted = wo.job_acceptance_log?.some(log => log.action === 'accepted');
+        const hasAccepted = wo.job_acceptance_log?.some((log: { action: string }) => log.action === 'accepted');
         return !hasAccepted;
       });
 
@@ -262,7 +261,7 @@ export function JobAcceptanceQueue() {
       ) : (
         <div className="space-y-3">
           {pendingJobs.map(job => {
-            const hasDeclined = job.job_acceptance_log?.some(log => log.action === 'declined');
+            const hasDeclined = job.job_acceptance_log?.some((log: { action: string }) => log.action === 'declined');
             const timeSinceAssigned = getTimeAgo(job.created_at);
 
             return (

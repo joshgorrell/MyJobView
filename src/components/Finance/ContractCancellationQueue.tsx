@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle, XCircle, DollarSign, Calendar, User, FileText, Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, DollarSign, User, FileText, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 

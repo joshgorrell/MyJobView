@@ -180,7 +180,7 @@ const DEVICE_PRESET_NICKNAMES = [
 
 export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?: 'usage' | 'schedule' }) {
   const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
-  const [userStats, setUserStats] = useState<UserStats[]>([]);
+  const [_userStats, setUserStats] = useState<UserStats[]>([]);
   const [locationStats, setLocationStats] = useState<LocationStats[]>([]);
   const [deviceStats, setDeviceStats] = useState<DeviceStats[]>([]);
   const [loading, setLoading] = useState(true);

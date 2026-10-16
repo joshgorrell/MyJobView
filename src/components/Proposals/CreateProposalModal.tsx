@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Contact, Lead } from '../../lib/types';
@@ -371,6 +371,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   }
 
   async function doCreate(finalTaxRate: number) {
+    if (!selectedResult) return;
     try {
       setCreating(true);
 

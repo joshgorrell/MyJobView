@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateInternalSessionModal } from './CreateInternalSessionModal';

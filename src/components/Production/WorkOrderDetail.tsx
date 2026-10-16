@@ -6,10 +6,10 @@ import {InvoiceDetailModal} from '../Invoices/InvoiceDetailModal';
 import { WorkOrderTimeControl } from './WorkOrderTimeControl';
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import Flow from '../Flow/Flow';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, AlertCircle, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Tag, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartRequestForm } from './PartRequestForm';
@@ -410,7 +410,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             product_request_items(id, product_name, quantity_requested, estimated_cost)
           `)
           .eq('work_order_id', workOrderId)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false }).overrideTypes<PartRequest[], { merge: false }>(),
         supabase
           .from('job_photos')
           .select('*')
@@ -513,46 +513,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     }
   }
 
-  async function handleConfirmCustomerContact() {
-    if (!profile || !workOrder) return;
-    if (workOrder.customer_contact_confirmed_at) {
-      setConfirmModal({
-        title: 'Update Contact Timestamp',
-        message: 'Customer contact has already been recorded. Do you want to update the timestamp to now?',
-        onConfirm: async () => {
-          try {
-            const { error } = await supabase
-              .from('work_orders')
-              .update({
-                customer_contact_confirmed_at: new Date().toISOString(),
-                customer_contact_confirmed_by: profile.id,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', workOrderId);
-            if (error) throw error;
-            loadWorkOrderData();
-          } catch (error) {
-            console.error('Error confirming customer contact:', error);
-          }
-        }
-      });
-      return;
-    }
-    try {
-      const { error } = await supabase
-        .from('work_orders')
-        .update({
-          customer_contact_confirmed_at: new Date().toISOString(),
-          customer_contact_confirmed_by: profile.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', workOrderId);
-      if (error) throw error;
-      loadWorkOrderData();
-    } catch (error) {
-      console.error('Error confirming customer contact:', error);
-    }
-  }
 
   async function handleArchive() {
     if (!profile || !workOrder) return;
@@ -697,10 +657,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   }
 
   const canEdit = profile?.role === 'admin' ||
-    profile?.role === 'office_manager' ||
-    profile?.role === 'project_manager';
+    profile?.role === 'manager';
 
-  const canArchive = profile?.role === 'admin' || profile?.role === 'finance' || profile?.role === 'office_manager';
+  const canArchive = profile?.role === 'admin' || profile?.role === 'finance' || profile?.role === 'manager';
 
   const canManageParts = ['admin','office_manager','project_manager','service_manager','manager','finance'].includes(profile?.role || '') || workOrder.assigned_to===profile?.id;
   const isAssignedTech = workOrder.assigned_to === profile?.id;
@@ -1376,7 +1335,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
             <WorkOrderTasksChecklist
               workOrderId={workOrderId}
-              projectId={workOrder.project_id}
+              projectId={workOrder.project_id ?? undefined}
               laborPhaseId={workOrder.labor_phase_id}
               workOrderGroupId={workOrder.work_order_group_id}
               isGroupWorkOrder={workOrder.is_group_work_order}
@@ -1462,7 +1421,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                 Add Photos
               </button>
             )}
-            <JobPhotoGallery workOrderId={workOrderId} photos={jobPhotos} onUpdate={loadWorkOrderData} />
+            <JobPhotoGallery workOrderId={workOrderId} />
           </div>
         )}
 
@@ -1807,7 +1766,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="bg-white rounded-xl w-full max-w-lg">
             <PartRequestForm
               workOrderId={workOrderId}
-              projectId={workOrder.project_id}
+              projectId={workOrder.project_id ?? undefined}
               onSuccess={() => { setShowPartRequestForm(false); loadWorkOrderData(); }}
               onCancel={() => setShowPartRequestForm(false)}
             />
@@ -1839,7 +1798,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       {showAddPartsModal && (
         <AddPartsModal
           workOrderId={workOrderId}
-          projectId={workOrder.project_id}
+          projectId={workOrder.project_id ?? undefined}
           onClose={() => setShowAddPartsModal(false)}
           onSuccess={() => { setShowAddPartsModal(false); loadWorkOrderData(); }}
         />

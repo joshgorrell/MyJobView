@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Award,
   TrendingUp,
-  TrendingDown,
   Clock,
   Target,
   Calendar,
@@ -16,10 +15,8 @@ import {
   FileText,
   Crown,
   ExternalLink,
-  Hourglass,
   ChevronRight,
   Layers,
-  Star,
   UserCheck,
   History
 } from 'lucide-react';

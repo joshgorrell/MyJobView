@@ -63,7 +63,7 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
   const [selectedCOId, setSelectedCOId] = useState<string>('');
   const [showFlowModal, setShowFlowModal] = useState(false);
   const [selectedFlowCO, setSelectedFlowCO] = useState<ChangeOrderSummary | null>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, _setStatusFilter] = useState('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [activating, setActivating] = useState<string | null>(null);
@@ -95,8 +95,8 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [overflowMenuId]);
 
-  const canApprove = profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'project_manager';
-  const canUnlock = profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'project_manager';
+  const canApprove = profile?.role === 'admin' || profile?.role === 'manager';
+  const canUnlock = profile?.role === 'admin' || profile?.role === 'manager';
 
   async function loadHistory(changeOrderId: string) {
     try {
@@ -411,14 +411,6 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
     return map;
   })();
 
-  const statusCounts = {
-    all: changeOrders.length,
-    draft: changeOrders.filter(c => c.status === 'draft').length,
-    pending_approval: changeOrders.filter(c => c.status === 'pending_approval').length,
-    approved: changeOrders.filter(c => c.status === 'approved').length,
-    rejected: changeOrders.filter(c => c.status === 'rejected').length,
-    transferred: changeOrders.filter(c => c.status === 'transferred').length,
-  };
 
   const openEditorCO = changeOrders.find(co => co.id === inlineEditorCOId);
 

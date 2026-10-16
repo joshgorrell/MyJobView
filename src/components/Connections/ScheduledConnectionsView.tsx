@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { Calendar, Plus, Edit2, Pause, Play, Trash2, Search, Filter, Clock, RefreshCw, User, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Calendar, Plus, Edit2, Pause, Play, Trash2, Search, Clock, RefreshCw, User, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScheduledConnectionForm } from './ScheduledConnectionForm';

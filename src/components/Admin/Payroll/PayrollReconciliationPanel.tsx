@@ -1,7 +1,7 @@
 import { notify } from '../../../lib/feedback';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Scale, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Scale, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface ReconciliationFlag {
   id: string;
@@ -80,7 +80,7 @@ export default function PayrollReconciliationPanel({ payPeriodId }: { payPeriodI
         .update({
           resolution_status: status,
           resolution_note: resolveNote || null,
-          resolved_by: userData.data.user?.id,
+          resolved_by: userData.user?.id,
           resolved_at: new Date().toISOString(),
         })
         .eq('id', flagId);

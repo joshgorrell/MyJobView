@@ -1,6 +1,6 @@
 import { loadProjectSummaries } from '../../lib/projectOverview';
 import { useAuth } from '../../contexts/AuthContext';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Calendar, DollarSign, FileText, CreditCard as Edit2, Save, X, Timer, Clock, AlertTriangle, CheckCircle, Flag } from 'lucide-react';
 import { ProjectRoleAssignment } from './ProjectRoleAssignment';

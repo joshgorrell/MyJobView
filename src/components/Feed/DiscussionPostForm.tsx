@@ -29,7 +29,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
   const [route, setRoute] = useState<FlowTarget | null>(null);
   const [routeToken, setRouteToken] = useState('');
   const [highlight, setHighlight] = useState(0);
-  const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id);
+  const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id ?? undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {

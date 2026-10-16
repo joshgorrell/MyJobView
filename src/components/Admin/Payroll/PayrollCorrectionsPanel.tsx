@@ -84,7 +84,7 @@ export default function PayrollCorrectionsPanel({ payPeriodId }: { payPeriodId: 
         original_jurisdiction: formData.original_jurisdiction || null,
         corrected_jurisdiction: formData.corrected_jurisdiction || null,
         reason: formData.reason,
-        created_by: userData.data.user?.id,
+        created_by: userData.user?.id,
         status: 'open',
       });
 

@@ -226,7 +226,7 @@ export async function recordCOModifierChange(
     const oldVal = (oldSnapshot[field] as number) ?? 0;
     const newVal = (newSnapshot[field] as number) ?? 0;
 
-    const oldApplyField = field.replace('_percent', '').replace('custom_modifier_1', 'custom_modifier_1').replace('custom_modifier_2', 'custom_modifier_2') as keyof COModifierSnapshot;
+
     const applyField = ('apply_' + field.replace('_percent', '')) as keyof COModifierSnapshot;
     const oldApply = (oldSnapshot[applyField] as boolean) ?? false;
     const newApply = (newSnapshot[applyField] as boolean) ?? false;

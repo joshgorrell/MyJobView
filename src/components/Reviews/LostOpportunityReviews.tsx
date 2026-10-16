@@ -43,7 +43,7 @@ interface Review {
   response_created_at: string | null;
 }
 export default function LostOpportunityReviews(
-  { showCreate = false }: { showCreate?: boolean },
+  { showCreate: _showCreate = false }: { showCreate?: boolean },
 ) {
   const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -177,14 +177,7 @@ export default function LostOpportunityReviews(
       active = false;
     };
   }, [contact, org]);
-  async function openResponse(review: Review) {
-    if (expandedReview === review.request_id) {
-      setExpandedReview(null);
-      return;
-    }
-    setExpandedReview(review.request_id);
-    await markViewed(review);
-  }
+
   async function markViewed(review: Review) {
     if (review.reviewed_at) return;
     setBusy(true);

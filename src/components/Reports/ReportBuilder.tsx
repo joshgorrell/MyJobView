@@ -7,19 +7,6 @@ import { formatCurrency } from '../../lib/utils';
 type ReportType = 'sales' | 'revenue' | 'proposals' | 'appointments' | 'commissions' | 'contacts';
 type ExportFormat = 'csv' | 'pdf';
 
-interface ReportConfig {
-  type: ReportType;
-  dateRange: {
-    start: string;
-    end: string;
-  };
-  groupBy?: 'day' | 'week' | 'month' | 'year' | 'user' | 'office';
-  filters?: {
-    status?: string[];
-    userId?: string;
-    officeId?: string;
-  };
-}
 
 interface ReportData {
   labels: string[];

@@ -355,9 +355,9 @@ export function TestTunePerformanceDashboard() {
       {activeTab === 'bonuses' ? (
         <MyBonusesTab />
       ) : activeTab === 'analytics' ? (
-        <TestTuneAnalytics permissions={permissions} profileId={profile!.id} />
+        <TestTuneAnalytics permissions={permissions} />
       ) : activeTab === 'leaderboard' ? (
-        <TechLeaderboard permissions={permissions} currentUserId={profile!.id} />
+        <TechLeaderboard permissions={permissions} />
       ) : (
         <>
           {/* Alerts Banner */}
@@ -920,7 +920,7 @@ export function TestTunePerformanceDashboard() {
       )}
 
       {showHelp && (
-        <HelpModal onClose={() => setShowHelp(false)}>
+        <HelpModal isOpen={showHelp} title="Test & Tune Help" onClose={() => setShowHelp(false)}>
           <TestTuneHelpContent
             userRole={permissions.user_role}
             canViewBonusAmounts={permissions.can_view_bonus_amounts}

@@ -1,6 +1,7 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { X, AtSign, Users, Search, UserCheck, ChevronDown } from 'lucide-react';
+import { AtSign, Users, Search, UserCheck } from 'lucide-react';
+import { AIFormFill } from '../Shared/AIFormFill';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';

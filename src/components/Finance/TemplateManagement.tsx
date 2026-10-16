@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { FileText, Plus, Edit2, Trash2, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { FileText, Plus, Edit2, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import TemplateBuilder from './TemplateBuilder';
 import ConfirmModal from '../ui/ConfirmModal';
 

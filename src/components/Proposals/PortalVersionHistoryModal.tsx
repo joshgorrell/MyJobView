@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, RotateCcw, Globe, Clock, User, DollarSign, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
 import { format } from 'date-fns';

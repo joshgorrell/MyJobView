@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Contact } from '../../lib/types';
 import { X, Save, Search, User, AlertCircle } from 'lucide-react';
@@ -17,7 +17,7 @@ interface EditCustomerModalProps {
 export default function EditCustomerModal({ contactId, proposalId, onSave, onClose }: EditCustomerModalProps) {
   const [activeTab, setActiveTab] = useState<'edit' | 'reassign'>('edit');
   const [contact, setContact] = useState<Contact | null>(null);
-  const [proposal, setProposal] = useState<any>(null);
+  const [_proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

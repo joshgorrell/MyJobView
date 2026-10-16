@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { X, RefreshCw } from 'lucide-react';

@@ -119,7 +119,7 @@ export function CalendarManagementModal({
             role
           )
         `)
-        .eq('calendar_id', selectedCalendar.id);
+        .eq('calendar_id', selectedCalendar.id).overrideTypes<CalendarMember[], { merge: false }>();
 
       if (error) throw error;
       setMembers(data || []);

@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Clock, Briefcase, MapPin, Download, AlertCircle, ChevronDown, ChevronUp, Trash2, Wrench, BookOpen, Check, X } from 'lucide-react';
+import { Search, Briefcase, MapPin, Download, AlertCircle, ChevronDown, ChevronUp, Trash2, Wrench, BookOpen, Check, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
 import {

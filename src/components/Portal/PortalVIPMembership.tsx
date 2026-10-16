@@ -308,18 +308,17 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         .select('cc_convenience_fee_enabled, cc_convenience_fee_type, cc_convenience_fee_percentage, cc_convenience_fee_flat_amount, cc_convenience_fee_label')
         .maybeSingle();
       const feeResult = calculateConvenienceFee(amount, paymentData.paymentType === 'card' ? 'credit_card' : 'ach', settings as any);
-      const convenienceFee = feeResult.feeAmount;
+
       const totalAmount = feeResult.totalWithFee;
 
       // In production, payment method and transaction details would be stored
       // For now, we just activate the subscription
 
-      let subscription;
 
       // Check if user is converting from trial
       if (currentSubscription?.status === 'trial') {
         // Update existing trial subscription to active
-        const { data: updatedSub, error: updateError } = await supabase
+        const { data: _updatedSub, error: updateError } = await supabase
           .from('recurring_subscriptions')
           .update({
             plan_id: selectedPlan.id,
@@ -334,10 +333,9 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           .single();
 
         if (updateError) throw updateError;
-        subscription = updatedSub;
       } else {
         // Create new active subscription
-        const { data: newSub, error: subError } = await supabase
+        const { data: _newSub, error: subError } = await supabase
           .from('recurring_subscriptions')
           .insert({
             contact_id: contactId,
@@ -353,7 +351,6 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
           .single();
 
         if (subError) throw subError;
-        subscription = newSub;
       }
 
       notify(currentSubscription?.status === 'trial'

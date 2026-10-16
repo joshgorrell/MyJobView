@@ -23,7 +23,7 @@ interface InternalSession {
   status: string;
   predetermined_hours: number | null;
   notes: string | null;
-  assigned_profile?: { full_name: string };
+  assigned_profile?: { full_name: string } | null;
 }
 
 interface CreateInternalSessionModalProps {

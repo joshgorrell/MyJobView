@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.app.json",
     "test:proposal-notifications:browser": "npm run build && node tests/reviews/proposal-notification-browser.mjs",
     "test:navigation:browser": "npm run build && node tests/navigation/responsive-browser.mjs",
     "test:themes": "node tests/themes/database.mjs",
@@ -62,7 +62,7 @@
     "test:welcome-onboarding": "node tests/welcome-onboarding/database.mjs && node tests/welcome-onboarding/push.mjs",
     "test:welcome-onboarding:browser": "npm run build && node tests/welcome-onboarding/browser.mjs",
     "test:smart-intake": "node tests/smart-intake/receipt-contract.mjs && node tests/smart-intake/attachment-manifest.mjs && node tests/smart-intake/private-malware-scanner.mjs && node tests/smart-intake/scan-worker.mjs && node tests/smart-intake/attachment-retention.mjs && node tests/smart-intake/attachment-metadata-permissions.mjs && node tests/smart-intake/customer-matching-contract.mjs && node tests/smart-intake/manual-draft-contract.mjs && node tests/smart-intake/manual-service-transaction.mjs && node tests/smart-intake/routing-readiness-contract.mjs && node tests/smart-intake/service-routing-contract.mjs && node tests/smart-intake/service-routing-worker.mjs",
-    "test:modals:feedback": "node tests/modals/feedback-browser.mjs"
+    "test:modals:feedback": "node tests/modals/dialog-runtime.mjs && node tests/modals/feedback-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

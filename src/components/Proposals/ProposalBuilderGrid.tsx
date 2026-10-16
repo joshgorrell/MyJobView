@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { supabase } from '../../lib/supabase';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
-import { ArrowLeft, Plus, Settings, ExternalLink, LayoutGrid, List, Trash2, Copy, CreditCard as Edit2, Eye, DollarSign, Package, User, ChevronRight, CheckCircle2, Maximize2, GripVertical, FileText, X, AlignJustify, GitBranch, Target, Zap, Receipt, ChevronDown, ChevronUp, XCircle, ThumbsUp, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, LayoutGrid, List, Trash2, CreditCard as Edit2, DollarSign, Package, User, ChevronRight, CheckCircle2, Maximize2, GripVertical, FileText, X, AlignJustify, GitBranch, Target, Zap, Receipt, ChevronDown, ChevronUp, XCircle, ThumbsUp, MoreHorizontal } from 'lucide-react';
 import ProposalSettings from './ProposalSettings';
 import ProposalRevisionManager from './ProposalRevisionManager';
 import AddItemToAreasModal from './AddItemToAreasModal';
@@ -33,9 +33,9 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
   const [viewMode, setViewMode] = useState<'inline' | 'sidebar'>('sidebar');
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [showAddRoomModal, setShowAddRoomModal] = useState(false);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [_showAddItemModal, _setShowAddItemModal] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [_selectedItemIds, _setSelectedItemIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [showTotalsBar, setShowTotalsBar] = useState(true);
   const [showRevisionManager, setShowRevisionManager] = useState(false);
@@ -245,7 +245,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
 
   function calculateRoomTotal(room: RoomWithItems): number {
     return room.line_items.reduce((sum, item) => {
-      return sum + (parseFloat(item.unit_price) * parseFloat(item.quantity));
+      return sum + (parseFloat(String(item.unit_price)) * parseFloat(String(item.quantity)));
     }, 0);
   }
 
@@ -254,7 +254,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
     const partsTotal = rooms.reduce((sum, room) => {
       return sum + room.line_items.reduce((itemSum, item) => {
         if (item.item_type === 'product' || item.item_type === 'material') {
-          return itemSum + (parseFloat(item.unit_price) * parseFloat(item.quantity));
+          return itemSum + (parseFloat(String(item.unit_price)) * parseFloat(String(item.quantity)));
         }
         return itemSum;
       }, 0);
@@ -263,14 +263,14 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
     const laborTotal = rooms.reduce((sum, room) => {
       return sum + room.line_items.reduce((itemSum, item) => {
         // Use labor_total field to support both material+labor items
-        return itemSum + parseFloat(item.labor_total || 0);
+        return itemSum + parseFloat(String(item.labor_total || 0));
       }, 0);
     }, 0);
 
     const programmingTotal = rooms.reduce((sum, room) => {
       return sum + room.line_items.reduce((itemSum, item) => {
         if (item.item_type === 'programming') {
-          return itemSum + (parseFloat(item.unit_price) * parseFloat(item.quantity));
+          return itemSum + (parseFloat(String(item.unit_price)) * parseFloat(String(item.quantity)));
         }
         return itemSum;
       }, 0);
@@ -278,7 +278,7 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
 
     const hoursTotal = rooms.reduce((sum, room) => {
       return sum + room.line_items.reduce((itemSum, item) => {
-        if (item.type === 'labor' || item.type === 'programming') {
+        if (item.item_type === 'labor' || item.item_type === 'programming') {
           return itemSum + item.quantity;
         }
         return itemSum;
@@ -326,9 +326,6 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
     };
   }
 
-  function calculateProposalTotal(): number {
-    return calculatePricingBreakdown().total;
-  }
 
   async function handleUpdateStatus(newStatus: string) {
     if (updatingStatus) return;
@@ -1296,9 +1293,9 @@ export default function ProposalBuilderGrid({ proposalId, onBack, onNavigateToSa
       {showEditCustomerModal && proposal && (
         <EditCustomerModal
           proposalId={proposal.id}
-          currentContactId={proposal.contact_id}
+          contactId={proposal.contact_id}
           onClose={() => setShowEditCustomerModal(false)}
-          onSaved={async () => {
+          onSave={async () => {
             setShowEditCustomerModal(false);
             await loadData();
           }}
@@ -1336,7 +1333,7 @@ function RoomCard({ room, onDelete, onAddItem, isActive }: RoomCardProps) {
   const [expanded, setExpanded] = useState(true);
 
   const roomTotal = room.line_items.reduce((sum, item) => {
-    return sum + (parseFloat(item.unit_price) * parseFloat(item.quantity));
+    return sum + (parseFloat(String(item.unit_price)) * parseFloat(String(item.quantity)));
   }, 0);
 
   return (
@@ -1412,7 +1409,7 @@ interface ItemCardProps {
 }
 
 function ItemCard({ item }: ItemCardProps) {
-  const totalPrice = parseFloat(item.unit_price) * parseFloat(item.quantity);
+  const totalPrice = parseFloat(String(item.unit_price)) * parseFloat(String(item.quantity));
 
   return (
     <div className="bg-gradient-to-br from-white to-gray-50 rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-lg transition-all p-3 sm:p-4 group h-full flex flex-col">
@@ -1433,12 +1430,12 @@ function ItemCard({ item }: ItemCardProps) {
       <div className="space-y-1.5 sm:space-y-2 mt-auto">
         <div className="flex items-center justify-between text-xs sm:text-sm">
           <span className="text-gray-600">Qty:</span>
-          <span className="font-semibold text-gray-900">{parseFloat(item.quantity)}</span>
+          <span className="font-semibold text-gray-900">{parseFloat(String(item.quantity))}</span>
         </div>
         <div className="flex items-center justify-between text-xs sm:text-sm">
           <span className="text-gray-600">Price:</span>
           <span className="font-semibold text-gray-900">
-            ${parseFloat(item.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${parseFloat(String(item.unit_price)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
         <div className="pt-1.5 sm:pt-2 border-t border-gray-200">

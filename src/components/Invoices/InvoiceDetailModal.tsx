@@ -9,7 +9,7 @@ import {
   X, Printer, Download, Mail, DollarSign, CheckCircle,
   Clock, AlertCircle, Send, CreditCard, Loader2,
   Pencil, Check, ChevronDown, ChevronUp, Info, ShieldCheck,
-  Ban, Trash2, MapPin, BarChart2, ArrowLeftRight, Receipt, Eye
+  Ban, Trash2, BarChart2, ArrowLeftRight, Receipt, Eye
 } from 'lucide-react';
 import { RecordPaymentModal } from './RecordPaymentModal';
 import ConfirmModal from '../ui/ConfirmModal';

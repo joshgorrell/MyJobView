@@ -108,7 +108,6 @@ export default function ConnectionForm({ onClose, onSuccess, contactId, editConn
     setShowDropdown(false);
   };
 
-  const selectedContact = contacts.find(c => c.id === formData.contact_id);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

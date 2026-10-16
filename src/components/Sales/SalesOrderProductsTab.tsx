@@ -30,11 +30,6 @@ function fmt(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function effectiveCost(item: GridLineItem): number | null {
-  if (item.cost != null && item.cost !== 0) return item.cost;
-  if (item.cost === 0 && item.product_id && item.products?.cost != null) return item.products.cost;
-  return item.cost;
-}
 
 function isVisibleItem(item: GridLineItem): boolean {
   const t = item.item_type?.toLowerCase();
@@ -107,7 +102,7 @@ function summarizeDuplicates(items: ProductLineItem[]): ProductLineItem[] {
         line_total: totalLine,
         labor_hours: totalLaborHrs || null,
         labor_total: totalLaborTotal || null,
-        _roomName: null,
+        _roomName: undefined,
       });
     }
   });
@@ -246,7 +241,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     });
   }
 
-  function toggleSelectSection(sectionKey: string, sectionItemIds: string[]) {
+  function toggleSelectSection(_sectionKey: string, sectionItemIds: string[]) {
     setSelectedIds(prev => {
       const next = new Set(prev);
       const allSelected = sectionItemIds.length > 0 && sectionItemIds.every(id => next.has(id));
@@ -930,10 +925,10 @@ function CleanItemRow({
   onClickItem,
   onSkuClick,
   stockMap,
-  requestingItem,
+  requestingItem: _requestingItem,
   setRequestingItem,
-  submitPartRequest,
-  requestSaving,
+  submitPartRequest: _submitPartRequest,
+  requestSaving: _requestSaving,
   selected,
   onToggleSelect,
 }: {

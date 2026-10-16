@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Wrench, X, Eye, EyeOff, Lock } from 'lucide-react';
+import { Wrench, X, Eye, Lock } from 'lucide-react';
 
 interface InstallTaskEditorProps {
   lineItemId: string;

@@ -1,5 +1,5 @@
 import { notify, requestText } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DollarSign, MapPin, Check, X, CreditCard as Edit2, Navigation, User, Calendar, Building2, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';

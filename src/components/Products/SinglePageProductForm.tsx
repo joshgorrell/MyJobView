@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
+import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Category {
@@ -378,16 +378,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   };
 
   // Format currency for display
-  const formatCurrency = (value: number): string => {
-    if (!value) return '';
-    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+
 
   // Parse currency input
-  const parseCurrency = (value: string): number => {
-    const cleaned = value.replace(/[^0-9.]/g, '');
-    return parseFloat(cleaned) || 0;
-  };
+
 
   // Calculate labor cost when hours change
   useEffect(() => {
@@ -945,9 +939,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     try {
       // Get category name from category_id
       const selectedCategory = categories.find(c => c.id === formData.category_id);
-      const selectedManufacturer = manufacturers.find(m => m.id === formData.manufacturer_id);
-      const selectedVendor = vendors.find(v => v.id === formData.default_vendor_id);
-      const selectedLaborPhase = laborPhases.find(lp => lp.id === formData.labor_phase_id);
+
 
       const productData = {
         is_discontinued: formData.is_discontinued,
@@ -2265,13 +2257,7 @@ interface DefaultTasksSectionProps {
     labor_phase_id: string | null;
     sort_order: number;
   }>;
-  setDefaultTasks: (tasks: Array<{
-    id: string | null;
-    title: string;
-    description: string;
-    labor_phase_id: string | null;
-    sort_order: number;
-  }>) => void;
+  setDefaultTasks: React.Dispatch<React.SetStateAction<DefaultTasksSectionProps['defaultTasks']>>;
   laborPhases: LaborPhase[];
   showAddDefaultTask: boolean;
   setShowAddDefaultTask: (v: boolean) => void;
@@ -2284,7 +2270,7 @@ interface DefaultTasksSectionProps {
 }
 
 function DefaultTasksSection({
-  productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
+  productId: _productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
   showAddDefaultTask, setShowAddDefaultTask,
   newDefaultTaskTitle, setNewDefaultTaskTitle,
   newDefaultTaskDesc, setNewDefaultTaskDesc,

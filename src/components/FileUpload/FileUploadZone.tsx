@@ -101,7 +101,7 @@ export function FileUploadZone({
         const fileName = `${crypto.randomUUID()}.${fileExt}`;
         const filePath = `${contextType}/${contextId}/${fileName}`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data: _uploadData, error: uploadError } = await supabase.storage
           .from('attachments')
           .upload(filePath, file, {
             cacheControl: '3600',

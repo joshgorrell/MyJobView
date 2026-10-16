@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MapPin, DollarSign, Save, Building2, Clock, User, AlertTriangle, X } from 'lucide-react';
 

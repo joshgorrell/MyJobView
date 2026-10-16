@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, Clock, EyeOff, Building2, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';

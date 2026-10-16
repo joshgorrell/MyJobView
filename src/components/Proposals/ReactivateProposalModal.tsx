@@ -28,7 +28,7 @@ export function ReactivateProposalModal({
 
   useEffect(() => {
     let mounted = true;
-    supabase.from('proposals').select('organization_id').eq('id', proposalId).single()
+    Promise.resolve(supabase.from('proposals').select('organization_id').eq('id', proposalId).single())
       .then(async ({ data, error }) => {
         if (error || !data?.organization_id) throw error || new Error('Organization not found');
         const result = await supabase.from('organizations').select('proposal_approval_days').eq('id', data.organization_id).single();

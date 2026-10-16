@@ -1,3 +1,4 @@
+import { formatCurrency } from '../../lib/utils';
 import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect } from 'react';
 import { FileText, Briefcase, Calendar, DollarSign, MessageSquare, LogOut, Shield, XCircle, ClipboardList, Star, ArrowLeft, ChevronRight, CheckSquare, Receipt, RefreshCw } from 'lucide-react';
@@ -68,7 +69,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const [loading, setLoading] = useState(true);
   const [contactName, setContactName] = useState('');
   const [trialAccess, setTrialAccess] = useState<TrialAccess | null>(null);
-  const [hasVipMembership, setHasVipMembership] = useState(false);
+  const [_hasVipMembership, setHasVipMembership] = useState(false);
   const [vipSubscription, setVipSubscription] = useState<{
     status: string;
     plan_name: string;

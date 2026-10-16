@@ -1,4 +1,3 @@
-import React from 'react';
 import { Package, Edit2, Trash2 } from 'lucide-react';
 
 interface ProductPackage {

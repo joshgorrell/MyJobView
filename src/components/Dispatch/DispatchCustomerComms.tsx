@@ -8,12 +8,8 @@ import {
   Phone,
   Mail,
   User,
-  Clock,
-  CheckCircle,
   Truck,
-  Search,
-  Filter
-} from 'lucide-react';
+  Search} from 'lucide-react';
 
 interface WorkOrder {
   id: string;

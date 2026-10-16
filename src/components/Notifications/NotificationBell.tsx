@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { proposalFeedbackUrl } from '../../lib/proposalFeedbackLinks';
-import { Bell, MessageCircle, CheckSquare, AlertCircle, Info, FileText, X, ChevronDown, ChevronUp, Trash2, MessageSquareWarning } from 'lucide-react';
+import { Bell, MessageCircle, CheckSquare, Info, FileText, X, ChevronDown, ChevronUp, Trash2, MessageSquareWarning } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Notification } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';
 

@@ -23,7 +23,7 @@ interface AddItemToAreasModalProps {
   onRoomsUpdate?: (rooms: ProposalRoom[]) => void;
 }
 
-interface MasterProductFull extends Product {
+interface MasterProductFull extends Omit<Product, 'category' | 'subcategory'> {
   manufacturer_model_number?: string | null;
   manufacturer?: { name: string } | null;
   vendor?: { vendor_name: string } | null;
@@ -173,7 +173,7 @@ export default function AddItemToAreasModal({
         labor_phase:labor_phases(name, default_price)
       `)
       .eq('id', productId)
-      .maybeSingle();
+      .maybeSingle().overrideTypes<MasterProductFull, { merge: false }>();
     if (data) setMasterProduct(data as MasterProductFull);
   }
 
@@ -213,7 +213,7 @@ export default function AddItemToAreasModal({
       item_type: ((product as any).item_type || 'material') as 'material' | 'labor' | 'other',
       task_notes: '',
       show_task_notes: false,
-      is_taxable: product.is_taxable !== undefined ? product.is_taxable : true,
+      is_taxable: product.is_taxable ?? true,
       is_hidden: false,
       is_customer_supplied: false,
       display_mode: 'itemized',
@@ -283,7 +283,8 @@ export default function AddItemToAreasModal({
     }
   }
 
-  function addPendingAccessory(product: Product) {
+  function addPendingAccessory(product: Product | null) {
+    if (!product) return;
     const acc: PendingAccessory = {
       tempId: `pending-${Date.now()}-${Math.random()}`,
       product,
@@ -784,7 +785,7 @@ export default function AddItemToAreasModal({
       )}
 
       {showAccessorySelector && (
-        <ProductSelector onSelect={addPendingAccessory} onClose={() => setShowAccessorySelector(false)} />
+        <ProductSelector showCreateActions={false} onSelect={addPendingAccessory} onClose={() => setShowAccessorySelector(false)} />
       )}
 
       <ConfirmModal

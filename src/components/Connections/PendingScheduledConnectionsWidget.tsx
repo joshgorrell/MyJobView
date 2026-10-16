@@ -28,7 +28,7 @@ export function PendingScheduledConnectionsWidget() {
   const { profile } = useAuth();
   const [connections, setConnections] = useState<PendingConnection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [_completing, _setCompleting] = useState<string | null>(null);
   const [selectedConnection, setSelectedConnection] = useState<PendingConnection | null>(null);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -92,7 +92,7 @@ export function PendingScheduledConnectionsWidget() {
         .lte('occurrence_date', today)
         .order('rollover_count', { ascending: false })
         .order('occurrence_date', { ascending: true })
-        .limit(5);
+        .limit(5).overrideTypes<PendingConnection[], { merge: false }>();
 
       if (error) throw error;
 

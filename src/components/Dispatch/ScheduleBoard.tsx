@@ -1,5 +1,5 @@
 import { requestConfirmation } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, User, MapPin, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { CreateAppointmentModal } from '../Appointments/CreateAppointmentModal';
@@ -91,7 +91,7 @@ export function ScheduleBoard() {
           `)
           .eq('is_technician', true)
           .eq('is_active', true)
-          .order('full_name')
+          .order('full_name').overrideTypes<Technician[], { merge: false }>()
       ]);
 
       if (appointmentsRes.data) setAppointments(appointmentsRes.data);
@@ -172,7 +172,7 @@ export function ScheduleBoard() {
     );
   }
 
-  const timeSlots = Array.from({ length: 12 }, (_, i) => i + 7); // 7 AM to 6 PM
+   // 7 AM to 6 PM
 
   if (loading) {
     return (

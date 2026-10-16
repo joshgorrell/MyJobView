@@ -496,7 +496,7 @@ export function CreateAppointmentModal({
                 <select
                   value={technicianId}
                   onChange={(e) => setTechnicianId(e.target.value)}
-                  required={appointmentType !== 'personal'}
+                  required
                   className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 >
                   <option value="">Select technician...</option>

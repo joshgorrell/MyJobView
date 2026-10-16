@@ -2,18 +2,15 @@ import { requestConfirmation } from '../../lib/feedback';
 import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
 import { dateKey } from '../../lib/workOrderScheduling';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  Calendar,
   Clock,
   User,
   MapPin,
   Plus,
   Settings,
-  Printer,
   Download,
-  Filter,
   TrendingUp,
   AlertTriangle,
   Zap
@@ -143,7 +140,7 @@ export function DispatchScheduler() {
           `)
           .gte('scheduled_date', dateRange.start)
           .lte('scheduled_date', dateRange.end)
-          .order('scheduled_start_time'),
+          .order('scheduled_start_time').overrideTypes<WorkOrder[], { merge: false }>(),
         supabase
           .from('profiles')
           .select('id, full_name, role, employment_type')
@@ -704,7 +701,7 @@ export function DispatchScheduler() {
                                 <div className="flex items-center gap-1 text-gray-500 mt-1">
                                   <Clock className="w-3 h-3" />
                                   {wo.scheduled_start_time}
-                                  {wo.estimated_duration && ` (${wo.estimated_duration}m)`}
+                                  {` (${resolveWorkOrderDurationMinutes(wo)}m)`}
                                 </div>
                               )}
                               {wo.project?.contacts?.city && (

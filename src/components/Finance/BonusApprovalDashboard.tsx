@@ -2,7 +2,7 @@ import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { Award, CheckCircle2, XCircle, DollarSign, Clock, Users, TrendingUp, AlertCircle, CreditCard as Edit, Eye, Calendar, Target, Unlock, X } from 'lucide-react';
+import { Award, CheckCircle2, XCircle, Clock, Users, AlertCircle, CreditCard as Edit, Calendar, X } from 'lucide-react';
 import { UserSelector } from '../Shared/UserSelector';
 
 interface BonusCalculation {
@@ -51,7 +51,7 @@ export function BonusApprovalDashboard() {
   const [calculations, setCalculations] = useState<BonusCalculation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'pending' | 'approved' | 'denied' | 'all'>('pending');
-  const [selectedCalculation, setSelectedCalculation] = useState<BonusCalculation | null>(null);
+  const [_selectedCalculation, _setSelectedCalculation] = useState<BonusCalculation | null>(null);
   const [approvalModal, setApprovalModal] = useState<ApprovalModalState>({
     isOpen: false,
     calculationId: null,

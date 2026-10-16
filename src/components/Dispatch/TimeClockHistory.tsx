@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Clock, AlertCircle, CheckCircle, AlertTriangle, Check, CreditCard as Edit2, Briefcase, Trash2, Bell, Send, MapPin, Upload, HelpCircle, X, FileText, Download, User, LayoutList, BarChart3, Wrench } from 'lucide-react';
 import { ManualTimeEntry } from './ManualTimeEntry';
@@ -180,7 +180,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [leaveFilter, setLeaveFilter] = useState<string>('all'); // all, work, leave
+  const [_leaveFilter, _setLeaveFilter] = useState<string>('all'); // all, work, leave
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'this_week' | 'week' | 'month' | 'custom'>('this_week');
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -202,7 +202,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   const [viewingAlertGPS, setViewingAlertGPS] = useState<ClockAlert | null>(null);
   const [autoClockOutsPendingApproval, setAutoClockOutsPendingApproval] = useState<ClockEntry[]>([]);
   const [approvingAutoClockOut, setApprovingAutoClockOut] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [_currentTime, setCurrentTime] = useState(Date.now());
   const [showCSVImport, setShowCSVImport] = useState(false);
   const [showJobTimeImport, setShowJobTimeImport] = useState(false);
   const [showCSVTutorial, setShowCSVTutorial] = useState(false);
@@ -820,7 +820,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
     }
   }
 
-  async function loadEntries(isInitial = false) {
+  async function loadEntries(_isInitial = false) {
     try {
       setLoading(true);
 
@@ -913,20 +913,6 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
     }
   }
 
-  function getStatusIcon(status: string) {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'rejected':
-        return <XCircle className="w-4 h-4 text-red-600" />;
-      case 'clocked_in':
-        return <Clock className="w-4 h-4 text-blue-600" />;
-      case 'clocked_out':
-        return <CheckCircle className="w-4 h-4 text-gray-600" />;
-      default:
-        return <AlertCircle className="w-4 h-4 text-yellow-600" />;
-    }
-  }
 
   function getStatusColor(status: string) {
     switch (status) {
@@ -955,7 +941,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
 
     // Parse times
     const [schedHour, schedMin] = scheduledStart.split(':').map(Number);
-    const [clockHour, clockMin, clockSec] = clockInTime.split(':').map(Number);
+    const [clockHour, clockMin, _clockSec] = clockInTime.split(':').map(Number);
 
     // Convert to minutes for comparison
     const scheduledMinutes = schedHour * 60 + schedMin;
@@ -1562,7 +1548,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                     <div className="text-xs text-gray-600 truncate flex items-center gap-1">
                       {alert.alert_type === 'really_late' ? (
                         <>
-                          <span>{formatLocalDate(alert.alert_date)} - Late: {alert.actual_clock_in_time ? formatTime12Hour(createTimestampInTimezone(alert.alert_date, alert.actual_clock_in_time, orgTimezone), orgTimezone) : 'N/A'} ({formatMinutesLate(alert.minutes_late)})</span>
+                          <span>{formatLocalDate(alert.alert_date)} - Late: {alert.actual_clock_in_time ? formatTime12Hour(createTimestampInTimezone(alert.alert_date, alert.actual_clock_in_time, orgTimezone), orgTimezone) : 'N/A'} ({formatMinutesLate(alert.minutes_late ?? 0)})</span>
                           {alert.has_gps && (
                             <button
                               onClick={(e) => {
@@ -1869,7 +1855,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                           <span className="px-1 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-300">Pending</span>
                         )}
                         {entry.auto_clocked_out && entry.auto_clock_out_approved && (
-                          <CheckCircle className="w-3 h-3 text-green-500" title="Approved" />
+                          <CheckCircle className="w-3 h-3 text-green-500"><title>{"Approved"}</title></CheckCircle>
                         )}
                         {entry.leave_type && (
                           <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${
@@ -1881,8 +1867,8 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                             {entry.leave_type === 'jury_duty' ? 'Jury' : entry.leave_type.charAt(0).toUpperCase() + entry.leave_type.slice(1)}
                           </span>
                         )}
-                        {entry.admin_adjusted && <AlertCircle className="w-3 h-3 text-yellow-600" title="Admin adjusted" />}
-                        {entry.offline_entry && !entry.admin_reviewed && <AlertCircle className="w-3 h-3 text-orange-600" title="Offline" />}
+                        {entry.admin_adjusted && <AlertCircle className="w-3 h-3 text-yellow-600"><title>{"Admin adjusted"}</title></AlertCircle>}
+                        {entry.offline_entry && !entry.admin_reviewed && <AlertCircle className="w-3 h-3 text-orange-600"><title>{"Offline"}</title></AlertCircle>}
                       </div>
                     </td>
                     <td className="px-2 py-1.5">

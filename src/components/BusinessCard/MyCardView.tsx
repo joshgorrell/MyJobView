@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, Upload, X, Save, User, Mail, Phone, Linkedin, Globe, MapPin, Send, Check, Edit3, Eye, ExternalLink } from 'lucide-react';
+import { CreditCard, Upload, X, Save, User, Mail, Phone, Linkedin, Globe, MapPin, Send, Check, Edit3, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BusinessCard, CompanySettings, CompanyOffice } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -439,6 +439,8 @@ export function MyCardView() {
       </div>
     );
   }
+
+  if (!card) return null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

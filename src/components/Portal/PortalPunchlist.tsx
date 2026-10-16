@@ -12,34 +12,26 @@ import {
   AlertCircle,
   Star,
   Calendar,
-  TrendingUp,
   CheckCircle2,
   MessageSquare,
   Eye,
   EyeOff,
-  GripVertical,
-  Save,
   Send,
   X,
-  Image as ImageIcon,
   Trash2,
   Camera,
   Upload,
   ExternalLink,
   ArrowLeft,
   LogOut,
-  Phone,
   Mail,
   Sparkles,
   ChevronDown,
   ChevronUp,
   Search,
-  Filter,
-  SlidersHorizontal,
   HelpCircle,
   RotateCcw
 } from 'lucide-react';
-import { FileUploadZone } from '../FileUpload/FileUploadZone';
 import { CameraCapture } from '../Contacts/CameraCapture';
 import { TrialStatusBanner } from './TrialStatusBanner';
 import { PunchlistTaskDetailModal } from './PunchlistTaskDetailModal';
@@ -119,14 +111,14 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'requested' | 'scheduled' | 'completed'>('all');
-  const [filterTimeframe, setFilterTimeframe] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [filterTimeframe, _setFilterTimeframe] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [showHelp, setShowHelp] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [requestingService, setRequestingService] = useState(false);
   const [detailTask, setDetailTask] = useState<PunchlistTask | null>(null);
-  const [appUrl, setAppUrl] = useState<string>('https://myjobview.com');
+  const [_appUrl, setAppUrl] = useState<string>('https://myjobview.com');
 
   const [newTask, setNewTask] = useState({
     details: '',
@@ -838,7 +830,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         </div>
       )}
 
-      {['test_and_tune','vip_trial','promotional'].includes(accessInfo.access_type || '') && accessInfo.days_remaining !== null && accessInfo.expiration_date && (
+      {accessInfo && ['test_and_tune','vip_trial','promotional'].includes(accessInfo.access_type || '') && accessInfo.days_remaining !== null && accessInfo.expiration_date && (
         <TrialStatusBanner
           program={accessInfo.access_type==='test_and_tune'?'test_and_tune':'vip_trial'}
           daysRemaining={accessInfo.days_remaining}
@@ -849,7 +841,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
         />
       )}
 
-      {accessInfo.access_type === 'vip_membership' && (
+      {accessInfo?.access_type === 'vip_membership' && (
         <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-300 rounded-lg p-2.5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-yellow-200 rounded-full flex items-center justify-center">
@@ -1501,7 +1493,6 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                         {task.details && <p className="text-sm text-gray-500">{task.details}</p>}
 
 
-
                         {task.service_request?.work_order && (
                           <a
                             href={`/work-order/${task.service_request.work_order.id}`}
@@ -1647,7 +1638,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <p className="text-sm font-medium text-gray-700 mb-1">Your Current Access:</p>
                   <p className="text-base font-bold text-gray-900 capitalize">
-                    {accessInfo.access_type === 'vip_membership' && 'VIP Membership'}
+                    {accessInfo?.access_type === 'vip_membership' && 'VIP Membership'}
                     {accessInfo.access_type === 'test_and_tune' && 'Test & Tune Program'}
                     {accessInfo.access_type === 'test_and_tune_no_portal' && 'Test & Tune (No Portal)'}
                   </p>
@@ -1837,14 +1828,14 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{timeGreeting}, {displayName}!</h2>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {accessInfo.access_type === 'vip_membership'
+                  {accessInfo?.access_type === 'vip_membership'
                     ? `Welcome back, VIP Member${accessInfo.subscription_plan_name ? ` — ${accessInfo.subscription_plan_name}` : ''}`
                     : accessInfo.access_type === 'test_and_tune' && accessInfo.days_remaining !== null
                     ? `You have ${accessInfo.days_remaining} day${accessInfo.days_remaining !== 1 ? 's' : ''} remaining in your Test & Tune trial`
                     : 'Here are your service items'}
                 </p>
               </div>
-              {accessInfo.access_type === 'vip_membership' && (
+              {accessInfo?.access_type === 'vip_membership' && (
                 <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <Star className="w-5 h-5 text-yellow-600 fill-yellow-500" />
                 </div>

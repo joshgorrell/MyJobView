@@ -64,7 +64,7 @@ interface ELROverrideLog {
 export function TestTuneStatusPanel({
   salesOrderId,
   salesOrderStatus,
-  initialLeadTechId,
+  initialLeadTechId: _initialLeadTechId,
   onUpdate
 }: TestTuneStatusPanelProps) {
   const { profile } = useAuth();
@@ -84,9 +84,9 @@ export function TestTuneStatusPanel({
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'finance' ||
-    profile?.role === 'sales_manager' || profile?.role === 'production_manager';
+    profile?.role === 'manager';
   const canOverrideELR = profile?.role === 'admin' || profile?.role === 'finance' ||
-    profile?.role === 'sales_manager';
+    profile?.role === 'manager';
 
   const isProjectComplete = salesOrderStatus === 'complete' || salesOrderStatus === 'completed' || salesOrderStatus === 'closed';
 

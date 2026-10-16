@@ -29,7 +29,7 @@ export function ContractCancellationForm({ contractId, contactId, onClose, onSuc
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<'select' | 'form' | 'success'>('select');
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [selectedContractId, setSelectedContractId] = useState<string>(contractId || '');
+  const [_selectedContractId, setSelectedContractId] = useState<string>(contractId || '');
 
   const [formData, setFormData] = useState({
     cancellation_reason: '',

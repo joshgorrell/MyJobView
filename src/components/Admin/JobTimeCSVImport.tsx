@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Upload, FileText, AlertCircle, CheckCircle, X, Download, Save,
+  Upload, AlertCircle, CheckCircle, X, Download, Save,
   ArrowRight, Edit2, Undo2, History, ChevronDown, ChevronUp, Sparkles
 } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -45,7 +45,7 @@ interface ValidationResult {
   errors: string[];
   warnings: string[];
   matchedEmployee?: { id: string; name: string };
-  matchedWorkOrder?: { id: string; number: string; title: string };
+  matchedWorkOrder?: { id: string; work_order_number: string; title: string };
   calculatedHours?: number;
   skipped?: boolean;
   suggestions?: {
@@ -1033,7 +1033,7 @@ export function JobTimeCSVImport() {
                       {result.matchedWorkOrder && (
                         <>
                           <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-600">WO #{result.matchedWorkOrder.number}</span>
+                          <span className="text-xs text-gray-600">WO #{result.matchedWorkOrder.work_order_number}</span>
                         </>
                       )}
                     </div>

@@ -8,7 +8,7 @@ import { Task, Contact, Profile } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { offlineSupabaseInsert, offlineSupabaseUpdate } from '../../lib/offlineSupport';
-import { generateUsername } from '../../lib/username';
+import { generateUniqueUsername } from '../../lib/username';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -37,7 +37,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [formData, setFormData] = useState({
     title: task?.title || (supportMode ? 'Support: ' : ''),
     description: task?.description || '',
-    priority: task?.priority || 'medium',
+    priority: (task?.priority || 'medium') as string,
     due_date: task?.due_date ? task.due_date.split('T')[0] : '',
     status: task?.status || 'pending',
     contact_id: (task as any)?.contact_id || contactId || '',
@@ -45,8 +45,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     assigned_to: task?.assigned_to || '',
     assigned_department_id: (task as any)?.assigned_department_id || '',
   });
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'contact_name' | 'company_name' | 'email' | 'phone'>[]>([]);
+  const [users, setUsers] = useState<Pick<Profile, 'id' | 'full_name'>[]>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; display_name: string }>>([]);
   const [showDetails, setShowDetails] = useState(!!task);
   const [priorities, setPriorities] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([]);
@@ -165,11 +165,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     }
 
     try {
-      const username = await generateUsername(
-        newContactData.contact_name,
-        'contacts',
-        supabase
-      );
+      const username = await generateUniqueUsername(newContactData.contact_name, supabase);
 
       const { data: newContact, error } = await supabase
         .from('contacts')

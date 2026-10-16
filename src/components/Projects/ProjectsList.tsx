@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calendar, Briefcase, Wrench, CheckCircle, Clock, FileText } from 'lucide-react';
 
 interface ProjectsListProps {

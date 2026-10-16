@@ -2,7 +2,7 @@ import { notify } from '../../lib/feedback';
 import { PTOManagement } from './PTOManagement';
 import { canManageTimeOff } from '../../lib/timeOff';
 import { TimeReviewPanel } from './Payroll/TimeReviewPanel';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -578,7 +578,6 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
           Import CSV
         </button>
       </div>
-
 
 
       {/* Auto Clock-Out Settings */}
@@ -1841,7 +1840,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
 
       {admin && activeTab === 'payroll' && (
         <div className="space-y-6">
-          <PayrollPeriodSummary 
+          <PayrollPeriodSummary
             onPeriodSelect={setSelectedPayPeriodId}
             onRefresh={() => setPayrollRefreshKey(k => k + 1)}
           />

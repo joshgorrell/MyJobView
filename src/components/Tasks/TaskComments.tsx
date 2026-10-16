@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, Edit2, Trash2, X } from 'lucide-react';
+import { MessageSquare, Send, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';

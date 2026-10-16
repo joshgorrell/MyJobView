@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
-import { Plus, GripVertical, Settings, Grid3x3, Calculator, X, RotateCcw, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Settings, Grid3x3, Calculator, RotateCcw, XCircle, AlertTriangle } from 'lucide-react';
 import ProposalGridRow from './ProposalGridRow';
 import ProposalDetailCard from './ProposalDetailCard';
 import ConfirmModal from '../ui/ConfirmModal';

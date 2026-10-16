@@ -2,7 +2,7 @@ import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { X, Check, DollarSign, FileText, Save, AlertCircle, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
+import { X, Check, Save, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import type { SalesOrderFull, ChangeOrderSummary } from './SalesOrderDetail';
 import { getTaxApplicability, getEnvironmentDisplayName, getProjectTypeDisplayName, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
@@ -45,10 +45,10 @@ function normalizePaymentTerms(terms: string | undefined | null): string {
 }
 
 export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSuccess }: CreateInvoiceFromCOModalProps) {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [selectedCOs, setSelectedCOs] = useState<Set<string>>(new Set());
   const [lineItems, setLineItems] = useState<Record<string, COLineItem[]>>({});
-  const [loadingItems, setLoadingItems] = useState(false);
+  const [_loadingItems, setLoadingItems] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
   const [invoiceNotes, setInvoiceNotes] = useState('');
@@ -160,7 +160,7 @@ export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSucce
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
-          company_id: profile?.company_id,
+          company_id: companySettings?.id,
           contact_id: order.contact?.id || order.contact_id,
           project_id: order.project?.id || order.project_id,
           sales_order_id: order.id,
@@ -218,7 +218,7 @@ export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSucce
         const fullCOAmount = Math.abs(co?.change_amount || coTotalBilled);
 
         allLinks.push({
-          company_id: profile?.company_id,
+          company_id: companySettings?.id,
           invoice_id: invoiceData.id,
           change_order_id: group.coId,
           amount_billed: coTotalBilled,

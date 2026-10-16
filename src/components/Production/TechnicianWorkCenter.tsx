@@ -1,12 +1,12 @@
 import { notify } from '../../lib/feedback';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { WorkOrderDetail } from './WorkOrderDetail';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
 
-import { Calendar, CheckCircle, Wrench, Camera, Award, Play, AlertCircle, Package, User, Send, Plus, Clock, Coffee, CreditCard as Edit2, Briefcase, BookOpen } from 'lucide-react';
+import { Calendar, CheckCircle, Wrench, Camera, Play, AlertCircle, Package, Send, Plus, Clock, Coffee, CreditCard as Edit2, Briefcase, BookOpen } from 'lucide-react';
 import { TimeAdjustmentRequestModal } from '../Technician/TimeAdjustmentRequestModal';
 import { AssignedSessionsWidget } from './AssignedSessionsWidget';
 
@@ -104,7 +104,7 @@ export function TechnicianWorkCenter() {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [sendingNotification, setSendingNotification] = useState<string | null>(null);
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
-  const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
+  const [_clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [timeEvents, setTimeEvents] = useState<TimeEvent[]>([]);
   const [requestingAdjustmentEntry, setRequestingAdjustmentEntry] = useState<ClockEntry | null>(null);
 
@@ -739,7 +739,7 @@ export function TechnicianWorkCenter() {
         <TimeAdjustmentRequestModal
           entry={requestingAdjustmentEntry}
           onClose={() => setRequestingAdjustmentEntry(null)}
-          onSuccess={() => {
+          onSubmit={() => {
             setRequestingAdjustmentEntry(null);
             loadClockEntries();
           }}

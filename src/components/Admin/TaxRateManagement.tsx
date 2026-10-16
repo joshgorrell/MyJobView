@@ -371,7 +371,7 @@ export default function TaxRateManagement() {
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-5">
             {allStates.map(({ state_code: code, state_name: name, library_status }) => {
               const isActive = nexusStates.includes(code);
-              const hasRule = !!STATE_TAX_RULES[code];
+
               const isVerified = library_status === 'verified';
               return (
                 <label

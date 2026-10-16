@@ -71,7 +71,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
           .from('payroll_approvals')
           .update({
             approval_status: status,
-            approved_by: status === 'approved' ? userData.data.user?.id : null,
+            approved_by: status === 'approved' ? userData.user?.id : null,
             approved_at: status === 'approved' ? new Date().toISOString() : null,
             exclusion_reason: status === 'excluded' ? reason || null : null,
           })
@@ -81,7 +81,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
         const { data: orgData } = await supabase
           .from('profiles')
           .select('organization_id')
-          .eq('id', userData.data.user?.id)
+          .eq('id', userData.user?.id)
           .maybeSingle();
 
         const { error } = await supabase.from('payroll_approvals').insert({
@@ -89,7 +89,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
           pay_period_id: payPeriodId,
           employee_id: employeeId,
           approval_status: status,
-          approved_by: status === 'approved' ? userData.data.user?.id : null,
+          approved_by: status === 'approved' ? userData.user?.id : null,
           approved_at: status === 'approved' ? new Date().toISOString() : null,
           exclusion_reason: status === 'excluded' ? reason || null : null,
         });
@@ -112,7 +112,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
       const { data: orgData } = await supabase
         .from('profiles')
         .select('organization_id')
-        .eq('id', userData.data.user?.id)
+        .eq('id', userData.user?.id)
         .maybeSingle();
 
       const pending = approvals.filter((a) => a.approval_status === 'pending');
@@ -122,7 +122,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
             .from('payroll_approvals')
             .update({
               approval_status: 'approved',
-              approved_by: userData.data.user?.id,
+              approved_by: userData.user?.id,
               approved_at: new Date().toISOString(),
             })
             .eq('id', p.id);
@@ -132,7 +132,7 @@ export default function PayrollApprovalPanel({ payPeriodId }: { payPeriodId: str
             pay_period_id: payPeriodId,
             employee_id: p.employee_id,
             approval_status: 'approved',
-            approved_by: userData.data.user?.id,
+            approved_by: userData.user?.id,
             approved_at: new Date().toISOString(),
           });
         }

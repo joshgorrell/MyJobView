@@ -76,7 +76,7 @@ export async function fetchSalesKpis(
     return { averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 };
   }
 
-  const orderIds = orders.map(o => o.id);
+
   const totals = orders.reduce(
     (acc, o) => {
       const ct = parseFloat(String(o.contract_total || 0));
@@ -275,7 +275,7 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
   return results;
 }
 
-export async function fetchCompanyKpis(orgId: string): Promise<SalesKpis> {
+export async function fetchCompanyKpis(_orgId: string): Promise<SalesKpis> {
   return fetchSalesKpis({ type: 'company' }, 'this_month');
 }
 

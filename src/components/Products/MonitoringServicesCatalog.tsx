@@ -145,7 +145,7 @@ export default function MonitoringServicesCatalog() {
     setEditingId(service.id);
     const serviceCategory = service.category || '';
     // Check if the category is not in the existing list
-    const isCustomCategory = serviceCategory && !existingCategories.includes(serviceCategory);
+    const isCustomCategory = Boolean(serviceCategory) && !existingCategories.includes(serviceCategory);
     setShowCustomCategory(isCustomCategory);
 
     setFormData({

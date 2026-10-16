@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Eye, Mail, X, AlertTriangle } from 'lucide-react';
 
 interface PromoteRevisionModalProps {

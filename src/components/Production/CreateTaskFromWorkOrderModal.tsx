@@ -26,7 +26,7 @@ interface Profile {
 }
 
 export function CreateTaskFromWorkOrderModal({
-  workOrderId,
+  workOrderId: _workOrderId,
   workOrderNumber,
   workOrderTitle,
   contactId,

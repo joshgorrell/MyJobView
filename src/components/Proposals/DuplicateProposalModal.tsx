@@ -31,7 +31,7 @@ export function DuplicateProposalModal({
   onSuccess,
   onOpenRevisionManager
 }: DuplicateProposalModalProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const newProposalId = useRef('');
   const completion = useCompletion(() => onSuccess(newProposalId.current));
   const [duplicationType, setDuplicationType] = useState<'same' | 'different'>('same');
@@ -94,7 +94,7 @@ export function DuplicateProposalModal({
       const { data, error } = await supabase
         .from('contacts')
         .select('id, full_name, company_name, email, zip_code')
-        .eq('company_id', profile?.company_id)
+        .eq('company_id', companySettings?.id)
         .order('full_name');
 
       if (error) throw error;

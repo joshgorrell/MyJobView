@@ -194,7 +194,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [selectedWorkOrderIds, setSelectedWorkOrderIds] = useState<string[]>(preSelectedWorkOrderId ? [preSelectedWorkOrderId] : []);
   const [laborEntries, setLaborEntries] = useState<LaborEntry[]>([]);
-  const [partsUsed, setPartsUsed] = useState<PartsUsed[]>([]);
+  const [_partsUsed, setPartsUsed] = useState<PartsUsed[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');

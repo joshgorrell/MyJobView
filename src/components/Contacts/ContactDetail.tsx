@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import Flow from '../Flow/Flow';
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Mail, Phone, Building2, Tag, Calendar, User, TrendingUp, CreditCard as Edit2, Save, X, Trash2, AlertCircle, Camera, Image as ImageIcon, MapPin, CheckCircle2, MessageSquare, Hash, Users, Send, Shield, Eye, DollarSign, Clock, FileText, Wrench, ListTodo, Plus, Video, Receipt, Target, Sparkles, UserCheck, RefreshCw, Flame, Thermometer, ExternalLink, Navigation, Zap } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, Tag, Calendar, User, CreditCard as Edit2, Save, X, Trash2, AlertCircle, Camera, Image as ImageIcon, MapPin, CheckCircle2, MessageSquare, Hash, Users, Send, Shield, Eye, DollarSign, Clock, ListTodo, Plus, Video, Receipt, Target, Sparkles, UserCheck, Flame, Thermometer, ExternalLink, Navigation, Zap } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Contact, ContactTag, Profile, CompanyOffice, Task, DiscussionPost } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1028,7 +1028,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                         name="contact_type"
                         value="person"
                         checked={editData.contact_type === 'person'}
-                        onChange={(e) => setEditData({ ...editData, contact_type: 'person' })}
+                        onChange={(_e) => setEditData({ ...editData, contact_type: 'person' })}
                         className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
                       />
                       <span className="text-sm font-medium text-gray-700">Person</span>
@@ -1039,7 +1039,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                         name="contact_type"
                         value="business"
                         checked={editData.contact_type === 'business'}
-                        onChange={(e) => setEditData({ ...editData, contact_type: 'business' })}
+                        onChange={(_e) => setEditData({ ...editData, contact_type: 'business' })}
                         className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
                       />
                       <span className="text-sm font-medium text-gray-700">Business</span>
@@ -1176,6 +1176,10 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                     onClick={() => {
                       setEditing(false);
                       setEditData({
+                        tax_jurisdiction_id: (contact as any).tax_jurisdiction_id || '',
+                        is_prospect: contact.is_prospect,
+                        electrician_name: (contact as any).electrician_name || '',
+                        electrician_notes: (contact as any).electrician_notes || '',
                         contact_type: (contact as any).contact_type || 'person',
                         company_name: contact.company_name || '',
                         first_name: contact.first_name || '',
@@ -3332,7 +3336,7 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
             source_invoice:invoices(invoice_number)
           `)
           .eq('contact_id', contactId)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false }).overrideTypes<AccountCredit[], { merge: false }>();
         setCredits((data as AccountCredit[]) || []);
       } catch {
       } finally {

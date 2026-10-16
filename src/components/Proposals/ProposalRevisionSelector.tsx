@@ -22,13 +22,13 @@ interface ProposalRevisionSelectorProps {
 
 export function ProposalRevisionSelector({
   proposalId,
-  currentRevisionName,
-  isRevision,
+  currentRevisionName: _currentRevisionName,
+  isRevision: _isRevision,
   onRevisionChange
 }: ProposalRevisionSelectorProps) {
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadRevisions();

@@ -264,6 +264,7 @@ export function UserPreferences() {
   }
 
   async function handleDisconnectCalendar() {
+    if (!profile) return;
     setDisconnecting(true);
     try {
       const { error } = await supabase

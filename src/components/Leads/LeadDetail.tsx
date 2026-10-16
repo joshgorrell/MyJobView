@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
-import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, AtSign, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, Clock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, Clock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Lead, LeadMessage, LeadTag, Profile } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -506,7 +506,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
     }
   }
 
-  function handleConvertSuccess(contactId: string) {
+  function handleConvertSuccess(_contactId: string) {
     setShowConvertModal(false);
     onClose();
     window.location.href = '/pipeline';
@@ -853,7 +853,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
                 />
               </div>
 
-              {(profile.role === 'admin' || profile.role === 'manager' || lead?.assigned_to === profile.id) && (
+              {profile && (profile.role === 'admin' || profile.role === 'manager' || lead?.assigned_to === profile.id) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Assign to

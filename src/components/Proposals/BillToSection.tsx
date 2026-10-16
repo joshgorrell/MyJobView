@@ -2,7 +2,7 @@ import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Search, X, Plus, Building2, User, ChevronDown, Loader2, Check, Mail, Send, Users, ArrowUpRight } from 'lucide-react';
+import { Search, X, Plus, Building2, User, Loader2, Check, Mail, Send, Users } from 'lucide-react';
 
 interface ContactOption {
   id: string;
@@ -57,7 +57,7 @@ export default function BillToSection({
   billToSendTo,
   onBillToChange,
 }: BillToSectionProps) {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [selectedContact, setSelectedContact] = useState<ContactOption | null>(null);
   const [query, setQuery] = useState('');
@@ -171,7 +171,7 @@ export default function BillToSection({
       const { data, error } = await supabase
         .from('contacts')
         .insert({
-          company_id: profile.company_id,
+          company_id: companySettings?.id,
           contact_type: quickAddForm.contact_type,
           first_name: quickAddForm.first_name || null,
           last_name: quickAddForm.last_name || null,

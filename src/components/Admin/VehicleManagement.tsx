@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Car, Plus, CreditCard as Edit, Trash2, User, Calendar, TrendingUp, AlertCircle, Gauge } from 'lucide-react';
+import { Car, Plus, CreditCard as Edit, Trash2, User, TrendingUp, AlertCircle, Gauge } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Vehicle {

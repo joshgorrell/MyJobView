@@ -363,7 +363,7 @@ function ContractModal({
                   name="contract_type"
                   value="sales"
                   checked={formData.contract_type === 'sales'}
-                  onChange={(e) => setFormData({ ...formData, contract_type: 'sales' })}
+                  onChange={(_e) => setFormData({ ...formData, contract_type: 'sales' })}
                   className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Sales Contract</span>
@@ -374,7 +374,7 @@ function ContractModal({
                   name="contract_type"
                   value="security"
                   checked={formData.contract_type === 'security'}
-                  onChange={(e) => setFormData({ ...formData, contract_type: 'security' })}
+                  onChange={(_e) => setFormData({ ...formData, contract_type: 'security' })}
                   className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Security Contract</span>

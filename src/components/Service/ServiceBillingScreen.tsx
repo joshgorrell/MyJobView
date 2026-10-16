@@ -1,9 +1,9 @@
 import { notify } from '../../lib/feedback';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
-import { X, Clock, DollarSign, Package, Plus, Trash2, CreditCard as Edit, Save, FileText, Image as ImageIcon, AlertCircle, CheckCircle, Send } from 'lucide-react';
+import { X, Clock, DollarSign, Package, Plus, Send } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface ServiceBillingScreenProps {
@@ -52,7 +52,7 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   // Job Overview Data
-  const [jobData, setJobData] = useState<any>(null);
+  const [_jobData, setJobData] = useState<any>(null);
   const [workOrder, setWorkOrder] = useState<any>(null);
   const [contact, setContact] = useState<any>(null);
 
@@ -66,8 +66,8 @@ export function ServiceBillingScreen({ billingQueueItemId, onClose, onSuccess }:
   const [taxProjectType, setTaxProjectType] = useState('general_installation_repair');
 
   // UI State
-  const [editingLabor, setEditingLabor] = useState<string | null>(null);
-  const [editingPart, setEditingPart] = useState<string | null>(null);
+  const [_editingLabor, _setEditingLabor] = useState<string | null>(null);
+  const [_editingPart, _setEditingPart] = useState<string | null>(null);
   const [showAddPart, setShowAddPart] = useState(false);
   const [showAddCharge, setShowAddCharge] = useState(false);
 

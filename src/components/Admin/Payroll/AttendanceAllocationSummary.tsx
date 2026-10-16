@@ -73,8 +73,6 @@ export function AttendanceAllocationSummary({ payPeriodId }: { payPeriodId: stri
         const config = configMap.get(emp.id);
         if (!config) continue;
 
-        const startDate = new Date(period.period_start_date);
-        const endDate = new Date(period.period_end_date);
 
         let availableHours: number | null = null;
         if (config.requires_daily_clock) {

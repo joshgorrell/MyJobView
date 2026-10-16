@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useCallback } from 'react';
-import { X, Search, Trash2, Package, ShoppingCart, Wrench, ClipboardList, Calendar, Target, Layers, User } from 'lucide-react';
+import { X, Search, Trash2, Package, ShoppingCart, Wrench, ClipboardList, Calendar, Target, Layers } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { SearchableCombobox, ComboboxOption } from '../Shared/SearchableCombobox';

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  CheckCircle, Circle, Clock, FileText, Wrench, Building2, Phone,
+  CheckCircle, Circle, FileText, Wrench, Building2, Phone,
   Calendar, AlertCircle, ChevronDown, ChevronRight, DollarSign,
   ClipboardList, RefreshCw, ArrowRight, StickyNote, User,
 } from 'lucide-react';
@@ -91,10 +91,6 @@ function formatDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function isSameDay(dateStr: string, refDate: Date): boolean {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.getTime() === refDate.getTime();
-}
 
 function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('en-US', {
@@ -128,10 +124,10 @@ function getStatusBadge(status: string) {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function DailyRecap({ repId, isManagerView, onNavigate }: DailyRecapProps) {
+export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }: DailyRecapProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [_refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [yesterdayWorkOrders, setYesterdayWorkOrders] = useState<RecapWorkOrder[]>([]);
@@ -146,7 +142,7 @@ export function DailyRecap({ repId, isManagerView, onNavigate }: DailyRecapProps
   const today = getToday();
   const yesterday = getYesterday();
   const todayStr = formatDateString(today);
-  const yesterdayStr = formatDateString(yesterday);
+
 
   const loadRecap = useCallback(async () => {
     if (!effectiveRepId || !profile?.organization_id) return;
@@ -329,7 +325,7 @@ export function DailyRecap({ repId, isManagerView, onNavigate }: DailyRecapProps
         item_type: 'follow_up',
         record_id: conn.id,
         title: `Connect with ${conn.contact?.full_name || conn.contact?.company_name || 'contact'}`,
-        subtitle: conn.notes || undefined,
+        subtitle: conn.notes || null,
       });
     });
 
@@ -339,7 +335,7 @@ export function DailyRecap({ repId, isManagerView, onNavigate }: DailyRecapProps
         item_type: 'appointment',
         record_id: appt.id,
         title: `Appointment: ${appt.title}`,
-        subtitle: appt.contact?.full_name || appt.contact?.company_name || undefined,
+        subtitle: appt.contact?.full_name || appt.contact?.company_name || null,
       });
     });
 
@@ -853,7 +849,7 @@ function TodoRow({
 function WorkOrderBillingRow({
   wo,
   onBill,
-  onArchive,
+  onArchive: _onArchive,
 }: {
   wo: RecapWorkOrder;
   onBill: () => void;

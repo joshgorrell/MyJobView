@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { ArrowRightLeft, Plus, Check, X, MapPin, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Plus, Check, Trash2 } from 'lucide-react';
 
 interface Warehouse {
   id: string;

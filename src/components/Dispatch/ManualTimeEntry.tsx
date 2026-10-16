@@ -2,7 +2,7 @@ import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Clock, Save, X, Calendar, User, AlertCircle, CreditCard as Edit2, Plus } from 'lucide-react';
+import { Save, X, Calendar, User, AlertCircle, CreditCard as Edit2, Plus } from 'lucide-react';
 import {
   getOrganizationTimezone,
   createTimestampInTimezone,
@@ -156,7 +156,6 @@ export function ManualTimeEntry({ entryToEdit, onClose, onSave }: ManualTimeEntr
     }
   }
 
-  const selectedTechnician = technicians.find(t => t.id === technicianId);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

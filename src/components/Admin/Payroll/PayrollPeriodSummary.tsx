@@ -199,7 +199,7 @@ export default function PayrollPeriodSummary({
       const { data: userData } = await supabase.auth.getUser();
       const { error } = await supabase.rpc('reopen_pay_period', {
         p_pay_period_id: selectedPeriodId,
-        p_reopened_by: userData.data.user?.id,
+        p_reopened_by: userData.user?.id,
         p_reopen_reason: reopenReason.trim(),
       });
       if (error) throw error;
@@ -302,7 +302,7 @@ export default function PayrollPeriodSummary({
                   </div>
                 ))}
                 {/* Future states shown as locked/disabled */}
-                {FUTURE_STATES.map((s, i) => (
+                {FUTURE_STATES.map((s, _i) => (
                   <div key={s} className="flex items-center">
                     <div
                       className="w-8 h-0.5 bg-slate-200"

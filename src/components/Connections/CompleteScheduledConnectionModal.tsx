@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { X, Check, Calendar, Clock, FileText, Bell, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Check, Calendar, FileText, Bell, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -13,7 +13,7 @@ interface CompleteScheduledConnectionModalProps {
       prospect_id: string;
       connection_type: string;
       default_notes?: string;
-      prospect: {
+      prospect?: {
         id: string;
         full_name: string;
         company_name?: string;
@@ -112,8 +112,8 @@ export function CompleteScheduledConnectionModal({ occurrence, onClose, onSucces
     }
   }
 
-  const prospectName = occurrence.scheduled_connection.prospect.full_name ||
-                       occurrence.scheduled_connection.prospect.company_name ||
+  const prospectName = occurrence.scheduled_connection.prospect?.full_name ||
+                       occurrence.scheduled_connection.prospect?.company_name ||
                        'Unknown';
 
   return (
