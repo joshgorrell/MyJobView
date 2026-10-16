@@ -229,6 +229,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [availableWorkOrders, setAvailableWorkOrders] = useState<any[]>([]);
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [customerHistory, setCustomerHistory] = useState<any[]>([]);
+  const [auditNames, setAuditNames] = useState<Record<string, string>>({});
   const [showContactLogModal, setShowContactLogModal] = useState(false);
   const [contactLogRefreshKey, setContactLogRefreshKey] = useState(0);
   const [selectedLinkIds, setSelectedLinkIds] = useState<string[]>([]);
@@ -429,6 +430,15 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       if (woResult.error) throw woResult.error;
       if (woResult.data) {
         setWorkOrder(woResult.data);
+        // Resolve available creator/editor names without inventing a historical actor.
+        const actorIds = [...new Set([woResult.data.created_by, woResult.data.updated_by].filter((id): id is string => Boolean(id)))];
+        if (actorIds.length) {
+          void supabase.from('profiles').select('id, full_name').in('id', actorIds).then(({ data }) => {
+            if (data) setAuditNames(Object.fromEntries(data.map(actor => [actor.id, actor.full_name || 'Unknown user'])));
+          });
+        } else {
+          setAuditNames({});
+        }
         loadLinkedWorkOrders(woResult.data?.work_order_group_id || null);
         loadCustomerHistory(woResult.data.contact_id);
         setEditedWorkOrder(woResult.data);
@@ -1890,8 +1900,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           await loadWorkOrderData();
         }} />}
       <footer className="border-t border-gray-200 pt-2 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span>Created {new Date(workOrder.created_at).toLocaleString()}</span>
-        {workOrder.updated_at && <span>Last changed {new Date(workOrder.updated_at).toLocaleString()}</span>}
+        <span>Created{workOrder.created_by ? ` by ${auditNames[workOrder.created_by] || 'Unknown user'}` : ''} · {new Date(workOrder.created_at).toLocaleString()}</span>
+        {workOrder.updated_at && <span>Last changed{workOrder.updated_by ? ` by ${auditNames[workOrder.updated_by] || 'Unknown user'}` : ''} · {new Date(workOrder.updated_at).toLocaleString()}</span>}
         <span className="font-mono text-gray-400">{workOrder.work_order_number}</span>
         <button type="button" onClick={() => setActiveTab('history')} className="text-blue-600 hover:underline">
           View previous customer work orders
