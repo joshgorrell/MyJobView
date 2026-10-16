@@ -220,7 +220,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
   // Required setup indicators are derived from actual values, never from the manual review checklist.
   const requiredSetupIssues: Partial<Record<TabKey, string>> = {
-    ...(!formData.full_name.trim() || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(formData.email) || !formData.username.trim()
+    ...(!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || !formData.username.trim()
       ? { profile: 'Complete the name, username and valid email.' } : {}),
     ...(!formData.role_id || (classification !== 'employee' && classification !== 'non_employee')
       ? { access: 'Select a role and employment classification.' } : {}),
