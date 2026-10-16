@@ -1,5 +1,6 @@
 import React from 'react';
-export const useAuth=()=>({profile:{id:'tech',organization_id:'org'}});
+const profile={id:'tech',organization_id:'org'};
+export const useAuth=()=>({profile});
 export const useEmployeeTimePolicy=()=>({ready:true,basis:location.search.includes('hourly')?'daily_clock':'work_allocation',dailyClock:location.search.includes('hourly')});
 export const getOrganizationTimezone=async()=> 'America/Chicago';
 export const formatDateInTimezone=()=> '2026-10-02';
