@@ -7,7 +7,7 @@ import {createServer} from 'vite';
 const server=await createServer({configFile:'tests/employee-time/browser/vite.config.mjs'});await server.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH});
 try{for(const size of [{width:320,height:568},{width:390,height:844},{width:1280,height:800}]){
- const page=await browser.newPage({viewport:size});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage({viewport:size});const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('Time Clock browser error:',e.message);});
  await page.goto('http://127.0.0.1:5191');await page.getByRole('button',{name:/Install Speakers/}).waitFor();
  const box=await page.getByRole('dialog').boundingBox();assert.ok(box.width<=size.width && box.height<=size.height);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow');
