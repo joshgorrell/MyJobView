@@ -27,6 +27,12 @@ The migration intentionally does **not** rewrite existing commission records. Re
 
 However, the live database function `update_invoice_payment_status()` independently calculates `SUM(payments.amount)` and writes that gross value into `invoices.amount_paid`. Both the payment-side commission trigger and the invoice-side commission trigger depend on `invoices.amount_paid / invoices.total`. Thus, fee-inclusive payments can make an invoice appear paid too early, especially on partial payments. The existing invoice UI update is not a durable solution because the database trigger runs automatically.
 
-**Do not merge/deploy the commission-basis migration until the payment amount semantics are fixed.** The recommended separate change is a structured `payments.convenience_fee_amount` column (default zero, constrained between zero and `amount`), populated at payment recording, with invoice payment status computed from `SUM(amount - convenience_fee_amount)`. Confirm QuickBooks reconciliation, processor charges, security-billing payment flows, and historical notes before backfilling. Do not parse notes to silently alter existing payment records.
+**Do not merge/deploy until the payment amount semantics and integration tests are verified.** The recommended separate change is a structured `payments.convenience_fee_amount` column (default zero, constrained between zero and `amount`), populated at payment recording, with invoice payment status computed from `SUM(amount - convenience_fee_amount)`. Confirm QuickBooks reconciliation, processor charges, security-billing payment flows, and historical notes before backfilling. Do not parse notes to silently alter existing payment records.
 
 The convenience fee charged at payment time is not included in invoice subtotal and must **not** be deducted a second time from the commission basis.
+
+## Proposed payment-accounting fix in this PR
+
+The payment entry form now writes a structured `convenience_fee_amount` alongside the full processor charge. The preceding migration adds this column and updates the invoice payment-status trigger to sum only `amount - convenience_fee_amount`. Existing rows default to zero; no historical notes are parsed or altered.
+
+**Not yet validated:** other payment entry points (QuickBooks synchronization, security billing), refund handling, receipt presentation, trigger order, and database integration tests. No production deployment until these are checked.
