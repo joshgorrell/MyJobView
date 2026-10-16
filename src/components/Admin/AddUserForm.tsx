@@ -475,15 +475,11 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         const { data: employee, error: employeeError } = await supabase.from('employees')
           .select('id, organization_id').eq('user_id', newUserId).single();
         if (employeeError || !employee) throw new Error('Employee setup must finish before sales compensation can be saved.');
-        const { error: compensationError } = await supabase.from('sales_compensation_arrangements').insert({
-          organization_id: employee.organization_id,
-          employee_id: employee.id,
-          arrangement_type: salesCompensation.arrangement,
-          base_amount_cents: salesCompensation.arrangement === 'base_plus_commission' ? Math.round(Number(salesCompensation.baseAmount) * 100) : 0,
-          base_frequency: salesCompensation.arrangement === 'base_plus_commission' ? salesCompensation.baseFrequency : null,
-          effective_from: new Date().toISOString().slice(0, 10),
-          created_by: currentUser?.id,
-          updated_by: currentUser?.id,
+        const { error: compensationError } = await supabase.rpc('save_sales_compensation_arrangement', {
+          p_employee_id: employee.id,
+          p_arrangement_type: salesCompensation.arrangement,
+          p_base_amount_cents: salesCompensation.arrangement === 'base_plus_commission' ? Math.round(Number(salesCompensation.baseAmount) * 100) : 0,
+          p_base_frequency: salesCompensation.arrangement === 'base_plus_commission' ? salesCompensation.baseFrequency : null,
         });
         if (compensationError) throw new Error('Sales compensation setup failed: ' + compensationError.message);
       }
