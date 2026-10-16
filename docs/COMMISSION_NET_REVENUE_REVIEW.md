@@ -20,3 +20,13 @@ The migration intentionally does **not** rewrite existing commission records. Re
 - Review legacy invoice commission records before any backfill.
 
 **Safety:** Do not deploy this migration until the snapshot/subtotal assumptions are verified. It is deliberately strict about invalid data, but a missing snapshot with an unmarked fee could still overstate the basis.
+
+## Verified payment-time fee blocker (2026-10-16)
+
+`RecordPaymentModal.tsx` inserts `payments.amount = paymentAmount + convenienceFee` and stores the fee amount only in free-text notes. Its own follow-up invoice update uses `paymentAmount` (without the fee).
+
+However, the live database function `update_invoice_payment_status()` independently calculates `SUM(payments.amount)` and writes that gross value into `invoices.amount_paid`. Both the payment-side commission trigger and the invoice-side commission trigger depend on `invoices.amount_paid / invoices.total`. Thus, fee-inclusive payments can make an invoice appear paid too early, especially on partial payments. The existing invoice UI update is not a durable solution because the database trigger runs automatically.
+
+**Do not merge/deploy the commission-basis migration until the payment amount semantics are fixed.** The recommended separate change is a structured `payments.convenience_fee_amount` column (default zero, constrained between zero and `amount`), populated at payment recording, with invoice payment status computed from `SUM(amount - convenience_fee_amount)`. Confirm QuickBooks reconciliation, processor charges, security-billing payment flows, and historical notes before backfilling. Do not parse notes to silently alter existing payment records.
+
+The convenience fee charged at payment time is not included in invoice subtotal and must **not** be deducted a second time from the commission basis.
