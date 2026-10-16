@@ -987,21 +987,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             );
           })}
         </nav>
-        <div className="p-3 sm:p-4">
-          {activeTab === 'tasks' && (
-            <div className="space-y-3">
-              <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />
-              {!workOrder.project_id && canEdit && (
-                <ServiceWorkOrderTaskManager workOrderId={workOrderId} workOrderGroupId={workOrder.work_order_group_id || undefined} isGroupWorkOrder={workOrder.is_group_work_order} onTasksChange={loadWorkOrderData} />
-              )}
-            </div>
+        <div className="p-3 sm:p-4 space-y-3">
+          {activeTab === 'tasks' && !workOrder.project_id && canEdit && (
+            <ServiceWorkOrderTaskManager workOrderId={workOrderId} workOrderGroupId={workOrder.work_order_group_id || undefined} isGroupWorkOrder={workOrder.is_group_work_order} onTasksChange={loadWorkOrderData} />
           )}
-          {activeTab !== 'tasks' && <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />}
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
+          {activeTab === 'time' && (
+            <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />
+          )}
+          {/* Section content shares the same panel as its navigation. */}
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
         {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist key={`${workOrderId}-${vipRefreshKey}`} workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} onAddSalesLeadPhoto={() => { setPhotoContext('vip_sales_lead'); setShowPhotoCapture(true); }} onCreateFollowUpTask={(finding) => { setVipFollowUpFinding({id:finding.id,description:finding.description}); setShowCreateTaskModal(true); }} />}
@@ -1736,6 +1729,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             )}
           </div>
         )}
+        </div>
       </div>
 
       {/* Modals */}
@@ -1900,7 +1894,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         {workOrder.updated_at && <span>Last changed {new Date(workOrder.updated_at).toLocaleString()}</span>}
         <span className="font-mono text-gray-400">{workOrder.work_order_number}</span>
         <button type="button" onClick={() => setActiveTab('history')} className="text-blue-600 hover:underline">
-          View work order history
+          View previous customer work orders
         </button>
       </footer>
       <ConfirmModal
