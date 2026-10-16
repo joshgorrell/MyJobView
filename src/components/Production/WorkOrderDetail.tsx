@@ -484,12 +484,12 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     };
     const tick = window.setInterval(() => setTimeNow(Date.now()), 1000);
     const poll = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 15000);
+    const idsInclude = (id: string) => [workOrderId, ...linkedWorkOrders.map(order => order.id)].includes(id);
     const channel = supabase.channel(`work-order-team-time-${workOrderId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, payload => {
         const changed = (payload.new || payload.old) as { work_order_id?: string };
         if (!changed.work_order_id || idsInclude(changed.work_order_id)) void refresh();
       }).subscribe();
-    const idsInclude = (id: string) => [workOrderId, ...linkedWorkOrders.map(order => order.id)].includes(id);
     const onFocus = () => { if (document.visibilityState === 'visible') void refresh(); };
     document.addEventListener('visibilitychange', onFocus);
     void refresh();
@@ -713,7 +713,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   const validTimeEntries = timeEntries.filter(t => !['rejected', 'cancelled'].includes(t.status));
   const activeTimeEntries = validTimeEntries.filter(t => !t.clock_out && Number.isFinite(Date.parse(t.clock_in)));
-  const elapsedHours = (entry: TimeEntry) => Math.max(0, (timeNow - Date.parse(entry.clock_in)) / 3600000);
+  const elapsedHours = (entry: TimeEntry) => Math.max(0, (timeNow - Date.parse(entry.clock_in)) / 3600000 - Number(entry.break_minutes || 0) / 60);
   const completedTimeHours = validTimeEntries.filter(t => t.clock_out).reduce((sum, t) => sum + Number(t.total_hours || 0), 0);
   const activeTimeHours = activeTimeEntries.reduce((sum, entry) => sum + elapsedHours(entry), 0);
   const totalTimeHours = completedTimeHours + activeTimeHours;
