@@ -130,6 +130,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
           invoice_id: invoice.id,
           contact_id: invoice.contact_id,
           amount: totalWithFee,
+          convenience_fee_amount: convenienceFee,
           payment_date: paymentDate,
           payment_method: paymentMethod,
           reference_number: referenceNumber || null,
