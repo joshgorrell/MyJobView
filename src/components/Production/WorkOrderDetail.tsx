@@ -474,7 +474,17 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     let requestId = 0;
     const refresh = async () => {
       const current = ++requestId;
-      const ids = [workOrderId, ...linkedWorkOrders.map(order => order.id)];
+      let ids = [workOrderId];
+      if (workOrder.work_order_group_id) {
+        const { data: visits, error: visitsError } = await supabase.from('work_orders')
+          .select('id').eq('work_order_group_id', workOrder.work_order_group_id);
+        if (visitsError) {
+          console.error('Could not resolve linked work-order time:', visitsError);
+          return;
+        }
+        ids = [...new Set([workOrderId, ...(visits || []).map(visit => visit.id)])];
+      }
+      if (disposed || current !== requestId) return;
       const { data, error } = await supabase.from('time_entries')
         .select('*, technician:profiles!technician_id(full_name)')
         .in('work_order_id', ids)
@@ -484,11 +494,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     };
     const tick = window.setInterval(() => setTimeNow(Date.now()), 1000);
     const poll = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 15000);
-    const idsInclude = (id: string) => [workOrderId, ...linkedWorkOrders.map(order => order.id)].includes(id);
     const channel = supabase.channel(`work-order-team-time-${workOrderId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, payload => {
         const changed = (payload.new || payload.old) as { work_order_id?: string };
-        if (!changed.work_order_id || idsInclude(changed.work_order_id)) void refresh();
+        // A visit can be linked or unlinked while this screen is open; re-check group membership.
+        if (!changed.work_order_id || changed.work_order_id === workOrderId || workOrder.work_order_group_id) void refresh();
       }).subscribe();
     const onFocus = () => {
       if (document.visibilityState === 'visible') {
@@ -508,7 +518,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       window.removeEventListener('online', onOnline);
       void supabase.removeChannel(channel);
     };
-  }, [workOrderId, workOrder?.work_order_group_id, linkedWorkOrders]);
+  }, [workOrderId, workOrder?.work_order_group_id]);
 
   async function saveNotesDraft() {
     if (!notesDirtyRef.current) return;
