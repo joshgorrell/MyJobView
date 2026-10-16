@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { requestConfirmation } from '../../lib/feedback';
 import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
@@ -31,7 +32,7 @@ interface Request {
   leave_days: LeaveDay[] | null;
   policy: { policy_name: string };
 }
-export function MyTimeOff() {
+export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   const { user, profile } = useAuth();
   const [tab, setTab] = useState<"mine" | "team" | "manage">("mine");
   const [balances, setBalances] = useState<Balance[]>([]);
@@ -53,7 +54,7 @@ export function MyTimeOff() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [today, setToday] = useState("");
   const [settings, setSettings] = useState({
-    notice: 14,
+    notice: 28,
     cutoff: "07:00",
     points: 10,
   });
@@ -71,7 +72,7 @@ export function MyTimeOff() {
       .then(({ data }) => {
         if (data && active)
           setSettings({
-            notice: data.pto_vacation_advance_days ?? 14,
+            notice: data.pto_vacation_advance_days ?? 28,
             cutoff: (data.pto_same_day_callin_cutoff_time ?? "07:00").slice(
               0,
               5,
@@ -184,13 +185,12 @@ export function MyTimeOff() {
   const selected = balances.find((b) => b.policy.id === policy);
   const total = preview.reduce((sum, d) => sum + Number(d.hours), 0);
   const shortNotice =
-    selected?.policy.pto_type === "vacation" &&
     start &&
     today &&
     (new Date(start + "T12:00Z").getTime() -
       new Date(today + "T12:00Z").getTime()) /
       86400000 <
-      settings.notice;
+      28;
   async function submit() {
     if (!policy || !preview.length || previewError) return;
     setBusy(true);
@@ -236,7 +236,7 @@ export function MyTimeOff() {
           Request Time Off
         </button>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           aria-pressed={tab === "mine"}
@@ -253,7 +253,7 @@ export function MyTimeOff() {
         >
           Team Time Off
         </button>
-        {canManageTimeOff(profile?.role) && (
+        {!compact && canManageTimeOff(profile?.role) && (
           <button
             type="button"
             onClick={() => setTab("manage")}
@@ -347,8 +347,8 @@ export function MyTimeOff() {
           </section>
         </>
       )}
-      {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center">
+      {showForm && createPortal(
+        <div className="fixed inset-0 z-[70] bg-black/60 p-4 flex items-center justify-center">
           <section
             role="dialog"
             aria-modal="true"
@@ -471,10 +471,7 @@ export function MyTimeOff() {
               )
             )}
             {shortNotice && (
-              <p className="rounded bg-amber-50 text-amber-900 p-3">
-                Vacation with less than {settings.notice} days’ notice can be
-                submitted, but needs a manager override reason to approve.
-              </p>
+              <p className="text-xs leading-relaxed text-muted">PTO requests made less than four weeks in advance may not be approved. Approval is not guaranteed.</p>
             )}
             {start === today &&
               selected &&
@@ -512,7 +509,7 @@ export function MyTimeOff() {
               {busy ? "Submitting…" : "Submit Request"}
             </button>
           </section>
-        </div>
+        </div>, document.body
       )}
     </div>
   );

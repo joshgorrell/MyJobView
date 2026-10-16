@@ -1,3 +1,4 @@
+import { PTORoutingSettings } from './PTORoutingSettings';
 import { requestConfirmation, requestText } from '../../lib/feedback';
 import { TeamTimeOffPanel } from "../Shared/TeamTimeOffPanel";
 import { displayDate, LeaveDay } from "../../lib/timeOff";
@@ -71,6 +72,8 @@ interface EmployeeBalance {
 
 export function PTOManagement() {
   const toast = useToast();
+  const [allowed, setAllowed] = useState<boolean | null>(null);
+  useEffect(() => { let active = true; supabase.rpc('can_manage_pto').then(({ data }) => { if (active) setAllowed(data === true); }); return () => { active = false; }; }, []);
   const [activeTab, setActiveTab] = useState<
     "requests" | "balances" | "policies"
   >("requests");
@@ -277,6 +280,12 @@ export function PTOManagement() {
       if (!user) throw new Error("Not authenticated");
 
       setBusyRequest(requestId);
+      if (action === 'approve') {
+        const { data: conflicts, error: coverageError } = await supabase.rpc('time_off_coverage', { p_request: requestId });
+        if (coverageError) throw coverageError;
+        if (conflicts?.length && !(await requestConfirmation(`${conflicts.length} existing job(s) or appointment(s) overlap this leave. Approve and then reassign those bookings?`, { theme: 'amber' }))) return;
+        if (conflicts?.length) setCoverage(v => ({ ...v, [requestId]: conflicts }));
+      }
       const { error } = await supabase.rpc("review_time_off", {
         p_request: requestId,
         p_action: action === "approve" ? "approved" : "denied",
@@ -344,6 +353,8 @@ export function PTOManagement() {
     );
   }
 
+  if (allowed === null) return <p role="status">Loading PTO permissions…</p>;
+  if (!allowed) return <p role="status">You are not assigned to approve or manage PTO. Contact an administrator to update PTO routing.</p>;
   return (
     <div className="space-y-6">
       <div>
@@ -355,6 +366,7 @@ export function PTOManagement() {
         </p>
       </div>
 
+      <PTORoutingSettings />
       <TeamTimeOffPanel />
       <button
         type="button"
@@ -624,7 +636,7 @@ export function PTOManagement() {
                             Cancel Approved Leave
                           </button>
                         )}
-                        {request.status === "pending" && (
+                        {["pending", "approved"].includes(request.status) && (
                           <div className="mt-2 text-primary">
                             <button
                               type="button"

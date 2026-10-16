@@ -1,3 +1,4 @@
+import { AttendanceBadge, useAttendanceResults } from '../Shared/AttendanceBadge';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -173,6 +174,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   const { profile, loading: authLoading } = useAuth();
   const [orgTimezone, setOrgTimezone] = useState<string>('America/Chicago');
   const [entries, setEntries] = useState<ClockEntry[]>([]);
+  const attendance = useAttendanceResults(entries.map(e => e.id));
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [alerts, setAlerts] = useState<ClockAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -934,25 +936,9 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   type ClockInStatus = 'early' | 'on-time' | 'late' | 'really-late';
 
   function getClockInStatus(entry: ClockEntry): ClockInStatus | null {
-    if (!entry.technician?.standard_start_time || !entry.clock_in) return null;
-
-    const scheduledStart = entry.technician.standard_start_time;
-    const clockInTime = new Date(entry.clock_in).toTimeString().slice(0, 8);
-
-    // Parse times
-    const [schedHour, schedMin] = scheduledStart.split(':').map(Number);
-    const [clockHour, clockMin, _clockSec] = clockInTime.split(':').map(Number);
-
-    // Convert to minutes for comparison
-    const scheduledMinutes = schedHour * 60 + schedMin;
-    const clockInMinutes = clockHour * 60 + clockMin;
-
-    const diffMinutes = clockInMinutes - scheduledMinutes;
-
-    if (diffMinutes < -15) return 'early';
-    if (diffMinutes <= 0) return 'on-time';
-    if (diffMinutes <= 15) return 'late';
-    return 'really-late';
+    const scored = attendance[entry.id];
+    if (!scored) return null;
+    return scored.event_type === 'early' ? 'early' : scored.event_type === 'on_time' ? 'on-time' : scored.event_type === 'late' ? 'late' : 'really-late';
   }
 
   function formatMinutesLate(minutes: number): string {
@@ -997,18 +983,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   }
 
   function calculateMinutesLate(entry: ClockEntry): number {
-    if (!entry.technician?.standard_start_time || !entry.clock_in) return 0;
-
-    const scheduledStart = entry.technician.standard_start_time;
-    const clockInTime = new Date(entry.clock_in).toTimeString().slice(0, 8);
-
-    const [schedHour, schedMin] = scheduledStart.split(':').map(Number);
-    const [clockHour, clockMin] = clockInTime.split(':').map(Number);
-
-    const scheduledMinutes = schedHour * 60 + schedMin;
-    const clockInMinutes = clockHour * 60 + clockMin;
-
-    return clockInMinutes - scheduledMinutes;
+    return attendance[entry.id]?.minutes_delta || 0;
   }
 
   function calculateElapsedHours(entry: ClockEntry): number {
@@ -1289,7 +1264,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 truncate">{entry.technician?.full_name}</div>
                   <div className="text-xs text-gray-600">
-                    {formatLocalDate(entry.entry_date)}: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : '—'}
+                    {formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} />: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : '—'}
                     <span className="font-medium ml-1">({entry.total_hours?.toFixed(2) || '0'}h)</span>
                   </div>
                 </div>
@@ -1335,7 +1310,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 truncate">{entry.full_name}</div>
                   <div className="text-xs text-gray-600">
-                    In: {formatLocalDate(entry.entry_date)} {formatTime12Hour(entry.clock_in, orgTimezone)}
+                    In: {formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} /> {formatTime12Hour(entry.clock_in, orgTimezone)}
                     <span className="text-orange-600 font-medium ml-1">
                       ({Math.floor(entry.hours_since_clock_in)}h)
                     </span>
@@ -1457,7 +1432,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900 text-sm truncate">{entry.technician.full_name}</div>
                     <div className="text-xs text-gray-600 space-y-0.5">
-                      <div>{formatLocalDate(entry.entry_date)}: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : 'Active'} ({entry.total_hours?.toFixed(2)}h)</div>
+                      <div>{formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} />: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : 'Active'} ({entry.total_hours?.toFixed(2)}h)</div>
                       {!entry.clock_in_latitude && <span className="text-orange-600">(No GPS)</span>}
                     </div>
                   </div>
@@ -1795,7 +1770,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-1.5 text-xs text-gray-700">{formatLocalDate(entry.entry_date)}</td>
+                    <td className="px-2 py-1.5 text-xs text-gray-700">{formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} /></td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-0.5">
                         <span className="text-xs text-gray-900 font-medium">{formatTime12Hour(entry.clock_in, orgTimezone)}</span>

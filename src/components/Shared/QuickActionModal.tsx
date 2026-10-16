@@ -178,7 +178,7 @@ export function QuickActionModal({
           tabIndex={-1}
           style={{ maxHeight: 'min(var(--qam-max-height), 100%)' }}
           onKeyDown={event => {
-            if (event.defaultPrevented) return;
+            if (event.defaultPrevented || (event.target as Element).closest('[role="dialog"]') !== dialogRef.current) return;
             if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
             if (event.key !== 'Tab') return;
             const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]') || [])

@@ -179,6 +179,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
 
     const channel = supabase
       .channel('appointments-calendar-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pto_requests' }, debouncedReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, debouncedReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, debouncedReload)
       .subscribe();

@@ -1,3 +1,4 @@
+import { gpsTrackingService } from '../../lib/gpsTracking';
 import { notify, requestConfirmation } from '../../lib/feedback';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
@@ -91,7 +92,7 @@ export function DailyClock() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [profile, todayEntry, timePolicy.ready, timePolicy.dailyClock]);
+  }, [profile, timePolicy.ready, timePolicy.dailyClock]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -150,19 +151,20 @@ export function DailyClock() {
             .from('daily_clock_entries')
             .select('*')
             .eq('technician_id', profile.id)
-            .eq('entry_date', today)
+            .or(`entry_date.eq.${today},clock_out.is.null`)
             .order('clock_in', { ascending: false });
         }
       );
 
       if (error) throw error;
 
+      const ownEntries = (entries || []).filter((e: any) => e.technician_id === profile.id && (!e.clock_out || e.entry_date === today));
       // Prioritize active entry (clock_out is null) over completed entries
       let entry = null;
-      if (entries && entries.length > 0) {
+      if (ownEntries.length > 0) {
         // First, look for any active entry (clock_out is null)
-        const activeEntry = entries.find(e => !e.clock_out);
-        entry = activeEntry || entries[0]; // Fall back to most recent if all are clocked out
+        const activeEntry = ownEntries.find(e => !e.clock_out);
+        entry = activeEntry || ownEntries[0]; // Fall back to most recent if all are clocked out
       }
 
       setTodayEntry(entry);
@@ -310,6 +312,7 @@ export function DailyClock() {
 
       const entryId = crypto.randomUUID();
 
+      const capture = gpsTrackingService.captureLocationForClockEvent();
       const clockInData = {
         id: entryId,
         technician_id: profile.id,
@@ -328,7 +331,7 @@ export function DailyClock() {
 
       if (error) throw error;
 
-      void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
+      void saveClockEventGps(entryId, 'daily_clock_entries', false, capture).catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       await loadTodaysClock();
 
@@ -351,7 +354,7 @@ export function DailyClock() {
 
   function handleClockOut() {
     if (!todayEntry || !profile) return;
-
+    if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) { notify('An unfinished older shift needs manager correction.', { theme: 'amber', tone: 'warning' }); return; }
     if (activeBreak) {
       notify('Please end your break before clocking out', { theme: 'blue', tone: 'warning' });
       return;

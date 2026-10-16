@@ -1,3 +1,4 @@
+import { saveNativeClockGps } from '../services/ClockEventGps';
 import * as Crypto from 'expo-crypto';
 import { openMJV } from '../services/OpenMJV';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
@@ -93,8 +94,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         .from('daily_clock_entries')
         .select('*')
         .eq('technician_id', profile.id)
-        .eq('entry_date', today)
-        .is('clock_out', null)
+        .is('clock_out', null).order('clock_in', { ascending: false }).limit(1)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -172,27 +172,15 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         offline_entry: false,
       };
 
-      // Capture high-accuracy location
-      const location = await locationTrackingService.captureHighAccuracyLocation();
-
-      Object.assign(clockInData, {clock_in_gps_attempted_at:now.toISOString(),clock_in_gps_capture_method:'failed'});
-      if (location) {
-        Object.assign(clockInData, {
-          clock_in_latitude: location.coords.latitude,
-          clock_in_longitude: location.coords.longitude,
-          clock_in_gps_accuracy: location.coords.accuracy,
-          clock_in_gps_capture_method: (location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy',
-          clock_in_gps_attempted_at: now.toISOString(),
-          clock_in_gps_captured_at: new Date(location.timestamp).toISOString(),
-          clock_in_gps_duration_ms: (location.coords as any).duration_ms || 0,
-        });
-      }
+      const capture = locationTrackingService.captureHighAccuracyLocation();
+      Object.assign(clockInData, { clock_in_gps_attempted_at: now.toISOString(), clock_in_gps_capture_method: 'none' });
 
       const { error } = await supabase
         .from('daily_clock_entries')
         .insert(clockInData);
 
       if (error) throw error;
+      void saveNativeClockGps(entryId, profile.id, false, capture, now.toISOString()).catch(error => console.error('Clock-in GPS save pending:', error));
 
 
       await loadTodaysClock();
@@ -211,32 +199,26 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       return;
     }
 
-    Alert.prompt(
+    if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) {
+      Alert.alert('Unfinished shift', 'Ask your manager to correct this older shift before recording another day.');
+      return;
+    }
+    const promptForNotes = (title: string, message: string, callback: (notes: string) => Promise<void>, type: 'plain-text') => {
+      if (Platform.OS === 'ios') Alert.prompt(title, message, callback, type);
+      else Alert.alert(title, 'Clock out for the day?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clock Out', onPress: () => { void callback(''); } }]);
+    };
+    promptForNotes(
       'Clock Out',
       'Add notes about your day (optional):',
       async (notes) => {
         try {
           const now = new Date();
 
-          // Capture final location
-          const location = await locationTrackingService.captureHighAccuracyLocation();
-
-          const updates: any = {
-            clock_out: now.toISOString(),
-            status: 'clocked_out',
-            notes: notes || null,
-            clock_out_gps_attempted_at: now.toISOString(),
-            clock_out_gps_capture_method: 'failed',
+          const capture = locationTrackingService.captureHighAccuracyLocation();
+          const updates = {
+            clock_out: now.toISOString(), status: 'clocked_out', notes: notes || null,
+            clock_out_gps_attempted_at: now.toISOString(), clock_out_gps_capture_method: 'none',
           };
-
-          if (location) {
-            updates.clock_out_latitude = location.coords.latitude;
-            updates.clock_out_longitude = location.coords.longitude;
-            updates.clock_out_gps_accuracy = location.coords.accuracy;
-            updates.clock_out_gps_capture_method = (location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy';
-            updates.clock_out_gps_captured_at = new Date(location.timestamp).toISOString();
-            updates.clock_out_gps_duration_ms = (location.coords as any).duration_ms || 0;
-          }
 
           const { error } = await supabase
             .from('daily_clock_entries')
@@ -244,6 +226,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
             .eq('id', todayEntry.id);
 
           if (error) throw error;
+          void saveNativeClockGps(todayEntry.id, profile.id, true, capture, now.toISOString()).catch(error => console.error('Clock-out GPS save pending:', error));
 
 
           await loadTodaysClock();

@@ -33,3 +33,12 @@ for (const path of ['src/components/Technician/DailyClock.tsx','src/components/L
 }
 assert.equal(fs.readFileSync('mobile/App.tsx','utf8').includes('initializeLocationTracking'),false,'Opening the native app must not request background location');
 console.log('Clock flows never start GPS watches, pre-warming, refinement or background tracking.');
+
+let nativeSaved=[],nativeRemoved=[],nativeWrites=[],nativeSession='tech';
+const nativeGps=load('mobile/src/services/ClockEventGps.ts',{
+ './LocationTrackingService':{},'./OfflineStorage':{offlineStorage:{saveClockGps:async(...args)=>nativeSaved.push(args),removeClockGps:async id=>nativeRemoved.push(id)}},
+ './supabase':{supabase:{auth:{getSession:async()=>({data:{session:{user:{id:nativeSession}}}})},from:()=>({update:values=>({eq:()=>({eq:()=>({select:async()=>{nativeWrites.push(values);return {data:[{id:'entry'}],error:null};}})})})})}},
+});
+for (const out of [false,true]) { await nativeGps.saveNativeClockGps('entry','tech',out,Promise.resolve(position),new Date().toISOString());const prefix=out?'clock_out':'clock_in';assert.equal(nativeWrites.at(-1)[`${prefix}_latitude`],0);assert.ok(nativeRemoved.includes(`entry:${prefix}`)); }
+nativeSession='other';const before=nativeWrites.length;await nativeGps.saveNativeClockGps('entry','tech',true,Promise.resolve(null),new Date().toISOString());assert.equal(nativeWrites.length,before,'Native GPS cannot sync through a different user account');assert.equal(nativeSaved.at(-1)[3].clock_out_gps_capture_method,'failed');
+console.log('Native punch GPS persists before network delivery, handles zero coordinates and records failure without crossing accounts.');

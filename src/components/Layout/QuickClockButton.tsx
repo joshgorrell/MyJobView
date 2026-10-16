@@ -4,7 +4,7 @@ import { Clock, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
-import { TimeClockModal } from './TimeClockModal';
+import { DailyLaunchpad } from './DailyLaunchpad';
 
 interface TimeButtonProps {
   onNavigate?: (tab: string, params?: Record<string, string>) => void;
@@ -72,9 +72,8 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
         .from('daily_clock_entries')
         .select('id, clock_in, clock_out')
         .eq('technician_id', profile.id)
-        .eq('entry_date', today)
         .is('clock_out', null)
-        .maybeSingle();
+        .order('clock_in', { ascending: false }).limit(1).maybeSingle();
 
       let isOnBreak = false;
       if (dailyEntry) {
@@ -173,14 +172,13 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
         </div>
       </button>
 
-      <TimeClockModal
-        isOpen={showModal}
+      {showModal && <DailyLaunchpad
         onClose={() => setShowModal(false)}
         onNavigate={(tab, params) => {
           setShowModal(false);
           if (onNavigate) onNavigate(tab, params);
         }}
-      />
+      />}
     </>
   );
 }

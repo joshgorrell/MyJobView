@@ -1,3 +1,4 @@
+import { gpsTrackingService } from '../../lib/gpsTracking';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import {offlineStorage} from '../../lib/offlineStorage';
 import {syncManager} from '../../lib/syncManager';
@@ -18,6 +19,7 @@ export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrd
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [showStop,setShowStop]=useState(false);
+  const [stoppingEntry,setStoppingEntry]=useState<{id:string}|null>(null);
   const [now,setNow]=useState(Date.now());
   async function load() {
     if(!profile) return;
@@ -52,9 +54,10 @@ export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrd
     if(!navigator.onLine){setError('Reconnect to start Work Order time. Offline starts are not yet supported.');return;}
     setBusy(true);setError('');
     try {
+      const capture = gpsTrackingService.captureLocationForClockEvent();
       const {data,error}=await supabase.rpc('start_work_order_time',{p_work_order_id:workOrderId});
       if(error) throw error;
-      void saveClockEventGps(data, 'time_entries').catch(error => console.error('Job clock-in GPS could not be saved:', error));
+      void saveClockEventGps(data, 'time_entries', false, capture).catch(error => console.error('Job clock-in GPS could not be saved:', error));
       // Payroll time is saved first. GPS evidence can refine in the background.
       await load();onChanged();
     } catch(error:any){setError(error.message||'Unable to start job time.');}
@@ -65,12 +68,12 @@ export function WorkOrderTimeControl({workOrderId,assignedTo,onChanged}:{workOrd
   const elapsed=active?Math.max(0,Math.floor((now-Date.parse(active.clock_in))/60000)):0;
   return <div className="rounded-xl border border-subtle bg-elevated p-3 space-y-2">
     <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-primary flex items-center gap-2"><Clock className="w-4 h-4" />{runningHere ? `Job time running · ${Math.floor(elapsed/60)}h ${elapsed%60}m`:'Work Order Job Time'}</p>
-      {runningHere?<button onClick={()=>setShowStop(true)} className="flex items-center gap-2 rounded-lg bg-red-600 text-white px-3 py-2 text-sm"><Square className="w-4 h-4" />Stop Time</button>:<button onClick={start} disabled={loading||busy||!!active||pendingStop||!verified||!online} className="flex items-center gap-2 rounded-lg bg-blue-600 text-white px-3 py-2 text-sm disabled:opacity-50"><Play className="w-4 h-4" />{busy?'Starting…':'Start Job Time'}</button>}
+      {runningHere?<button onClick={()=>{setStoppingEntry(active);setShowStop(true);}} className="flex items-center gap-2 rounded-lg bg-red-600 text-white px-3 py-2 text-sm"><Square className="w-4 h-4" />Stop Time</button>:<button onClick={start} disabled={loading||busy||!!active||pendingStop||!verified||!online} className="flex items-center gap-2 rounded-lg bg-blue-600 text-white px-3 py-2 text-sm disabled:opacity-50"><Play className="w-4 h-4" />{busy?'Starting…':'Start Job Time'}</button>}
     </div>
     {active && !runningHere && <p className="text-sm text-secondary">You have time running on another activity. Stop that activity before starting this Work Order.</p>}
     {pendingStop && <p className="text-sm text-amber-700">Your time stop is saved on this device and waiting to sync. Reconnect before starting another activity.</p>}
     {!online && !runningHere && !pendingStop && <p className="text-sm text-secondary">Reconnect to start Work Order time.</p>}
     {error && <p role="alert" className="text-red-600 text-sm">{error}</p>}
-    {showStop && active && profile && <ClockOutModal type="job" entryId={active.id} technicianId={profile.id} workOrderId={workOrderId} allowCompletion={false} onClose={()=>setShowStop(false)} onSuccess={()=>{setShowStop(false);void load();onChanged();}} />}
+    {showStop && stoppingEntry && profile && <ClockOutModal type="job" entryId={stoppingEntry.id} technicianId={profile.id} workOrderId={workOrderId} allowCompletion={false} onClose={()=>setShowStop(false)} onSuccess={()=>{setShowStop(false);void load();onChanged();}} />}
   </div>;
 }

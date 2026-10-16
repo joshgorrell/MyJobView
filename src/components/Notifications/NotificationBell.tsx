@@ -228,6 +228,13 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
       return;
     }
 
+    if (notifType === 'system' && (notification.title === 'New PTO request' || notification.title.startsWith('PTO request ')) && onTabChange) {
+      const { data } = await supabase.rpc('can_manage_pto');
+      onTabChange(data === true ? 'pto_management' : 'my_time_off');
+      setIsOpen(false);
+      return;
+    }
+
     // Proposal-related notifications
     if (notification.type === 'proposal' && notification.proposal_id && onProposalClick) {
       onProposalClick(notification.proposal_id);

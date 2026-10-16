@@ -30,7 +30,7 @@ try {
   await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){
     b.onResolve({filter:/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useEmployeeTimePolicy$|lib\/timezoneUtils$/},()=>({path:'fixture',namespace:'fixture'}));
     b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js',resolveDir:process.cwd()}));
-    b.onResolve({filter:/TimeClockModal$|ManualJobTimeRequestModal$|RequestInternalTimeModal$|MyTimeView$|AppointmentsCalendar$/},args=>({path:args.path.split('/').at(-1),namespace:'empty'}));
+    b.onResolve({filter:/TimeClockModal$|ManualJobTimeRequestModal$|RequestInternalTimeModal$|MyTimeView$|MyJobTimeView$|MyTimeOff$|TeamTimeOffPanel$|WorkOrderTimeControl$|AppointmentsCalendar$/},args=>({path:args.path.split('/').at(-1),namespace:'empty'}));
     b.onLoad({filter:/.*/,namespace:'empty'},args=>({contents:'export const '+args.path+'=()=>null;',loader:'js'}));
   }}]});
   const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));
