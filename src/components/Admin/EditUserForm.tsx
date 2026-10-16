@@ -758,30 +758,14 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (salesArrangementChanged) {
         const { data: emp, error: empError } = await supabase.from('employees').select('id, organization_id').eq('user_id', user.id).single();
         if (empError || !emp) throw new Error('Employee record required for sales compensation.');
-        const { data: existing, error: existingError } = await supabase.from('sales_compensation_arrangements')
-          .select('id, effective_from').eq('employee_id', emp.id).is('effective_to', null).maybeSingle();
-        if (existingError) throw existingError;
-        const startDate = new Date().toISOString().slice(0, 10);
-        if (existing) {
-          if (existing.effective_from >= startDate) {
-            const { error: deleteError } = await supabase.from('sales_compensation_arrangements').delete().eq('id', existing.id);
-            if (deleteError) throw deleteError;
-          } else {
-            const priorDay = new Date(Date.parse(startDate + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
-            const { error: closeError } = await supabase.from('sales_compensation_arrangements').update({ effective_to: priorDay, updated_by: currentUser2?.id }).eq('id', existing.id);
-            if (closeError) throw closeError;
-          }
-        }
-        if (salesCompensation.arrangement !== 'none') {
-          const { error: insertError } = await supabase.from('sales_compensation_arrangements').insert({
-            organization_id: emp.organization_id, employee_id: emp.id,
-            arrangement_type: salesCompensation.arrangement,
-            base_amount_cents: salesCompensation.arrangement === 'base_plus_commission' ? Math.round(Number(salesCompensation.baseAmount) * 100) : 0,
-            base_frequency: salesCompensation.arrangement === 'base_plus_commission' ? salesCompensation.baseFrequency : null,
-            effective_from: startDate, created_by: currentUser2?.id, updated_by: currentUser2?.id,
-          });
-          if (insertError) throw new Error('Sales compensation save failed: ' + insertError.message);
-        }
+        const { error: saveError } = await supabase.rpc('save_sales_compensation_arrangement', {
+          p_employee_id: emp.id,
+          p_arrangement_type: salesCompensation.arrangement,
+          p_base_amount_cents: salesCompensation.arrangement === 'base_plus_commission' ? Math.round(Number(salesCompensation.baseAmount) * 100) : 0,
+          p_base_frequency: salesCompensation.arrangement === 'base_plus_commission' ? salesCompensation.baseFrequency : null,
+          p_effective_from: new Date().toISOString().slice(0, 10),
+        });
+        if (saveError) throw saveError;
       }
 
       await saveSetupReview(
