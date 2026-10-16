@@ -346,13 +346,13 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <QuickActionModal
       scrollBody={false}
       stableHeight
-      title={task ? 'Edit Task' : supportMode ? 'New Support Request' : 'New Task'}
-      subtitle={task ? 'Update task details' : supportMode ? 'Customer assistance tracked as a task' : 'Assign and track a new task'}
+      title={task ? 'Edit Assignment' : supportMode ? 'New Support Request' : 'New Assignment'}
+      subtitle={task ? 'Update assignment details' : supportMode ? 'Customer assistance tracked as an assignment' : 'Assign and track a follow-up'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
       showSuccess={showSuccess}
-      successMessage={task ? 'Task Updated!' : 'Task Created!'}
+      successMessage={task ? 'Assignment Updated!' : 'Assignment Created!'}
 
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
