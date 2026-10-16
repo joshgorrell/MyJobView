@@ -197,6 +197,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [timeNow, setTimeNow] = useState(Date.now());
   const [partRequests, setPartRequests] = useState<PartRequest[]>([]);
   const [jobPhotos, setJobPhotos] = useState<any[]>([]);
   const [jobCompletion, setJobCompletion] = useState<JobCompletion | null>(null);
@@ -466,6 +467,39 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   }
 
 
+  // Keep the whole crew's time visible without reloading notes or the work-order editor.
+  useEffect(() => {
+    if (!workOrder) return;
+    let disposed = false;
+    let requestId = 0;
+    const refresh = async () => {
+      const current = ++requestId;
+      const ids = [workOrderId, ...linkedWorkOrders.map(order => order.id)];
+      const { data, error } = await supabase.from('time_entries')
+        .select('*, technician:profiles!technician_id(full_name)')
+        .in('work_order_id', ids)
+        .order('entry_date', { ascending: false });
+      if (!disposed && current === requestId && !error) setTimeEntries(data || []);
+      if (error) console.error('Could not refresh work-order time:', error);
+    };
+    const tick = window.setInterval(() => setTimeNow(Date.now()), 1000);
+    const poll = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 15000);
+    const channel = supabase.channel(`work-order-team-time-${workOrderId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, payload => {
+        const changed = (payload.new || payload.old) as { work_order_id?: string };
+        if (!changed.work_order_id || idsInclude(changed.work_order_id)) void refresh();
+      }).subscribe();
+    const idsInclude = (id: string) => [workOrderId, ...linkedWorkOrders.map(order => order.id)].includes(id);
+    const onFocus = () => { if (document.visibilityState === 'visible') void refresh(); };
+    document.addEventListener('visibilitychange', onFocus);
+    void refresh();
+    return () => {
+      disposed = true; window.clearInterval(tick); window.clearInterval(poll);
+      document.removeEventListener('visibilitychange', onFocus);
+      void supabase.removeChannel(channel);
+    };
+  }, [workOrderId, workOrder?.work_order_group_id, linkedWorkOrders]);
+
   async function saveNotesDraft() {
     if (!notesDirtyRef.current) return;
     const value = notesDraftRef.current;
@@ -677,7 +711,12 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const canManageParts = ['admin','office_manager','project_manager','service_manager','manager','finance'].includes(profile?.role || '') || workOrder.assigned_to===profile?.id;
   const isAssignedTech = workOrder.assigned_to === profile?.id;
 
-  const totalTimeHours = timeEntries.filter(t=>t.clock_out && !['rejected','cancelled'].includes(t.status)).reduce((sum, t) => sum + Number(t.total_hours || 0), 0);
+  const validTimeEntries = timeEntries.filter(t => !['rejected', 'cancelled'].includes(t.status));
+  const activeTimeEntries = validTimeEntries.filter(t => !t.clock_out && Number.isFinite(Date.parse(t.clock_in)));
+  const elapsedHours = (entry: TimeEntry) => Math.max(0, (timeNow - Date.parse(entry.clock_in)) / 3600000);
+  const completedTimeHours = validTimeEntries.filter(t => t.clock_out).reduce((sum, t) => sum + Number(t.total_hours || 0), 0);
+  const activeTimeHours = activeTimeEntries.reduce((sum, entry) => sum + elapsedHours(entry), 0);
+  const totalTimeHours = completedTimeHours + activeTimeHours;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const pendingParts = partRequests.filter(p => p.status === 'pending').length;
   const canComplete = workOrder.status !== 'completed' && isAssignedTech && !jobCompletion;
@@ -920,8 +959,18 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             <span className="font-semibold text-gray-800">Working on this job</span>
             <span className="text-gray-600">{[workOrder.technician?.full_name, ...linkedWorkOrders.map(order => order.technician?.full_name)].filter(Boolean).filter((name, index, all) => all.indexOf(name) === index).join(', ') || 'Unassigned'}</span>
           </div>
-          <span className="text-xs text-gray-500">{timeEntries.filter(entry => !entry.clock_out).length} active time {timeEntries.filter(entry => !entry.clock_out).length === 1 ? 'entry' : 'entries'}</span>
+          <span className="text-xs text-gray-500">{activeTimeEntries.length} clocked in now</span>
         </div>
+        {activeTimeEntries.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2 text-xs" aria-live="off">
+            {activeTimeEntries.map(entry => (
+              <span key={entry.id} className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-green-900">
+                <span className="font-semibold">● {entry.technician?.full_name || 'Technician'} · Clocked in {new Date(entry.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                <span className="ml-2 tabular-nums">{Math.floor(elapsedHours(entry))}h {Math.floor(elapsedHours(entry) * 60) % 60}m elapsed</span>
+              </span>
+            ))}
+          </div>
+        )}
         {linkedWorkOrders.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             <span className="text-gray-500">Linked visits:</span>
@@ -1504,7 +1553,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
               <>
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                   <span className="text-sm font-semibold text-gray-700">All Entries</span>
-                  <span className="text-sm font-bold text-gray-900">{totalTimeHours.toFixed(2)}h total{workOrder.work_order_group_id ? ' across linked work orders' : ''}</span>
+                  <span className="text-sm font-bold text-gray-900">{totalTimeHours.toFixed(2)}h total ({completedTimeHours.toFixed(2)}h completed + {activeTimeHours.toFixed(2)}h running){workOrder.work_order_group_id ? ' across linked work orders' : ''}</span>
                 </div>
                 {timeEntries.map(entry => (
                   <div key={entry.id} className="border border-gray-200 rounded-xl p-4">
@@ -1519,7 +1568,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                           }`}>
                             {entry.status}
                           </span>
-                          <span className="text-sm font-bold text-gray-900 ml-auto">{Number(entry.total_hours || 0).toFixed(2)}h</span>
+                          <span className="text-sm font-bold text-gray-900 ml-auto">{entry.clock_out ? Number(entry.total_hours || 0).toFixed(2) : elapsedHours(entry).toFixed(2)}h{!entry.clock_out ? ' running' : ''}</span>
                         </div>
                         <div className="text-xs text-gray-500 flex items-center gap-2">
                           <span>{new Date(entry.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
