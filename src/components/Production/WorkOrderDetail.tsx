@@ -1511,7 +1511,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-gray-900 text-sm">{entry.technician.full_name}</span>
+                          <span className="font-semibold text-gray-900 text-sm">{entry.technician?.full_name || 'Unknown technician'}</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
                             entry.status === 'approved' ? 'bg-green-100 text-green-700' :
                             entry.status === 'submitted' ? 'bg-amber-100 text-amber-700' :
@@ -1519,7 +1519,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                           }`}>
                             {entry.status}
                           </span>
-                          <span className="text-sm font-bold text-gray-900 ml-auto">{entry.total_hours.toFixed(2)}h</span>
+                          <span className="text-sm font-bold text-gray-900 ml-auto">{Number(entry.total_hours || 0).toFixed(2)}h</span>
                         </div>
                         <div className="text-xs text-gray-500 flex items-center gap-2">
                           <span>{new Date(entry.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
