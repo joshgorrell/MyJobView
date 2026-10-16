@@ -1912,6 +1912,13 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           if (error) throw new Error(error.message);
           await loadWorkOrderData();
         }} />}
+      <footer className="border-t border-gray-200 pt-2 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span>Created {new Date(workOrder.created_at).toLocaleString()}</span>
+        <span className="font-mono text-gray-400">{workOrder.work_order_number}</span>
+        <button type="button" onClick={() => setActiveTab('history')} className="text-blue-600 hover:underline">
+          View work order history
+        </button>
+      </footer>
       <ConfirmModal
         isOpen={!!confirmModal}
         title={confirmModal?.title || ''}
