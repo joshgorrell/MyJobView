@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
 import type { CustomerLocation } from '../Contacts/CustomerLocationSelector';
+import { AIFormFill } from '../Shared/AIFormFill';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import {
   Search,
