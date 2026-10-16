@@ -60,6 +60,9 @@ interface WorkOrder {
   contact_id: string;
   customer_sales_rep_id: string | null;
   created_at: string;
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
   is_billable: boolean;
   is_archived: boolean;
   work_order_group_id: string | null;
@@ -671,17 +674,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
 
   const tabs = [
-    { id: 'flow', label: 'Flow', icon: History },
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
-    { id: 'overview', label: 'Overview', icon: FileText },
     { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'tasks', label: "Today's Work", icon: CheckSquare },
-    { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
+    { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length + partsUsed.length + materials.length, badge: pendingParts },
     { id: 'photos', label: 'Photos', icon: Camera, count: jobPhotos.length },
-    { id: 'materials', label: 'Materials', icon: Package, count: materials.length + partsUsed.length },
-    { id: 'time', label: 'Time', icon: Clock, count: timeEntries.length },
-    { id: 'completion', label: 'Completion', icon: Award, badge: jobCompletion ? 1 : 0 },
-    { id: 'history', label: 'History', icon: History, count: customerHistory.length }
+    { id: 'time', label: 'Time', icon: Clock, count: timeEntries.length }
   ];
 
   return (
@@ -938,6 +935,26 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             currentUserId={profile?.id || ''}
           />
         </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white px-3 py-2 sm:px-4" aria-label="Work order team">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-gray-800">Working on this job</span>
+            <span className="text-gray-600">{[workOrder.technician?.full_name, ...linkedWorkOrders.map(order => order.technician?.full_name)].filter(Boolean).filter((name, index, all) => all.indexOf(name) === index).join(', ') || 'Unassigned'}</span>
+          </div>
+          <span className="text-xs text-gray-500">{timeEntries.filter(entry => !entry.clock_out).length} active time {timeEntries.filter(entry => !entry.clock_out).length === 1 ? 'entry' : 'entries'}</span>
+        </div>
+        {linkedWorkOrders.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-gray-500">Linked visits:</span>
+            {linkedWorkOrders.map(order => (
+              <a key={order.id} href={`/work-orders?workOrderId=${encodeURIComponent(order.id)}`} className="rounded-md border border-blue-200 px-2 py-1 text-blue-700 hover:bg-blue-50">
+                {order.work_order_number}{order.technician?.full_name ? ` · ${order.technician.full_name}` : ''}
+              </a>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Tabs */}
@@ -1914,6 +1931,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         }} />}
       <footer className="border-t border-gray-200 pt-2 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1">
         <span>Created {new Date(workOrder.created_at).toLocaleString()}</span>
+        {workOrder.updated_at && <span>Last changed {new Date(workOrder.updated_at).toLocaleString()}</span>}
         <span className="font-mono text-gray-400">{workOrder.work_order_number}</span>
         <button type="button" onClick={() => setActiveTab('history')} className="text-blue-600 hover:underline">
           View work order history
