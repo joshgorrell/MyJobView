@@ -100,7 +100,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const canPost = scopeModule ? hasModuleAccess(scopeModule) : ['contacts', 'projects', 'work_orders'].some(hasModuleAccess);
   useEffect(() => {
     if (createRequested && canPost) {
-      setCreateMode('chat');
+      setCreateMode('choose');
       onCreateOpened?.();
     }
   }, [createRequested, canPost, onCreateOpened]);

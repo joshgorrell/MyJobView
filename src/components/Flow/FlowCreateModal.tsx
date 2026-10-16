@@ -41,7 +41,7 @@ export function FlowCreateModal({
         ? "Message"
         : mode === "update"
           ? "Activity update"
-          : "Log interaction";
+          : "Activity";
   return createPortal(
     <QuickActionModal
       title={title}
@@ -50,7 +50,7 @@ export function FlowCreateModal({
       onClose={completed ? completion.finish : onClose}
       accentColor="from-cyan-600 to-blue-700"
       showSuccess={completed}
-      successMessage={mode === 'chat' ? 'Message sent!' : mode === 'update' ? 'Added to Flow' : followup ? 'Follow-up completed!' : 'Interaction logged!'}
+      successMessage={mode === 'chat' ? 'Message sent!' : mode === 'update' ? 'Added to Flow' : followup ? 'Follow-up completed!' : 'Activity saved!'}
       successIcon={mode === 'chat' ? <Send className="h-20 w-20" strokeWidth={1.5} /> : <CheckCircle2 className="h-20 w-20" strokeWidth={1.5} />}
     >
       <div className="flow flow-quick-composer flow-create-modal">
@@ -76,16 +76,16 @@ export function FlowCreateModal({
             <button onClick={() => setMode("update")}>
               <Activity />
               <span>
-                <strong>Activity update</strong>
-                <small>Customer or job progress</small>
+                <strong>Update</strong>
+                <small>Job and customer progress</small>
               </span>
             </button>
             {canInteract && (
               <button onClick={() => setMode("interaction")}>
                 <Calendar />
                 <span>
-                  <strong>Log interaction</strong>
-                  <small>Calls, meetings, notes and follow-up reminders</small>
+                  <strong>Activity</strong>
+                  <small>Calls, meetings, visits and follow-ups</small>
                 </span>
               </button>
             )}

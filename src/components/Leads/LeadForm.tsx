@@ -682,7 +682,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/30 transition-all font-medium text-sm disabled:opacity-50"
+              className="flex-1 min-h-11 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? 'Creating...' : 'Create Lead'}
             </button>
