@@ -233,7 +233,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <MessageSquare className="w-4 h-4 text-purple-400" />
                     <div>
-                      <div className="font-medium">Internal chat</div>
+                      <div className="font-medium">Message</div>
                       <div className="text-xs text-muted">Teammates, departments or everyone</div>
                     </div>
                   </button>}
@@ -457,7 +457,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium">Internal chat</div>
+                      <div className="text-sm font-medium">Message</div>
                       <div className="text-xs text-muted">Teammates, departments or everyone</div>
                     </div>
                   </button>}
