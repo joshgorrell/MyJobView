@@ -53,12 +53,12 @@ BEGIN
 END;
 $$;
 -- Serialize arrangement writes per employee to avoid concurrent inserts racing the overlap check.
-CREATE OR REPLACE FUNCTION lock_sales_compensation_employee() RETURNS trigger LANGUAGE plpgsql AS $
+CREATE OR REPLACE FUNCTION lock_sales_compensation_employee() RETURNS trigger LANGUAGE plpgsql AS $lock$
 BEGIN
   PERFORM 1 FROM employees WHERE id = NEW.employee_id FOR UPDATE;
   RETURN NEW;
 END;
-$;
+$lock$;
 CREATE TRIGGER sales_compensation_employee_lock
   BEFORE INSERT OR UPDATE ON sales_compensation_arrangements
   FOR EACH ROW EXECUTE FUNCTION lock_sales_compensation_employee();
