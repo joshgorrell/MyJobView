@@ -17,6 +17,8 @@ $$;
 INSERT INTO organizations VALUES ('${id(1)}'), ('${id(2)}');
 INSERT INTO profiles VALUES ('${id(10)}','${id(1)}','admin'), ('${id(11)}','${id(1)}','tech'), ('${id(20)}','${id(2)}','admin');
 INSERT INTO employees VALUES ('${id(100)}','${id(1)}','${id(11)}'), ('${id(200)}','${id(2)}',NULL);
+GRANT USAGE ON SCHEMA auth TO authenticated;
+GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
 GRANT SELECT ON profiles, employees TO authenticated;
 GRANT UPDATE ON employees TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_org_id() TO authenticated;
