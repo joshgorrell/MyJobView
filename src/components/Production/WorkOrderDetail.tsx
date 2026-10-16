@@ -1438,7 +1438,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         )}
 
         {/* Materials */}
-        {activeTab === 'materials' && (
+        {activeTab === 'parts' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Parts {workOrder.work_order_group_id ? '— all linked work orders' : ''}</h3>
