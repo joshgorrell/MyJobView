@@ -1,3 +1,4 @@
+import {mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
@@ -20,5 +21,8 @@ try{for(const size of [{width:320,height:568},{width:390,height:844},{width:1280
  await page.goto('http://127.0.0.1:5191');await page.getByRole('button',{name:/Install Speakers/}).click();
  assert.deepEqual(await page.evaluate(()=>window.__navigation),{tab:'work_orders',params:{workOrderId:'wo'}});
  await page.goto('http://127.0.0.1:5191');await page.getByRole('dialog').waitFor();await page.keyboard.press('Escape');await page.getByRole('button',{name:'Closed',exact:true}).waitFor();
+ await page.goto('http://127.0.0.1:5191/?hourly');await page.getByRole('button',{name:'Start Your Day',exact:true}).waitFor();
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Hourly Time Clock does not overflow');
+ if(size.width===390){await mkdir('test-artifacts/time-clock',{recursive:true});await page.screenshot({path:'test-artifacts/time-clock/hourly-mobile.png',fullPage:true});}
  assert.deepEqual(errors,[]);await page.close();
 }console.log('Command Center browser checks passed at 320px, 390px and desktop: fit, routing and Escape.');}finally{await browser.close();await server.close();}

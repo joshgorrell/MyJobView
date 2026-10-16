@@ -83,4 +83,26 @@ await as(11);const locked=(await scalar("SELECT submit_time_off($1,'2027-04-01',
 await as(12);await assert.rejects(db.query('SELECT review_time_off($1,\'approved\')',[locked]),/Reopen/);
 await db.exec('SET ROLE anon');await assert.rejects(db.query("SELECT * FROM team_time_off('2027-01-04','2027-01-08')"),/permission denied/);
 console.log('PTO database checks passed: real schedule, scoped privacy, approval, daily payroll, cancellation, partial-day booking, coverage and payroll locks.');
+// Apply the new migration on top of the real PTO workflow, including its mirrors/RLS/locks.
+await db.exec(`RESET ROLE;
+ALTER TABLE profiles ADD standard_start_time time, ADD standard_end_time time, ADD work_days text[];
+ALTER TABLE daily_clock_entries ADD admin_adjusted boolean DEFAULT false;
+CREATE TABLE clock_in_rewards_log(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid,technician_id uuid,daily_clock_entry_id uuid,event_type text,points_awarded int,minutes_delta int,scheduled_time time,actual_time time);
+CREATE TABLE time_clock_alerts(organization_id uuid,technician_id uuid,alert_date date,alert_type text,scheduled_start_time time,actual_clock_in_time time,minutes_late int,resolved boolean DEFAULT false);
+ALTER TABLE points_transactions ADD CONSTRAINT points_transactions_transaction_type_check CHECK(transaction_type IN ('task_completion','question_answer','reward_redemption','admin_adjustment'));
+CREATE TABLE notifications(organization_id uuid,user_id uuid,type text,title text,body text,related_id uuid,is_read boolean);GRANT SELECT ON notifications TO authenticated;
+`);
+await db.exec(await readFile('supabase/migrations/20261016131655_time_clock_attendance_pto_routing.sql','utf8'));
+await as(12);await db.query('SELECT save_pto_routing($1,$2)',[[],[id(11)]]);
+const shortDate=(await scalar("SELECT min(d)::date::text d FROM generate_series(current_date+1,current_date+7,interval '1 day') d WHERE extract(dow FROM d) BETWEEN 1 AND 5")).d;
+await as(10);const shortReq=(await scalar("SELECT submit_time_off($1,$2,$2,'full_day') id",[vacation,shortDate])).id;
+await as(12);await assert.rejects(db.query("SELECT review_time_off($1,'approved')",[shortReq]),/Short-notice/);
+await db.query("SELECT review_time_off($1,'approved','Reviewed short notice',true)",[shortReq]);
+assert.equal((await db.query("SELECT count(*) n FROM time_entries WHERE pto_request_id=$1",[shortReq])).rows[0].n,1,'New routing coexists with payable-leave mirrors');
+assert.equal((await db.query("SELECT count(*) n FROM notifications WHERE user_id=$1 AND related_id=$2 AND title='PTO request approved'",[id(10),shortReq])).rows[0].n,1,'Decision reaches requester exactly once despite mirror update');
+await as(11);assert.equal((await scalar('SELECT can_manage_pto() allowed')).allowed,false,'Notification recipient does not gain approval authority');
+assert.equal((await db.query('SELECT * FROM pto_requests WHERE id=$1',[shortReq])).rows.length,0,'Notification recipient cannot read another employee’s private request');
+await as(12);await db.query('SELECT cancel_time_off($1)',[shortReq]);
+assert.equal((await db.query("SELECT count(*) n FROM time_entries WHERE pto_request_id=$1",[shortReq])).rows[0].n,0,'Cancellation still removes PTO mirror');
+console.log('New attendance/routing migration also passes against real PTO RPCs, RLS, balance/mirror triggers, short-notice override and cancellation.');
 await db.close();

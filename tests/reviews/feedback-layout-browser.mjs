@@ -33,7 +33,7 @@ try {
     b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js',resolveDir:process.cwd()}));
     b.onResolve({filter:/ProposalFollowUps$|LostOpportunityReviews$/},()=>({path:'review-child',namespace:'review-child'}));
     b.onLoad({filter:/.*/,namespace:'review-child'},()=>({contents:'export default ()=>null;',loader:'js'}));
-    b.onResolve({filter:/TimeClockModal$|ManualJobTimeRequestModal$|RequestInternalTimeModal$|MyTimeView$|AppointmentsCalendar$/},args=>({path:args.path.split('/').at(-1),namespace:'empty'}));
+    b.onResolve({filter:/TimeClockModal$|ManualJobTimeRequestModal$|RequestInternalTimeModal$|MyTimeView$|MyJobTimeView$|MyTimeOff$|TeamTimeOffPanel$|WorkOrderTimeControl$|AppointmentsCalendar$/},args=>({path:args.path.split('/').at(-1),namespace:'empty'}));
     b.onLoad({filter:/.*/,namespace:'empty'},args=>({contents:'export const '+args.path+'=()=>null;',loader:'js'}));
   }}]});
   const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));

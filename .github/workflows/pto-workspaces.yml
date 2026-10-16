@@ -42,3 +42,12 @@ jobs:
       - run: npm run test:employee-time:browser
       - run: npm run test:pto
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: time-clock-pto-mobile-preview
+          path: |
+            test-artifacts/time-clock/*.png
+            /tmp/pto-request-mobile.png
+            /tmp/pto-command-mobile.png
+          if-no-files-found: ignore
