@@ -225,25 +225,11 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   </button>
 
                   {onCreateInternalChat && <button
-                    onClick={() => {
-                      onCreateInternalChat?.();
-                      setShowCreateMenu(false);
-                    }}
-                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
-                  >
-                    <MessageSquare className="w-4 h-4 text-purple-400" />
-                    <div>
-                      <div className="font-medium">Message</div>
-                      <div className="text-xs text-muted">Teammates, departments or everyone</div>
-                    </div>
-                  </button>}
-
-                  {onCreateFlowUpdate && <button
-                    onClick={() => { onCreateFlowUpdate(); setShowCreateMenu(false); }}
+                    onClick={() => { onCreateInternalChat(); setShowCreateMenu(false); setMobileMenuOpen(false); }}
                     className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="font-medium">Activity update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                    <div><div className="font-medium">Flow</div><div className="text-xs text-muted">Messages, activities and updates</div></div>
                   </button>}
 
                   <button
@@ -452,22 +438,11 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   </button>
 
                   {onCreateInternalChat && <button
-                    onClick={() => { onCreateInternalChat?.(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
-                  >
-                    <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm font-medium">Message</div>
-                      <div className="text-xs text-muted">Teammates, departments or everyone</div>
-                    </div>
-                  </button>}
-
-                  {onCreateFlowUpdate && <button
-                    onClick={() => { onCreateFlowUpdate(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
+                    onClick={() => { onCreateInternalChat(); setShowCreateMenu(false); setMobileMenuOpen(false); }}
+                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="text-sm font-medium">Activity update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                    <div><div className="font-medium">Flow</div><div className="text-xs text-muted">Messages, activities and updates</div></div>
                   </button>}
 
                   <button
