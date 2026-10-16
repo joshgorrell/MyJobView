@@ -545,8 +545,23 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
         throw new Error('Enter a full name and valid email.');
       if (!formData.username.trim()) throw new Error('Enter a username on Profile before saving.');
-      if (isEmployee && (!employeeForm.hire_date || !employeeForm.pay_schedule_id))
-        throw new Error('Employees require a hire date and pay schedule.');
+      // Existing incomplete payroll records must not block unrelated profile or permission edits.
+      // Never silently discard an attempted payroll change: require the missing setup first.
+      const payrollIncomplete = isEmployee && (!employeeForm.hire_date || !employeeForm.pay_schedule_id);
+      const payrollEdited = isEmployee && (
+        (employeeRecord && (
+          employeeForm.hire_date !== (employeeRecord.hire_date || '') ||
+          employeeForm.employment_status !== employeeRecord.employment_status ||
+          employeeForm.employee_number !== (employeeRecord.employee_number || '') ||
+          employeeForm.termination_date !== (employeeRecord.termination_date || '') ||
+          (currentConfig !== null && checkConfigChanged(employeeForm))
+        )) ||
+        (!employeeRecord && showEmployeeSetup)
+      );
+      if (payrollIncomplete && payrollEdited) {
+        setActiveTab('pay');
+        throw new Error('Complete the hire date and pay schedule before saving payroll changes. Other user settings can be saved without changing payroll.');
+      }
       if (isEmployee && employeeForm.expected_weekly_hours !== '' &&
         (!Number.isFinite(Number(employeeForm.expected_weekly_hours)) || Number(employeeForm.expected_weekly_hours) < 0))
         throw new Error('Expected weekly hours must be a non-negative number on Pay & Time.');
@@ -654,7 +669,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         data: { user: currentUser2 },
       } = await supabase.auth.getUser();
 
-      if (isEmployee && employeeRecord) {
+      if (isEmployee && employeeRecord && !payrollIncomplete) {
         const { error: rpcError } = await supabase.rpc('update_employee_and_config', {
           p_user_id: user.id,
           p_hire_date: employeeForm.hire_date,
