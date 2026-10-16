@@ -29,15 +29,15 @@ CREATE POLICY sales_compensation_select ON sales_compensation_arrangements FOR S
 -- Only administrators may change pay arrangements; tenant isolation is required for every write.
 CREATE POLICY sales_compensation_insert ON sales_compensation_arrangements FOR INSERT TO authenticated
   WITH CHECK (organization_id = get_user_org_id() AND EXISTS
-    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = organization_id));
+    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = sales_compensation_arrangements.organization_id));
 CREATE POLICY sales_compensation_update ON sales_compensation_arrangements FOR UPDATE TO authenticated
   USING (organization_id = get_user_org_id() AND EXISTS
-    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = organization_id))
+    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = sales_compensation_arrangements.organization_id))
   WITH CHECK (organization_id = get_user_org_id() AND EXISTS
-    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = organization_id));
+    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = sales_compensation_arrangements.organization_id));
 CREATE POLICY sales_compensation_delete ON sales_compensation_arrangements FOR DELETE TO authenticated
   USING (organization_id = get_user_org_id() AND EXISTS
-    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = organization_id));
+    (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.organization_id = sales_compensation_arrangements.organization_id));
 -- Guard against historical date-range overlaps, including closed records.
 CREATE OR REPLACE FUNCTION prevent_sales_compensation_overlap() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -52,6 +52,17 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+-- Serialize arrangement writes per employee to avoid concurrent inserts racing the overlap check.
+CREATE OR REPLACE FUNCTION lock_sales_compensation_employee() RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  PERFORM 1 FROM employees WHERE id = NEW.employee_id FOR UPDATE;
+  RETURN NEW;
+END;
+$;
+CREATE TRIGGER sales_compensation_employee_lock
+  BEFORE INSERT OR UPDATE ON sales_compensation_arrangements
+  FOR EACH ROW EXECUTE FUNCTION lock_sales_compensation_employee();
+
 CREATE TRIGGER sales_compensation_no_overlap
   BEFORE INSERT OR UPDATE ON sales_compensation_arrangements
   FOR EACH ROW EXECUTE FUNCTION prevent_sales_compensation_overlap();
