@@ -685,7 +685,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
@@ -914,26 +914,31 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
       )}
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-        {[
-          ...(tasks.length ? [{ icon: CheckSquare, label: 'Internal Tasks', value: `${completedTasks}/${tasks.length}`, color: 'text-blue-600' }] : []),
-          { icon: Clock, label: 'Hours', value: `${totalTimeHours.toFixed(2)}h`, color: 'text-slate-600' },
-          { icon: Package, label: 'Parts Used', value: partsUsed.length, color: 'text-green-600' },
-          { icon: Wrench, label: 'Part Requests', value: partRequests.length, sub: pendingParts > 0 ? `${pendingParts} pending` : undefined, color: 'text-orange-600' },
-          { icon: Camera, label: 'Photos', value: jobPhotos.length, color: 'text-purple-600' },
-          { icon: Calendar, label: 'Due', value: workOrder.target_completion_date ? new Date(workOrder.target_completion_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD', color: 'text-gray-600' },
-        ].map(({ icon: Icon, label, value, sub, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className={`flex items-center gap-1.5 text-xs text-gray-500 mb-1`}>
-              <Icon className={`w-3.5 h-3.5 ${color}`} />
-              {label}
-            </div>
-            <div className="text-lg font-bold text-gray-900">{value}</div>
-            {sub && <div className="text-xs text-orange-500 mt-0.5">{sub}</div>}
-          </div>
-        ))}
-      </div>
+      {/* Work instructions and the actual visit checklist are the primary work-order content. */}
+      <section className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-900">Work Requested</h2>
+        {editing ? (
+          <textarea
+            value={editedWorkOrder.description || ''}
+            onChange={(event) => setEditedWorkOrder({ ...editedWorkOrder, description: event.target.value })}
+            rows={4}
+            className="w-full rounded-lg border border-gray-300 p-2 text-sm"
+          />
+        ) : (
+          <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
+        )}
+        <div className="border-t border-gray-100 pt-3 space-y-3">
+          <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
+          <WorkOrderTasksChecklist
+            workOrderId={workOrderId}
+            projectId={workOrder.project_id ?? undefined}
+            laborPhaseId={workOrder.labor_phase_id}
+            workOrderGroupId={workOrder.work_order_group_id}
+            isGroupWorkOrder={workOrder.is_group_work_order}
+            currentUserId={profile?.id || ''}
+          />
+        </div>
+      </section>
 
       {/* Tabs */}
       <div className="border-b border-gray-200 overflow-x-auto">
@@ -1332,16 +1337,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
               <h3 className="font-semibold text-gray-900 mb-2">Scope / Description</h3>
               <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
             </section>
-            <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
-            <WorkOrderTasksChecklist
-              workOrderId={workOrderId}
-              projectId={workOrder.project_id ?? undefined}
-              laborPhaseId={workOrder.labor_phase_id}
-              workOrderGroupId={workOrder.work_order_group_id}
-              isGroupWorkOrder={workOrder.is_group_work_order}
-              currentUserId={profile?.id || ''}
-            />
-
             {!workOrder.project_id && canEdit && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Manage Internal Tasks</h3>
