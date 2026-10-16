@@ -18,7 +18,7 @@ BEGIN
   END IF;
   IF p_arrangement_type = 'base_plus_commission' AND
      (p_base_amount_cents IS NULL OR p_base_amount_cents <= 0 OR
-      p_base_frequency NOT IN ('weekly', 'biweekly', 'semimonthly', 'monthly')) THEN
+      (p_base_frequency IS NULL OR p_base_frequency NOT IN ('weekly', 'biweekly', 'semimonthly', 'monthly'))) THEN
     RAISE EXCEPTION 'Guaranteed base amount and pay frequency are required';
   END IF;
   SELECT * INTO v_employee FROM employees WHERE id = p_employee_id FOR UPDATE;
