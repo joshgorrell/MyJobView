@@ -269,8 +269,8 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <CheckSquare className="w-4 h-4 text-cyan-400" />
                     <div>
-                      <div className="font-medium">New Task</div>
-                      <div className="text-xs text-muted">Create a task or reminder</div>
+                      <div className="font-medium">New Assignment</div>
+                      <div className="text-xs text-muted">Assign a follow-up or reminder</div>
                     </div>
                   </button>
 
@@ -487,8 +487,8 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <CheckSquare className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium">New Task</div>
-                      <div className="text-xs text-muted">Create a task or reminder</div>
+                      <div className="text-sm font-medium">New Assignment</div>
+                      <div className="text-xs text-muted">Assign a follow-up or reminder</div>
                     </div>
                   </button>
 
