@@ -574,7 +574,11 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (!formData.username.trim()) throw new Error('Enter a username on Profile before saving.');
       // Existing incomplete payroll records must not block unrelated profile or permission edits.
       // Never silently discard an attempted payroll change: require the missing setup first.
-      const salesArrangementChanged = JSON.stringify(salesCompensation) !== JSON.stringify(savedSalesCompensation);
+      const salesArrangementChanged = salesCompensation.arrangement !== savedSalesCompensation.arrangement ||
+        (salesCompensation.arrangement === 'base_plus_commission' && (
+          Number(salesCompensation.baseAmount) !== Number(savedSalesCompensation.baseAmount) ||
+          salesCompensation.baseFrequency !== savedSalesCompensation.baseFrequency
+        ));
       if (salesArrangementChanged && validateSalesCompensation(salesCompensation)) {
         setActiveTab('pay');
         throw new Error(validateSalesCompensation(salesCompensation)!);
