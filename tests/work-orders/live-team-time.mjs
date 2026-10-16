@@ -13,7 +13,7 @@ for (const [label, pattern] of [
   ['active and completed totals separated', /completedTimeHours \+ activeTimeHours/],
   ['rejected time excluded', /'rejected', 'cancelled'/],
   ['break deduction', /Number\(entry\.break_minutes \|\| 0\) \/ 60/],
-  ['linked visits included', /\.\.\.linkedWorkOrders\.map\(order => order\.id\)/],
+  ['linked visits resolved from database', /\.eq\('work_order_group_id', workOrder\.work_order_group_id\)/],
   ['timer refresh cleanup', /clearInterval\(tick\); window\.clearInterval\(poll\)/],
   ['refresh on browser focus', /window\.addEventListener\('focus', onFocus\)/],
   ['refresh after reconnect', /window\.addEventListener\('online', onOnline\)/],
