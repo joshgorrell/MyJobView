@@ -11,6 +11,7 @@ assert.match(migration, /base_plus_commission/);
 assert.match(migration, /commission_only/);
 assert.match(migration, /base_amount_cents > 0/);
 assert.match(migration, /sales_compensation_no_overlap/);
+assert.match(migration, /AS \$lock\$[\s\S]*?\$lock\$;/);
 assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
 assert.match(migration, /p\.role = 'admin'/);
 assert.doesNotMatch(migration, /recoverable_draw|nonrecoverable_draw/);
