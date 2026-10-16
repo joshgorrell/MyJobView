@@ -202,7 +202,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const validTabs = ['overview','vip','notes','tasks','materials','time','parts','photos','completion','history','flow'] as const;
   type WorkOrderTab = typeof validTabs[number];
   const requestedTab = new URLSearchParams(window.location.search).get('subtab') as WorkOrderTab | null;
-  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'tasks');
+  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'overview');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -704,10 +704,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                 className="text-xl font-bold text-gray-900 px-2 py-1 border border-gray-300 rounded-lg w-full"
               />
             ) : (
-              <h1 className="text-xl font-bold text-gray-900 leading-tight">{workOrder.title}</h1>
+              <div className="min-w-0"><h1 className="text-xl font-bold text-gray-900 leading-tight">{workOrder.contact?.company_name || workOrder.contact?.full_name || workOrder.title}</h1><p className="text-sm text-gray-600 truncate">{workOrder.title}</p></div>
             )}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className="text-sm font-mono text-gray-500">{workOrder.work_order_number}</span>
+              <span className="text-xs font-mono text-gray-400">{workOrder.work_order_number}</span>
               {workOrder.project && (
                 <>
                   <span className="text-gray-300">•</span>
