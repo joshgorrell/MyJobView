@@ -1001,7 +1001,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
         {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist key={`${workOrderId}-${vipRefreshKey}`} workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} onAddSalesLeadPhoto={() => { setPhotoContext('vip_sales_lead'); setShowPhotoCapture(true); }} onCreateFollowUpTask={(finding) => { setVipFollowUpFinding({id:finding.id,description:finding.description}); setShowCreateTaskModal(true); }} />}
@@ -1331,39 +1331,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                 )}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Tasks */}
-        {activeTab === 'tasks' && (
-          <div className="space-y-6">
-            <section aria-label="Visit location" className="border border-subtle bg-surface rounded-xl p-4 space-y-2">
-              <h2 className="font-semibold text-primary">Where am I going?</h2>
-              <p className="font-medium text-primary break-words">{workOrder.contact?.full_name || workOrder.contact?.company_name || 'Customer'}</p>
-              {(() => {
-                const address = [workOrder.service_location_address || workOrder.address || workOrder.contact?.street_address,
-                  workOrder.service_location_city || workOrder.contact?.city, workOrder.service_location_state || workOrder.contact?.state,
-                  workOrder.service_location_zip || workOrder.contact?.zip_code].filter(Boolean).join(', ');
-                return address ? <><p className="text-sm text-secondary break-words">{address}</p><a className="inline-flex items-center gap-2 min-h-11 text-blue-600" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer"><Navigation className="w-4 h-4" />Directions</a></> : <p className="text-sm text-amber-700">No visit address recorded.</p>;
-              })()}
-              <p className="text-sm text-secondary">{(workOrder.scheduled_date || workOrder.start_date)?.split('T')[0] || 'Date not set'} · {workOrder.scheduled_start_time?.slice(0, 5) || 'Time not set'}{workOrder.scheduled_end_time ? `–${workOrder.scheduled_end_time.slice(0, 5)}` : ''}</p>
-              <p className="text-sm text-secondary break-words">Technician: {workOrder.technician?.full_name || 'Unassigned'}{linkedWorkOrders.length > 0 ? ` · Also assigned: ${linkedWorkOrders.map(order => order.technician?.full_name).filter(Boolean).join(', ')}` : ''}</p>
-            </section>
-            <section className="border border-blue-200 bg-blue-50 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Scope / Description</h3>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
-            </section>
-            {!workOrder.project_id && canEdit && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Manage Internal Tasks</h3>
-                <ServiceWorkOrderTaskManager
-                  workOrderId={workOrderId}
-                  workOrderGroupId={workOrder.work_order_group_id || undefined}
-                  isGroupWorkOrder={workOrder.is_group_work_order}
-                  onTasksChange={loadWorkOrderData}
-                />
-              </div>
-            )}
           </div>
         )}
 
