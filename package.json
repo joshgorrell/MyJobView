@@ -26,6 +26,7 @@
     "test:punchlist": "node tests/punchlist/database.mjs && node tests/punchlist/dashboard-runtime.mjs && node tests/punchlist/detail-actions.mjs",
     "test:punchlist:browser": "npm run build && node tests/punchlist/dashboard-browser.mjs",
     "test:work-orders": "node tests/work-orders/deployment-contract.mjs && node tests/work-orders/complete-scheduling-database.mjs && node tests/work-orders/modal-runtime.mjs && node tests/work-orders/scheduling-runtime.mjs && node tests/work-orders/notes-polish-runtime.mjs",
+    "test:work-orders:live-time": "node tests/work-orders/live-team-time.mjs",
     "test:work-orders:notes:browser": "node tests/work-orders/notes-polish-browser.mjs",
     "test:vip-plans": "node tests/vip-plans/flow.mjs",
     "test:program-access": "node tests/program-access/database.mjs && node tests/program-access/invite-email.mjs",
