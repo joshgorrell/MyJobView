@@ -9,7 +9,7 @@ import Flow from '../Flow/Flow';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Archive, ArchiveRestore, Link, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartRequestForm } from './PartRequestForm';
@@ -737,7 +737,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const completedTimeHours = validTimeEntries.filter(t => t.clock_out).reduce((sum, t) => sum + Number(t.total_hours || 0), 0);
   const activeTimeHours = activeTimeEntries.reduce((sum, entry) => sum + elapsedHours(entry), 0);
   const totalTimeHours = completedTimeHours + activeTimeHours;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const pendingParts = partRequests.filter(p => p.status === 'pending').length;
   const canComplete = workOrder.status !== 'completed' && isAssignedTech && !jobCompletion;
 
