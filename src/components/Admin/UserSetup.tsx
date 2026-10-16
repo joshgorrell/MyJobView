@@ -92,12 +92,14 @@ export function UserSetupTabs({
   reviewed,
   guided = false,
   issues = {},
+  requiredSections = [],
 }: {
   active: Section | 'review';
   onSelect: (section: Section | 'review') => void;
   reviewed: string[];
   guided?: boolean;
   issues?: Partial<Record<Section | 'review', string>>;
+  requiredSections?: Section[];
 }) {
   return (
     <div className="flex-shrink-0">
@@ -112,7 +114,11 @@ export function UserSetupTabs({
             className={`min-h-11 shrink-0 px-3 py-2 text-xs sm:text-sm border-b-2 ${active === s.key ? 'text-cyan-300 border-cyan-400 bg-gray-800' : 'text-gray-300 border-transparent'}`}
           >
             <span className="inline-flex items-center gap-2 whitespace-nowrap">
-              {issues[s.key] ? <span className="text-red-400 font-bold" aria-label="Required information missing">✕</span> : null}
+              {s.key !== 'review' && requiredSections.includes(s.key) && (
+                issues[s.key]
+                  ? <span className="text-red-400 font-bold" aria-label="Required information missing">✕</span>
+                  : <span className="text-green-400 font-bold" aria-label="Required information complete">✓</span>
+              )}
               {s.label}
             </span>
             {guided && s.key !== 'review' && (
