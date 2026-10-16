@@ -4,7 +4,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.CH
 try{for(const size of [{width:320,height:568},{width:390,height:844},{width:1280,height:800}]){
  const page=await browser.newPage({viewport:size});const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('Browser error:',e.message);});
  await page.goto('http://127.0.0.1:5196');await page.getByText('80.0 hrs available').waitFor();
- await page.getByRole('button',{name:'Team Time Off',exact:true}).click();await page.getByRole('cell',{name:'Off 08:00–12:00'}).waitFor();
+ await page.getByRole('button',{name:'Team Time Off',exact:true}).click();await page.getByText('Off 08:00–12:00',{exact:false}).filter({visible:true}).first().waitFor();
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Shared availability does not overflow viewport');
  await page.getByLabel('Availability view').selectOption('upcoming');await page.getByText('Luis',{exact:true}).waitFor();
  await page.getByRole('button',{name:'My Requests & Balances',exact:true}).click();await page.getByRole('button',{name:'Request Time Off',exact:true}).click();

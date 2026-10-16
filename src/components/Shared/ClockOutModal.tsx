@@ -1,7 +1,11 @@
+import { createPortal } from 'react-dom';
+import { useCompletion } from '../../hooks/useCompletion';
+import { CompletionDialog } from './CompletionDialog';
 import { notify } from '../../lib/feedback';
+import { gpsTrackingService } from '../../lib/gpsTracking';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { offlineSupabaseUpdate } from '../../lib/offlineSupport';
@@ -17,6 +21,9 @@ interface ClockOutModalProps {
 }
 
 export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowCompletion=true, onClose, onSuccess }: ClockOutModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const completion = useCompletion(onSuccess);
+  useEffect(() => { const previous = document.activeElement as HTMLElement | null; dialogRef.current?.focus(); return () => { previous?.focus(); }; }, []);
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
@@ -77,6 +84,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
   }
 
   async function handleClockOut() {
+    if (uploading || completion.completed) return;
     // Enforce minimum 20 characters for job clock out
     if (type === 'job' && noteChars < 20) {
       setError('Job notes must be at least 20 characters. Please describe what work was completed.');
@@ -87,6 +95,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
     setError(null);
 
     try {
+      const capture = gpsTrackingService.captureLocationForClockEvent(true);
       // 1. Update the clock entry immediately (non-blocking)
       const tableName = type === 'daily' ? 'daily_clock_entries' : 'time_entries';
       const updateData: any = {
@@ -116,7 +125,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
       );
 
       if (updateError) throw updateError;
-      void saveClockEventGps(entryId, type === 'daily' ? 'daily_clock_entries' : 'time_entries', true)
+      void saveClockEventGps(entryId, type === 'daily' ? 'daily_clock_entries' : 'time_entries', true, capture)
         .catch(error => console.error('Clock-out GPS could not be saved:', error));
 
       // 1.5. Update work order status to completed if marked complete
@@ -216,8 +225,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
         notify('You clocked out offline. Your data will sync when you reconnect. Photos will be uploaded when online.', { theme: 'blue', tone: 'info' });
       }
 
-      onSuccess();
-      onClose();
+      completion.complete();
     } catch (err: any) {
       console.error('Error clocking out:', err);
       setError(err.message || 'Failed to clock out');
@@ -247,9 +255,18 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
     });
   }
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+  if (completion.completed) return createPortal(<CompletionDialog title={type === 'daily' ? 'Day complete. You’re clocked out!' : 'Job time saved!'} theme="emerald" onContinue={completion.finish} />, document.body);
+  return createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[70]">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={type === 'daily' ? 'Clock out for the day' : 'Stop job time'} onKeyDown={e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!uploading) onClose(); }
+        if (e.key === 'Tab') {
+          const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input,textarea,select') || []).filter(el => el.getClientRects().length);
+          const first = controls[0], last = controls[controls.length - 1];
+          if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { e.preventDefault(); last?.focus(); }
+          else if (!e.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { e.preventDefault(); first?.focus(); }
+        }
+      }} className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90dvh] overflow-y-auto outline-none">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
@@ -514,5 +531,5 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
