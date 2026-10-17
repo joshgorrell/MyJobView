@@ -367,7 +367,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             {/* Task Title */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
-                Task Title <span className="text-red-400">*</span>
+                Assignment Title <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -608,7 +608,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               disabled={loading}
               className="flex-1 px-4 py-3 bg-gradient-to-r from-sky-600 to-blue-700 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm disabled:opacity-50"
             >
-              {loading ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
+              {loading ? 'Saving...' : supportMode ? 'Create Support Request' : task ? 'Update Assignment' : 'Create Assignment'}
             </button>
           </div>
         </form>
