@@ -44,8 +44,8 @@ fillWithAI({priority:'critical'}); assert.equal(priority(),'normal','Unknown AI 
 fillWithAI({priority:'urgent'}); assert.equal(priority(),'urgent','Supported AI priority is applied');
 fillWithAI({priority:'high'}); assert.equal(priority(),'urgent','Invalid AI values cannot replace a chosen priority');
 const change=(label,value)=>{nodes(tree).find(n=>n.props?.['aria-label']===label).props.onChange({target:{value}});render();};
-change('Billing type','warranty');change('Warranty reference','Project 101');change('Warranty reason','Return visit');change('Customer contact responsibility','requester');change('Earliest date','2026-10-08');
-const needBy=nodes(tree).find(n=>n.type==='input'&&n.props.type==='date'&&!n.props['aria-label']);needBy.props.onChange({target:{value:'2026-10-10'}});render();
+change('Billing type','warranty');change('Warranty reference','Project 101');change('Warranty reason','Return visit');change('Customer contact responsibility','requester');nodes(tree).find(n=>n.type==='input'&&n.props.name==='request-scheduling'&&!n.props.checked).props.onChange();render();change('Earliest date','2026-10-08');
+const needBy=nodes(tree).find(n=>n.type==='input'&&n.props['aria-label']==='Need by');needBy.props.onChange({target:{value:'2026-10-10'}});render();
 await nodes(tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
 const request=calls.find(c=>c[0]==='service_requests')[1];assert.equal(request.earliest_date,'2026-10-08');assert.equal(request.requested_date,'2026-10-10');assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.warranty_reference,'Project 101');assert.equal(request.warranty_notes,'Return visit');assert.equal(request.job_location_address,'');assert.equal(request.billable_by,'assigned_sales_rep');assert.equal(request.priority,'urgent');
 console.log('Fast intake submits without mandatory address and preserves scheduling/warranty context.');
