@@ -176,7 +176,7 @@ export function QuickActionModal({
           aria-labelledby={titleId}
           aria-describedby={subtitle ? subtitleId : undefined}
           tabIndex={-1}
-          style={{ maxHeight: 'min(var(--qam-max-height), 100%)' }}
+          style={{ maxHeight: viewport ? `min(var(--qam-max-height), ${viewport.height}px)` : 'var(--qam-max-height)' }}
           onKeyDown={event => {
             if (event.defaultPrevented || (event.target as Element).closest('[role="dialog"]') !== dialogRef.current) return;
             if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
@@ -257,7 +257,7 @@ export function QuickActionModal({
           <div
             ref={scrollRef}
             {...(showSuccess ? { inert: '' } : {})}
-            className={`qam-body qam-safe-bottom flex flex-col flex-1 min-h-0 min-w-0 ${scrollBody ? 'qam-scroll overflow-y-auto' : 'overflow-hidden'}`}
+            className={`qam-body qam-safe-bottom flex flex-col min-h-0 min-w-0 ${scrollBody ? 'qam-scroll overflow-y-auto' : 'flex-1 overflow-hidden'}`}
           >
             {children}
           </div>
